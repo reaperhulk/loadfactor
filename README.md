@@ -30,8 +30,9 @@ npm run dev     # then open http://localhost:5173
   cheap seats or yield with premium service, and fight rivals for share.
 - **Survive**: quarterly interest, fuel indexes, recessions, and events with
   era flavor. Bankruptcy is two bad quarters away.
-- **Win**: hit the scenario objective (net worth, market share) before the
-  final quarter.
+- **Win**: the scenario is a race over a fixed window — finish the final
+  quarter #1 among the airlines on the scenario metric (net worth, market
+  share) while clearing its qualifying floor.
 
 ## Testing
 

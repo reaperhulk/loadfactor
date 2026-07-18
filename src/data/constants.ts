@@ -40,6 +40,9 @@ export const WEEKS_PER_QUARTER = 13
 // Minutes of weekly block time one airframe can fly.
 export const WEEKLY_BLOCK_MINUTES = 6000
 export const MIN_ROUTE_KM = 300
+// Bot/rival policies refuse routes shorter than this: the ground-competition
+// demand band makes them traps (players may still open them).
+export const AI_MIN_ROUTE_KM = 800
 // Landing + handling fee per leg = FEE_BASE + seats * FEE_PER_SEAT ($).
 export const LANDING_FEE_BASE = 300
 export const LANDING_FEE_PER_SEAT = 3

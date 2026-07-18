@@ -17,7 +17,8 @@ export interface Scenario {
   quarters: number
   player: AirlineSetup
   rivals: readonly AirlineSetup[]
-  // Objective: reach the target net worth ($k) before the final quarter.
+  // Scored when the final quarter resolves: the player wins by finishing #1
+  // in net worth among the airlines AND clearing this qualifying floor ($k).
   targetNetWorth: number
 }
 
@@ -27,7 +28,8 @@ export const SCENARIOS: readonly Scenario[] = [
     name: 'The Jet Age',
     description:
       'New York, 1960. The jets are here, the Atlantic is the prize, and two ' +
-      'rivals are racing you for every slot. Build a $300M airline by 1980.',
+      'rivals are racing you for every slot. Finish 1980 as the #1 airline by ' +
+      'net worth — and be worth at least $300M.',
     startYear: 1960,
     quarters: 80,
     player: {
@@ -44,7 +46,9 @@ export const SCENARIOS: readonly Scenario[] = [
         hq: 'LHR',
         cash: 18000,
         hqSlots: 8,
-        extraSlots: { CDG: 4, FRA: 2, AMS: 2 },
+        // Footholds at medium-haul distances — LHR-CDG/AMS sit in the
+        // ground-competition demand band and would starve the AI.
+        extraSlots: { FRA: 2, MAD: 2, FCO: 2 },
         starterFleet: ['meridian80', 'meridian80'],
       },
       {

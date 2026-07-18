@@ -133,18 +133,36 @@ export function endQuarter(prev: GameState): EngineResult {
     }
   }
 
-  // Victory / defeat, then advance the clock.
+  // Victory / defeat, then advance the clock. The scenario is a race over a
+  // fixed window (PLAN.md §2.4): bankruptcy loses at any time, but victory is
+  // only scored when the final quarter resolves — finish #1 in net worth
+  // among the airlines AND clear the scenario's qualifying target.
   const scenario = getScenario(state.scenario)
   const player = state.airlines[0]!
   if (player.insolventQuarters >= INSOLVENCY_QUARTERS_TO_FAIL) {
     state.phase = 'lost'
     events.push({ type: 'game_over', result: 'lost', reason: 'bankruptcy' })
-  } else if (netWorth(player) >= scenario.targetNetWorth) {
-    state.phase = 'won'
-    events.push({ type: 'game_over', result: 'won', reason: 'objective reached' })
   } else if (state.turn + 1 >= scenario.quarters) {
-    state.phase = 'lost'
-    events.push({ type: 'game_over', result: 'lost', reason: 'deadline reached' })
+    const playerWorth = netWorth(player)
+    let bestRival: Airline | null = null
+    for (const rival of state.airlines) {
+      if (rival.id === 0 || rival.bankrupt) continue
+      if (bestRival === null || netWorth(rival) > netWorth(bestRival)) bestRival = rival
+    }
+    if (playerWorth < scenario.targetNetWorth) {
+      state.phase = 'lost'
+      events.push({
+        type: 'game_over',
+        result: 'lost',
+        reason: `missed the $${Math.floor(scenario.targetNetWorth / 1000)}M target`,
+      })
+    } else if (bestRival !== null && netWorth(bestRival) >= playerWorth) {
+      state.phase = 'lost'
+      events.push({ type: 'game_over', result: 'lost', reason: `outscored by ${bestRival.name}` })
+    } else {
+      state.phase = 'won'
+      events.push({ type: 'game_over', result: 'won', reason: 'finished #1 with the target met' })
+    }
   }
   state.turn++
 

@@ -1,49 +1,51 @@
 {
   "greedy-alpha": {
     "checkpointHashes": {
-      "10": "2787bc64",
-      "20": "2262ba61",
-      "30": "ac67744f"
+      "10": "d56954cb",
+      "20": "ca9d2fc2",
+      "30": "d0d5c004",
+      "40": "2bc78d3e"
     },
     "summary": {
-      "turn": 30,
-      "phase": "won",
-      "cash": 259574,
-      "netWorth": 316948,
-      "routes": 20,
-      "fleet": 12,
-      "quarterlyProfit": 32707
+      "turn": 40,
+      "phase": "planning",
+      "cash": 45344,
+      "netWorth": 52244,
+      "routes": 9,
+      "fleet": 4,
+      "quarterlyProfit": -2738
     }
   },
   "greedy-beta": {
     "checkpointHashes": {
-      "10": "03fc1e47",
-      "20": "878f4af4",
-      "30": "de940402"
+      "10": "fb091f34",
+      "20": "965f3820",
+      "30": "59f3f128",
+      "40": "1d40cce1"
     },
     "summary": {
-      "turn": 31,
-      "phase": "won",
-      "cash": 245793,
-      "netWorth": 316912,
-      "routes": 21,
-      "fleet": 12,
-      "quarterlyProfit": 42384
+      "turn": 40,
+      "phase": "planning",
+      "cash": 201406,
+      "netWorth": 249397,
+      "routes": 16,
+      "fleet": 7,
+      "quarterlyProfit": 35050
     }
   },
   "naive-alpha": {
     "checkpointHashes": {
-      "10": "a0cf7c54",
-      "20": "0bac405b"
+      "10": "95da6336",
+      "20": "5bdb8036"
     },
     "summary": {
-      "turn": 25,
+      "turn": 28,
       "phase": "lost",
-      "cash": -3817,
-      "netWorth": 3051,
+      "cash": -2184,
+      "netWorth": 4072,
       "routes": 2,
       "fleet": 2,
-      "quarterlyProfit": -1830
+      "quarterlyProfit": -2017
     }
   }
 }

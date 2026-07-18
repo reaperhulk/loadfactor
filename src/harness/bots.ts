@@ -5,7 +5,7 @@
 
 import { getAircraftType, typesOnSale } from '../data/aircraft'
 import { CITIES, distanceKm, pairKey } from '../data/cities'
-import { NEG_MIN_SPEND } from '../data/constants'
+import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
 import { pairWeeklyDemand } from '../engine/market'
 import { negotiationDifficulty } from '../engine/negotiation'
 import {
@@ -52,7 +52,25 @@ function assignmentCommands(state: GameState): Command[] {
   return commands
 }
 
-function bestUnservedPair(state: GameState): { from: string; to: string; demand: number } | null {
+// Rival airlines already flying a pair (market share must be split with them).
+function competitorsOnPair(state: GameState, a: string, b: string): number {
+  const key = pairKey(a, b)
+  let n = 0
+  for (const airline of state.airlines) {
+    if (airline.id === 0) continue
+    if (airline.routes.some((r) => pairKey(r.from, r.to) === key)) n++
+  }
+  return n
+}
+
+// Demand discounted by incumbent competition: a monopoly pair is worth far
+// more than a contested one of equal size.
+function pairScore(state: GameState, a: string, b: string): number {
+  const demand = pairWeeklyDemand(state, a, b)
+  return Math.floor((demand * 100) / (100 + 150 * competitorsOnPair(state, a, b)))
+}
+
+function bestUnservedPair(state: GameState): { from: string; to: string; score: number } | null {
   const airline = state.airlines[0]!
   // Only consider pairs some current or incoming airframe could actually fly.
   let maxRange = 0
@@ -60,16 +78,17 @@ function bestUnservedPair(state: GameState): { from: string; to: string; demand:
   for (const o of airline.orders) maxRange = Math.max(maxRange, getAircraftType(o.type).rangeKm)
   const cities = slotCities(airline)
   const served = new Set(airline.routes.map((r) => pairKey(r.from, r.to)))
-  let best: { from: string; to: string; demand: number } | null = null
+  let best: { from: string; to: string; score: number } | null = null
   for (let i = 0; i < cities.length; i++) {
     for (let j = i + 1; j < cities.length; j++) {
       const a = cities[i]!
       const b = cities[j]!
       if (served.has(pairKey(a, b))) continue
       if (slotsFree(airline, a) < 1 || slotsFree(airline, b) < 1) continue
-      if (distanceKm(a, b) > maxRange) continue
-      const demand = pairWeeklyDemand(state, a, b)
-      if (demand > (best?.demand ?? 0)) best = { from: a, to: b, demand }
+      const km = distanceKm(a, b)
+      if (km > maxRange || km < AI_MIN_ROUTE_KM) continue
+      const score = pairScore(state, a, b)
+      if (score > (best?.score ?? 0)) best = { from: a, to: b, score }
     }
   }
   return best
@@ -87,6 +106,21 @@ function naiveCommands(state: GameState): Command[] {
   return [...commands, ...assignmentCommands(state)]
 }
 
+// Yield management: monopoly-tight routes can bear higher fares; slack routes
+// buy back share with cheaper seats.
+function fareCommands(state: GameState): Command[] {
+  const commands: Command[] = []
+  for (const route of state.airlines[0]!.routes) {
+    if (route.lastCapacity === 0) continue
+    if (route.lastLoadFactorBp >= 9700 && route.fareLevel < 2) {
+      commands.push({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel + 1 })
+    } else if (route.lastLoadFactorBp < 5500 && route.fareLevel > -1) {
+      commands.push({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel - 1 })
+    }
+  }
+  return commands
+}
+
 // Greedy: expand routes, buy the biggest affordable jet, push into the best
 // new city, borrow when thin. Mirrors the rival policy minus the coin flips.
 function greedyCommands(state: GameState): Command[] {
@@ -101,7 +135,7 @@ function greedyCommands(state: GameState): Command[] {
   const idleOrIncoming =
     airline.fleet.some((a) => a.routeId === null) || airline.orders.length > 0 || airline.routes.length === 0
   const pair = bestUnservedPair(state)
-  if (idleOrIncoming && pair && pair.demand > 300) {
+  if (idleOrIncoming && pair && pair.score > 300) {
     commands.push({ type: 'open_route', from: pair.from, to: pair.to })
   }
 
@@ -126,14 +160,26 @@ function greedyCommands(state: GameState): Command[] {
   }
 
   if (airline.negotiations.length === 0 && airline.cash >= 4000) {
+    // Target the city whose best competition-discounted pair with our
+    // existing network is richest — not the biggest city on the map. Reach
+    // includes what we could buy today, since slots outlive fleets.
+    let reach = 0
+    for (const ac of airline.fleet) reach = Math.max(reach, getAircraftType(ac.type).rangeKm)
+    for (const t of typesOnSale(yearOf(state))) reach = Math.max(reach, t.rangeKm)
+    const held = slotCities(airline)
     let target: string | null = null
-    let bestMass = 0
+    let bestScore = 0
     for (const c of CITIES) {
       if ((airline.slots[c.id] ?? 0) > 0) continue
       if (slotsAllocated(state, c.id) >= c.slotPool) continue
-      const mass = c.pop * 4 + c.biz * 3 + c.tour * 2
-      if (mass > bestMass) {
-        bestMass = mass
+      let cityScore = 0
+      for (const h of held) {
+        const km = distanceKm(c.id, h)
+        if (km < AI_MIN_ROUTE_KM || km > reach) continue
+        cityScore = Math.max(cityScore, pairScore(state, c.id, h))
+      }
+      if (cityScore > bestScore) {
+        bestScore = cityScore
         target = c.id
       }
     }
@@ -145,7 +191,7 @@ function greedyCommands(state: GameState): Command[] {
     }
   }
 
-  return [...commands, ...assignmentCommands(state)]
+  return [...commands, ...fareCommands(state), ...assignmentCommands(state)]
 }
 
 export function botCommands(state: GameState, bot: BotName): Command[] {

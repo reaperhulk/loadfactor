@@ -110,9 +110,13 @@ points where precision matters).
 
 A scenario defines: era window (start year, quarters), starting city/region
 per airline, starting cash/fleet/slots, rival count and personalities,
-objective, and event-deck weights. Objectives are measurable predicates
-(e.g. "net worth ≥ $200M and ≥ 25% of global pax share by 1980"). Failure =
-objective missed at deadline or bankruptcy.
+objective, and event-deck weights. A scenario is a **race over a fixed
+window**: victory is scored only when the final quarter resolves, and the
+player must finish **#1 among the airlines on the scenario metric** (net
+worth in scenario 1) *and* clear an absolute qualifying floor (so limping
+past weak rivals is not a win). There is no early exit; bankruptcy loses at
+any time. Later scenarios can swap the metric (pax share, regional
+dominance) without changing the shape.
 
 The difficulty contract (asserted by balance tests, tuned over milestones):
 - A naive bot (opens obvious routes, never adjusts fares) should *fail* the

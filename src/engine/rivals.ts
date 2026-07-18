@@ -5,7 +5,7 @@
 
 import { typesOnSale, getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, pairKey } from '../data/cities'
-import { NEG_MIN_SPEND } from '../data/constants'
+import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
 import { applyPlanningCommand } from './commands'
 import { pairWeeklyDemand } from './market'
 import { negotiationDifficulty } from './negotiation'
@@ -74,7 +74,8 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
         const b = cities[j]!
         if (served.has(pairKey(a, b))) continue
         if (slotsFree(airline, a) < 1 || slotsFree(airline, b) < 1) continue
-        if (distanceKm(a, b) > maxRange) continue
+        const km = distanceKm(a, b)
+        if (km > maxRange || km < AI_MIN_ROUTE_KM) continue
         const demand = pairWeeklyDemand(state, a, b)
         if (demand > bestDemand) {
           bestDemand = demand
