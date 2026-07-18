@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { SCENARIOS, getScenario } from '../data/scenarios'
 import { netWorth, quarterOf, yearOf } from '../engine/queries'
 import { MapView } from './MapView'
@@ -43,12 +43,34 @@ function ScenarioSelect() {
   )
 }
 
+const TABS: readonly Tab[] = ['routes', 'fleet', 'airports', 'finance', 'report']
+
 function GameScreen() {
   const session = getSession()!
   const [tab, setTab] = useState<Tab>('routes')
+  const [selectedCity, setSelectedCity] = useState<string | null>(null)
   const state = session.state
   const player = state.airlines[0]!
   const scenario = getScenario(state.scenario)
+
+  // Keyboard shortcuts: Space/E end the quarter, 1–5 switch panels, Esc
+  // clears the map selection. Ignored while typing in a form control.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      const target = e.target as HTMLElement | null
+      if (target && ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(target.tagName)) return
+      if (e.key === ' ' || e.key === 'e' || e.key === 'E') {
+        e.preventDefault()
+        if (getSession()?.state.phase === 'planning') dispatch({ type: 'end_quarter' })
+      } else if (e.key >= '1' && e.key <= String(TABS.length)) {
+        setTab(TABS[Number(e.key) - 1]!)
+      } else if (e.key === 'Escape') {
+        setSelectedCity(null)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   return (
     <main className="game">
@@ -72,13 +94,20 @@ function GameScreen() {
           </span>
         )}
       </header>
-      <MapView state={state} />
+      <MapView state={state} selected={selectedCity} onSelect={setSelectedCity} />
       <nav className="tabs">
-        {(['routes', 'fleet', 'airports', 'finance', 'report'] as const).map((t) => (
-          <button key={t} className={tab === t ? 'active' : ''} data-testid={`tab-${t}`} onClick={() => setTab(t)}>
+        {TABS.map((t, i) => (
+          <button
+            key={t}
+            className={tab === t ? 'active' : ''}
+            data-testid={`tab-${t}`}
+            onClick={() => setTab(t)}
+            title={`shortcut: ${i + 1}`}
+          >
             {t}
           </button>
         ))}
+        <span className="key-hints">space = end quarter · 1–5 = panels · esc = deselect</span>
       </nav>
       <section className="panel">
         {tab === 'routes' && <RoutesPanel state={state} />}

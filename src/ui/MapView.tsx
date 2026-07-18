@@ -2,7 +2,6 @@
 // Click two cities to open a route. Presentation-only trig/floats are fine
 // here — the engine never sees screen coordinates.
 
-import { useState } from 'react'
 import { CITIES, getCity } from '../data/cities'
 import type { GameState } from '../engine'
 import { slotsHeld } from '../engine/queries'
@@ -19,18 +18,23 @@ function y(lat: number): number {
   return ((90 - lat) / 180) * ((H * 175) / 180) // clip Antarctica, keep aspect
 }
 
-export function MapView({ state }: { state: GameState }) {
-  const [selected, setSelected] = useState<string | null>(null)
+interface MapViewProps {
+  state: GameState
+  selected: string | null
+  onSelect: (city: string | null) => void
+}
+
+export function MapView({ state, selected, onSelect }: MapViewProps) {
   const player = state.airlines[0]!
 
   const onCityClick = (cityId: string): void => {
     if (selected === null) {
-      setSelected(cityId)
+      onSelect(cityId)
     } else if (selected === cityId) {
-      setSelected(null)
+      onSelect(null)
     } else {
       dispatch({ type: 'open_route', from: selected, to: cityId })
-      setSelected(null)
+      onSelect(null)
     }
   }
 

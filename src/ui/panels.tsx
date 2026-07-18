@@ -20,7 +20,7 @@ export function RoutesPanel({ state }: { state: GameState }) {
     return <p className="hint">No routes yet. Click two cities on the map to open one.</p>
   }
   return (
-    <table>
+    <div className="table-scroll"><table>
       <thead>
         <tr>
           <th>Route</th>
@@ -81,7 +81,7 @@ export function RoutesPanel({ state }: { state: GameState }) {
           )
         })}
       </tbody>
-    </table>
+    </table></div>
   )
 }
 
@@ -90,7 +90,7 @@ export function FleetPanel({ state }: { state: GameState }) {
   const year = yearOf(state)
   return (
     <div>
-      <table>
+      <div className="table-scroll"><table>
         <thead>
           <tr>
             <th>Aircraft</th>
@@ -137,7 +137,7 @@ export function FleetPanel({ state }: { state: GameState }) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       <h3>Order new aircraft ({year})</h3>
       <div className="shop">
         {typesOnSale(year).map((t) => (
@@ -171,7 +171,7 @@ export function AirportsPanel({ state }: { state: GameState }) {
         />{' '}
         $k
       </label>
-      <table>
+      <div className="table-scroll"><table>
         <thead>
           <tr>
             <th>City</th>
@@ -210,7 +210,7 @@ export function AirportsPanel({ state }: { state: GameState }) {
             )
           })}
         </tbody>
-      </table>
+      </table></div>
     </div>
   )
 }
@@ -231,7 +231,7 @@ export function FinancePanel({ state }: { state: GameState }) {
         $k
       </label>
       <button onClick={() => dispatch({ type: 'take_loan', amount })}>take loan</button>
-      <table>
+      <div className="table-scroll"><table>
         <tbody>
           {player.loans.map((l) => (
             <tr key={l.id}>
@@ -245,9 +245,9 @@ export function FinancePanel({ state }: { state: GameState }) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
       <h3>History</h3>
-      <table>
+      <div className="table-scroll"><table>
         <thead>
           <tr>
             <th>Q</th>
@@ -268,7 +268,7 @@ export function FinancePanel({ state }: { state: GameState }) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </div>
   )
 }

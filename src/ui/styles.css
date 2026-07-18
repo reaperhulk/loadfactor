@@ -257,3 +257,86 @@ select {
 input[type='number'] {
   width: 90px;
 }
+
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.table-scroll table {
+  white-space: nowrap;
+}
+
+.key-hints {
+  margin-left: auto;
+  color: var(--dim);
+  font-size: 0.75rem;
+  align-self: center;
+}
+
+/* Tablet and below: tighter chrome, bigger tap targets, no page-level
+   horizontal scroll — wide content scrolls inside its own container. */
+@media (max-width: 900px) {
+  .key-hints {
+    display: none;
+  }
+
+  main {
+    padding: 8px;
+  }
+
+  header {
+    gap: 10px;
+    font-size: 0.9rem;
+  }
+
+  header h1 {
+    font-size: 1.05rem;
+  }
+}
+
+@media (max-width: 600px) {
+  header {
+    font-size: 0.8rem;
+    gap: 6px 10px;
+  }
+
+  .end-quarter {
+    width: 100%;
+    margin-left: 0;
+    padding: 10px 0;
+  }
+
+  .banner {
+    margin-left: 0;
+  }
+
+  .tabs {
+    flex-wrap: wrap;
+  }
+
+  .tabs button {
+    flex: 1 1 auto;
+    padding: 8px 6px;
+  }
+
+  .panel {
+    padding: 8px;
+    border-radius: 10px;
+  }
+
+  th,
+  td {
+    padding: 4px 5px;
+    font-size: 0.82rem;
+  }
+
+  .standings {
+    gap: 6px 14px;
+    font-size: 0.78rem;
+  }
+
+  .city-label {
+    font-size: 11px;
+  }
+}
