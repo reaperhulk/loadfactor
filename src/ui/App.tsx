@@ -4,10 +4,11 @@ import { netWorth, quarterOf, yearOf } from '../engine/queries'
 import { useCountUp } from './countUp'
 import { MapView } from './MapView'
 import { AirportsPanel, FinancePanel, FleetPanel, ReportPanel, RoutesPanel } from './panels'
-import { dispatch, getSession, startGame, reset } from './session'
+import { ReplayViewer } from './ReplayViewer'
+import { dispatch, getReplay, getSession, loadSave, resumeSave, startGame, reset } from './session'
 import { subscribe } from './session'
 import { ToastStack } from './toasts'
-import type { GameState } from '../engine'
+import type { GameState, Replay } from '../engine'
 
 type Tab = 'routes' | 'fleet' | 'airports' | 'finance' | 'report'
 
@@ -15,12 +16,28 @@ function money(k: number): string {
   return k >= 1000 || k <= -1000 ? `$${(k / 1000).toFixed(1)}M` : `$${k}k`
 }
 
-function ScenarioSelect() {
+function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => void }) {
   const [seed, setSeed] = useState('')
+  const save = loadSave()
   return (
     <main className="menu">
       <h1>Load Factor</h1>
       <p className="tagline">Routes. Jets. Margins. Fill the seats.</p>
+      {save && (
+        <div className="scenario-card continue-card">
+          <h2>Saved game</h2>
+          <p className="dim">
+            {save.scenario} · seed “{save.seed}” · {save.commands.filter((c) => c.type === 'end_quarter').length}{' '}
+            quarters played
+          </p>
+          <button data-testid="continue-save" onClick={() => resumeSave()}>
+            Continue
+          </button>{' '}
+          <button data-testid="watch-save-replay" onClick={() => onWatchReplay(save)}>
+            Watch replay
+          </button>
+        </div>
+      )}
       {SCENARIOS.map((s) => (
         <div key={s.id} className="scenario-card">
           <h2>{s.name}</h2>
@@ -49,7 +66,7 @@ function ScenarioSelect() {
 const TABS: readonly Tab[] = ['routes', 'fleet', 'airports', 'finance', 'report']
 
 // Final standings, ranked — the scenario is a race, show the podium.
-function GameOverOverlay({ state }: { state: GameState }) {
+function GameOverOverlay({ state, onWatchReplay }: { state: GameState; onWatchReplay: (r: Replay) => void }) {
   const ranked = [...state.airlines].sort((a, b) => netWorth(b) - netWorth(a))
   return (
     <div className="gameover-overlay" data-testid="gameover-overlay">
@@ -64,6 +81,15 @@ function GameOverOverlay({ state }: { state: GameState }) {
             </li>
           ))}
         </ol>
+        <button
+          data-testid="watch-replay"
+          onClick={() => {
+            const replay = getReplay()
+            if (replay) onWatchReplay(replay)
+          }}
+        >
+          Watch replay
+        </button>{' '}
         <button data-testid="new-game" onClick={() => reset()}>
           New game
         </button>
@@ -72,7 +98,7 @@ function GameOverOverlay({ state }: { state: GameState }) {
   )
 }
 
-function GameScreen() {
+function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const session = getSession()!
   const [tab, setTab] = useState<Tab>('routes')
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
@@ -119,7 +145,7 @@ function GameScreen() {
           </button>
         )}
       </header>
-      {state.phase !== 'planning' && <GameOverOverlay state={state} />}
+      {state.phase !== 'planning' && <GameOverOverlay state={state} onWatchReplay={onWatchReplay} />}
       <MapView
         state={state}
         selected={selectedCity}
@@ -174,5 +200,11 @@ function GameScreen() {
 
 export function App() {
   const session = useSyncExternalStore(subscribe, getSession)
-  return session ? <GameScreen /> : <ScenarioSelect />
+  const [replay, setReplay] = useState<Replay | null>(null)
+  if (replay) return <ReplayViewer replay={replay} onExit={() => setReplay(null)} />
+  return session ? (
+    <GameScreen onWatchReplay={setReplay} />
+  ) : (
+    <ScenarioSelect onWatchReplay={setReplay} />
+  )
 }

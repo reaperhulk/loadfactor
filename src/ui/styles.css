@@ -372,6 +372,32 @@ td {
   line-height: 1.7;
 }
 
+.replay-badge {
+  background: #ffd166;
+  color: #06101f;
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.replay-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.replay-controls input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.continue-card {
+  border: 1px solid var(--accent);
+}
+
 .standings {
   display: flex;
   gap: 18px;

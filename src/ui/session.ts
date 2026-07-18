@@ -3,13 +3,88 @@
 // notifies subscribers after every engine call. Commands are the only write
 // path — the UI never mutates state.
 
-import { applyCommand, newGame, type Command, type GameEvent, type GameState, type Replay } from '../engine'
+import {
+  applyCommand,
+  newGame,
+  runReplay,
+  type Command,
+  type GameEvent,
+  type GameState,
+  type Replay,
+} from '../engine'
+import { getScenario } from '../data/scenarios'
 
 export interface Session {
   state: GameState
   lastEvents: GameEvent[] // events from the most recent engine call
   reportEvents: GameEvent[] // events from the most recent end_quarter
   commandLog: Command[]
+}
+
+// A save IS a replay: (scenario, seed, command log). Determinism does the rest.
+const SAVE_KEY = 'loadfactor:save:v1'
+
+interface SaveV1 extends Replay {
+  version: 1
+}
+
+function persist(): void {
+  if (!session) return
+  const save: SaveV1 = {
+    version: 1,
+    scenario: session.state.scenario,
+    seed: session.state.seed,
+    commands: session.commandLog,
+  }
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(save))
+  } catch {
+    // Storage may be full or unavailable (private mode) — play on without saves.
+  }
+}
+
+export function loadSave(): SaveV1 | null {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY)
+    if (!raw) return null
+    const save = JSON.parse(raw) as SaveV1
+    if (save.version !== 1 || typeof save.seed !== 'string' || !Array.isArray(save.commands)) return null
+    getScenario(save.scenario) // throws on unknown scenario
+    return save
+  } catch {
+    return null
+  }
+}
+
+export function clearSave(): void {
+  try {
+    localStorage.removeItem(SAVE_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+// Rebuild a session from a save by replaying it through the engine.
+export function resumeSave(): boolean {
+  const save = loadSave()
+  if (!save) return false
+  const { state } = runReplay(save)
+  // Recover the last quarter's report so the Report panel isn't empty on resume.
+  let lastEnd = -1
+  for (let i = save.commands.length - 1; i >= 0; i--) {
+    if (save.commands[i]!.type === 'end_quarter') {
+      lastEnd = i
+      break
+    }
+  }
+  let reportEvents: GameEvent[] = []
+  if (lastEnd >= 0) {
+    const upTo = runReplay({ ...save, commands: save.commands.slice(0, lastEnd) })
+    reportEvents = applyCommand(upTo.state, { type: 'end_quarter' }).events
+  }
+  session = { state, lastEvents: [], reportEvents, commandLog: [...save.commands] }
+  notify()
+  return true
 }
 
 type Listener = () => void
@@ -37,6 +112,7 @@ export function startGame(scenarioId: string, seed: string): void {
     reportEvents: [],
     commandLog: [],
   }
+  persist()
   notify()
 }
 
@@ -49,6 +125,7 @@ export function dispatch(command: Command): GameEvent[] {
     reportEvents: command.type === 'end_quarter' ? events : session.reportEvents,
     commandLog: [...session.commandLog, command],
   }
+  persist()
   notify()
   return events
 }
@@ -64,5 +141,6 @@ export function getReplay(): Replay | null {
 
 export function reset(): void {
   session = null
+  clearSave()
   notify()
 }
