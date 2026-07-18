@@ -1,0 +1,26 @@
+# The deep build-fuzz hunt, on a schedule. CI runs a light sweep on every
+# push; this job runs the real evolutionary search weekly so a curve-breaking
+# build can't hide between manual hunts. A red run means a genome printed past
+# the runaway cap — reproduce locally with the logged genome and options
+# (the search is fully deterministic), fix the curve, and pin the genome.
+name: Deep fuzz
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run fuzz:builds

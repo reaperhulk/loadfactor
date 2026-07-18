@@ -16,16 +16,18 @@ interface Golden {
   summary: ReturnType<typeof runCareer>['summary']
 }
 
-const CAREERS: readonly { name: string; seed: string; bot: BotName; quarters: number }[] = [
-  { name: 'greedy-alpha', seed: 'alpha', bot: 'greedy', quarters: 40 },
-  { name: 'greedy-beta', seed: 'beta', bot: 'greedy', quarters: 40 },
-  { name: 'naive-alpha', seed: 'alpha', bot: 'naive', quarters: 40 },
+const CAREERS: readonly { name: string; scenario: string; seed: string; bot: BotName; quarters: number }[] = [
+  { name: 'greedy-alpha', scenario: 'jet_age', seed: 'alpha', bot: 'greedy', quarters: 40 },
+  { name: 'greedy-beta', scenario: 'jet_age', seed: 'beta', bot: 'greedy', quarters: 40 },
+  { name: 'naive-alpha', scenario: 'jet_age', seed: 'alpha', bot: 'naive', quarters: 40 },
+  { name: 'oil-crisis-greedy', scenario: 'oil_crisis', seed: 'alpha', bot: 'greedy', quarters: 40 },
+  { name: 'deregulation-greedy', scenario: 'deregulation', seed: 'alpha', bot: 'greedy', quarters: 40 },
 ]
 
 describe('golden careers', () => {
   const actual: Record<string, Golden> = {}
   for (const career of CAREERS) {
-    const result = runCareer('jet_age', career.seed, career.bot, career.quarters)
+    const result = runCareer(career.scenario, career.seed, career.bot, career.quarters)
     actual[career.name] = { checkpointHashes: result.checkpointHashes, summary: result.summary }
   }
 

@@ -23,7 +23,7 @@ import type { Command, GameState } from '../engine/types'
 export type BotName = 'naive' | 'greedy'
 
 // Shared: assign every idle aircraft to the route most starved for seats.
-function assignmentCommands(state: GameState): Command[] {
+export function assignmentCommands(state: GameState): Command[] {
   const airline = state.airlines[0]!
   const commands: Command[] = []
   // Track pending capacity so two idle aircraft do not pile onto one route.
@@ -55,12 +55,12 @@ function assignmentCommands(state: GameState): Command[] {
 
 // Demand discounted by incumbent competition: a monopoly pair is worth far
 // more than a contested one of equal size.
-function pairScore(state: GameState, a: string, b: string): number {
+export function pairScore(state: GameState, a: string, b: string): number {
   const demand = pairWeeklyDemand(state, a, b)
   return Math.floor((demand * 100) / (100 + 150 * airlinesOnPair(state, a, b, 0)))
 }
 
-function bestUnservedPair(state: GameState): { from: string; to: string; score: number } | null {
+export function bestUnservedPair(state: GameState): { from: string; to: string; score: number } | null {
   const airline = state.airlines[0]!
   // Only consider pairs some current or incoming airframe could actually fly.
   let maxRange = 0
@@ -98,7 +98,7 @@ function naiveCommands(state: GameState): Command[] {
 
 // Yield management: monopoly-tight routes can bear higher fares; slack routes
 // buy back share with cheaper seats.
-function fareCommands(state: GameState): Command[] {
+export function fareCommands(state: GameState): Command[] {
   const commands: Command[] = []
   for (const route of state.airlines[0]!.routes) {
     if (route.lastCapacity === 0) continue

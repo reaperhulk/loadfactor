@@ -10,6 +10,7 @@ function makeAirline(id: number, setup: AirlineSetup, controller: 'player' | 'ri
     id,
     name: setup.name,
     controller,
+    personality: controller === 'player' ? 'player' : (setup.personality ?? 'balanced'),
     hq: setup.hq,
     cash: setup.cash,
     loans: [],

@@ -4,7 +4,7 @@
 // player (PLAN.md §3.3 step 1).
 
 import { typesOnSale, getAircraftType } from '../data/aircraft'
-import { CITIES, distanceKm, pairKey } from '../data/cities'
+import { CITIES, distanceKm, getCity, pairKey } from '../data/cities'
 import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
 import { applyPlanningCommand } from './commands'
 import { pairWeeklyDemand } from './market'
@@ -25,12 +25,61 @@ function apply(state: GameState, idx: number, cmd: Command, events: GameEvent[])
   events.push(...applyPlanningCommand(state, idx, cmd).events)
 }
 
-// One rival's planning turn. Greedy policy: stay solvent, keep planes flying,
-// open the best reachable route, buy the biggest sensible jet, push into the
-// best new city. Mutates state via applyPlanningCommand only.
+// Rival archetypes (PLAN.md M3): the same policy skeleton, different dials.
+// price_war floods cheap seats, premium sells service at a markup, fortress
+// builds a dense home-region web before venturing out.
+interface Personality {
+  orderChanceBp: number // per-quarter appetite for a new airframe
+  fareLevel: number
+  serviceLevel: number
+  expandMinDemand: number // weekly-demand floor for opening a route
+  negotiateBudgetBp: number // spend as bp of city difficulty
+  homeRegionUntil: number // cities held before negotiating outside the HQ region
+}
+
+const PERSONALITIES: Record<string, Personality> = {
+  balanced: {
+    orderChanceBp: 7000,
+    fareLevel: 0,
+    serviceLevel: 2,
+    expandMinDemand: 300,
+    negotiateBudgetBp: 10000,
+    homeRegionUntil: 0,
+  },
+  price_war: {
+    orderChanceBp: 8000,
+    fareLevel: -1,
+    serviceLevel: 1,
+    expandMinDemand: 200,
+    negotiateBudgetBp: 9000,
+    homeRegionUntil: 0,
+  },
+  premium: {
+    orderChanceBp: 6000,
+    fareLevel: 1,
+    serviceLevel: 3,
+    expandMinDemand: 400,
+    negotiateBudgetBp: 11000,
+    homeRegionUntil: 0,
+  },
+  fortress: {
+    orderChanceBp: 7000,
+    fareLevel: 0,
+    serviceLevel: 2,
+    expandMinDemand: 250,
+    negotiateBudgetBp: 12000,
+    homeRegionUntil: 6,
+  },
+}
+
+// One rival's planning turn. Shared skeleton: stay solvent, keep planes
+// flying, open the best reachable route, buy jets when full, push into the
+// best new city — with the dials set by its personality. Mutates state via
+// applyPlanningCommand only.
 export function runRivalTurn(state: GameState, idx: number, events: GameEvent[]): void {
   const airline = state.airlines[idx]
   if (!airline || airline.bankrupt) return
+  const personality = PERSONALITIES[airline.personality] ?? PERSONALITIES['balanced']!
 
   // Borrow when the cash buffer is thin and there is real debt room.
   if (airline.cash < 3000) {
@@ -83,7 +132,19 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
         }
       }
     }
-    if (best && bestDemand > 300) apply(state, idx, { type: 'open_route', ...best }, events)
+    if (best && bestDemand > personality.expandMinDemand) {
+      apply(
+        state,
+        idx,
+        {
+          type: 'open_route',
+          ...best,
+          fareLevel: personality.fareLevel,
+          serviceLevel: personality.serviceLevel,
+        },
+        events,
+      )
+    }
   }
 
   // Buy at most one aircraft per quarter, and only when the network is full
@@ -97,7 +158,7 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   }
   const networkFull = lastCapacity > 0 && lastPax * 10000 >= lastCapacity * 7500
   const bootstrapping = airline.fleet.length + airline.orders.length < 4
-  const flip = chanceBp(state.rng.rivals, 7000)
+  const flip = chanceBp(state.rng.rivals, personality.orderChanceBp)
   state.rng.rivals = flip.rng
   if (flip.value && (networkFull || bootstrapping) && airline.orders.length === 0) {
     const buffer = 5000
@@ -109,13 +170,17 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
     }
   }
 
-  // Push into the most attractive city we do not hold slots at yet.
+  // Push into the most attractive city we do not hold slots at yet. A
+  // fortress builds out its home region before venturing abroad.
   if (airline.negotiations.length === 0 && airline.cash >= 4000) {
+    const homeRegion = getCity(airline.hq).region
+    const stayHome = slotCities(airline).length < personality.homeRegionUntil
     let target: string | null = null
     let bestMass = 0
     for (const c of CITIES) {
       if ((airline.slots[c.id] ?? 0) > 0) continue
       if (slotsAllocated(state, c.id) >= c.slotPool) continue
+      if (stayHome && c.region !== homeRegion) continue
       const mass = c.pop * 4 + c.biz * 3 + c.tour * 2
       if (mass > bestMass) {
         bestMass = mass
@@ -123,7 +188,8 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
       }
     }
     if (target !== null) {
-      const spend = Math.max(NEG_MIN_SPEND, Math.min(negotiationDifficulty(target), airline.cash - 3000))
+      const budget = Math.floor((negotiationDifficulty(target) * personality.negotiateBudgetBp) / 10000)
+      const spend = Math.max(NEG_MIN_SPEND, Math.min(budget, airline.cash - 3000))
       if (spend >= NEG_MIN_SPEND && spend <= airline.cash) {
         apply(state, idx, { type: 'negotiate_slots', city: target, spend }, events)
       }

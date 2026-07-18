@@ -14,6 +14,7 @@
     "gen:distances": "node tools/gen-distances.mjs",
     "gen:worldmap": "node tools/gen-worldmap.mjs",
     "goldens:update": "UPDATE_GOLDENS=1 vitest --run src/engine/__tests__/goldens.test.ts",
+    "fuzz:builds": "FUZZ_POP=16 FUZZ_GENS=5 FUZZ_SEEDS=alpha,beta,gamma FUZZ_SEARCH_SEEDS=hunt-1,hunt-2,hunt-3 vitest --run src/harness/__tests__/fuzz.test.ts",
     "test:e2e": "playwright test",
     "check": "npm run lint && npm run typecheck && npm run test:unit && npm run build"
   },

@@ -1,42 +1,42 @@
 {
   "greedy-alpha": {
     "checkpointHashes": {
-      "10": "18c8c731",
-      "20": "736ff80a",
-      "30": "97667c39",
-      "40": "8f23589c"
+      "10": "8a5360bb",
+      "20": "c611499b",
+      "30": "c835cb0b",
+      "40": "ada55238"
     },
     "summary": {
       "turn": 40,
       "phase": "planning",
-      "cash": 1357657,
-      "netWorth": 1451077,
-      "routes": 21,
-      "fleet": 17,
-      "quarterlyProfit": 48789
+      "cash": 1507237,
+      "netWorth": 1618997,
+      "routes": 24,
+      "fleet": 19,
+      "quarterlyProfit": 57899
     }
   },
   "greedy-beta": {
     "checkpointHashes": {
-      "10": "2c6e1e8d",
-      "20": "063eedc1",
-      "30": "52358949",
-      "40": "9ec54ccb"
+      "10": "1f710363",
+      "20": "39c694f7",
+      "30": "ecd5bef8",
+      "40": "6d9f49f0"
     },
     "summary": {
       "turn": 40,
       "phase": "planning",
-      "cash": 1871612,
-      "netWorth": 1968746,
+      "cash": 1775221,
+      "netWorth": 1872355,
       "routes": 27,
       "fleet": 17,
-      "quarterlyProfit": 126771
+      "quarterlyProfit": 114060
     }
   },
   "naive-alpha": {
     "checkpointHashes": {
-      "10": "efc565c3",
-      "20": "91509b12"
+      "10": "19ff37c2",
+      "20": "9f8138c8"
     },
     "summary": {
       "turn": 25,
@@ -46,6 +46,40 @@
       "routes": 2,
       "fleet": 2,
       "quarterlyProfit": -2541
+    }
+  },
+  "oil-crisis-greedy": {
+    "checkpointHashes": {
+      "10": "e5ad9bfa",
+      "20": "7078120b",
+      "30": "dc596a59",
+      "40": "2e09027e"
+    },
+    "summary": {
+      "turn": 40,
+      "phase": "planning",
+      "cash": 737200,
+      "netWorth": 809084,
+      "routes": 16,
+      "fleet": 7,
+      "quarterlyProfit": -6059
+    }
+  },
+  "deregulation-greedy": {
+    "checkpointHashes": {
+      "10": "2e0fd082",
+      "20": "f8728c82",
+      "30": "454751b9",
+      "40": "c08de53a"
+    },
+    "summary": {
+      "turn": 40,
+      "phase": "planning",
+      "cash": 1442847,
+      "netWorth": 1551327,
+      "routes": 16,
+      "fleet": 7,
+      "quarterlyProfit": 72555
     }
   }
 }

@@ -39,19 +39,19 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           </button>
         </div>
       )}
+      <label className="seed-field">
+        Seed (optional):{' '}
+        <input
+          value={seed}
+          placeholder="random each day"
+          onChange={(e) => setSeed(e.target.value)}
+          data-testid="seed-input"
+        />
+      </label>
       {SCENARIOS.map((s) => (
         <div key={s.id} className="scenario-card">
           <h2>{s.name}</h2>
           <p>{s.description}</p>
-          <label>
-            Seed (optional):{' '}
-            <input
-              value={seed}
-              placeholder="random each day"
-              onChange={(e) => setSeed(e.target.value)}
-              data-testid="seed-input"
-            />
-          </label>
           <button
             data-testid={`start-${s.id}`}
             onClick={() => startGame(s.id, seed || new Date().toISOString().slice(0, 10))}

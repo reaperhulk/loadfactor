@@ -15,6 +15,7 @@ import {
   FUEL_STEP_BP,
 } from '../data/constants'
 import { getEventDef, WORLD_EVENTS } from '../data/events'
+import { getScenario } from '../data/scenarios'
 import { yearOf } from './queries'
 import { chanceBp, nextInt } from './rng'
 import type { GameEvent, GameState, WorldState } from './types'
@@ -97,14 +98,17 @@ export function updateWorld(state: GameState): GameEvent[] {
   const roll = chanceBp(evRng, EVENT_DRAW_CHANCE_BP)
   evRng = roll.rng
   if (roll.value && eligible.length > 0) {
+    // Scenario era flavor: weight multipliers (oil_shock ×4 in Oil Crisis…).
+    const mults = getScenario(state.scenario).eventWeightMult
+    const weightOf = (id: string, weight: number): number => Math.floor(weight * (mults?.[id] ?? 1))
     let totalWeight = 0
-    for (const def of eligible) totalWeight += def.weight
+    for (const def of eligible) totalWeight += weightOf(def.id, def.weight)
     const pick = nextInt(evRng, 0, totalWeight - 1)
     evRng = pick.rng
     let acc = 0
     let chosen = eligible[0]!
     for (const def of eligible) {
-      acc += def.weight
+      acc += weightOf(def.id, def.weight)
       if (pick.value < acc) {
         chosen = def
         break

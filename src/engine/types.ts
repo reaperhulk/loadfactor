@@ -67,6 +67,7 @@ export interface Airline {
   id: number // index into GameState.airlines; 0 = player
   name: string
   controller: 'player' | 'rival'
+  personality: string // rival archetype id ('player' for the human seat)
   hq: string
   cash: number // $k
   loans: Loan[]
