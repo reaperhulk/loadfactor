@@ -1,11 +1,13 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { SCENARIOS, getScenario } from '../data/scenarios'
 import { netWorth, quarterOf, yearOf } from '../engine/queries'
+import { useCountUp } from './countUp'
 import { MapView } from './MapView'
 import { AirportsPanel, FinancePanel, FleetPanel, ReportPanel, RoutesPanel } from './panels'
 import { dispatch, getSession, startGame, reset } from './session'
 import { subscribe } from './session'
 import { ToastStack } from './toasts'
+import type { GameState } from '../engine'
 
 type Tab = 'routes' | 'fleet' | 'airports' | 'finance' | 'report'
 
@@ -46,6 +48,30 @@ function ScenarioSelect() {
 
 const TABS: readonly Tab[] = ['routes', 'fleet', 'airports', 'finance', 'report']
 
+// Final standings, ranked — the scenario is a race, show the podium.
+function GameOverOverlay({ state }: { state: GameState }) {
+  const ranked = [...state.airlines].sort((a, b) => netWorth(b) - netWorth(a))
+  return (
+    <div className="gameover-overlay" data-testid="gameover-overlay">
+      <div className="gameover-card">
+        <h2 className={state.phase === 'won' ? 'pos' : 'neg'}>
+          {state.phase === 'won' ? '🏆 VICTORY' : 'DEFEAT'}
+        </h2>
+        <ol>
+          {ranked.map((a) => (
+            <li key={a.id} className={a.id === 0 ? 'me' : ''}>
+              {a.name} — {a.bankrupt ? 'bankrupt' : money(netWorth(a))}
+            </li>
+          ))}
+        </ol>
+        <button data-testid="new-game" onClick={() => reset()}>
+          New game
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function GameScreen() {
   const session = getSession()!
   const [tab, setTab] = useState<Tab>('routes')
@@ -73,6 +99,9 @@ function GameScreen() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  const shownCash = useCountUp(player.cash)
+  const shownWorth = useCountUp(netWorth(player))
+
   return (
     <main className="game">
       <header>
@@ -80,21 +109,17 @@ function GameScreen() {
         <span data-testid="date">
           {yearOf(state)} Q{quarterOf(state)}
         </span>
-        <span data-testid="cash">Cash {money(player.cash)}</span>
+        <span data-testid="cash">Cash {money(shownCash)}</span>
         <span data-testid="networth">
-          Net worth {money(netWorth(player))} / {money(scenario.targetNetWorth)}
+          Net worth {money(shownWorth)} / {money(scenario.targetNetWorth)}
         </span>
-        {state.phase === 'planning' ? (
+        {state.phase === 'planning' && (
           <button className="end-quarter" data-testid="end-quarter" onClick={() => dispatch({ type: 'end_quarter' })}>
             End Quarter ▶
           </button>
-        ) : (
-          <span className={state.phase === 'won' ? 'banner won' : 'banner lost'} data-testid="game-over">
-            {state.phase === 'won' ? 'VICTORY' : 'DEFEAT'}
-            <button onClick={() => reset()}>new game</button>
-          </span>
         )}
       </header>
+      {state.phase !== 'planning' && <GameOverOverlay state={state} />}
       <MapView
         state={state}
         selected={selectedCity}

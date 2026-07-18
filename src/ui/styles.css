@@ -255,6 +255,86 @@ td {
   display: block;
   height: 100%;
   background: var(--accent);
+  transition: width 600ms ease-out;
+}
+
+.event-halo {
+  fill: none;
+  stroke-width: 2;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: halo-breathe 2200ms ease-in-out infinite;
+}
+
+.halo-boom {
+  stroke: #ffd166;
+}
+
+.halo-bust {
+  stroke: var(--neg);
+}
+
+@keyframes halo-breathe {
+  0%,
+  100% {
+    transform: scale(0.75);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.35;
+  }
+}
+
+.gameover-overlay {
+  position: fixed;
+  inset: 0;
+  background: #060a12cc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  animation: overlay-fade 400ms ease-out;
+}
+
+.gameover-card {
+  background: var(--panel);
+  border: 1px solid #35415d;
+  border-radius: 14px;
+  padding: 28px 40px;
+  text-align: center;
+  animation: card-land 500ms cubic-bezier(0.2, 0.9, 0.3, 1.25);
+}
+
+.gameover-card h2 {
+  font-size: 2rem;
+  margin: 0 0 12px;
+  letter-spacing: 0.08em;
+}
+
+.gameover-card ol {
+  text-align: left;
+  color: var(--dim);
+  line-height: 1.9;
+}
+
+.gameover-card .me {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+@keyframes overlay-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes card-land {
+  from {
+    transform: translateY(24px) scale(0.94);
+    opacity: 0;
+  }
 }
 
 .shop {
@@ -349,7 +429,10 @@ input[type='number'] {
 @media (prefers-reduced-motion: reduce) {
   .route-new,
   .endpoint-pulse,
-  .toast {
+  .toast,
+  .event-halo,
+  .gameover-overlay,
+  .gameover-card {
     animation: none;
   }
 
@@ -359,6 +442,10 @@ input[type='number'] {
 
   .endpoint-pulse {
     display: none;
+  }
+
+  .lf-fill {
+    transition: none;
   }
 }
 

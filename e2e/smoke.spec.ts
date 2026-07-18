@@ -72,6 +72,21 @@ test('opening a route triggers the reward animation and toast', async ({ page })
   await expect(page.getByTestId('route-line-new')).toHaveCount(0)
 })
 
+test('game over shows the ranked overlay and resets to the menu', async ({ page }) => {
+  await startGame(page)
+  // Idle airline: fixed costs bleed it into bankruptcy within the window.
+  await page.evaluate(() => {
+    for (let q = 0; q < 80 && window.__harness.getState()!.phase === 'planning'; q++) {
+      window.__harness.endQuarter()
+    }
+  })
+  await expect(page.getByTestId('gameover-overlay')).toBeVisible()
+  await expect(page.getByTestId('gameover-overlay')).toContainText('DEFEAT')
+  await expect(page.getByTestId('gameover-overlay')).toContainText('Meridian Air')
+  await page.getByTestId('new-game').click()
+  await expect(page.getByTestId('start-jet_age')).toBeVisible()
+})
+
 test('the harness replays deterministically', async ({ page }) => {
   await startGame(page)
   const first = await page.evaluate(() => {
