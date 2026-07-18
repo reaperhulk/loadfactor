@@ -122,7 +122,7 @@ function fareCommands(state: GameState): Command[] {
 }
 
 // Greedy: expand routes, buy the biggest affordable jet, push into the best
-// new city, borrow when thin. Mirrors the rival policy minus the coin flips.
+// new city, borrow when thin, prune losers, retire maintenance hogs.
 function greedyCommands(state: GameState): Command[] {
   const airline = state.airlines[0]!
   const commands: Command[] = []
@@ -132,6 +132,22 @@ function greedyCommands(state: GameState): Command[] {
     if (room >= 5000) commands.push({ type: 'take_loan', amount: Math.min(room, 8000) })
   }
 
+  // Prune routes losing >15% of their costs — deeper than demand noise (±8%)
+  // can explain, so it's structural, not a bad quarter.
+  for (const route of airline.routes) {
+    if (route.lastCapacity > 0 && route.lastRevenue * 100 < route.lastCost * 85) {
+      commands.push({ type: 'close_route', routeId: route.id })
+    }
+  }
+
+  // Fleet renewal: maintenance escalates with age, and inflation compounds
+  // it. Retire the two oldest geriatric airframes per quarter.
+  const geriatric = airline.fleet
+    .filter((a) => a.ageQuarters >= 48)
+    .sort((a, b) => b.ageQuarters - a.ageQuarters)
+    .slice(0, 2)
+  for (const ac of geriatric) commands.push({ type: 'sell_aircraft', aircraftId: ac.id })
+
   const idleOrIncoming =
     airline.fleet.some((a) => a.routeId === null) || airline.orders.length > 0 || airline.routes.length === 0
   const pair = bestUnservedPair(state)
@@ -140,7 +156,7 @@ function greedyCommands(state: GameState): Command[] {
   }
 
   // Capacity discipline: only buy when the network is actually full (or we
-  // are still fielding the starter fleet). Expansion follows demand, not cash.
+  // are still fielding the starter fleet, or renewal just thinned us out).
   let lastPax = 0
   let lastCapacity = 0
   for (const route of airline.routes) {
@@ -149,10 +165,21 @@ function greedyCommands(state: GameState): Command[] {
   }
   const networkFull = lastCapacity > 0 && lastPax * 10000 >= lastCapacity * 7500
   const bootstrapping = airline.fleet.length + airline.orders.length < 4
-  if (networkFull || bootstrapping) {
+  if ((networkFull || bootstrapping || geriatric.length > 0) && airline.orders.length === 0) {
+    // Expansion credit: profitable and full but cash-poor is exactly when
+    // borrowing to grow is right.
+    const lastProfit = airline.history[airline.history.length - 1]?.profit ?? 0
+    let expectedCash = airline.cash
+    if (airline.cash < 12000 && lastProfit > 0) {
+      const room = debtCeiling(airline) - totalDebt(airline)
+      if (room >= 8000) {
+        commands.push({ type: 'take_loan', amount: 10000 })
+        expectedCash += 10000
+      }
+    }
     const buffer = 5000
-    const affordable = typesOnSale(yearOf(state)).filter((t) => t.price + buffer <= airline.cash)
-    if (affordable.length > 0 && airline.orders.length === 0) {
+    const affordable = typesOnSale(yearOf(state)).filter((t) => t.price + buffer <= expectedCash)
+    if (affordable.length > 0) {
       let pick = affordable[0]!
       for (const t of affordable) if (t.seats > pick.seats) pick = t
       commands.push({ type: 'order_aircraft', aircraftType: pick.id })

@@ -5,6 +5,7 @@
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm, getCity, pairKey } from '../data/cities'
 import {
+  COST_INFLATION_BP_PER_QUARTER,
   CREW_COST_PER_BLOCK_HOUR,
   DEMAND_DIST_BANDS,
   DEMAND_GROWTH_BP_PER_QUARTER,
@@ -37,6 +38,11 @@ function distBandFactor(km: number): number {
     if (km <= maxKm) return factor
   }
   return DEMAND_DIST_BANDS[DEMAND_DIST_BANDS.length - 1]![1]
+}
+
+// Era cost inflation multiplier (bp) at a given turn.
+export function inflationBp(turn: number): number {
+  return 10000 + COST_INFLATION_BP_PER_QUARTER * turn
 }
 
 // One-way base fare in $, concave with distance.
@@ -162,8 +168,12 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       const weeklyService = weeklyPax * SERVICE_COST_PER_PAX[e.route.serviceLevel - 1]!
       const weeklyRevenue = weeklyPax * fare
 
+      // Crew, fees, and service inflate with the era; fuel rides its own index.
+      const inflated = Math.floor(
+        ((weeklyFees + weeklyCrew + weeklyService) * inflationBp(state.turn)) / 10000,
+      )
       const revenue = Math.floor((weeklyRevenue * WEEKS_PER_QUARTER) / 1000)
-      const cost = Math.floor(((weeklyFuel + weeklyFees + weeklyCrew + weeklyService) * WEEKS_PER_QUARTER) / 1000)
+      const cost = Math.floor(((weeklyFuel + inflated) * WEEKS_PER_QUARTER) / 1000)
       const quarterPax = weeklyPax * WEEKS_PER_QUARTER
 
       e.route.lastPax = quarterPax

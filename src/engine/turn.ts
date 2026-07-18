@@ -11,7 +11,7 @@ import {
   OWNERSHIP_BP_PER_QUARTER,
 } from '../data/constants'
 import { getScenario } from '../data/scenarios'
-import { resolveMarket } from './market'
+import { inflationBp, resolveMarket } from './market'
 import { resolveNegotiations } from './negotiation'
 import { netWorth } from './queries'
 import { runRivalTurn } from './rivals'
@@ -84,13 +84,17 @@ export function endQuarter(prev: GameState): EngineResult {
       continue
     }
     const t = totals[airline.id]!
-    let fixedCosts = AIRLINE_OVERHEAD_PER_QUARTER
+    // Overhead, maintenance, and admin inflate with the era (market.ts
+    // inflates the per-route operating costs); ownership tracks list price.
+    let inflatable = AIRLINE_OVERHEAD_PER_QUARTER
+    let fixedCosts = 0
     for (const ac of airline.fleet) {
       const type = getAircraftType(ac.type)
-      fixedCosts += Math.floor((type.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * ac.ageQuarters)) / 10000)
+      inflatable += Math.floor((type.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * ac.ageQuarters)) / 10000)
+      inflatable += AIRCRAFT_ADMIN_PER_QUARTER
       fixedCosts += Math.floor((type.price * OWNERSHIP_BP_PER_QUARTER) / 10000)
-      fixedCosts += AIRCRAFT_ADMIN_PER_QUARTER
     }
+    fixedCosts += Math.floor((inflatable * inflationBp(state.turn)) / 10000)
     let interest = 0
     for (const loan of airline.loans) {
       interest += Math.floor((loan.principal * loan.annualRateBp) / 4 / 10000)

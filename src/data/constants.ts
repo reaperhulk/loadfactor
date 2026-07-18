@@ -18,6 +18,12 @@ export const DEMAND_DIST_BANDS: readonly (readonly [number, number])[] = [
 ]
 // Era growth: +1.25%/quarter compounding-ish (linear approx) ≈ 5%/yr jet-age boom.
 export const DEMAND_GROWTH_BP_PER_QUARTER = 125
+// Operating-cost inflation trails demand growth slightly: a saturated route's
+// margin decays over the years, so growth must come from expansion and fleet
+// renewal, never from sitting on a full plane (M1 anti-compounding rule).
+// Applies to crew, fees, service, maintenance, admin, and overhead — not fuel
+// (its own index) and not aircraft list prices (era-designed).
+export const COST_INFLATION_BP_PER_QUARTER = 100
 export const DEMAND_NOISE_SPREAD_BP = 800
 
 // --- Fares & service ---
