@@ -93,11 +93,20 @@ interface MapViewProps {
   selected: string | null // city shown in the dossier panel
   routeFrom: string | null // armed origin: next city click opens a route
   onCityClick: (city: string) => void
+  onRouteClick?: (routeId: number) => void
   newRouteIds: ReadonlySet<number>
   newSlotCities: ReadonlySet<string>
 }
 
-export function MapView({ state, selected, routeFrom, onCityClick, newRouteIds, newSlotCities }: MapViewProps) {
+export function MapView({
+  state,
+  selected,
+  routeFrom,
+  onCityClick,
+  onRouteClick,
+  newRouteIds,
+  newSlotCities,
+}: MapViewProps) {
   const [view, setView] = useState<ViewBox>(FULL_VIEW)
   const svgRef = useRef<SVGSVGElement>(null)
   const drag = useRef<{ px: number; py: number; moved: boolean } | null>(null)
@@ -263,6 +272,13 @@ export function MapView({ state, selected, routeFrom, onCityClick, newRouteIds, 
                 pathLength={1}
                 className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}`}
                 data-testid={isNew ? 'route-line-new' : undefined}
+                onClick={() => {
+                  if (suppressClick.current) {
+                    suppressClick.current = false
+                    return
+                  }
+                  onRouteClick?.(r.id)
+                }}
               />
               {isNew &&
                 [r.from, r.to].map((cityId) => {

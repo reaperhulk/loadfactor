@@ -18,15 +18,16 @@ import {
   yearOf,
 } from '../engine/queries'
 import { dispatch } from './session'
+import { Sparkline } from './Sparkline'
 
 function money(k: number): string {
   return k >= 1000 || k <= -1000 ? `$${(k / 1000).toFixed(1)}M` : `$${k}k`
 }
 
-export function RoutesPanel({ state }: { state: GameState }) {
+export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect: (routeId: number) => void }) {
   const player = state.airlines[0]!
   if (player.routes.length === 0) {
-    return <p className="hint">No routes yet. Click two cities on the map to open one.</p>
+    return <p className="hint">No routes yet. Click a city on the map, then “Open route from here”.</p>
   }
   return (
     <div className="table-scroll"><table>
@@ -56,7 +57,14 @@ export function RoutesPanel({ state }: { state: GameState }) {
           return (
             <tr key={r.id} data-testid={`route-${r.from}-${r.to}`}>
               <td>
-                {r.from}–{r.to}
+                <button
+                  className="link-btn"
+                  data-testid={`inspect-${r.from}-${r.to}`}
+                  onClick={() => onInspect(r.id)}
+                  title="open route dossier"
+                >
+                  {r.from}–{r.to}
+                </button>
               </td>
               <td>{km}</td>
               <td>
@@ -242,6 +250,24 @@ export function FinancePanel({ state }: { state: GameState }) {
   const debt = totalDebt(player)
   return (
     <div>
+      {player.history.length >= 2 && (
+        <div className="finance-trends">
+          <div className="trend-row">
+            <span className="dim">net worth</span>
+            <Sparkline points={player.history.map((h) => h.netWorth)} width={180} />
+            <span>{money(player.history[player.history.length - 1]!.netWorth)}</span>
+          </div>
+          <div className="trend-row">
+            <span className="dim">profit</span>
+            <Sparkline points={player.history.map((h) => h.profit)} width={180} className="sparkline spark-profit" />
+            <span
+              className={player.history[player.history.length - 1]!.profit >= 0 ? 'pos' : 'neg'}
+            >
+              {money(player.history[player.history.length - 1]!.profit)}/q
+            </span>
+          </div>
+        </div>
+      )}
       <p>
         Debt {money(debt)} of {money(ceiling)} ceiling
       </p>

@@ -17,6 +17,7 @@ function withRoute(state: GameState, airlineIdx: number, from: string, to: strin
     lastLoadFactorBp: 0,
     lastRevenue: 0,
     lastCost: 0,
+    history: [],
   }
   airline.routes.push(route)
   airline.slots[a] = (airline.slots[a] ?? 0) + 1

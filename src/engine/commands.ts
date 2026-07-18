@@ -65,6 +65,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         lastLoadFactorBp: 0,
         lastRevenue: 0,
         lastCost: 0,
+        history: [],
       }
       airline.routes.push(route)
       return { events: [{ type: 'route_opened', airline: airlineIdx, routeId: route.id, from: a, to: b }] }

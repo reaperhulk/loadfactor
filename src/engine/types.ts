@@ -34,6 +34,15 @@ export interface AircraftOrder {
   quartersLeft: number
 }
 
+export interface RouteQuarter {
+  turn: number
+  pax: number
+  capacity: number
+  loadFactorBp: number
+  revenue: number // $k
+  cost: number // $k
+}
+
 export interface Route {
   id: number
   from: string // city id, lexicographically < to
@@ -46,6 +55,8 @@ export interface Route {
   lastLoadFactorBp: number
   lastRevenue: number // $k
   lastCost: number // $k
+  // Rolling recent quarters (newest last, capped at ROUTE_HISTORY_QUARTERS).
+  history: RouteQuarter[]
 }
 
 export interface PendingNegotiation {

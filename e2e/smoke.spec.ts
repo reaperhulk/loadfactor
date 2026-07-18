@@ -17,15 +17,22 @@ async function startGame(page: Page): Promise<void> {
   await expect(page.getByTestId('date')).toHaveText('1960 Q1')
 }
 
+// Ending a quarter via the UI presents the report card; dismiss it so the
+// next interaction isn't behind the overlay.
+async function endQuarterUI(page: Page): Promise<void> {
+  await page.getByTestId('end-quarter').click()
+  await page.getByTestId('report-card-close').click()
+}
+
 test('scenario starts and quarters advance deterministically', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(String(err)))
   await startGame(page)
-  await page.getByTestId('end-quarter').click()
+  await endQuarterUI(page)
   await expect(page.getByTestId('date')).toHaveText('1960 Q2')
-  await page.getByTestId('end-quarter').click()
-  await page.getByTestId('end-quarter').click()
-  await page.getByTestId('end-quarter').click()
+  await endQuarterUI(page)
+  await endQuarterUI(page)
+  await endQuarterUI(page)
   await expect(page.getByTestId('date')).toHaveText('1961 Q1')
   expect(errors).toEqual([])
 })
@@ -73,7 +80,14 @@ test('the quarterly report reflects the resolved quarter', async ({ page }) => {
   })
   // Serving a route puts an ambient plane on the map.
   await expect(page.locator('[data-testid^="plane-"]')).toHaveCount(1)
+  // Ending the quarter presents the report card with the P&L…
   await page.getByTestId('end-quarter').click()
+  await expect(page.getByTestId('report-card')).toBeVisible()
+  await expect(page.getByTestId('report-card')).toContainText('Profit')
+  await expect(page.getByTestId('report-card')).toContainText('Best route')
+  await page.getByTestId('report-card-close').click()
+  await expect(page.getByTestId('report-card')).toHaveCount(0)
+  // …and the report tab keeps the full log.
   await page.getByTestId('tab-report').click()
   await expect(page.getByTestId('report')).toContainText('Quarter closed')
   const loadFactor = await page.evaluate(
@@ -104,6 +118,32 @@ test('zoom reveals small cities that are hidden at world view', async ({ page })
   await expect(page.getByTestId('city-DOH')).toHaveCount(1)
   await page.getByTestId('zoom-reset').click()
   await expect(page.getByTestId('city-DOH')).toHaveCount(0)
+})
+
+test('the route dossier and rivals intel expose the numbers', async ({ page }) => {
+  await startGame(page)
+  await page.evaluate(() => {
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD' })
+    const state = window.__harness.getState()!
+    const routeId = state.airlines[0]!.routes[0]!.id
+    for (const aircraft of state.airlines[0]!.fleet) {
+      window.__harness.dispatch({ type: 'assign_aircraft', aircraftId: aircraft.id, routeId })
+    }
+    window.__harness.endQuarter()
+    window.__harness.endQuarter()
+  })
+  // Route dossier from the routes table.
+  await page.getByTestId('tab-routes').click()
+  await page.getByTestId('inspect-JFK-ORD').click()
+  await expect(page.getByTestId('route-dossier')).toBeVisible()
+  await expect(page.getByTestId('route-dossier')).toContainText('The pair')
+  await expect(page.getByTestId('route-dossier')).toContainText('rt/wk')
+  await page.getByTestId('route-dossier-close').click()
+  await expect(page.getByTestId('route-dossier')).toHaveCount(0)
+  // Rivals intel tab.
+  await page.getByTestId('tab-rivals').click()
+  await expect(page.getByTestId('rivals-panel')).toContainText('Albion Airways')
+  await expect(page.getByTestId('rivals-panel')).toContainText('net worth by quarter')
 })
 
 test('game over shows the ranked overlay and resets to the menu', async ({ page }) => {

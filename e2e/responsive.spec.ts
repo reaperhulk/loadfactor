@@ -10,7 +10,7 @@ const VIEWPORTS = [
   { name: 'desktop', width: 1280, height: 800 },
 ] as const
 
-const TABS = ['routes', 'fleet', 'airports', 'finance', 'report'] as const
+const TABS = ['routes', 'fleet', 'airports', 'rivals', 'finance', 'report'] as const
 
 async function horizontalOverflow(page: Page): Promise<number> {
   return page.evaluate(
@@ -51,8 +51,11 @@ for (const viewport of VIEWPORTS) {
     expect(await horizontalOverflow(page), 'city panel fits').toBeLessThanOrEqual(0)
     await page.getByTestId('city-panel-close').click()
 
-    // The core interaction still works at this size.
+    // The core interaction still works at this size, report card included.
     await page.getByTestId('end-quarter').click()
+    await expect(page.getByTestId('report-card')).toBeVisible()
+    expect(await horizontalOverflow(page), 'report card fits').toBeLessThanOrEqual(0)
+    await page.getByTestId('report-card-close').click()
     await expect(page.getByTestId('date')).toHaveText('1960 Q3')
   })
 }
@@ -66,10 +69,14 @@ test('keyboard shortcuts: space ends quarter, digits switch tabs, esc deselects'
   await page.locator('body').click() // move focus off the start button
   await page.keyboard.press(' ')
   await expect(page.getByTestId('date')).toHaveText('1960 Q2')
+  // Space presented the report card; Esc dismisses it.
+  await expect(page.getByTestId('report-card')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('report-card')).toHaveCount(0)
 
   await page.keyboard.press('2')
   await expect(page.getByTestId('tab-fleet')).toHaveClass(/active/)
-  await page.keyboard.press('5')
+  await page.keyboard.press('6')
   await expect(page.getByTestId('tab-report')).toHaveClass(/active/)
 
   await page.getByTestId('city-MIA').click()

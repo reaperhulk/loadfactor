@@ -1,10 +1,10 @@
 {
   "greedy-alpha": {
     "checkpointHashes": {
-      "10": "8a5360bb",
-      "20": "c611499b",
-      "30": "c835cb0b",
-      "40": "ada55238"
+      "10": "dfcbeaa7",
+      "20": "924d8776",
+      "30": "2e270f39",
+      "40": "9dd090e1"
     },
     "summary": {
       "turn": 40,
@@ -18,10 +18,10 @@
   },
   "greedy-beta": {
     "checkpointHashes": {
-      "10": "1f710363",
-      "20": "39c694f7",
-      "30": "ecd5bef8",
-      "40": "6d9f49f0"
+      "10": "53507195",
+      "20": "086c53f8",
+      "30": "fb45b920",
+      "40": "51fe47ed"
     },
     "summary": {
       "turn": 40,
@@ -35,8 +35,8 @@
   },
   "naive-alpha": {
     "checkpointHashes": {
-      "10": "19ff37c2",
-      "20": "9f8138c8"
+      "10": "ae941598",
+      "20": "e1593b3b"
     },
     "summary": {
       "turn": 25,
@@ -50,10 +50,10 @@
   },
   "oil-crisis-greedy": {
     "checkpointHashes": {
-      "10": "e5ad9bfa",
-      "20": "7078120b",
-      "30": "dc596a59",
-      "40": "2e09027e"
+      "10": "1acdfe21",
+      "20": "7959006a",
+      "30": "6ca2bb8e",
+      "40": "16761fd3"
     },
     "summary": {
       "turn": 40,
@@ -67,10 +67,10 @@
   },
   "deregulation-greedy": {
     "checkpointHashes": {
-      "10": "2e0fd082",
-      "20": "f8728c82",
-      "30": "454751b9",
-      "40": "c08de53a"
+      "10": "161b9a13",
+      "20": "1bac319d",
+      "30": "b914dcde",
+      "40": "07dabbca"
     },
     "summary": {
       "turn": 40,

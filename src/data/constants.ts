@@ -43,6 +43,8 @@ export const SERVICE_COST_PER_PAX: readonly number[] = [10, 18, 28]
 
 // --- Operations ---
 export const WEEKS_PER_QUARTER = 13
+// Quarters of per-route results kept for the UI (rolling window).
+export const ROUTE_HISTORY_QUARTERS = 24
 // Minutes of weekly block time one airframe can fly.
 export const WEEKLY_BLOCK_MINUTES = 6000
 export const MIN_ROUTE_KM = 300

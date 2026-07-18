@@ -617,6 +617,138 @@ input[type='number'] {
   }
 }
 
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+.trend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.trend-row .dim {
+  width: 44px;
+}
+
+.sparkline path {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+
+.spark-profit path {
+  stroke: var(--pos);
+}
+
+.dossier-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.race-chart {
+  background: #0e1522;
+  border-radius: 8px;
+}
+
+.race-chart path {
+  stroke-width: 1.6;
+}
+
+.race-me {
+  stroke: var(--accent);
+}
+
+.race-rival-1 {
+  stroke: #d78fae;
+}
+
+.race-rival-2 {
+  stroke: #8fd7b8;
+}
+
+.race-rival-3 {
+  stroke: #d7c98f;
+}
+
+.race-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 6px 0 10px;
+  font-size: 0.82rem;
+}
+
+.race-key.me {
+  color: var(--accent);
+}
+
+.race-key.rival-1 {
+  color: #d78fae;
+}
+
+.race-key.rival-2 {
+  color: #8fd7b8;
+}
+
+.race-key.rival-3 {
+  color: #d7c98f;
+}
+
+.rival-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.rival-card {
+  background: #10141c;
+  border: 1px solid #232c40;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+}
+
+.rival-card h4 {
+  margin: 0 0 4px;
+}
+
+.rival-card p {
+  margin: 4px 0;
+}
+
+.report-card {
+  text-align: left;
+  max-width: 460px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.report-card h2 {
+  font-size: 1.2rem;
+  letter-spacing: 0.04em;
+}
+
+.report-lines {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.report-lines td:nth-child(2) {
+  text-align: right;
+}
+
+.finance-trends {
+  margin-bottom: 10px;
+}
+
 .toast-stack {
   position: fixed;
   top: 14px;

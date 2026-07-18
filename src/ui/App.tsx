@@ -6,12 +6,15 @@ import { useCountUp } from './countUp'
 import { MapView } from './MapView'
 import { AirportsPanel, FinancePanel, FleetPanel, ReportPanel, RoutesPanel } from './panels'
 import { ReplayViewer } from './ReplayViewer'
+import { ReportCard } from './ReportCard'
+import { RivalsPanel } from './RivalsPanel'
+import { RouteDossier } from './RouteDossier'
 import { dispatch, getReplay, getSession, loadSave, resumeSave, startGame, reset } from './session'
 import { subscribe } from './session'
 import { ToastStack } from './toasts'
 import type { GameState, Replay } from '../engine'
 
-type Tab = 'routes' | 'fleet' | 'airports' | 'finance' | 'report'
+type Tab = 'routes' | 'fleet' | 'airports' | 'rivals' | 'finance' | 'report'
 
 function money(k: number): string {
   return k >= 1000 || k <= -1000 ? `$${(k / 1000).toFixed(1)}M` : `$${k}k`
@@ -64,7 +67,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
   )
 }
 
-const TABS: readonly Tab[] = ['routes', 'fleet', 'airports', 'finance', 'report']
+const TABS: readonly Tab[] = ['routes', 'fleet', 'airports', 'rivals', 'finance', 'report']
 
 // Final standings, ranked — the scenario is a race, show the podium.
 function GameOverOverlay({ state, onWatchReplay }: { state: GameState; onWatchReplay: (r: Replay) => void }) {
@@ -103,7 +106,9 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const session = getSession()!
   const [tab, setTab] = useState<Tab>('routes')
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
+  const [selectedRoute, setSelectedRoute] = useState<number | null>(null)
   const [routeFrom, setRouteFrom] = useState<string | null>(null)
+  const [showReport, setShowReport] = useState(false)
   const state = session.state
   const player = state.airlines[0]!
   const scenario = getScenario(state.scenario)
@@ -111,6 +116,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   // Map interaction: a click selects a city (dossier panel). With a route
   // armed from the panel, the next click is the destination.
   const handleCityClick = (cityId: string): void => {
+    setSelectedRoute(null)
     if (routeFrom !== null && routeFrom !== cityId) {
       dispatch({ type: 'open_route', from: routeFrom, to: cityId })
       setRouteFrom(null)
@@ -122,18 +128,43 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     }
   }
 
-  // Keyboard shortcuts: Space/E end the quarter, 1–5 switch panels, Esc backs
-  // out of route mode, then the panel. Ignored while typing in a form control.
+  const inspectRoute = (routeId: number): void => {
+    setSelectedCity(null)
+    setRouteFrom(null)
+    setSelectedRoute(routeId)
+  }
+
+  const endQuarter = (): void => {
+    if (getSession()?.state.phase !== 'planning') return
+    dispatch({ type: 'end_quarter' })
+    setShowReport(true)
+  }
+
+  // Keyboard shortcuts: Space/E end the quarter (or dismiss the report card),
+  // 1–6 switch panels, Esc backs out of route mode, then the panel. Ignored
+  // while typing in a form control.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const target = e.target as HTMLElement | null
       if (target && ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(target.tagName)) return
-      if (e.key === ' ' || e.key === 'e' || e.key === 'E') {
+      if (e.key === ' ' || e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
         e.preventDefault()
-        if (getSession()?.state.phase === 'planning') dispatch({ type: 'end_quarter' })
+        setShowReport((open) => {
+          if (open) return false
+          if (e.key !== 'Enter') {
+            // End the quarter only when no report card was in the way.
+            if (getSession()?.state.phase === 'planning') {
+              dispatch({ type: 'end_quarter' })
+              return true
+            }
+          }
+          return open
+        })
       } else if (e.key >= '1' && e.key <= String(TABS.length)) {
         setTab(TABS[Number(e.key) - 1]!)
       } else if (e.key === 'Escape') {
+        setShowReport(false)
+        setSelectedRoute(null)
         setRouteFrom((armed) => {
           if (armed === null) setSelectedCity(null)
           return null
@@ -159,11 +190,14 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           Net worth {money(shownWorth)} / {money(scenario.targetNetWorth)}
         </span>
         {state.phase === 'planning' && (
-          <button className="end-quarter" data-testid="end-quarter" onClick={() => dispatch({ type: 'end_quarter' })}>
+          <button className="end-quarter" data-testid="end-quarter" onClick={endQuarter}>
             End Quarter ▶
           </button>
         )}
       </header>
+      {showReport && session.reportEvents.length > 0 && (
+        <ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} />
+      )}
       {state.phase !== 'planning' && <GameOverOverlay state={state} onWatchReplay={onWatchReplay} />}
       <div className="map-area">
         <MapView
@@ -171,6 +205,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           selected={selectedCity}
           routeFrom={routeFrom}
           onCityClick={handleCityClick}
+          onRouteClick={inspectRoute}
           newRouteIds={
             new Set(
               session.lastEvents
@@ -198,6 +233,9 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             }}
           />
         )}
+        {selectedRoute !== null && (
+          <RouteDossier state={state} routeId={selectedRoute} onClose={() => setSelectedRoute(null)} />
+        )}
       </div>
       <ToastStack events={session.lastEvents} />
       <nav className="tabs">
@@ -212,12 +250,13 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             {t}
           </button>
         ))}
-        <span className="key-hints">space = end quarter · 1–5 = panels · esc = deselect</span>
+        <span className="key-hints">space = end quarter · 1–6 = panels · esc = deselect</span>
       </nav>
       <section className="panel">
-        {tab === 'routes' && <RoutesPanel state={state} />}
+        {tab === 'routes' && <RoutesPanel state={state} onInspect={inspectRoute} />}
         {tab === 'fleet' && <FleetPanel state={state} />}
         {tab === 'airports' && <AirportsPanel state={state} />}
+        {tab === 'rivals' && <RivalsPanel state={state} />}
         {tab === 'finance' && <FinancePanel state={state} />}
         {tab === 'report' && <ReportPanel state={state} events={session.reportEvents} />}
       </section>

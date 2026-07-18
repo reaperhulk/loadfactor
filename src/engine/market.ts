@@ -19,6 +19,7 @@ import {
   FARE_TAPER_KM,
   LANDING_FEE_BASE,
   LANDING_FEE_PER_SEAT,
+  ROUTE_HISTORY_QUARTERS,
   SERVICE_COST_PER_PAX,
   SERVICE_LEVEL_WEIGHT,
   WEEKS_PER_QUARTER,
@@ -182,6 +183,15 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
         e.weeklyCapacity === 0 ? 0 : Math.floor((weeklyPax * 10000) / e.weeklyCapacity)
       e.route.lastRevenue = revenue
       e.route.lastCost = cost
+      e.route.history.push({
+        turn: state.turn,
+        pax: quarterPax,
+        capacity: e.route.lastCapacity,
+        loadFactorBp: e.route.lastLoadFactorBp,
+        revenue,
+        cost,
+      })
+      if (e.route.history.length > ROUTE_HISTORY_QUARTERS) e.route.history.shift()
 
       totals[e.airlineIdx]!.revenue += revenue
       totals[e.airlineIdx]!.cost += cost
