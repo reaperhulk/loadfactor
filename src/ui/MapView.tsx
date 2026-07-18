@@ -3,7 +3,7 @@
 // tells you short-haul from long-haul at a glance. Presentation-only floats
 // are fine here — the engine never sees screen coordinates.
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent, WheelEvent } from 'react'
 import { CITIES, distanceKm, getCity, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
@@ -101,6 +101,51 @@ export function MapView({ state, selected, routeFrom, onCityClick, newRouteIds, 
   const [view, setView] = useState<ViewBox>(FULL_VIEW)
   const svgRef = useRef<SVGSVGElement>(null)
   const drag = useRef<{ px: number; py: number; moved: boolean } | null>(null)
+  // Zoom eases toward targetRef via exponential smoothing in a rAF loop;
+  // panning writes through immediately. Wheel/button handlers mutate the
+  // TARGET, so rapid inputs compound smoothly instead of stacking jumps.
+  const targetRef = useRef<ViewBox>(FULL_VIEW)
+  const rafRef = useRef(0)
+
+  const settleView = (): void => {
+    setView((v) => {
+      const t = targetRef.current
+      const k = 0.25 // smoothing per frame ≈ 130ms to settle at 60fps
+      const next = {
+        x: v.x + (t.x - v.x) * k,
+        y: v.y + (t.y - v.y) * k,
+        w: v.w + (t.w - v.w) * k,
+        h: v.h + (t.h - v.h) * k,
+      }
+      const done = Math.abs(next.w - t.w) < 0.5 && Math.abs(next.x - t.x) < 0.5 && Math.abs(next.y - t.y) < 0.5
+      if (done) {
+        rafRef.current = 0
+        return t
+      }
+      rafRef.current = requestAnimationFrame(settleView)
+      return next
+    })
+  }
+
+  const applyView = (target: ViewBox, immediate: boolean): void => {
+    targetRef.current = clampView(target)
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (immediate || reduced) {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = 0
+      }
+      setView(targetRef.current)
+      return
+    }
+    if (!rafRef.current) rafRef.current = requestAnimationFrame(settleView)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
+  }, [])
 
   const player = state.airlines[0]!
   const scale = W / view.w
@@ -124,26 +169,27 @@ export function MapView({ state, selected, routeFrom, onCityClick, newRouteIds, 
     visible.filter((c) => cityTier(c) === 1 || scale >= 1.5 || stakes.has(c.id)).map((c) => c.id),
   )
 
-  // Convert a client point into map coordinates for cursor-anchored zoom.
-  const toMap = (clientX: number, clientY: number): { mx: number; my: number } => {
-    const rect = svgRef.current!.getBoundingClientRect()
-    return {
-      mx: view.x + ((clientX - rect.left) / rect.width) * view.w,
-      my: view.y + ((clientY - rect.top) / rect.height) * view.h,
+  // Cursor-anchored zoom, computed in TARGET space so consecutive wheel
+  // events compound on where the view is heading, not where it is.
+  const zoomAt = (clientX: number | null, clientY: number | null, factor: number): void => {
+    const t = targetRef.current
+    let mx = t.x + t.w / 2
+    let my = t.y + t.h / 2
+    if (clientX !== null && clientY !== null && svgRef.current) {
+      const rect = svgRef.current.getBoundingClientRect()
+      mx = t.x + ((clientX - rect.left) / rect.width) * t.w
+      my = t.y + ((clientY - rect.top) / rect.height) * t.h
     }
-  }
-
-  const zoomAt = (mx: number, my: number, factor: number): void => {
-    setView((v) => {
-      const w = v.w / factor
-      const h = v.h / factor
-      return clampView({ x: mx - ((mx - v.x) / v.w) * w, y: my - ((my - v.y) / v.h) * h, w, h })
-    })
+    const w = t.w / factor
+    const h = t.h / factor
+    applyView({ x: mx - ((mx - t.x) / t.w) * w, y: my - ((my - t.y) / t.h) * h, w, h }, false)
   }
 
   const onWheel = (e: WheelEvent<SVGSVGElement>): void => {
-    const { mx, my } = toMap(e.clientX, e.clientY)
-    zoomAt(mx, my, e.deltaY < 0 ? 1.25 : 0.8)
+    // Proportional to scroll delta: gentle on trackpads (many small deltas),
+    // one comfortable step per mouse-wheel notch, hard-clamped per event.
+    const factor = Math.min(1.6, Math.max(0.625, Math.pow(1.0018, -e.deltaY)))
+    zoomAt(e.clientX, e.clientY, factor)
   }
 
   const onPointerDown = (e: PointerEvent<SVGSVGElement>): void => {
@@ -162,7 +208,8 @@ export function MapView({ state, selected, routeFrom, onCityClick, newRouteIds, 
     }
     drag.current.moved = true
     const rect = svgRef.current!.getBoundingClientRect()
-    setView((v) => clampView({ ...v, x: v.x - (dx / rect.width) * v.w, y: v.y - (dy / rect.height) * v.h }))
+    const t = targetRef.current
+    applyView({ ...t, x: t.x - (dx / rect.width) * t.w, y: t.y - (dy / rect.height) * t.h }, true)
     drag.current.px = e.clientX
     drag.current.py = e.clientY
   }
@@ -183,8 +230,6 @@ export function MapView({ state, selected, routeFrom, onCityClick, newRouteIds, 
     }
     onCityClick(cityId)
   }
-
-  const center = { mx: view.x + view.w / 2, my: view.y + view.h / 2 }
 
   return (
     <div className="map-wrap">
@@ -323,21 +368,13 @@ export function MapView({ state, selected, routeFrom, onCityClick, newRouteIds, 
         })}
       </svg>
       <div className="map-controls">
-        <button
-          data-testid="zoom-in"
-          aria-label="zoom in"
-          onClick={() => zoomAt(center.mx, center.my, 1.5)}
-        >
+        <button data-testid="zoom-in" aria-label="zoom in" onClick={() => zoomAt(null, null, 1.5)}>
           +
         </button>
-        <button
-          data-testid="zoom-out"
-          aria-label="zoom out"
-          onClick={() => zoomAt(center.mx, center.my, 1 / 1.5)}
-        >
+        <button data-testid="zoom-out" aria-label="zoom out" onClick={() => zoomAt(null, null, 1 / 1.5)}>
           −
         </button>
-        <button data-testid="zoom-reset" aria-label="reset zoom" onClick={() => setView(FULL_VIEW)}>
+        <button data-testid="zoom-reset" aria-label="reset zoom" onClick={() => applyView(FULL_VIEW, false)}>
           ⤢
         </button>
       </div>
