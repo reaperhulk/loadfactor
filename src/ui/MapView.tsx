@@ -42,10 +42,12 @@ interface MapViewProps {
   selected: string | null
   onSelect: (city: string | null) => void
   newRouteIds: ReadonlySet<number>
+  newSlotCities: ReadonlySet<string>
 }
 
-export function MapView({ state, selected, onSelect, newRouteIds }: MapViewProps) {
+export function MapView({ state, selected, onSelect, newRouteIds, newSlotCities }: MapViewProps) {
   const player = state.airlines[0]!
+  const flownRoutes = player.routes.filter((r) => player.fleet.some((a) => a.routeId === r.id))
 
   const onCityClick = (cityId: string): void => {
     if (selected === null) {
@@ -97,6 +99,39 @@ export function MapView({ state, selected, onSelect, newRouteIds }: MapViewProps
                 )
               })}
           </g>
+        )
+      })}
+      {/* Ambient reward: little planes fly the routes you actually serve.
+          Staggered by route id so the sky never moves in lockstep. */}
+      {flownRoutes.map((r) => (
+        <g key={`plane-${r.id}`} className="plane" data-testid={`plane-${r.id}`}>
+          <text fontSize="11" dy="3.5" textAnchor="middle">
+            ✈
+          </text>
+          <animateMotion
+            dur={`${7 + (r.id % 5)}s`}
+            begin={`${-((r.id * 13) % 60) / 10}s`}
+            repeatCount="indefinite"
+            keyPoints="0;1;1;0;0"
+            keyTimes="0;0.45;0.5;0.95;1"
+            calcMode="linear"
+            rotate="auto"
+            path={arcPath(r.from, r.to)}
+          />
+        </g>
+      ))}
+      {/* Fresh slot wins ping gold at the airport. */}
+      {[...newSlotCities].sort().map((cityId) => {
+        const c = getCity(cityId)
+        return (
+          <circle
+            key={`slots-${cityId}`}
+            cx={x(c.lon)}
+            cy={y(c.lat)}
+            r={11}
+            className="slots-ping"
+            data-testid={`slots-ping-${cityId}`}
+          />
         )
       })}
       {/* Active world events glow on the map: gold halo on boosted cities and

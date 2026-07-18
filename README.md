@@ -56,8 +56,12 @@ enabled for the repository (Settings → Pages → Source: GitHub Actions).
 
 ## Status
 
-**M0 — scaffold.** Deterministic engine steel thread (quarterly turns, route
-economics, slot negotiations, world events, loans, two rival AIs), one
-scenario (Jet Age, 1960–1980), ~30 cities, 8 aircraft types, bot harness,
-determinism/property/golden/balance tests, minimal map + panels UI, CI and
-Pages deploy. See PLAN.md §8 for the milestone ladder.
+**M0 — scaffold, in iteration.** Deterministic engine steel thread (quarterly
+turns, route economics, slot negotiations, world events, loans, two rival
+AIs), one race scenario (Jet Age, 1960–1980: finish #1 by net worth), ~30
+cities, 8 aircraft types, bot harness, determinism/property/golden/balance
+tests, CI and Pages deploy. UI: responsive map + panels from phone to
+desktop (viewport-regression tested), keyboard shortcuts, and a reward
+layer — route draw-in arcs, ambient planes on served routes, world-event
+map halos, celebration toasts, money roll-ups, ranked game-over podium —
+all reduced-motion aware. See PLAN.md §8 for the milestone ladder.

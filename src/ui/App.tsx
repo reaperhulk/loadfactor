@@ -131,6 +131,13 @@ function GameScreen() {
               .map((e) => (e.type === 'route_opened' ? e.routeId : -1)),
           )
         }
+        newSlotCities={
+          new Set(
+            session.lastEvents
+              .filter((e) => e.type === 'slots_granted' && e.airline === 0)
+              .map((e) => (e.type === 'slots_granted' ? e.city : '')),
+          )
+        }
       />
       <ToastStack events={session.lastEvents} />
       <nav className="tabs">

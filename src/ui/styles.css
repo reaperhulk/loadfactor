@@ -143,6 +143,29 @@ button:disabled {
   stroke-width: 1.6;
   opacity: 0.9;
   fill: none;
+  pointer-events: stroke;
+  transition: stroke-width 150ms ease-out, opacity 150ms ease-out;
+}
+
+.route-player:hover {
+  stroke-width: 3;
+  opacity: 1;
+}
+
+.plane {
+  fill: #cfe3ff;
+  pointer-events: none;
+  filter: drop-shadow(0 0 3px #4fa3ff88);
+}
+
+.slots-ping {
+  fill: none;
+  stroke: #ffd166;
+  stroke-width: 2.5;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: endpoint-ping 1200ms ease-out 3;
+  pointer-events: none;
 }
 
 .route-rival {
@@ -432,8 +455,13 @@ input[type='number'] {
   .toast,
   .event-halo,
   .gameover-overlay,
-  .gameover-card {
+  .gameover-card,
+  .slots-ping {
     animation: none;
+  }
+
+  .plane {
+    display: none;
   }
 
   .route-new {

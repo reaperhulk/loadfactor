@@ -52,6 +52,8 @@ test('the quarterly report reflects the resolved quarter', async ({ page }) => {
       window.__harness.dispatch({ type: 'assign_aircraft', aircraftId: aircraft.id, routeId })
     }
   })
+  // Serving a route puts an ambient plane on the map.
+  await expect(page.locator('[data-testid^="plane-"]')).toHaveCount(1)
   await page.getByTestId('end-quarter').click()
   await page.getByTestId('tab-report').click()
   await expect(page.getByTestId('report')).toContainText('Quarter closed')
