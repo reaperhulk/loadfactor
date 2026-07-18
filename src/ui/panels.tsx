@@ -11,7 +11,8 @@ import { negotiationDifficulty } from '../engine/negotiation'
 import {
   airlinesOnPair,
   debtCeiling,
-  roundTripsPerWeek,
+  effectiveFrequency,
+  maxRouteFrequency,
   slotsHeld,
   slotsUsed,
   totalDebt,
@@ -50,9 +51,7 @@ export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect:
         {player.routes.map((r) => {
           const km = distanceKm(r.from, r.to)
           const planes = player.fleet.filter((a) => a.routeId === r.id).length
-          const freq = player.fleet
-            .filter((a) => a.routeId === r.id)
-            .reduce((sum, a) => sum + roundTripsPerWeek(a.type, km), 0)
+          const freq = `${effectiveFrequency(player, r)}/${maxRouteFrequency(player, r)}`
           const rivalsHere = airlinesOnPair(state, r.from, r.to, 0)
           return (
             <tr key={r.id} data-testid={`route-${r.from}-${r.to}`}>

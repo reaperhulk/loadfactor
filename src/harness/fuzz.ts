@@ -20,7 +20,7 @@ import {
 } from '../engine/queries'
 import { nextInt, rngFromSeed, type Rng } from '../engine/rng'
 import type { Command, GameState } from '../engine/types'
-import { assignmentCommands, bestUnservedPair, pairScore } from './bots'
+import { assignmentCommands, launchCommands, pairScore } from './bots'
 
 // A strategy genome: every dial the greedy bot hard-codes, as a searchable
 // parameter. Ranges are inclusive and integer.
@@ -70,18 +70,8 @@ export function genomeCommands(state: GameState, g: Genome): Command[] {
     .slice(0, 2)
   for (const ac of geriatric) commands.push({ type: 'sell_aircraft', aircraftId: ac.id })
 
-  const idleOrIncoming =
-    airline.fleet.some((a) => a.routeId === null) || airline.orders.length > 0 || airline.routes.length === 0
-  const pair = bestUnservedPair(state)
-  if (idleOrIncoming && pair && pair.score > g.expandThreshold) {
-    commands.push({
-      type: 'open_route',
-      from: pair.from,
-      to: pair.to,
-      fareLevel: g.fareBias,
-      serviceLevel: g.serviceLevel,
-    })
-  }
+  const launch = launchCommands(state, g.expandThreshold, g.fareBias, g.serviceLevel)
+  commands.push(...launch.commands)
 
   let lastPax = 0
   let lastCapacity = 0
@@ -152,7 +142,8 @@ export function genomeCommands(state: GameState, g: Genome): Command[] {
     }
   }
 
-  return [...commands, ...assignmentCommands(state)]
+  const skip = launch.usedAircraft !== null ? new Set([launch.usedAircraft]) : undefined
+  return [...commands, ...assignmentCommands(state, skip)]
 }
 
 export function runGenomeCareer(scenarioId: string, seed: string, genome: Genome, quarters: number): number {

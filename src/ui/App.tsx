@@ -11,6 +11,7 @@ import { ReplayViewer } from './ReplayViewer'
 import { ReportCard } from './ReportCard'
 import { RivalsPanel } from './RivalsPanel'
 import { RouteDossier } from './RouteDossier'
+import { RouteSetupDialog } from './RouteSetupDialog'
 import { dispatch, getReplay, getSession, loadSave, resumeSave, startGame, reset } from './session'
 import { subscribe } from './session'
 import { ToastStack } from './toasts'
@@ -127,6 +128,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<number | null>(null)
   const [routeFrom, setRouteFrom] = useState<string | null>(null)
+  const [pendingRoute, setPendingRoute] = useState<{ from: string; to: string } | null>(null)
   const [showReport, setShowReport] = useState(false)
   const state = session.state
   const player = state.airlines[0]!
@@ -137,9 +139,9 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const handleCityClick = (cityId: string): void => {
     setSelectedRoute(null)
     if (routeFrom !== null && routeFrom !== cityId) {
-      dispatch({ type: 'open_route', from: routeFrom, to: cityId })
+      // Destination picked: configure the launch (aircraft, frequency, fare).
+      setPendingRoute({ from: routeFrom, to: cityId })
       setRouteFrom(null)
-      setSelectedCity(cityId)
     } else if (routeFrom === cityId) {
       setRouteFrom(null) // clicking the armed origin disarms it
     } else {
@@ -184,6 +186,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       } else if (e.key === 'Escape') {
         setShowReport(false)
         setSelectedRoute(null)
+        setPendingRoute(null)
         setRouteFrom((armed) => {
           if (armed === null) setSelectedCity(null)
           return null
@@ -218,6 +221,14 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       <CoachMarks state={state} />
       {showReport && session.reportEvents.length > 0 && (
         <ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} />
+      )}
+      {pendingRoute !== null && (
+        <RouteSetupDialog
+          state={state}
+          from={pendingRoute.from}
+          to={pendingRoute.to}
+          onClose={() => setPendingRoute(null)}
+        />
       )}
       {state.phase !== 'planning' && <GameOverOverlay state={state} onWatchReplay={onWatchReplay} />}
       <div className="map-area">

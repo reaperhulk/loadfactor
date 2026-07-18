@@ -49,6 +49,9 @@ export interface Route {
   to: string
   fareLevel: number // -2..+2
   serviceLevel: number // 1..3
+  // Requested round trips per week. The schedule actually flown is
+  // min(frequency, what the assigned fleet can fly) — see queries.ts.
+  frequency: number
   // Last quarter's results, for the UI and bot policies.
   lastPax: number
   lastCapacity: number
@@ -119,10 +122,21 @@ export interface GameState {
 // Player actions. Serializable, validated by applyCommand; invalid commands
 // reject with a command_rejected event, never throw.
 export type Command =
-  | { type: 'open_route'; from: string; to: string; fareLevel?: number; serviceLevel?: number }
+  | {
+      type: 'open_route'
+      from: string
+      to: string
+      // Opening a route is a real scheduling decision: it launches with a
+      // specific aircraft and a weekly frequency that aircraft can fly.
+      aircraftId: number
+      frequency: number
+      fareLevel?: number
+      serviceLevel?: number
+    }
   | { type: 'close_route'; routeId: number }
   | { type: 'set_fare'; routeId: number; fareLevel: number }
   | { type: 'set_service'; routeId: number; serviceLevel: number }
+  | { type: 'set_frequency'; routeId: number; frequency: number }
   | { type: 'assign_aircraft'; aircraftId: number; routeId: number | null }
   | { type: 'order_aircraft'; aircraftType: string }
   | { type: 'sell_aircraft'; aircraftId: number }
@@ -139,6 +153,7 @@ export type GameEvent =
   | { type: 'route_closed'; airline: number; routeId: number }
   | { type: 'fare_set'; airline: number; routeId: number; fareLevel: number }
   | { type: 'service_set'; airline: number; routeId: number; serviceLevel: number }
+  | { type: 'frequency_set'; airline: number; routeId: number; frequency: number }
   | { type: 'aircraft_assigned'; airline: number; aircraftId: number; routeId: number | null }
   | { type: 'aircraft_ordered'; airline: number; orderId: number; aircraftType: string; price: number }
   | { type: 'aircraft_delivered'; airline: number; aircraftId: number; aircraftType: string }

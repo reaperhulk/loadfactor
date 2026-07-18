@@ -31,7 +31,11 @@ for (const viewport of VIEWPORTS) {
 
     // Populate real content (routes table is the widest), then check every tab.
     await page.evaluate(() => {
-      window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD' })
+      {
+      const snap = window.__harness.getState()!
+      const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
+      window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
+    }
       const state = window.__harness.getState()!
       const routeId = state.airlines[0]!.routes[0]!.id
       for (const aircraft of state.airlines[0]!.fleet) {

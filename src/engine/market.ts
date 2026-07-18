@@ -27,7 +27,7 @@ import {
   WEEKS_PER_QUARTER,
 } from '../data/constants'
 import { hashNoiseBp } from './rng'
-import { roundTripsPerWeek } from './queries'
+import { allocateTrips, roundTripsPerWeek } from './queries'
 import { cityDemandModBp, effEconomyBp, effFuelBp } from './worldEvents'
 import type { GameEvent, GameState, Route } from './types'
 
@@ -123,18 +123,15 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
   const fuelBp = effFuelBp(state.world)
 
   // Collect entrants per pair in stable order (airline index, then route id).
+  // Each route flies its scheduled frequency (requested, capped by fleet).
   const pairs = new Map<string, Entrant[]>()
   for (const airline of state.airlines) {
     for (const route of airline.routes) {
-      const km = distanceKm(route.from, route.to)
       let weeklyRoundTrips = 0
       let weeklyCapacity = 0
-      for (const ac of airline.fleet) {
-        if (ac.routeId !== route.id) continue
-        const t = getAircraftType(ac.type)
-        const rt = roundTripsPerWeek(ac.type, km)
-        weeklyRoundTrips += rt
-        weeklyCapacity += t.seats * rt * 2
+      for (const alloc of allocateTrips(airline, route)) {
+        weeklyRoundTrips += alloc.trips
+        weeklyCapacity += getAircraftType(alloc.type).seats * alloc.trips * 2
       }
       const weight =
         weeklyCapacity === 0
@@ -182,18 +179,17 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       const weeklyPax = pax[i]!
       const fare = fareFor(km, e.route.fareLevel)
 
-      // Weekly costs in $, converted to $k per quarter at the end.
+      // Weekly costs in $, converted to $k per quarter at the end. Only the
+      // trips actually flown burn fuel, fees, and crew time.
       let weeklyFuel = 0
       let weeklyFees = 0
       let weeklyCrewMin = 0
       const airline = state.airlines[e.airlineIdx]!
-      for (const ac of airline.fleet) {
-        if (ac.routeId !== e.route.id) continue
-        const t = getAircraftType(ac.type)
-        const rt = roundTripsPerWeek(ac.type, km)
-        weeklyFuel += Math.floor((rt * 2 * km * t.fuelPerKm * fuelBp) / 10000)
-        weeklyFees += rt * 2 * (LANDING_FEE_BASE + t.seats * LANDING_FEE_PER_SEAT)
-        weeklyCrewMin += rt * 2 * Math.floor((km * 60) / t.speedKmh)
+      for (const alloc of allocateTrips(airline, e.route)) {
+        const t = getAircraftType(alloc.type)
+        weeklyFuel += Math.floor((alloc.trips * 2 * km * t.fuelPerKm * fuelBp) / 10000)
+        weeklyFees += alloc.trips * 2 * (LANDING_FEE_BASE + t.seats * LANDING_FEE_PER_SEAT)
+        weeklyCrewMin += alloc.trips * 2 * Math.floor((km * 60) / t.speedKmh)
       }
       const weeklyCrew = Math.floor((weeklyCrewMin / 60) * CREW_COST_PER_BLOCK_HOUR)
       const weeklyService = weeklyPax * SERVICE_COST_PER_PAX[e.route.serviceLevel - 1]!

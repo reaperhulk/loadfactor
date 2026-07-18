@@ -37,7 +37,7 @@ test('scenario starts and quarters advance deterministically', async ({ page }) 
   expect(errors).toEqual([])
 })
 
-test('routes open via the city panel plan-route flow', async ({ page }) => {
+test('routes open via the city panel plan-route flow with a launch schedule', async ({ page }) => {
   await startGame(page)
   // MIA and ORD are slotted at game start and their dots sit clear of
   // neighbors on the projection (JFK is huddled under Toronto).
@@ -45,6 +45,12 @@ test('routes open via the city panel plan-route flow', async ({ page }) => {
   await expect(page.getByTestId('city-panel')).toBeVisible()
   await page.getByTestId('plan-route').click()
   await page.getByTestId('city-ORD').click()
+  // The launch dialog: aircraft + frequency (bounded by distance) + fare.
+  await expect(page.getByTestId('route-setup')).toBeVisible()
+  await expect(page.getByTestId('route-setup')).toContainText('Meridian 80')
+  await expect(page.getByTestId('route-setup-freq')).toContainText('rt/wk')
+  await page.getByTestId('route-setup-confirm').click()
+  await expect(page.getByTestId('route-setup')).toHaveCount(0)
   await page.getByTestId('tab-routes').click()
   await expect(page.getByTestId('route-MIA-ORD')).toBeVisible()
 })
@@ -71,7 +77,11 @@ test('the quarterly report reflects the resolved quarter', async ({ page }) => {
   // Open a route and assign the starter fleet through the harness (the same
   // command surface the UI uses), then resolve a quarter in the UI.
   await page.evaluate(() => {
-    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD' })
+    {
+      const snap = window.__harness.getState()!
+      const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
+      window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
+    }
     const state = window.__harness.getState()!
     const routeId = state.airlines[0]!.routes[0]!.id
     for (const aircraft of state.airlines[0]!.fleet) {
@@ -101,6 +111,7 @@ test('opening a route triggers the reward animation and toast', async ({ page })
   await page.getByTestId('city-MIA').click()
   await page.getByTestId('plan-route').click()
   await page.getByTestId('city-ORD').click()
+  await page.getByTestId('route-setup-confirm').click()
   await expect(page.getByTestId('toasts')).toContainText('Route opened: MIA – ORD')
   await expect(page.getByTestId('route-line-new')).toHaveCount(1)
   // The reward is transient: the draw-in class clears on the next action.
@@ -123,7 +134,11 @@ test('zoom reveals small cities that are hidden at world view', async ({ page })
 test('the route dossier and rivals intel expose the numbers', async ({ page }) => {
   await startGame(page)
   await page.evaluate(() => {
-    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD' })
+    {
+      const snap = window.__harness.getState()!
+      const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
+      window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
+    }
     const state = window.__harness.getState()!
     const routeId = state.airlines[0]!.routes[0]!.id
     for (const aircraft of state.airlines[0]!.fleet) {
@@ -154,7 +169,11 @@ test('the shop estimates per-route economics, coach marks guide, mute persists',
   await expect(page.getByTestId('coach')).toHaveCount(0)
 
   await page.evaluate(() => {
-    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD' })
+    {
+      const snap = window.__harness.getState()!
+      const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
+      window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
+    }
   })
   await page.getByTestId('tab-fleet').click()
   await expect(page.getByTestId('shop-table')).toContainText('Meridian 80')
@@ -193,7 +212,11 @@ test('game over shows the ranked overlay and resets to the menu', async ({ page 
 test('the harness replays deterministically', async ({ page }) => {
   await startGame(page)
   const first = await page.evaluate(() => {
-    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'MIA' })
+    {
+      const snap = window.__harness.getState()!
+      const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
+      window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'MIA', aircraftId: idle.id, frequency: 5 })
+    }
     window.__harness.endQuarter()
     window.__harness.endQuarter()
     return JSON.stringify(window.__harness.getState())
@@ -201,7 +224,11 @@ test('the harness replays deterministically', async ({ page }) => {
   const second = await page.evaluate(() => {
     window.__harness.reset()
     window.__harness.newGame('jet_age', 'e2e-seed')
-    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'MIA' })
+    {
+      const snap = window.__harness.getState()!
+      const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
+      window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'MIA', aircraftId: idle.id, frequency: 5 })
+    }
     window.__harness.endQuarter()
     window.__harness.endQuarter()
     return JSON.stringify(window.__harness.getState())

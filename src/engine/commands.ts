@@ -15,7 +15,9 @@ import {
 import {
   debtCeiling,
   findRoute,
+  maxRouteFrequency,
   resaleValue,
+  roundTripsPerWeek,
   slotsAllocated,
   slotsFree,
   totalDebt,
@@ -45,9 +47,20 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       const [a, b] = from < to ? [from, to] : [to, from]
       if (airline.routes.some((r) => r.from === a && r.to === b))
         return reject(airlineIdx, command, 'route already open')
-      if (distanceKm(a, b) < MIN_ROUTE_KM) return reject(airlineIdx, command, 'route too short')
+      const km = distanceKm(a, b)
+      if (km < MIN_ROUTE_KM) return reject(airlineIdx, command, 'route too short')
       if (slotsFree(airline, a) < 1) return reject(airlineIdx, command, `no free slots at ${a}`)
       if (slotsFree(airline, b) < 1) return reject(airlineIdx, command, `no free slots at ${b}`)
+      // A route launches with a real schedule: one idle aircraft and a weekly
+      // frequency that aircraft can actually fly at this distance.
+      const aircraft = airline.fleet.find((ac) => ac.id === command.aircraftId)
+      if (!aircraft) return reject(airlineIdx, command, 'no such aircraft')
+      if (aircraft.routeId !== null) return reject(airlineIdx, command, 'aircraft is already assigned')
+      if (getAircraftType(aircraft.type).rangeKm < km)
+        return reject(airlineIdx, command, 'aircraft lacks the range for this route')
+      const maxFreq = roundTripsPerWeek(aircraft.type, km)
+      if (!Number.isInteger(command.frequency) || command.frequency < 1 || command.frequency > maxFreq)
+        return reject(airlineIdx, command, `frequency must be 1..${maxFreq} for this aircraft`)
       const fareLevel = command.fareLevel ?? 0
       const serviceLevel = command.serviceLevel ?? 2
       if (!Number.isInteger(fareLevel) || fareLevel < -2 || fareLevel > 2)
@@ -60,6 +73,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         to: b,
         fareLevel,
         serviceLevel,
+        frequency: command.frequency,
         lastPax: 0,
         lastCapacity: 0,
         lastLoadFactorBp: 0,
@@ -68,7 +82,25 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         history: [],
       }
       airline.routes.push(route)
-      return { events: [{ type: 'route_opened', airline: airlineIdx, routeId: route.id, from: a, to: b }] }
+      aircraft.routeId = route.id
+      return {
+        events: [
+          { type: 'route_opened', airline: airlineIdx, routeId: route.id, from: a, to: b },
+          { type: 'aircraft_assigned', airline: airlineIdx, aircraftId: aircraft.id, routeId: route.id },
+        ],
+      }
+    }
+
+    case 'set_frequency': {
+      const route = findRoute(airline, command.routeId)
+      if (!route) return reject(airlineIdx, command, 'no such route')
+      const max = maxRouteFrequency(airline, route)
+      if (!Number.isInteger(command.frequency) || command.frequency < 1 || command.frequency > max)
+        return reject(airlineIdx, command, `frequency must be 1..${max} with the assigned fleet`)
+      route.frequency = command.frequency
+      return {
+        events: [{ type: 'frequency_set', airline: airlineIdx, routeId: route.id, frequency: route.frequency }],
+      }
     }
 
     case 'close_route': {

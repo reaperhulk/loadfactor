@@ -14,49 +14,109 @@ function fresh(): GameState {
 }
 
 describe('command validation', () => {
-  it('opens a route between slotted cities', () => {
-    const { state, events } = applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'ORD' })
+  it('opens a route with a launch aircraft and schedule', () => {
+    const { state, events } = applyCommand(fresh(), {
+      type: 'open_route',
+      from: 'JFK',
+      to: 'ORD',
+      aircraftId: 1,
+      frequency: 10,
+    })
     expect(events[0]).toMatchObject({ type: 'route_opened', from: 'JFK', to: 'ORD' })
-    expect(state.airlines[0]!.routes).toHaveLength(1)
+    expect(state.airlines[0]!.routes[0]).toMatchObject({ frequency: 10 })
+    // The launch aircraft is assigned as part of the open.
+    expect(state.airlines[0]!.fleet[0]!.routeId).toBe(state.airlines[0]!.routes[0]!.id)
+  })
+
+  it('validates the launch schedule against the aircraft', () => {
+    // Meridian 80 tops out at 22 round trips/week on JFK-ORD.
+    expectRejected(
+      applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: 1, frequency: 99 }).events,
+      'frequency must be 1..22',
+    )
+    expectRejected(
+      applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: 1, frequency: 0 }).events,
+      'frequency',
+    )
+    // A busy aircraft cannot launch a second route.
+    const first = applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: 1, frequency: 5 })
+    expectRejected(
+      applyCommand(first.state, { type: 'open_route', from: 'JFK', to: 'MIA', aircraftId: 1, frequency: 5 }).events,
+      'already assigned',
+    )
+  })
+
+  it('set_frequency is capped by the assigned fleet', () => {
+    let r = applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: 1, frequency: 5 })
+    const routeId = r.state.airlines[0]!.routes[0]!.id
+    r = applyCommand(r.state, { type: 'set_frequency', routeId, frequency: 22 })
+    expect(r.state.airlines[0]!.routes[0]!.frequency).toBe(22)
+    expectRejected(
+      applyCommand(r.state, { type: 'set_frequency', routeId, frequency: 23 }).events,
+      'frequency must be 1..22',
+    )
+    // Assigning the second Meridian doubles the ceiling.
+    r = applyCommand(r.state, { type: 'assign_aircraft', aircraftId: 2, routeId })
+    r = applyCommand(r.state, { type: 'set_frequency', routeId, frequency: 44 })
+    expect(r.state.airlines[0]!.routes[0]!.frequency).toBe(44)
   })
 
   it('canonicalizes the pair ordering', () => {
-    const { state } = applyCommand(fresh(), { type: 'open_route', from: 'ORD', to: 'JFK' })
+    const { state } = applyCommand(fresh(), {
+      type: 'open_route',
+      from: 'ORD',
+      to: 'JFK',
+      aircraftId: 1,
+      frequency: 5,
+    })
     expect(state.airlines[0]!.routes[0]).toMatchObject({ from: 'JFK', to: 'ORD' })
   })
 
   it('rejects routes without slots at both ends', () => {
-    const { events } = applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'LHR' })
+    const { events } = applyCommand(fresh(), {
+      type: 'open_route',
+      from: 'JFK',
+      to: 'LHR',
+      aircraftId: 1,
+      frequency: 5,
+    })
     expectRejected(events, 'no free slots')
   })
 
   it('rejects duplicate routes', () => {
-    const first = applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'ORD' })
-    const second = applyCommand(first.state, { type: 'open_route', from: 'ORD', to: 'JFK' })
+    const first = applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: 1, frequency: 5 })
+    const second = applyCommand(first.state, {
+      type: 'open_route',
+      from: 'ORD',
+      to: 'JFK',
+      aircraftId: 2,
+      frequency: 5,
+    })
     expectRejected(second.events, 'already open')
   })
 
   it('rejects unknown cities and self-routes', () => {
-    expectRejected(applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'XXX' }).events, 'invalid city pair')
-    expectRejected(applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'JFK' }).events, 'invalid city pair')
+    expectRejected(
+      applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'XXX', aircraftId: 1, frequency: 5 }).events,
+      'invalid city pair',
+    )
+    expectRejected(
+      applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'JFK', aircraftId: 1, frequency: 5 }).events,
+      'invalid city pair',
+    )
   })
 
-  it('rejects assignment beyond aircraft range', () => {
+  it('rejects a launch beyond the aircraft range', () => {
     const state = fresh()
     state.airlines[0]!.slots['LHR'] = 2 // grant a transatlantic foothold
-    const opened = applyCommand(state, { type: 'open_route', from: 'JFK', to: 'LHR' })
-    const routeId = opened.state.airlines[0]!.routes[0]!.id
-    const aircraftId = opened.state.airlines[0]!.fleet[0]!.id
     // Meridian 80 range 3000km < JFK-LHR 5541km.
-    const assigned = applyCommand(opened.state, { type: 'assign_aircraft', aircraftId, routeId })
-    expectRejected(assigned.events, 'range')
+    const opened = applyCommand(state, { type: 'open_route', from: 'JFK', to: 'LHR', aircraftId: 1, frequency: 3 })
+    expectRejected(opened.events, 'range')
   })
 
   it('closing a route unassigns its aircraft', () => {
-    let r = applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'ORD' })
+    let r = applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: 1, frequency: 5 })
     const routeId = r.state.airlines[0]!.routes[0]!.id
-    const aircraftId = r.state.airlines[0]!.fleet[0]!.id
-    r = applyCommand(r.state, { type: 'assign_aircraft', aircraftId, routeId })
     expect(r.state.airlines[0]!.fleet[0]!.routeId).toBe(routeId)
     r = applyCommand(r.state, { type: 'close_route', routeId })
     expect(r.state.airlines[0]!.routes).toHaveLength(0)
@@ -113,7 +173,7 @@ describe('command validation', () => {
   it('never mutates the input state', () => {
     const state = fresh()
     const snapshot = JSON.stringify(state)
-    applyCommand(state, { type: 'open_route', from: 'JFK', to: 'ORD' })
+    applyCommand(state, { type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: 1, frequency: 5 })
     applyCommand(state, { type: 'end_quarter' })
     expect(JSON.stringify(state)).toBe(snapshot)
   })

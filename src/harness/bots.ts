@@ -11,6 +11,8 @@ import { negotiationDifficulty } from '../engine/negotiation'
 import {
   airlinesOnPair,
   debtCeiling,
+  maxRouteFrequency,
+  roundTripsPerWeek,
   routeWeeklyCapacity,
   slotCities,
   slotsAllocated,
@@ -22,16 +24,20 @@ import type { Command, GameState } from '../engine/types'
 
 export type BotName = 'naive' | 'greedy'
 
-// Shared: assign every idle aircraft to the route most starved for seats.
-export function assignmentCommands(state: GameState): Command[] {
+// Shared: assign every idle aircraft to the route most starved for seats,
+// bumping each route's schedule to the fleet's new maximum. Commands are
+// computed against the pre-apply snapshot, so expected frequencies are
+// tracked explicitly. `skip` excludes aircraft consumed by an open_route
+// command earlier in the same batch.
+export function assignmentCommands(state: GameState, skip?: ReadonlySet<number>): Command[] {
   const airline = state.airlines[0]!
   const commands: Command[] = []
-  // Track pending capacity so two idle aircraft do not pile onto one route.
   const pendingCapacity = new Map<number, number>()
+  const pendingTrips = new Map<number, number>()
   for (const ac of airline.fleet) {
-    if (ac.routeId !== null) continue
+    if (ac.routeId !== null || skip?.has(ac.id)) continue
     const type = getAircraftType(ac.type)
-    let bestRoute: number | null = null
+    let bestRoute: (typeof airline.routes)[number] | null = null
     let bestGap = 0
     for (const route of airline.routes) {
       const km = distanceKm(route.from, route.to)
@@ -42,15 +48,52 @@ export function assignmentCommands(state: GameState): Command[] {
         (pendingCapacity.get(route.id) ?? 0)
       if (gap > bestGap) {
         bestGap = gap
-        bestRoute = route.id
+        bestRoute = route
       }
     }
     if (bestRoute !== null) {
-      commands.push({ type: 'assign_aircraft', aircraftId: ac.id, routeId: bestRoute })
-      pendingCapacity.set(bestRoute, (pendingCapacity.get(bestRoute) ?? 0) + type.seats * 20)
+      const km = distanceKm(bestRoute.from, bestRoute.to)
+      const trips = roundTripsPerWeek(ac.type, km)
+      commands.push({ type: 'assign_aircraft', aircraftId: ac.id, routeId: bestRoute.id })
+      const newMax = maxRouteFrequency(airline, bestRoute) + (pendingTrips.get(bestRoute.id) ?? 0) + trips
+      commands.push({ type: 'set_frequency', routeId: bestRoute.id, frequency: newMax })
+      pendingCapacity.set(bestRoute.id, (pendingCapacity.get(bestRoute.id) ?? 0) + type.seats * 20)
+      pendingTrips.set(bestRoute.id, (pendingTrips.get(bestRoute.id) ?? 0) + trips)
     }
   }
   return commands
+}
+
+// The launch order for the best unserved pair, if an idle airframe can fly
+// it. Returns the commands plus the consumed aircraft id.
+export function launchCommands(
+  state: GameState,
+  minScore: number,
+  fareLevel = 0,
+  serviceLevel = 2,
+): { commands: Command[]; usedAircraft: number | null } {
+  const airline = state.airlines[0]!
+  const pair = bestUnservedPair(state)
+  if (!pair || pair.score <= minScore) return { commands: [], usedAircraft: null }
+  const km = distanceKm(pair.from, pair.to)
+  const launch = airline.fleet.find(
+    (ac) => ac.routeId === null && getAircraftType(ac.type).rangeKm >= km,
+  )
+  if (!launch) return { commands: [], usedAircraft: null }
+  return {
+    commands: [
+      {
+        type: 'open_route',
+        from: pair.from,
+        to: pair.to,
+        aircraftId: launch.id,
+        frequency: roundTripsPerWeek(launch.type, km),
+        fareLevel,
+        serviceLevel,
+      },
+    ],
+    usedAircraft: launch.id,
+  }
 }
 
 // Demand discounted by incumbent competition: a monopoly pair is worth far
@@ -88,12 +131,9 @@ export function bestUnservedPair(state: GameState): { from: string; to: string; 
 // never negotiates, never borrows, never touches fares. The balance envelope
 // expects this bot to survive early but lose the scenario.
 function naiveCommands(state: GameState): Command[] {
-  const commands: Command[] = []
-  const pair = bestUnservedPair(state)
-  if (pair && state.airlines[0]!.fleet.some((a) => a.routeId === null)) {
-    commands.push({ type: 'open_route', from: pair.from, to: pair.to })
-  }
-  return [...commands, ...assignmentCommands(state)]
+  const launch = launchCommands(state, 0)
+  const skip = launch.usedAircraft !== null ? new Set([launch.usedAircraft]) : undefined
+  return [...launch.commands, ...assignmentCommands(state, skip)]
 }
 
 // Yield management: monopoly-tight routes can bear higher fares; slack routes
@@ -138,12 +178,8 @@ function greedyCommands(state: GameState): Command[] {
     .slice(0, 2)
   for (const ac of geriatric) commands.push({ type: 'sell_aircraft', aircraftId: ac.id })
 
-  const idleOrIncoming =
-    airline.fleet.some((a) => a.routeId === null) || airline.orders.length > 0 || airline.routes.length === 0
-  const pair = bestUnservedPair(state)
-  if (idleOrIncoming && pair && pair.score > 300) {
-    commands.push({ type: 'open_route', from: pair.from, to: pair.to })
-  }
+  const launch = launchCommands(state, 300)
+  commands.push(...launch.commands)
 
   // Capacity discipline: only buy when the network is actually full (or we
   // are still fielding the starter fleet, or renewal just thinned us out).
@@ -208,7 +244,8 @@ function greedyCommands(state: GameState): Command[] {
     }
   }
 
-  return [...commands, ...fareCommands(state), ...assignmentCommands(state)]
+  const skip = launch.usedAircraft !== null ? new Set([launch.usedAircraft]) : undefined
+  return [...commands, ...fareCommands(state), ...assignmentCommands(state, skip)]
 }
 
 export function botCommands(state: GameState, bot: BotName): Command[] {

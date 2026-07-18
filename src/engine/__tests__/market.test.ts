@@ -12,6 +12,7 @@ function withRoute(state: GameState, airlineIdx: number, from: string, to: strin
     to: b,
     fareLevel,
     serviceLevel: 2,
+    frequency: 9999, // effective schedule capped by the assigned fleet
     lastPax: 0,
     lastCapacity: 0,
     lastLoadFactorBp: 0,
@@ -106,10 +107,13 @@ describe('market resolution', () => {
   })
 
   it('quarter resolution emits results through the public surface', () => {
-    let r = applyCommand(newGame('jet_age', 'market-seed'), { type: 'open_route', from: 'JFK', to: 'ORD' })
-    const routeId = r.state.airlines[0]!.routes[0]!.id
-    const aircraftId = r.state.airlines[0]!.fleet[0]!.id
-    r = applyCommand(r.state, { type: 'assign_aircraft', aircraftId, routeId })
+    let r = applyCommand(newGame('jet_age', 'market-seed'), {
+      type: 'open_route',
+      from: 'JFK',
+      to: 'ORD',
+      aircraftId: 1,
+      frequency: 10,
+    })
     r = applyCommand(r.state, { type: 'end_quarter' })
     const route = r.state.airlines[0]!.routes[0]!
     expect(route.lastPax).toBeGreaterThan(0)

@@ -6,7 +6,7 @@ import { getAircraftType } from '../data/aircraft'
 import { distanceKm, pairKey } from '../data/cities'
 import type { GameState } from '../engine'
 import { fareFor, pairWeeklyDemand } from '../engine/market'
-import { roundTripsPerWeek, routeWeeklyCapacity } from '../engine/queries'
+import { effectiveFrequency, maxRouteFrequency, roundTripsPerWeek, routeWeeklyCapacity } from '../engine/queries'
 import { Sparkline } from './Sparkline'
 import { dispatch } from './session'
 
@@ -79,6 +79,20 @@ export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
 
       <h3>Controls</h3>
       <div className="dossier-controls">
+        <span data-testid="dossier-frequency">
+          Schedule{' '}
+          <button
+            onClick={() => dispatch({ type: 'set_frequency', routeId: route.id, frequency: route.frequency - 1 })}
+          >
+            −
+          </button>{' '}
+          {effectiveFrequency(player, route)}/{maxRouteFrequency(player, route)} rt/wk{' '}
+          <button
+            onClick={() => dispatch({ type: 'set_frequency', routeId: route.id, frequency: route.frequency + 1 })}
+          >
+            +
+          </button>
+        </span>
         <span>
           Fare{' '}
           <button onClick={() => dispatch({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel - 1 })}>

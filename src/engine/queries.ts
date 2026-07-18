@@ -83,14 +83,47 @@ export function roundTripsPerWeek(type: string, km: number): number {
   return Math.floor(WEEKLY_BLOCK_MINUTES / roundTripMin)
 }
 
-// Weekly seat capacity (both directions summed) an airline fields on a route.
-export function routeWeeklyCapacity(airline: Airline, route: Route): number {
+// Most round trips per week the assigned fleet could fly on this route.
+export function maxRouteFrequency(airline: Airline, route: Route): number {
   const km = distanceKm(route.from, route.to)
-  let seats = 0
+  let max = 0
+  for (const a of airline.fleet) {
+    if (a.routeId === route.id) max += roundTripsPerWeek(a.type, km)
+  }
+  return max
+}
+
+// The schedule actually flown: the requested frequency, capped by the fleet.
+export function effectiveFrequency(airline: Airline, route: Route): number {
+  return Math.min(route.frequency, maxRouteFrequency(airline, route))
+}
+
+export interface TripAllocation {
+  aircraftId: number
+  type: string
+  trips: number // round trips this airframe flies this week
+}
+
+// Distribute the effective frequency across the assigned fleet in stable
+// fleet order — each airframe flies up to its own weekly maximum.
+export function allocateTrips(airline: Airline, route: Route): TripAllocation[] {
+  const km = distanceKm(route.from, route.to)
+  let remaining = effectiveFrequency(airline, route)
+  const out: TripAllocation[] = []
   for (const a of airline.fleet) {
     if (a.routeId !== route.id) continue
-    const t = getAircraftType(a.type)
-    seats += t.seats * roundTripsPerWeek(a.type, km) * 2
+    const trips = Math.min(roundTripsPerWeek(a.type, km), remaining)
+    remaining -= trips
+    out.push({ aircraftId: a.id, type: a.type, trips })
+  }
+  return out
+}
+
+// Weekly seat capacity (both directions summed) an airline fields on a route.
+export function routeWeeklyCapacity(airline: Airline, route: Route): number {
+  let seats = 0
+  for (const alloc of allocateTrips(airline, route)) {
+    seats += getAircraftType(alloc.type).seats * alloc.trips * 2
   }
   return seats
 }

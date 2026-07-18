@@ -17,13 +17,26 @@ const idArb = fc.integer({ min: -2, max: 30 })
 const moneyArb = fc.integer({ min: -5000, max: 40000 })
 
 const commandArb: fc.Arbitrary<Command> = fc.oneof(
-  fc.record({ type: fc.constant('open_route' as const), from: cityArb, to: cityArb }),
   fc.record({
     type: fc.constant('open_route' as const),
     from: cityArb,
     to: cityArb,
+    aircraftId: idArb,
+    frequency: fc.integer({ min: -3, max: 60 }),
+  }),
+  fc.record({
+    type: fc.constant('open_route' as const),
+    from: cityArb,
+    to: cityArb,
+    aircraftId: idArb,
+    frequency: fc.integer({ min: -3, max: 60 }),
     fareLevel: fc.integer({ min: -4, max: 4 }),
     serviceLevel: fc.integer({ min: 0, max: 5 }),
+  }),
+  fc.record({
+    type: fc.constant('set_frequency' as const),
+    routeId: idArb,
+    frequency: fc.integer({ min: -3, max: 60 }),
   }),
   fc.record({ type: fc.constant('close_route' as const), routeId: idArb }),
   fc.record({ type: fc.constant('set_fare' as const), routeId: idArb, fareLevel: fc.integer({ min: -4, max: 4 }) }),

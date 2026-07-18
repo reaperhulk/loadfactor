@@ -19,11 +19,16 @@ describe('quarter resolution', () => {
     // No planning commands → the only player cash movement during resolution
     // is the quarterly P&L (PLAN.md §3.3 step 6).
     let state: GameState = newGame('jet_age', 'accounting-seed')
-    state = applyCommand(state, { type: 'open_route', from: 'JFK', to: 'ORD' }).state
+    state = applyCommand(state, {
+      type: 'open_route',
+      from: 'JFK',
+      to: 'ORD',
+      aircraftId: 1,
+      frequency: 20,
+    }).state
     const routeId = state.airlines[0]!.routes[0]!.id
-    for (const ac of state.airlines[0]!.fleet) {
-      state = applyCommand(state, { type: 'assign_aircraft', aircraftId: ac.id, routeId }).state
-    }
+    state = applyCommand(state, { type: 'assign_aircraft', aircraftId: 2, routeId }).state
+    state = applyCommand(state, { type: 'set_frequency', routeId, frequency: 44 }).state
     for (let q = 0; q < 8; q++) {
       const before = state.airlines[0]!.cash
       const { state: after, events } = applyCommand(state, { type: 'end_quarter' })
@@ -80,7 +85,7 @@ describe('quarter resolution', () => {
     const after = applyCommand(state, { type: 'end_quarter' })
     expect(after.state).toBe(state)
     expect(after.events).toHaveLength(0)
-    const rejected = applyCommand(state, { type: 'open_route', from: 'JFK', to: 'ORD' })
+    const rejected = applyCommand(state, { type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: 1, frequency: 5 })
     expect(rejected.events[0]).toMatchObject({ type: 'command_rejected' })
   })
 

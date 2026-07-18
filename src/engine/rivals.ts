@@ -11,6 +11,8 @@ import { pairWeeklyDemand } from './market'
 import { negotiationDifficulty } from './negotiation'
 import {
   debtCeiling,
+  maxRouteFrequency,
+  roundTripsPerWeek,
   routeWeeklyCapacity,
   slotCities,
   slotsAllocated,
@@ -87,7 +89,23 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
     if (room >= 5000) apply(state, idx, { type: 'take_loan', amount: Math.min(room, 8000) }, events)
   }
 
-  // Assign idle aircraft to the route that is most starved for seats.
+  // Defensive play, same as the competent player bot: prune structurally
+  // losing routes and retire one geriatric maintenance hog per quarter.
+  for (const route of [...airline.routes]) {
+    if (route.lastCapacity > 0 && route.lastRevenue * 100 < route.lastCost * 85) {
+      apply(state, idx, { type: 'close_route', routeId: route.id }, events)
+    }
+  }
+  if (airline.fleet.length > 2) {
+    let oldest: (typeof airline.fleet)[number] | null = null
+    for (const ac of airline.fleet) {
+      if (ac.ageQuarters >= 60 && (oldest === null || ac.ageQuarters > oldest.ageQuarters)) oldest = ac
+    }
+    if (oldest) apply(state, idx, { type: 'sell_aircraft', aircraftId: oldest.id }, events)
+  }
+
+  // Assign idle aircraft to the route that is most starved for seats, and
+  // keep the schedule at the fleet's maximum as capacity arrives.
   for (const ac of airline.fleet) {
     if (ac.routeId !== null) continue
     const range = getAircraftType(ac.type).rangeKm
@@ -102,20 +120,25 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
         bestRoute = route.id
       }
     }
-    if (bestRoute !== null) apply(state, idx, { type: 'assign_aircraft', aircraftId: ac.id, routeId: bestRoute }, events)
+    if (bestRoute !== null) {
+      apply(state, idx, { type: 'assign_aircraft', aircraftId: ac.id, routeId: bestRoute }, events)
+      const route = airline.routes.find((r) => r.id === bestRoute)
+      if (route) {
+        const max = maxRouteFrequency(airline, route)
+        if (max > route.frequency) apply(state, idx, { type: 'set_frequency', routeId: route.id, frequency: max }, events)
+      }
+    }
   }
 
-  // Open the highest-demand unserved pair among cities we hold slots at —
-  // but only if there is (or soon will be) an aircraft with the range for it.
-  const idleOrIncoming =
-    airline.fleet.some((a) => a.routeId === null) || airline.orders.length > 0 || airline.routes.length === 0
-  if (idleOrIncoming) {
+  // Open the highest-demand unserved pair an IDLE aircraft can actually fly,
+  // launching it at that aircraft's full weekly frequency.
+  const idle = airline.fleet.filter((a) => a.routeId === null)
+  if (idle.length > 0) {
     let maxRange = 0
-    for (const ac of airline.fleet) maxRange = Math.max(maxRange, getAircraftType(ac.type).rangeKm)
-    for (const o of airline.orders) maxRange = Math.max(maxRange, getAircraftType(o.type).rangeKm)
+    for (const ac of idle) maxRange = Math.max(maxRange, getAircraftType(ac.type).rangeKm)
     const cities = slotCities(airline)
     const served = new Set(airline.routes.map((r) => pairKey(r.from, r.to)))
-    let best: { from: string; to: string } | null = null
+    let best: { from: string; to: string; km: number } | null = null
     let bestDemand = 0
     for (let i = 0; i < cities.length; i++) {
       for (let j = i + 1; j < cities.length; j++) {
@@ -128,22 +151,28 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
         const demand = pairWeeklyDemand(state, a, b)
         if (demand > bestDemand) {
           bestDemand = demand
-          best = { from: a, to: b }
+          best = { from: a, to: b, km }
         }
       }
     }
     if (best && bestDemand > personality.expandMinDemand) {
-      apply(
-        state,
-        idx,
-        {
-          type: 'open_route',
-          ...best,
-          fareLevel: personality.fareLevel,
-          serviceLevel: personality.serviceLevel,
-        },
-        events,
-      )
+      const launch = idle.find((ac) => getAircraftType(ac.type).rangeKm >= best.km)
+      if (launch) {
+        apply(
+          state,
+          idx,
+          {
+            type: 'open_route',
+            from: best.from,
+            to: best.to,
+            aircraftId: launch.id,
+            frequency: roundTripsPerWeek(launch.type, best.km),
+            fareLevel: personality.fareLevel,
+            serviceLevel: personality.serviceLevel,
+          },
+          events,
+        )
+      }
     }
   }
 

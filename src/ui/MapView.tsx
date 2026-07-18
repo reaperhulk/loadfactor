@@ -9,7 +9,7 @@ import { CITIES, distanceKm, getCity, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { WORLD_PATH } from '../data/worldmap.gen'
 import type { GameState, Route } from '../engine'
-import { slotsHeld } from '../engine/queries'
+import { effectiveFrequency, slotsHeld } from '../engine/queries'
 
 function slotsUsedAt(routes: readonly Route[], city: string): number {
   let used = 0
@@ -197,8 +197,12 @@ export function MapView({
       mx = t.x + ((clientX - rect.left) / rect.width) * t.w
       my = t.y + ((clientY - rect.top) / rect.height) * t.h
     }
-    const w = t.w / factor
-    const h = t.h / factor
+    // Clamp the scale BEFORE anchoring: at the zoom limit the width stops
+    // changing, and anchoring with an unclamped width would keep shifting
+    // x/y toward the cursor — the "scrolls at an angle" bug.
+    const w = Math.min(W, Math.max(W / MAX_SCALE, t.w / factor))
+    if (w === t.w) return
+    const h = (w / W) * H
     applyView({ x: mx - ((mx - t.x) / t.w) * w, y: my - ((my - t.y) / t.h) * h, w, h }, immediate)
   }
 
@@ -345,28 +349,32 @@ export function MapView({
             </g>
           )
         })}
-        {/* Ambient reward: little planes fly the routes you actually serve.
-            Long-haul takes visibly longer than a hop. */}
-        {flownRoutes.map((r) => {
+        {/* Constant traffic: planes shuttle back and forth on every served
+            route — more of them the busier the schedule, and long-haul takes
+            visibly longer than a hop. */}
+        {flownRoutes.flatMap((r) => {
           const km = distanceKm(r.from, r.to)
+          const freq = effectiveFrequency(player, r)
+          const planes = Math.max(1, Math.min(4, Math.round(freq / 8)))
           const dur = 4 + Math.min(14, km / 900)
-          return (
-            <g key={`plane-${r.id}`} className="plane" data-testid={`plane-${r.id}`}>
+          const path = arcPath(r.from, r.to)
+          return Array.from({ length: planes }, (_, i) => (
+            <g key={`plane-${r.id}-${i}`} className="plane" data-testid={i === 0 ? `plane-${r.id}` : undefined}>
               <text fontSize={11 / scale} dy={3.5 / scale} textAnchor="middle">
                 ✈
               </text>
               <animateMotion
                 dur={`${dur.toFixed(1)}s`}
-                begin={`${-((r.id * 13) % 60) / 10}s`}
+                begin={`${(-((r.id * 13) % 60) / 10 - (i * dur) / planes).toFixed(1)}s`}
                 repeatCount="indefinite"
                 keyPoints="0;1;1;0;0"
                 keyTimes="0;0.45;0.5;0.95;1"
                 calcMode="linear"
                 rotate="auto"
-                path={arcPath(r.from, r.to)}
+                path={path}
               />
             </g>
-          )
+          ))
         })}
         {/* Fresh slot wins ping gold at the airport. */}
         {[...newSlotCities].sort().map((cityId) => {

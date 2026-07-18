@@ -25,6 +25,10 @@ export function checkInvariants(state: GameState): void {
       assertInv(isCity(route.from) && isCity(route.to), `route ${route.id} cities exist`)
       assertInv(route.from < route.to, `route ${route.id} pair is canonical`)
       assertInv(route.fareLevel >= -2 && route.fareLevel <= 2, `route ${route.id} fare level in range`)
+      assertInv(
+        Number.isInteger(route.frequency) && route.frequency >= 1,
+        `route ${route.id} frequency is a positive integer`,
+      )
       assertInv(route.serviceLevel >= 1 && route.serviceLevel <= 3, `route ${route.id} service level in range`)
       assertInv(
         route.lastLoadFactorBp >= 0 && route.lastLoadFactorBp <= 10000,
