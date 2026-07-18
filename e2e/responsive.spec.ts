@@ -45,6 +45,12 @@ for (const viewport of VIEWPORTS) {
       expect(await horizontalOverflow(page), `${tab} tab fits`).toBeLessThanOrEqual(0)
     }
 
+    // The city dossier panel must fit too (overlay on desktop, stacked on mobile).
+    await page.getByTestId('city-MIA').click()
+    await expect(page.getByTestId('city-panel')).toBeVisible()
+    expect(await horizontalOverflow(page), 'city panel fits').toBeLessThanOrEqual(0)
+    await page.getByTestId('city-panel-close').click()
+
     // The core interaction still works at this size.
     await page.getByTestId('end-quarter').click()
     await expect(page.getByTestId('date')).toHaveText('1960 Q3')

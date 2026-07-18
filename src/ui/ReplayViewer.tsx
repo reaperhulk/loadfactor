@@ -58,7 +58,14 @@ export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () =>
           Exit replay
         </button>
       </header>
-      <MapView state={state} selected={null} onSelect={() => {}} newRouteIds={EMPTY} newSlotCities={EMPTY} />
+      <MapView
+        state={state}
+        selected={null}
+        routeFrom={null}
+        onCityClick={() => {}}
+        newRouteIds={EMPTY}
+        newSlotCities={EMPTY}
+      />
       <div className="replay-controls">
         <button onClick={() => setIndex(0)} title="restart">
           ⏮

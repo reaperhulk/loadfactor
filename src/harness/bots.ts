@@ -9,6 +9,7 @@ import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
 import { pairWeeklyDemand } from '../engine/market'
 import { negotiationDifficulty } from '../engine/negotiation'
 import {
+  airlinesOnPair,
   debtCeiling,
   routeWeeklyCapacity,
   slotCities,
@@ -52,22 +53,11 @@ function assignmentCommands(state: GameState): Command[] {
   return commands
 }
 
-// Rival airlines already flying a pair (market share must be split with them).
-function competitorsOnPair(state: GameState, a: string, b: string): number {
-  const key = pairKey(a, b)
-  let n = 0
-  for (const airline of state.airlines) {
-    if (airline.id === 0) continue
-    if (airline.routes.some((r) => pairKey(r.from, r.to) === key)) n++
-  }
-  return n
-}
-
 // Demand discounted by incumbent competition: a monopoly pair is worth far
 // more than a contested one of equal size.
 function pairScore(state: GameState, a: string, b: string): number {
   const demand = pairWeeklyDemand(state, a, b)
-  return Math.floor((demand * 100) / (100 + 150 * competitorsOnPair(state, a, b)))
+  return Math.floor((demand * 100) / (100 + 150 * airlinesOnPair(state, a, b, 0)))
 }
 
 function bestUnservedPair(state: GameState): { from: string; to: string; score: number } | null {

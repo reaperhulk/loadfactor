@@ -10,7 +10,7 @@ import {
   RESALE_INITIAL_BP,
   WEEKLY_BLOCK_MINUTES,
 } from '../data/constants'
-import { distanceKm } from '../data/cities'
+import { distanceKm, pairKey } from '../data/cities'
 import { getScenario } from '../data/scenarios'
 import type { Airline, GameState, Route } from './types'
 
@@ -93,6 +93,17 @@ export function routeWeeklyCapacity(airline: Airline, route: Route): number {
     seats += t.seats * roundTripsPerWeek(a.type, km) * 2
   }
   return seats
+}
+
+// Airlines serving a pair, optionally excluding one (for "my competitors").
+export function airlinesOnPair(state: GameState, a: string, b: string, excludeIdx?: number): number {
+  const key = pairKey(a, b)
+  let n = 0
+  for (const airline of state.airlines) {
+    if (airline.id === excludeIdx) continue
+    if (airline.routes.some((r) => pairKey(r.from, r.to) === key)) n++
+  }
+  return n
 }
 
 // Stable sorted city ids an airline holds slots at (object-key iteration is

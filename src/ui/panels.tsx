@@ -6,8 +6,17 @@ import { getAircraftType, typesOnSale } from '../data/aircraft'
 import { CITIES, distanceKm } from '../data/cities'
 import { NEG_MIN_SPEND } from '../data/constants'
 import type { GameEvent, GameState } from '../engine'
+import { fareFor } from '../engine/market'
 import { negotiationDifficulty } from '../engine/negotiation'
-import { debtCeiling, slotsHeld, slotsUsed, totalDebt, yearOf } from '../engine/queries'
+import {
+  airlinesOnPair,
+  debtCeiling,
+  roundTripsPerWeek,
+  slotsHeld,
+  slotsUsed,
+  totalDebt,
+  yearOf,
+} from '../engine/queries'
 import { dispatch } from './session'
 
 function money(k: number): string {
@@ -28,25 +37,33 @@ export function RoutesPanel({ state }: { state: GameState }) {
           <th>Fare</th>
           <th>Service</th>
           <th>Planes</th>
+          <th>Freq/wk</th>
+          <th>Rivals</th>
           <th>Load</th>
+          <th>Rev</th>
           <th>P&L</th>
           <th />
         </tr>
       </thead>
       <tbody>
         {player.routes.map((r) => {
+          const km = distanceKm(r.from, r.to)
           const planes = player.fleet.filter((a) => a.routeId === r.id).length
+          const freq = player.fleet
+            .filter((a) => a.routeId === r.id)
+            .reduce((sum, a) => sum + roundTripsPerWeek(a.type, km), 0)
+          const rivalsHere = airlinesOnPair(state, r.from, r.to, 0)
           return (
             <tr key={r.id} data-testid={`route-${r.from}-${r.to}`}>
               <td>
                 {r.from}–{r.to}
               </td>
-              <td>{distanceKm(r.from, r.to)}</td>
+              <td>{km}</td>
               <td>
                 <button onClick={() => dispatch({ type: 'set_fare', routeId: r.id, fareLevel: r.fareLevel - 1 })}>
                   −
                 </button>
-                {r.fareLevel > 0 ? `+${r.fareLevel}` : r.fareLevel}
+                ${fareFor(km, r.fareLevel)}
                 <button onClick={() => dispatch({ type: 'set_fare', routeId: r.id, fareLevel: r.fareLevel + 1 })}>
                   +
                 </button>
@@ -65,12 +82,15 @@ export function RoutesPanel({ state }: { state: GameState }) {
                 </button>
               </td>
               <td>{planes}</td>
+              <td>{freq}</td>
+              <td>{rivalsHere > 0 ? rivalsHere : '—'}</td>
               <td>
                 <span className="lf-bar">
                   <span className="lf-fill" style={{ width: `${r.lastLoadFactorBp / 100}%` }} />
                 </span>
                 {(r.lastLoadFactorBp / 100).toFixed(0)}%
               </td>
+              <td>{money(r.lastRevenue)}</td>
               <td className={r.lastRevenue - r.lastCost >= 0 ? 'pos' : 'neg'}>
                 {money(r.lastRevenue - r.lastCost)}
               </td>

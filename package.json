@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "gen:distances": "node tools/gen-distances.mjs",
+    "gen:worldmap": "node tools/gen-worldmap.mjs",
     "goldens:update": "UPDATE_GOLDENS=1 vitest --run src/engine/__tests__/goldens.test.ts",
     "test:e2e": "playwright test",
     "check": "npm run lint && npm run typecheck && npm run test:unit && npm run build"

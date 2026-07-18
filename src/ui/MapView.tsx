@@ -1,12 +1,21 @@
-// SVG world map: equirectangular projection, cities as dots, routes as lines.
-// Click two cities to open a route. Presentation-only trig/floats are fine
-// here — the engine never sees screen coordinates.
+// SVG world map: real landmass under an equirectangular projection, cities as
+// dots with zoom-dependent level of detail, routes as lifted arcs whose look
+// tells you short-haul from long-haul at a glance. Presentation-only floats
+// are fine here — the engine never sees screen coordinates.
 
-import { CITIES, getCity } from '../data/cities'
+import { useRef, useState } from 'react'
+import type { PointerEvent, WheelEvent } from 'react'
+import { CITIES, distanceKm, getCity, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
-import type { GameState } from '../engine'
+import { WORLD_PATH } from '../data/worldmap.gen'
+import type { GameState, Route } from '../engine'
 import { slotsHeld } from '../engine/queries'
-import { dispatch } from './session'
+
+function slotsUsedAt(routes: readonly Route[], city: string): number {
+  let used = 0
+  for (const r of routes) if (r.from === city || r.to === city) used++
+  return used
+}
 
 const W = 960
 const H = 420
@@ -19,8 +28,23 @@ function y(lat: number): number {
   return ((90 - lat) / 180) * ((H * 175) / 180) // clip Antarctica, keep aspect
 }
 
+export function cityMass(c: City): number {
+  return c.pop * 4 + c.biz * 3 + c.tour * 2
+}
+
+// Level of detail: majors always visible, regionals from mid zoom, small
+// fields only up close — plus anything the player has a stake in.
+export function cityTier(c: City): 1 | 2 | 3 {
+  const mass = cityMass(c)
+  return mass >= 62 ? 1 : mass >= 45 ? 2 : 3
+}
+
+// Majors and regionals are visible from the world view (Aerobiz-style busy
+// map); small fields fade in as you zoom.
+const TIER_MIN_SCALE: Record<1 | 2 | 3, number> = { 1: 0, 2: 0, 3: 1.8 }
+
 // Quadratic arc between two cities, lifted perpendicular to the chord — reads
-// as a flight path instead of a fence line. Pure presentation.
+// as a flight path instead of a fence line.
 function arcPath(fromId: string, toId: string): string {
   const a = getCity(fromId)
   const b = getCity(toId)
@@ -37,141 +61,286 @@ function arcPath(fromId: string, toId: string): string {
   return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`
 }
 
+// Short hops, medium stages, and long-haul trunks each get their own line
+// language (width/dash), on top of the arc lift that grows with distance.
+function haulClass(km: number): string {
+  return km >= 4500 ? 'route-long' : km >= 1500 ? 'route-medium' : 'route-short'
+}
+
+interface ViewBox {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+const FULL_VIEW: ViewBox = { x: 0, y: 0, w: W, h: H }
+const MAX_SCALE = 6
+
+function clampView(v: ViewBox): ViewBox {
+  const w = Math.min(W, Math.max(W / MAX_SCALE, v.w))
+  const h = (w / W) * H
+  return {
+    x: Math.min(W - w, Math.max(0, v.x)),
+    y: Math.min(H - h, Math.max(0, v.y)),
+    w,
+    h,
+  }
+}
+
 interface MapViewProps {
   state: GameState
-  selected: string | null
-  onSelect: (city: string | null) => void
+  selected: string | null // city shown in the dossier panel
+  routeFrom: string | null // armed origin: next city click opens a route
+  onCityClick: (city: string) => void
   newRouteIds: ReadonlySet<number>
   newSlotCities: ReadonlySet<string>
 }
 
-export function MapView({ state, selected, onSelect, newRouteIds, newSlotCities }: MapViewProps) {
+export function MapView({ state, selected, routeFrom, onCityClick, newRouteIds, newSlotCities }: MapViewProps) {
+  const [view, setView] = useState<ViewBox>(FULL_VIEW)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const drag = useRef<{ px: number; py: number; moved: boolean } | null>(null)
+
   const player = state.airlines[0]!
+  const scale = W / view.w
   const flownRoutes = player.routes.filter((r) => player.fleet.some((a) => a.routeId === r.id))
 
-  const onCityClick = (cityId: string): void => {
-    if (selected === null) {
-      onSelect(cityId)
-    } else if (selected === cityId) {
-      onSelect(null)
-    } else {
-      dispatch({ type: 'open_route', from: selected, to: cityId })
-      onSelect(null)
+  // Cities the player has a stake in stay visible at any zoom.
+  const stakes = new Set<string>()
+  for (const airline of state.airlines) {
+    if (airline.id !== 0) continue
+    for (const r of airline.routes) {
+      stakes.add(r.from)
+      stakes.add(r.to)
+    }
+  }
+  for (const c of CITIES) if (slotsHeld(player, c.id) > 0) stakes.add(c.id)
+  for (const e of state.world.events) if (e.city !== null) stakes.add(e.city)
+  if (selected !== null) stakes.add(selected)
+
+  const visible = CITIES.filter((c) => scale >= TIER_MIN_SCALE[cityTier(c)] || stakes.has(c.id))
+  const labeled = new Set(
+    visible.filter((c) => cityTier(c) === 1 || scale >= 1.5 || stakes.has(c.id)).map((c) => c.id),
+  )
+
+  // Convert a client point into map coordinates for cursor-anchored zoom.
+  const toMap = (clientX: number, clientY: number): { mx: number; my: number } => {
+    const rect = svgRef.current!.getBoundingClientRect()
+    return {
+      mx: view.x + ((clientX - rect.left) / rect.width) * view.w,
+      my: view.y + ((clientY - rect.top) / rect.height) * view.h,
     }
   }
 
+  const zoomAt = (mx: number, my: number, factor: number): void => {
+    setView((v) => {
+      const w = v.w / factor
+      const h = v.h / factor
+      return clampView({ x: mx - ((mx - v.x) / v.w) * w, y: my - ((my - v.y) / v.h) * h, w, h })
+    })
+  }
+
+  const onWheel = (e: WheelEvent<SVGSVGElement>): void => {
+    const { mx, my } = toMap(e.clientX, e.clientY)
+    zoomAt(mx, my, e.deltaY < 0 ? 1.25 : 0.8)
+  }
+
+  const onPointerDown = (e: PointerEvent<SVGSVGElement>): void => {
+    drag.current = { px: e.clientX, py: e.clientY, moved: false }
+  }
+
+  const onPointerMove = (e: PointerEvent<SVGSVGElement>): void => {
+    if (!drag.current) return
+    const dx = e.clientX - drag.current.px
+    const dy = e.clientY - drag.current.py
+    if (!drag.current.moved && Math.hypot(dx, dy) < 5) return
+    if (!drag.current.moved) {
+      // Capture only once a real drag starts — capturing on pointerdown would
+      // steal the click from the city dots.
+      e.currentTarget.setPointerCapture(e.pointerId)
+    }
+    drag.current.moved = true
+    const rect = svgRef.current!.getBoundingClientRect()
+    setView((v) => clampView({ ...v, x: v.x - (dx / rect.width) * v.w, y: v.y - (dy / rect.height) * v.h }))
+    drag.current.px = e.clientX
+    drag.current.py = e.clientY
+  }
+
+  const onPointerUp = (): void => {
+    // Keep `moved` readable by the click handlers that fire right after.
+    const wasDrag = drag.current?.moved ?? false
+    drag.current = null
+    if (wasDrag) suppressClick.current = true
+  }
+
+  const suppressClick = useRef(false)
+
+  const handleCityClick = (cityId: string): void => {
+    if (suppressClick.current) {
+      suppressClick.current = false
+      return
+    }
+    onCityClick(cityId)
+  }
+
+  const center = { mx: view.x + view.w / 2, my: view.y + view.h / 2 }
+
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      className="map"
-      role="img"
-      aria-label="World route map"
-      data-testid="map"
-    >
-      <rect x={0} y={0} width={W} height={H} className="map-sea" />
-      {/* Rival routes, thin, under the player's */}
-      {state.airlines.slice(1).map((airline) =>
-        airline.routes.map((r) => (
-          <path key={`${airline.id}-${r.id}`} d={arcPath(r.from, r.to)} className="route-rival" />
-        )),
-      )}
-      {player.routes.map((r) => {
-        const isNew = newRouteIds.has(r.id)
-        return (
-          <g key={r.id}>
-            <path
-              d={arcPath(r.from, r.to)}
-              pathLength={1}
-              className={isNew ? 'route-player route-new' : 'route-player'}
-              data-testid={isNew ? 'route-line-new' : undefined}
-            />
-            {isNew &&
-              [r.from, r.to].map((cityId) => {
-                const c = getCity(cityId)
-                return (
-                  <circle
-                    key={cityId}
-                    cx={x(c.lon)}
-                    cy={y(c.lat)}
-                    r={10}
-                    className="endpoint-pulse"
-                  />
-                )
-              })}
-          </g>
-        )
-      })}
-      {/* Ambient reward: little planes fly the routes you actually serve.
-          Staggered by route id so the sky never moves in lockstep. */}
-      {flownRoutes.map((r) => (
-        <g key={`plane-${r.id}`} className="plane" data-testid={`plane-${r.id}`}>
-          <text fontSize="11" dy="3.5" textAnchor="middle">
-            ✈
-          </text>
-          <animateMotion
-            dur={`${7 + (r.id % 5)}s`}
-            begin={`${-((r.id * 13) % 60) / 10}s`}
-            repeatCount="indefinite"
-            keyPoints="0;1;1;0;0"
-            keyTimes="0;0.45;0.5;0.95;1"
-            calcMode="linear"
-            rotate="auto"
-            path={arcPath(r.from, r.to)}
-          />
-        </g>
-      ))}
-      {/* Fresh slot wins ping gold at the airport. */}
-      {[...newSlotCities].sort().map((cityId) => {
-        const c = getCity(cityId)
-        return (
-          <circle
-            key={`slots-${cityId}`}
-            cx={x(c.lon)}
-            cy={y(c.lat)}
-            r={11}
-            className="slots-ping"
-            data-testid={`slots-ping-${cityId}`}
-          />
-        )
-      })}
-      {/* Active world events glow on the map: gold halo on boosted cities and
-          regions (Olympics, fairs, tourism waves), red on conflict zones. */}
-      {state.world.events.map((e) => {
-        const def = getEventDef(e.id)
-        if (def.demandModBp === undefined) return null
-        const good = def.demandModBp >= 10000
-        const cities = e.city !== null ? [getCity(e.city)] : CITIES.filter((c) => c.region === e.region)
-        return cities.map((c) => (
-          <circle
-            key={`${e.id}-${c.id}`}
-            cx={x(c.lon)}
-            cy={y(c.lat)}
-            r={12}
-            className={good ? 'event-halo halo-boom' : 'event-halo halo-bust'}
-            data-testid={`event-halo-${c.id}`}
-          />
-        ))
-      })}
-      {CITIES.map((c) => {
-        const held = slotsHeld(player, c.id)
-        const mass = c.pop * 4 + c.biz * 3 + c.tour * 2
-        return (
-          <g key={c.id} onClick={() => onCityClick(c.id)} className="city">
+    <div className="map-wrap">
+      <svg
+        ref={svgRef}
+        viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
+        className="map"
+        role="img"
+        aria-label="World route map"
+        data-testid="map"
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      >
+        <rect x={0} y={0} width={W} height={H} className="map-sea" />
+        <path d={WORLD_PATH} className="map-land" />
+        {/* Rival routes, thin, under the player's */}
+        {state.airlines.slice(1).map((airline) =>
+          airline.routes.map((r) => (
+            <path key={`${airline.id}-${r.id}`} d={arcPath(r.from, r.to)} className="route-rival" />
+          )),
+        )}
+        {player.routes.map((r) => {
+          const km = distanceKm(r.from, r.to)
+          const isNew = newRouteIds.has(r.id)
+          return (
+            <g key={r.id}>
+              <path
+                d={arcPath(r.from, r.to)}
+                pathLength={1}
+                className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}`}
+                data-testid={isNew ? 'route-line-new' : undefined}
+              />
+              {isNew &&
+                [r.from, r.to].map((cityId) => {
+                  const c = getCity(cityId)
+                  return (
+                    <circle key={cityId} cx={x(c.lon)} cy={y(c.lat)} r={10 / scale} className="endpoint-pulse" />
+                  )
+                })}
+            </g>
+          )
+        })}
+        {/* Ambient reward: little planes fly the routes you actually serve.
+            Long-haul takes visibly longer than a hop. */}
+        {flownRoutes.map((r) => {
+          const km = distanceKm(r.from, r.to)
+          const dur = 4 + Math.min(14, km / 900)
+          return (
+            <g key={`plane-${r.id}`} className="plane" data-testid={`plane-${r.id}`}>
+              <text fontSize={11 / scale} dy={3.5 / scale} textAnchor="middle">
+                ✈
+              </text>
+              <animateMotion
+                dur={`${dur.toFixed(1)}s`}
+                begin={`${-((r.id * 13) % 60) / 10}s`}
+                repeatCount="indefinite"
+                keyPoints="0;1;1;0;0"
+                keyTimes="0;0.45;0.5;0.95;1"
+                calcMode="linear"
+                rotate="auto"
+                path={arcPath(r.from, r.to)}
+              />
+            </g>
+          )
+        })}
+        {/* Fresh slot wins ping gold at the airport. */}
+        {[...newSlotCities].sort().map((cityId) => {
+          const c = getCity(cityId)
+          return (
             <circle
-              data-testid={`city-${c.id}`}
+              key={`slots-${cityId}`}
               cx={x(c.lon)}
               cy={y(c.lat)}
-              r={2 + mass / 18}
-              className={
-                selected === c.id ? 'city-dot selected' : held > 0 ? 'city-dot slotted' : 'city-dot'
-              }
+              r={11 / scale}
+              className="slots-ping"
+              data-testid={`slots-ping-${cityId}`}
             />
-            <text x={x(c.lon) + 6} y={y(c.lat) + 3} className="city-label">
-              {c.id}
-            </text>
-          </g>
-        )
-      })}
-    </svg>
+          )
+        })}
+        {/* Active world events glow on the map: gold halo on boosted cities and
+            regions (Olympics, fairs, tourism waves), red on conflict zones. */}
+        {state.world.events.map((e) => {
+          const def = getEventDef(e.id)
+          if (def.demandModBp === undefined) return null
+          const good = def.demandModBp >= 10000
+          const cities = e.city !== null ? [getCity(e.city)] : CITIES.filter((c) => c.region === e.region)
+          return cities.map((c) => (
+            <circle
+              key={`${e.id}-${c.id}`}
+              cx={x(c.lon)}
+              cy={y(c.lat)}
+              r={12 / scale}
+              className={good ? 'event-halo halo-boom' : 'event-halo halo-bust'}
+              data-testid={`event-halo-${c.id}`}
+            />
+          ))
+        })}
+        {visible.map((c) => {
+          const held = slotsHeld(player, c.id)
+          // In route-planning mode, legal destinations light up as targets.
+          const isTarget =
+            routeFrom !== null &&
+            routeFrom !== c.id &&
+            held > slotsUsedAt(player.routes, c.id) &&
+            !player.routes.some(
+              (r) =>
+                (r.from === c.id && r.to === routeFrom) || (r.from === routeFrom && r.to === c.id),
+            )
+          const r = (2 + cityMass(c) / 18) / Math.sqrt(scale)
+          return (
+            <g key={c.id} onClick={() => handleCityClick(c.id)} className="city">
+              <circle
+                data-testid={`city-${c.id}`}
+                cx={x(c.lon)}
+                cy={y(c.lat)}
+                r={r}
+                className={
+                  selected === c.id
+                    ? 'city-dot selected'
+                    : isTarget
+                      ? 'city-dot target'
+                      : held > 0
+                        ? 'city-dot slotted'
+                        : 'city-dot'
+                }
+              />
+              {labeled.has(c.id) && (
+                <text x={x(c.lon) + r + 3 / scale} y={y(c.lat) + 3 / scale} fontSize={9 / scale} className="city-label">
+                  {c.id}
+                </text>
+              )}
+            </g>
+          )
+        })}
+      </svg>
+      <div className="map-controls">
+        <button
+          data-testid="zoom-in"
+          aria-label="zoom in"
+          onClick={() => zoomAt(center.mx, center.my, 1.5)}
+        >
+          +
+        </button>
+        <button
+          data-testid="zoom-out"
+          aria-label="zoom out"
+          onClick={() => zoomAt(center.mx, center.my, 1 / 1.5)}
+        >
+          −
+        </button>
+        <button data-testid="zoom-reset" aria-label="reset zoom" onClick={() => setView(FULL_VIEW)}>
+          ⤢
+        </button>
+      </div>
+    </div>
   )
 }

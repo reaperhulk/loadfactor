@@ -105,15 +105,49 @@ button:disabled {
   color: var(--neg);
 }
 
+.map-wrap {
+  position: relative;
+}
+
 .map {
   width: 100%;
   background: #0b0f16;
   border-radius: 10px;
   display: block;
+  touch-action: none; /* the map handles its own panning */
+  cursor: grab;
+}
+
+.map:active {
+  cursor: grabbing;
 }
 
 .map-sea {
   fill: #0e1522;
+}
+
+.map-land {
+  fill: #1c2739;
+  stroke: #2c3a54;
+  stroke-width: 0.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.map-controls {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.map-controls button {
+  width: 34px;
+  height: 34px;
+  font-size: 1.1rem;
+  line-height: 1;
+  background: #1d2740e6;
 }
 
 .city {
@@ -132,9 +166,20 @@ button:disabled {
   fill: #ffd166;
 }
 
+.city-dot.target {
+  fill: #58c98a;
+  animation: target-blink 1200ms ease-in-out infinite;
+}
+
+@keyframes target-blink {
+  50% {
+    opacity: 0.55;
+  }
+}
+
 .city-label {
   fill: var(--dim);
-  font-size: 9px;
+  /* font-size comes from the SVG attribute — it scales with zoom */
   pointer-events: none;
 }
 
@@ -144,12 +189,30 @@ button:disabled {
   opacity: 0.9;
   fill: none;
   pointer-events: stroke;
+  vector-effect: non-scaling-stroke;
   transition: stroke-width 150ms ease-out, opacity 150ms ease-out;
 }
 
 .route-player:hover {
   stroke-width: 3;
   opacity: 1;
+}
+
+/* Haul classes: hops are faint threads, stages solid, long-haul trunks are
+   bold dashed corridors. */
+.route-short {
+  stroke-width: 1;
+  opacity: 0.7;
+}
+
+.route-medium {
+  stroke-width: 1.8;
+}
+
+.route-long {
+  stroke-width: 2.6;
+  stroke-dasharray: 7 3;
+  filter: drop-shadow(0 0 2px #4fa3ff66);
 }
 
 .plane {
@@ -173,6 +236,7 @@ button:disabled {
   stroke-width: 0.8;
   opacity: 0.7;
   fill: none;
+  vector-effect: non-scaling-stroke;
 }
 
 /* Reward: a fresh route draws itself across the map… */
@@ -424,6 +488,135 @@ input[type='number'] {
   width: 90px;
 }
 
+.map-area {
+  position: relative;
+}
+
+.city-panel {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 300px;
+  max-height: calc(100% - 20px);
+  overflow-y: auto;
+  background: #161e2ef2;
+  border: 1px solid #35415d;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 0.85rem;
+  animation: panel-in 220ms ease-out;
+}
+
+@keyframes panel-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+
+.city-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.city-panel h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.city-panel h3 {
+  margin: 12px 0 4px;
+  font-size: 0.82rem;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 3px 0;
+}
+
+.rating-label {
+  width: 72px;
+  color: var(--dim);
+}
+
+.rating-track {
+  flex: 1;
+  height: 7px;
+  background: #232c40;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.rating-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.rating-value {
+  width: 16px;
+  text-align: right;
+}
+
+.city-events {
+  display: flex;
+  flex-direction: column;
+  margin: 8px 0 0;
+}
+
+.city-slots {
+  margin: 10px 0;
+}
+
+.plan-route {
+  width: 100%;
+  padding: 8px 0;
+  margin-bottom: 8px;
+}
+
+.plan-route.armed {
+  background: #58c98a;
+  color: #06101f;
+  font-weight: 700;
+}
+
+.city-negotiate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.city-negotiate input {
+  width: 70px;
+}
+
+.city-panel table {
+  font-size: 0.78rem;
+}
+
+.city-panel td {
+  padding: 3px 4px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .city-panel {
+    position: static;
+    width: auto;
+    max-height: none;
+    margin-top: 8px;
+    animation: none;
+  }
+}
+
 .toast-stack {
   position: fixed;
   top: 14px;
@@ -457,6 +650,10 @@ input[type='number'] {
 
 .toast-victory {
   border-left-color: var(--pos);
+}
+
+.toast-error {
+  border-left-color: var(--neg);
 }
 
 .toast-defeat {
@@ -579,9 +776,5 @@ input[type='number'] {
   .standings {
     gap: 6px 14px;
     font-size: 0.78rem;
-  }
-
-  .city-label {
-    font-size: 11px;
   }
 }

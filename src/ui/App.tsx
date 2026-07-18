@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { SCENARIOS, getScenario } from '../data/scenarios'
 import { netWorth, quarterOf, yearOf } from '../engine/queries'
+import { CityPanel } from './CityPanel'
 import { useCountUp } from './countUp'
 import { MapView } from './MapView'
 import { AirportsPanel, FinancePanel, FleetPanel, ReportPanel, RoutesPanel } from './panels'
@@ -102,12 +103,27 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const session = getSession()!
   const [tab, setTab] = useState<Tab>('routes')
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
+  const [routeFrom, setRouteFrom] = useState<string | null>(null)
   const state = session.state
   const player = state.airlines[0]!
   const scenario = getScenario(state.scenario)
 
-  // Keyboard shortcuts: Space/E end the quarter, 1–5 switch panels, Esc
-  // clears the map selection. Ignored while typing in a form control.
+  // Map interaction: a click selects a city (dossier panel). With a route
+  // armed from the panel, the next click is the destination.
+  const handleCityClick = (cityId: string): void => {
+    if (routeFrom !== null && routeFrom !== cityId) {
+      dispatch({ type: 'open_route', from: routeFrom, to: cityId })
+      setRouteFrom(null)
+      setSelectedCity(cityId)
+    } else if (routeFrom === cityId) {
+      setRouteFrom(null) // clicking the armed origin disarms it
+    } else {
+      setSelectedCity(selectedCity === cityId ? null : cityId)
+    }
+  }
+
+  // Keyboard shortcuts: Space/E end the quarter, 1–5 switch panels, Esc backs
+  // out of route mode, then the panel. Ignored while typing in a form control.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const target = e.target as HTMLElement | null
@@ -118,7 +134,10 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       } else if (e.key >= '1' && e.key <= String(TABS.length)) {
         setTab(TABS[Number(e.key) - 1]!)
       } else if (e.key === 'Escape') {
-        setSelectedCity(null)
+        setRouteFrom((armed) => {
+          if (armed === null) setSelectedCity(null)
+          return null
+        })
       }
     }
     window.addEventListener('keydown', onKey)
@@ -146,25 +165,40 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         )}
       </header>
       {state.phase !== 'planning' && <GameOverOverlay state={state} onWatchReplay={onWatchReplay} />}
-      <MapView
-        state={state}
-        selected={selectedCity}
-        onSelect={setSelectedCity}
-        newRouteIds={
-          new Set(
-            session.lastEvents
-              .filter((e) => e.type === 'route_opened' && e.airline === 0)
-              .map((e) => (e.type === 'route_opened' ? e.routeId : -1)),
-          )
-        }
-        newSlotCities={
-          new Set(
-            session.lastEvents
-              .filter((e) => e.type === 'slots_granted' && e.airline === 0)
-              .map((e) => (e.type === 'slots_granted' ? e.city : '')),
-          )
-        }
-      />
+      <div className="map-area">
+        <MapView
+          state={state}
+          selected={selectedCity}
+          routeFrom={routeFrom}
+          onCityClick={handleCityClick}
+          newRouteIds={
+            new Set(
+              session.lastEvents
+                .filter((e) => e.type === 'route_opened' && e.airline === 0)
+                .map((e) => (e.type === 'route_opened' ? e.routeId : -1)),
+            )
+          }
+          newSlotCities={
+            new Set(
+              session.lastEvents
+                .filter((e) => e.type === 'slots_granted' && e.airline === 0)
+                .map((e) => (e.type === 'slots_granted' ? e.city : '')),
+            )
+          }
+        />
+        {selectedCity !== null && (
+          <CityPanel
+            state={state}
+            cityId={selectedCity}
+            routeFrom={routeFrom}
+            onPlanRoute={(from) => setRouteFrom(routeFrom === from ? null : from)}
+            onClose={() => {
+              setSelectedCity(null)
+              setRouteFrom(null)
+            }}
+          />
+        )}
+      </div>
       <ToastStack events={session.lastEvents} />
       <nav className="tabs">
         {TABS.map((t, i) => (

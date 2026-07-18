@@ -8,7 +8,7 @@ import type { GameEvent } from '../engine'
 
 export interface Toast {
   id: number
-  kind: 'route' | 'delivery' | 'slots' | 'event' | 'victory' | 'defeat'
+  kind: 'route' | 'delivery' | 'slots' | 'event' | 'victory' | 'defeat' | 'error'
   icon: string
   text: string
 }
@@ -39,6 +39,11 @@ export function toastsFor(events: GameEvent[]): Omit<Toast, 'id'>[] {
   const out: Omit<Toast, 'id'>[] = []
   for (const e of events) {
     switch (e.type) {
+      case 'command_rejected':
+        // Immediate feedback beats a silent no-op — but only for the player's
+        // own clicks (rival rejections are engine-internal noise).
+        if (e.airline === 0) out.push({ kind: 'error', icon: '⚠️', text: e.reason })
+        break
       case 'route_opened':
         if (e.airline === 0) out.push({ kind: 'route', icon: '✈️', text: `Route opened: ${e.from} – ${e.to}` })
         break

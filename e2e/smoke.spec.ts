@@ -30,14 +30,33 @@ test('scenario starts and quarters advance deterministically', async ({ page }) 
   expect(errors).toEqual([])
 })
 
-test('routes open by clicking cities and show up in the panel', async ({ page }) => {
+test('routes open via the city panel plan-route flow', async ({ page }) => {
   await startGame(page)
   // MIA and ORD are slotted at game start and their dots sit clear of
   // neighbors on the projection (JFK is huddled under Toronto).
   await page.getByTestId('city-MIA').click()
+  await expect(page.getByTestId('city-panel')).toBeVisible()
+  await page.getByTestId('plan-route').click()
   await page.getByTestId('city-ORD').click()
   await page.getByTestId('tab-routes').click()
   await expect(page.getByTestId('route-MIA-ORD')).toBeVisible()
+})
+
+test('the city panel shows stats and negotiates in context', async ({ page }) => {
+  await startGame(page)
+  await page.getByTestId('city-LAX').click()
+  const panel = page.getByTestId('city-panel')
+  await expect(panel).toBeVisible()
+  await expect(panel).toContainText('Los Angeles')
+  await expect(page.getByTestId('city-slots')).toContainText('pool 30')
+  await expect(panel).toContainText('Top demand from here')
+  // Negotiate for slots straight from the dossier.
+  await page.getByTestId('negotiate-spend').fill('1500')
+  await page.getByTestId('panel-negotiate').click()
+  await expect(page.getByTestId('negotiating-note')).toBeVisible()
+  // Rejected commands surface as toasts (no free slots at an unheld city).
+  await page.getByTestId('city-panel-close').click()
+  await expect(page.getByTestId('city-panel')).toHaveCount(0)
 })
 
 test('the quarterly report reflects the resolved quarter', async ({ page }) => {
@@ -66,12 +85,25 @@ test('the quarterly report reflects the resolved quarter', async ({ page }) => {
 test('opening a route triggers the reward animation and toast', async ({ page }) => {
   await startGame(page)
   await page.getByTestId('city-MIA').click()
+  await page.getByTestId('plan-route').click()
   await page.getByTestId('city-ORD').click()
   await expect(page.getByTestId('toasts')).toContainText('Route opened: MIA – ORD')
   await expect(page.getByTestId('route-line-new')).toHaveCount(1)
   // The reward is transient: the draw-in class clears on the next action.
   await page.getByTestId('end-quarter').click()
   await expect(page.getByTestId('route-line-new')).toHaveCount(0)
+})
+
+test('zoom reveals small cities that are hidden at world view', async ({ page }) => {
+  await startGame(page)
+  // Doha is a tier-3 field with no player stake: invisible at world zoom.
+  await expect(page.getByTestId('city-DOH')).toHaveCount(0)
+  await page.getByTestId('zoom-in').click()
+  await page.getByTestId('zoom-in').click()
+  await page.getByTestId('zoom-in').click()
+  await expect(page.getByTestId('city-DOH')).toHaveCount(1)
+  await page.getByTestId('zoom-reset').click()
+  await expect(page.getByTestId('city-DOH')).toHaveCount(0)
 })
 
 test('game over shows the ranked overlay and resets to the menu', async ({ page }) => {
