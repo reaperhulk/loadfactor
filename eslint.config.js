@@ -4,7 +4,8 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'node_modules', 'playwright-report', 'test-results'] },
+  // public/sw.js runs in a ServiceWorker global scope, not the app bundle.
+  { ignores: ['dist', 'coverage', 'node_modules', 'playwright-report', 'test-results', 'public/sw.js'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

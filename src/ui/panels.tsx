@@ -6,7 +6,7 @@ import { getAircraftType, typesOnSale } from '../data/aircraft'
 import { CITIES, distanceKm } from '../data/cities'
 import { NEG_MIN_SPEND } from '../data/constants'
 import type { GameEvent, GameState } from '../engine'
-import { fareFor } from '../engine/market'
+import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor } from '../engine/market'
 import { negotiationDifficulty } from '../engine/negotiation'
 import {
   airlinesOnPair,
@@ -167,17 +167,84 @@ export function FleetPanel({ state }: { state: GameState }) {
         </tbody>
       </table></div>
       <h3>Order new aircraft ({year})</h3>
-      <div className="shop">
-        {typesOnSale(year).map((t) => (
-          <button
-            key={t.id}
-            disabled={player.cash < t.price}
-            onClick={() => dispatch({ type: 'order_aircraft', aircraftType: t.id })}
-            title={`${t.seats} seats · ${t.rangeKm}km range · delivers in ${t.deliveryQuarters} quarters`}
-          >
-            {t.name} — {money(t.price)}
-          </button>
-        ))}
+      <Shop state={state} />
+    </div>
+  )
+}
+
+// The showroom: full specs, and — pick one of your routes — an honest
+// estimate of what each type would cost and carry there per quarter.
+function Shop({ state }: { state: GameState }) {
+  const player = state.airlines[0]!
+  const year = yearOf(state)
+  const [routeId, setRouteId] = useState<number | ''>('')
+  const route = player.routes.find((r) => r.id === routeId)
+  const km = route ? distanceKm(route.from, route.to) : null
+  return (
+    <div>
+      <label>
+        Estimate economics on:{' '}
+        <select
+          data-testid="shop-route"
+          value={routeId}
+          onChange={(e) => setRouteId(e.target.value === '' ? '' : Number(e.target.value))}
+        >
+          <option value="">— pick a route —</option>
+          {player.routes.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.from}–{r.to}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="table-scroll">
+        <table data-testid="shop-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Seats</th>
+              <th>Range</th>
+              <th>Speed</th>
+              <th>Fuel $/km</th>
+              <th>Maint/q</th>
+              <th>Delivery</th>
+              <th>Price</th>
+              {km !== null && <th>Est. cost/q here</th>}
+              {km !== null && <th>Seats/wk here</th>}
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {typesOnSale(year).map((t) => {
+              const cost = km !== null ? estimateAircraftQuarterCost(state, t.id, km) : null
+              const seats = km !== null ? estimateWeeklySeats(t.id, km) : null
+              const outOfRange = km !== null && cost === -1
+              return (
+                <tr key={t.id} className={outOfRange ? 'dim' : ''}>
+                  <td>{t.name}</td>
+                  <td>{t.seats}</td>
+                  <td>{t.rangeKm}km</td>
+                  <td>{t.speedKmh}km/h</td>
+                  <td>${t.fuelPerKm}</td>
+                  <td>{money(t.maintBase)}</td>
+                  <td>{t.deliveryQuarters}q</td>
+                  <td>{money(t.price)}</td>
+                  {km !== null && <td>{outOfRange ? 'out of range' : money(cost!)}</td>}
+                  {km !== null && <td>{outOfRange ? '—' : seats}</td>}
+                  <td>
+                    <button
+                      disabled={player.cash < t.price}
+                      data-testid={`order-${t.id}`}
+                      onClick={() => dispatch({ type: 'order_aircraft', aircraftType: t.id })}
+                    >
+                      order
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   )

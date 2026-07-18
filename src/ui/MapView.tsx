@@ -3,7 +3,7 @@
 // tells you short-haul from long-haul at a glance. Presentation-only floats
 // are fine here — the engine never sees screen coordinates.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent, WheelEvent } from 'react'
 import { CITIES, distanceKm, getCity, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
@@ -39,9 +39,9 @@ export function cityTier(c: City): 1 | 2 | 3 {
   return mass >= 62 ? 1 : mass >= 45 ? 2 : 3
 }
 
-// Majors and regionals are visible from the world view (Aerobiz-style busy
-// map); small fields fade in as you zoom.
-const TIER_MIN_SCALE: Record<1 | 2 | 3, number> = { 1: 0, 2: 0, 3: 1.8 }
+// LOD contract: majors and regionals (tier 1-2) are visible from the world
+// view — Aerobiz-style busy map; small fields (tier 3) fade in at 1.8× zoom,
+// labels for non-majors at 1.5×. Implemented via lodKey in the render memo.
 
 // Quadratic arc between two cities, lifted perpendicular to the chord — reads
 // as a flight path instead of a fence line.
@@ -160,27 +160,35 @@ export function MapView({
   const scale = W / view.w
   const flownRoutes = player.routes.filter((r) => player.fleet.some((a) => a.routeId === r.id))
 
-  // Cities the player has a stake in stay visible at any zoom.
-  const stakes = new Set<string>()
-  for (const airline of state.airlines) {
-    if (airline.id !== 0) continue
-    for (const r of airline.routes) {
+  // Visibility only changes when the game state, selection, or an LOD
+  // threshold crossing changes — not on every animation frame of a zoom.
+  const lodKey = (scale >= 1.8 ? 2 : 0) | (scale >= 1.5 ? 1 : 0)
+  const { visible, labeled } = useMemo(() => {
+    // Cities the player has a stake in stay visible at any zoom.
+    const stakes = new Set<string>()
+    for (const r of player.routes) {
       stakes.add(r.from)
       stakes.add(r.to)
     }
-  }
-  for (const c of CITIES) if (slotsHeld(player, c.id) > 0) stakes.add(c.id)
-  for (const e of state.world.events) if (e.city !== null) stakes.add(e.city)
-  if (selected !== null) stakes.add(selected)
-
-  const visible = CITIES.filter((c) => scale >= TIER_MIN_SCALE[cityTier(c)] || stakes.has(c.id))
-  const labeled = new Set(
-    visible.filter((c) => cityTier(c) === 1 || scale >= 1.5 || stakes.has(c.id)).map((c) => c.id),
-  )
+    for (const c of CITIES) if (slotsHeld(player, c.id) > 0) stakes.add(c.id)
+    for (const e of state.world.events) if (e.city !== null) stakes.add(e.city)
+    if (selected !== null) stakes.add(selected)
+    const vis = CITIES.filter((c) => (lodKey >= 2 ? true : cityTier(c) < 3) || stakes.has(c.id))
+    return {
+      visible: vis,
+      labeled: new Set(vis.filter((c) => cityTier(c) === 1 || lodKey >= 1 || stakes.has(c.id)).map((c) => c.id)),
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, selected, lodKey])
 
   // Cursor-anchored zoom, computed in TARGET space so consecutive wheel
   // events compound on where the view is heading, not where it is.
-  const zoomAt = (clientX: number | null, clientY: number | null, factor: number): void => {
+  const zoomAt = (
+    clientX: number | null,
+    clientY: number | null,
+    factor: number,
+    immediate = false,
+  ): void => {
     const t = targetRef.current
     let mx = t.x + t.w / 2
     let my = t.y + t.h / 2
@@ -191,7 +199,7 @@ export function MapView({
     }
     const w = t.w / factor
     const h = t.h / factor
-    applyView({ x: mx - ((mx - t.x) / t.w) * w, y: my - ((my - t.y) / t.h) * h, w, h }, false)
+    applyView({ x: mx - ((mx - t.x) / t.w) * w, y: my - ((my - t.y) / t.h) * h, w, h }, immediate)
   }
 
   const onWheel = (e: WheelEvent<SVGSVGElement>): void => {
@@ -201,11 +209,55 @@ export function MapView({
     zoomAt(e.clientX, e.clientY, factor)
   }
 
+  // Touch pinch: two active pointers zoom about their midpoint and pan with
+  // it, writing through immediately (easing would fight fingers).
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  const pinch = useRef<{ dist: number; midX: number; midY: number } | null>(null)
+
+  const pinchGeometry = (): { dist: number; midX: number; midY: number } | null => {
+    if (pointers.current.size < 2) return null
+    const [a, b] = [...pointers.current.values()]
+    return {
+      dist: Math.hypot(b!.x - a!.x, b!.y - a!.y) || 1,
+      midX: (a!.x + b!.x) / 2,
+      midY: (a!.y + b!.y) / 2,
+    }
+  }
+
   const onPointerDown = (e: PointerEvent<SVGSVGElement>): void => {
-    drag.current = { px: e.clientX, py: e.clientY, moved: false }
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (pointers.current.size === 2) {
+      pinch.current = pinchGeometry()
+      drag.current = null
+      suppressClick.current = true
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } else if (pointers.current.size === 1) {
+      drag.current = { px: e.clientX, py: e.clientY, moved: false }
+    }
   }
 
   const onPointerMove = (e: PointerEvent<SVGSVGElement>): void => {
+    if (pointers.current.has(e.pointerId)) {
+      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    }
+    if (pinch.current) {
+      const now = pinchGeometry()
+      if (!now || !svgRef.current) return
+      const rect = svgRef.current.getBoundingClientRect()
+      // Zoom about the midpoint, then follow the midpoint's travel.
+      zoomAt(now.midX, now.midY, now.dist / pinch.current.dist, true)
+      const t = targetRef.current
+      applyView(
+        {
+          ...t,
+          x: t.x - ((now.midX - pinch.current.midX) / rect.width) * t.w,
+          y: t.y - ((now.midY - pinch.current.midY) / rect.height) * t.h,
+        },
+        true,
+      )
+      pinch.current = now
+      return
+    }
     if (!drag.current) return
     const dx = e.clientX - drag.current.px
     const dy = e.clientY - drag.current.py
@@ -223,7 +275,9 @@ export function MapView({
     drag.current.py = e.clientY
   }
 
-  const onPointerUp = (): void => {
+  const onPointerUp = (e: PointerEvent<SVGSVGElement>): void => {
+    pointers.current.delete(e.pointerId)
+    if (pointers.current.size < 2) pinch.current = null
     // Keep `moved` readable by the click handlers that fire right after.
     const wasDrag = drag.current?.moved ?? false
     drag.current = null
@@ -253,6 +307,7 @@ export function MapView({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
       >
         <rect x={0} y={0} width={W} height={H} className="map-sea" />
         <path d={WORLD_PATH} className="map-land" />

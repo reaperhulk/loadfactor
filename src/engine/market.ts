@@ -5,8 +5,10 @@
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm, getCity, pairKey } from '../data/cities'
 import {
+  AIRCRAFT_ADMIN_PER_QUARTER,
   COST_INFLATION_BP_PER_QUARTER,
   CREW_COST_PER_BLOCK_HOUR,
+  OWNERSHIP_BP_PER_QUARTER,
   DEMAND_DIST_BANDS,
   DEMAND_GROWTH_BP_PER_QUARTER,
   DEMAND_MASS_FLOOR,
@@ -44,6 +46,34 @@ function distBandFactor(km: number): number {
 // Era cost inflation multiplier (bp) at a given turn.
 export function inflationBp(turn: number): number {
   return 10000 + COST_INFLATION_BP_PER_QUARTER * turn
+}
+
+// What one airframe of this type costs per quarter on a route of this length,
+// $k, at today's fuel index and inflation — the shop's honest sticker. Mirrors
+// resolveMarket's per-flight costs plus the fixed ownership stack from turn.ts.
+export function estimateAircraftQuarterCost(state: GameState, typeId: string, km: number): number {
+  const t = getAircraftType(typeId)
+  if (km > t.rangeKm) return -1
+  const rt = roundTripsPerWeek(typeId, km)
+  const fuelBp = effFuelBp(state.world)
+  const weeklyFuel = Math.floor((rt * 2 * km * t.fuelPerKm * fuelBp) / 10000)
+  const weeklyFees = rt * 2 * (LANDING_FEE_BASE + t.seats * LANDING_FEE_PER_SEAT)
+  const weeklyCrewMin = rt * 2 * Math.floor((km * 60) / t.speedKmh)
+  const weeklyCrew = Math.floor((weeklyCrewMin / 60) * CREW_COST_PER_BLOCK_HOUR)
+  const inflated = Math.floor(((weeklyFees + weeklyCrew) * inflationBp(state.turn)) / 10000)
+  const routeCost = Math.floor(((weeklyFuel + inflated) * WEEKS_PER_QUARTER) / 1000)
+  const fixed =
+    Math.floor((t.maintBase * inflationBp(state.turn)) / 10000) +
+    Math.floor((t.price * OWNERSHIP_BP_PER_QUARTER) / 10000) +
+    Math.floor((AIRCRAFT_ADMIN_PER_QUARTER * inflationBp(state.turn)) / 10000)
+  return routeCost + fixed
+}
+
+// Seats one airframe adds per week on the route (both directions).
+export function estimateWeeklySeats(typeId: string, km: number): number {
+  const t = getAircraftType(typeId)
+  if (km > t.rangeKm) return 0
+  return t.seats * roundTripsPerWeek(typeId, km) * 2
 }
 
 // One-way base fare in $, concave with distance.

@@ -749,6 +749,27 @@ input[type='number'] {
   margin-bottom: 10px;
 }
 
+.coach {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #1d2740;
+  border: 1px solid #35415d;
+  border-left: 3px solid #ffd166;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 8px 0 0;
+  font-size: 0.88rem;
+}
+
+.mute-toggle {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  padding: 2px 4px;
+}
+
 .toast-stack {
   position: fixed;
   top: 14px;

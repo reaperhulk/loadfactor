@@ -2,7 +2,7 @@
 // context — ratings, slots, active events, the richest pairs from here, your
 // presence, and slot negotiations. Opens when a city is clicked on the map.
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { CITIES, distanceKm, getCity } from '../data/cities'
 import { NEG_MIN_SPEND } from '../data/constants'
 import { getEventDef } from '../data/events'
@@ -66,17 +66,22 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onClose }: Ci
     return e.city === cityId || (e.region !== null && e.region === city.region)
   })
 
-  // The five richest pairs from this city right now.
-  const pairs = CITIES.filter((c) => c.id !== cityId)
-    .map((c) => ({
-      to: c.id,
-      km: distanceKm(cityId, c.id),
-      demand: pairWeeklyDemand(state, cityId, c.id),
-      competitors: airlinesOnPair(state, cityId, c.id, 0),
-      mine: airlinesOnPair(state, cityId, c.id) - airlinesOnPair(state, cityId, c.id, 0) > 0,
-    }))
-    .sort((a, b) => b.demand - a.demand)
-    .slice(0, 5)
+  // The five richest pairs from this city right now (80 demand evaluations —
+  // memoized so panel re-renders don't rescan the world).
+  const pairs = useMemo(
+    () =>
+      CITIES.filter((c) => c.id !== cityId)
+        .map((c) => ({
+          to: c.id,
+          km: distanceKm(cityId, c.id),
+          demand: pairWeeklyDemand(state, cityId, c.id),
+          competitors: airlinesOnPair(state, cityId, c.id, 0),
+          mine: airlinesOnPair(state, cityId, c.id) - airlinesOnPair(state, cityId, c.id, 0) > 0,
+        }))
+        .sort((a, b) => b.demand - a.demand)
+        .slice(0, 5),
+    [state, cityId],
+  )
 
   const myRoutes = player.routes.filter((r) => r.from === cityId || r.to === cityId)
 

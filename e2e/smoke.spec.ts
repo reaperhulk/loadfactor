@@ -146,6 +146,35 @@ test('the route dossier and rivals intel expose the numbers', async ({ page }) =
   await expect(page.getByTestId('rivals-panel')).toContainText('net worth by quarter')
 })
 
+test('the shop estimates per-route economics, coach marks guide, mute persists', async ({ page }) => {
+  await startGame(page)
+  // Coach mark points at the first move and is dismissable forever.
+  await expect(page.getByTestId('coach')).toContainText('Open route from here')
+  await page.getByTestId('coach-dismiss').click()
+  await expect(page.getByTestId('coach')).toHaveCount(0)
+
+  await page.evaluate(() => {
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD' })
+  })
+  await page.getByTestId('tab-fleet').click()
+  await expect(page.getByTestId('shop-table')).toContainText('Meridian 80')
+  await page.getByTestId('shop-route').selectOption({ label: 'JFK–ORD' })
+  await expect(page.getByTestId('shop-table')).toContainText('Est. cost/q here')
+  await expect(page.getByTestId('shop-table')).toContainText('Seats/wk here')
+  // Ordering from the shop deducts cash.
+  await page.getByTestId('order-meridian80').click()
+  await expect(page.getByTestId('cash')).toContainText('$11.2M')
+
+  // Mute toggle flips and persists across reload.
+  await page.getByTestId('mute-toggle').click()
+  await expect(page.getByTestId('mute-toggle')).toHaveAttribute('aria-label', 'unmute sounds')
+  await page.reload()
+  await page.getByTestId('continue-save').click()
+  await expect(page.getByTestId('mute-toggle')).toHaveAttribute('aria-label', 'unmute sounds')
+  // The dismissed coach never returns either.
+  await expect(page.getByTestId('coach')).toHaveCount(0)
+})
+
 test('game over shows the ranked overlay and resets to the menu', async ({ page }) => {
   await startGame(page)
   // Idle airline: fixed costs bleed it into bankruptcy within the window.

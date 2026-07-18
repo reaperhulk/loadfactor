@@ -2,7 +2,9 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import { SCENARIOS, getScenario } from '../data/scenarios'
 import { netWorth, quarterOf, yearOf } from '../engine/queries'
 import { CityPanel } from './CityPanel'
+import { CoachMarks } from './CoachMarks'
 import { useCountUp } from './countUp'
+import { isMuted, setMuted } from './sounds'
 import { MapView } from './MapView'
 import { AirportsPanel, FinancePanel, FleetPanel, ReportPanel, RoutesPanel } from './panels'
 import { ReplayViewer } from './ReplayViewer'
@@ -68,6 +70,23 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
 }
 
 const TABS: readonly Tab[] = ['routes', 'fleet', 'airports', 'rivals', 'finance', 'report']
+
+function MuteToggle() {
+  const [muted, setMutedState] = useState(isMuted)
+  return (
+    <button
+      className="mute-toggle"
+      data-testid="mute-toggle"
+      aria-label={muted ? 'unmute sounds' : 'mute sounds'}
+      onClick={() => {
+        setMuted(!muted)
+        setMutedState(!muted)
+      }}
+    >
+      {muted ? '🔇' : '🔊'}
+    </button>
+  )
+}
 
 // Final standings, ranked — the scenario is a race, show the podium.
 function GameOverOverlay({ state, onWatchReplay }: { state: GameState; onWatchReplay: (r: Replay) => void }) {
@@ -189,12 +208,14 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         <span data-testid="networth">
           Net worth {money(shownWorth)} / {money(scenario.targetNetWorth)}
         </span>
+        <MuteToggle />
         {state.phase === 'planning' && (
           <button className="end-quarter" data-testid="end-quarter" onClick={endQuarter}>
             End Quarter ▶
           </button>
         )}
       </header>
+      <CoachMarks state={state} />
       {showReport && session.reportEvents.length > 0 && (
         <ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} />
       )}
