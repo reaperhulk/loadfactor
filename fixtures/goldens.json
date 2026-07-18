@@ -1,0 +1,49 @@
+{
+  "greedy-alpha": {
+    "checkpointHashes": {
+      "10": "2787bc64",
+      "20": "2262ba61",
+      "30": "ac67744f"
+    },
+    "summary": {
+      "turn": 30,
+      "phase": "won",
+      "cash": 259574,
+      "netWorth": 316948,
+      "routes": 20,
+      "fleet": 12,
+      "quarterlyProfit": 32707
+    }
+  },
+  "greedy-beta": {
+    "checkpointHashes": {
+      "10": "03fc1e47",
+      "20": "878f4af4",
+      "30": "de940402"
+    },
+    "summary": {
+      "turn": 31,
+      "phase": "won",
+      "cash": 245793,
+      "netWorth": 316912,
+      "routes": 21,
+      "fleet": 12,
+      "quarterlyProfit": 42384
+    }
+  },
+  "naive-alpha": {
+    "checkpointHashes": {
+      "10": "a0cf7c54",
+      "20": "0bac405b"
+    },
+    "summary": {
+      "turn": 25,
+      "phase": "lost",
+      "cash": -3817,
+      "netWorth": 3051,
+      "routes": 2,
+      "fleet": 2,
+      "quarterlyProfit": -1830
+    }
+  }
+}
