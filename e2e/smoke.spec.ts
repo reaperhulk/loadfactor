@@ -61,6 +61,17 @@ test('the quarterly report reflects the resolved quarter', async ({ page }) => {
   expect(loadFactor).toBeGreaterThan(0)
 })
 
+test('opening a route triggers the reward animation and toast', async ({ page }) => {
+  await startGame(page)
+  await page.getByTestId('city-MIA').click()
+  await page.getByTestId('city-ORD').click()
+  await expect(page.getByTestId('toasts')).toContainText('Route opened: MIA – ORD')
+  await expect(page.getByTestId('route-line-new')).toHaveCount(1)
+  // The reward is transient: the draw-in class clears on the next action.
+  await page.getByTestId('end-quarter').click()
+  await expect(page.getByTestId('route-line-new')).toHaveCount(0)
+})
+
 test('the harness replays deterministically', async ({ page }) => {
   await startGame(page)
   const first = await page.evaluate(() => {

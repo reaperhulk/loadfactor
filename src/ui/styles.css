@@ -142,12 +142,49 @@ button:disabled {
   stroke: var(--accent);
   stroke-width: 1.6;
   opacity: 0.9;
+  fill: none;
 }
 
 .route-rival {
   stroke: #8a5470;
   stroke-width: 0.8;
   opacity: 0.7;
+  fill: none;
+}
+
+/* Reward: a fresh route draws itself across the map… */
+.route-new {
+  stroke-width: 2.4;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: route-draw 900ms ease-out forwards;
+}
+
+@keyframes route-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* …and its endpoints ping. */
+.endpoint-pulse {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: endpoint-ping 1100ms ease-out 2;
+}
+
+@keyframes endpoint-ping {
+  0% {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
 }
 
 .tabs {
@@ -256,6 +293,73 @@ select {
 
 input[type='number'] {
   width: 90px;
+}
+
+.toast-stack {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 10;
+  pointer-events: none;
+  max-width: min(340px, calc(100vw - 28px));
+}
+
+.toast {
+  background: #1d2740f2;
+  border: 1px solid #35415d;
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  box-shadow: 0 6px 18px #0009;
+  animation: toast-in 380ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.toast-icon {
+  margin-right: 8px;
+}
+
+.toast-event {
+  border-left-color: #ffd166;
+}
+
+.toast-victory {
+  border-left-color: var(--pos);
+}
+
+.toast-defeat {
+  border-left-color: var(--neg);
+}
+
+@keyframes toast-in {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Accessibility: honor reduced-motion — rewards land instantly, nothing moves. */
+@media (prefers-reduced-motion: reduce) {
+  .route-new,
+  .endpoint-pulse,
+  .toast {
+    animation: none;
+  }
+
+  .route-new {
+    stroke-dashoffset: 0;
+  }
+
+  .endpoint-pulse {
+    display: none;
+  }
 }
 
 .table-scroll {

@@ -5,6 +5,7 @@ import { MapView } from './MapView'
 import { AirportsPanel, FinancePanel, FleetPanel, ReportPanel, RoutesPanel } from './panels'
 import { dispatch, getSession, startGame, reset } from './session'
 import { subscribe } from './session'
+import { ToastStack } from './toasts'
 
 type Tab = 'routes' | 'fleet' | 'airports' | 'finance' | 'report'
 
@@ -94,7 +95,19 @@ function GameScreen() {
           </span>
         )}
       </header>
-      <MapView state={state} selected={selectedCity} onSelect={setSelectedCity} />
+      <MapView
+        state={state}
+        selected={selectedCity}
+        onSelect={setSelectedCity}
+        newRouteIds={
+          new Set(
+            session.lastEvents
+              .filter((e) => e.type === 'route_opened' && e.airline === 0)
+              .map((e) => (e.type === 'route_opened' ? e.routeId : -1)),
+          )
+        }
+      />
+      <ToastStack events={session.lastEvents} />
       <nav className="tabs">
         {TABS.map((t, i) => (
           <button

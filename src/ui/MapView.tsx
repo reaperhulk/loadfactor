@@ -18,13 +18,32 @@ function y(lat: number): number {
   return ((90 - lat) / 180) * ((H * 175) / 180) // clip Antarctica, keep aspect
 }
 
+// Quadratic arc between two cities, lifted perpendicular to the chord — reads
+// as a flight path instead of a fence line. Pure presentation.
+function arcPath(fromId: string, toId: string): string {
+  const a = getCity(fromId)
+  const b = getCity(toId)
+  const x1 = x(a.lon)
+  const y1 = y(a.lat)
+  const x2 = x(b.lon)
+  const y2 = y(b.lat)
+  const dx = x2 - x1
+  const dy = y2 - y1
+  const len = Math.sqrt(dx * dx + dy * dy) || 1
+  const lift = Math.min(40, len * 0.18)
+  const mx = (x1 + x2) / 2 + (dy / len) * lift
+  const my = (y1 + y2) / 2 - (dx / len) * lift
+  return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`
+}
+
 interface MapViewProps {
   state: GameState
   selected: string | null
   onSelect: (city: string | null) => void
+  newRouteIds: ReadonlySet<number>
 }
 
-export function MapView({ state, selected, onSelect }: MapViewProps) {
+export function MapView({ state, selected, onSelect, newRouteIds }: MapViewProps) {
   const player = state.airlines[0]!
 
   const onCityClick = (cityId: string): void => {
@@ -49,33 +68,34 @@ export function MapView({ state, selected, onSelect }: MapViewProps) {
       <rect x={0} y={0} width={W} height={H} className="map-sea" />
       {/* Rival routes, thin, under the player's */}
       {state.airlines.slice(1).map((airline) =>
-        airline.routes.map((r) => {
-          const a = getCity(r.from)
-          const b = getCity(r.to)
-          return (
-            <line
-              key={`${airline.id}-${r.id}`}
-              x1={x(a.lon)}
-              y1={y(a.lat)}
-              x2={x(b.lon)}
-              y2={y(b.lat)}
-              className="route-rival"
-            />
-          )
-        }),
+        airline.routes.map((r) => (
+          <path key={`${airline.id}-${r.id}`} d={arcPath(r.from, r.to)} className="route-rival" />
+        )),
       )}
       {player.routes.map((r) => {
-        const a = getCity(r.from)
-        const b = getCity(r.to)
+        const isNew = newRouteIds.has(r.id)
         return (
-          <line
-            key={r.id}
-            x1={x(a.lon)}
-            y1={y(a.lat)}
-            x2={x(b.lon)}
-            y2={y(b.lat)}
-            className="route-player"
-          />
+          <g key={r.id}>
+            <path
+              d={arcPath(r.from, r.to)}
+              pathLength={1}
+              className={isNew ? 'route-player route-new' : 'route-player'}
+              data-testid={isNew ? 'route-line-new' : undefined}
+            />
+            {isNew &&
+              [r.from, r.to].map((cityId) => {
+                const c = getCity(cityId)
+                return (
+                  <circle
+                    key={cityId}
+                    cx={x(c.lon)}
+                    cy={y(c.lat)}
+                    r={10}
+                    className="endpoint-pulse"
+                  />
+                )
+              })}
+          </g>
         )
       })}
       {CITIES.map((c) => {
