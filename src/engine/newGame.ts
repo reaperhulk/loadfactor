@@ -19,6 +19,7 @@ function makeAirline(id: number, setup: AirlineSetup, controller: 'player' | 'ri
     routes: [],
     slots: { [setup.hq]: setup.hqSlots, ...setup.extraSlots },
     negotiations: [],
+    fuelHedge: null,
     insolventQuarters: 0,
     bankrupt: false,
     history: [],
@@ -26,7 +27,7 @@ function makeAirline(id: number, setup: AirlineSetup, controller: 'player' | 'ri
   }
   for (const type of setup.starterFleet) {
     getAircraftType(type) // validate data
-    airline.fleet.push({ id: airline.nextId++, type, ageQuarters: 0, routeId: null })
+    airline.fleet.push({ id: airline.nextId++, type, ageQuarters: 0, routeId: null, leased: false })
   }
   return airline
 }
@@ -46,7 +47,7 @@ export function newGame(scenarioId: string, seed: string): GameState {
       negotiations: deriveStream(seed, 'negotiations'),
       rivals: deriveStream(seed, 'rivals'),
     },
-    world: { economyBp: 10000, fuelBp: 10000, events: [] },
+    world: { economyBp: 10000, fuelBp: 10000, events: [], usedMarket: [] },
     airlines,
   }
 }

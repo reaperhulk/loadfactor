@@ -54,6 +54,12 @@ const commandArb: fc.Arbitrary<Command> = fc.oneof(
     type: fc.constant('order_aircraft' as const),
     aircraftType: fc.constantFrom(...AIRCRAFT.map((a) => a.id), 'bogus'),
   }),
+  fc.record({
+    type: fc.constant('lease_aircraft' as const),
+    aircraftType: fc.constantFrom(...AIRCRAFT.map((a) => a.id), 'bogus'),
+  }),
+  fc.record({ type: fc.constant('buy_used' as const), offerId: fc.integer({ min: -5, max: 500 }) }),
+  fc.record({ type: fc.constant('hedge_fuel' as const), quarters: fc.integer({ min: -2, max: 12 }) }),
   fc.record({ type: fc.constant('sell_aircraft' as const), aircraftId: idArb }),
   fc.record({ type: fc.constant('negotiate_slots' as const), city: cityArb, spend: moneyArb }),
   fc.record({ type: fc.constant('take_loan' as const), amount: moneyArb }),

@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 import { runCareer } from '../simulate'
 
 const SEEDS = ['alpha', 'beta', 'gamma', 'delta', 'epsilon']
-const RUNAWAY_CAP = 20_000_000 // $20B — nothing should print past this
+const RUNAWAY_CAP = 12_000_000 // $12B — tightened after the M2 growth taper
 
 describe('balance envelope', () => {
   it('the greedy bot survives the window and wins the race on every pinned seed', () => {

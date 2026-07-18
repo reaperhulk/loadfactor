@@ -10,6 +10,7 @@ import { applyPlanningCommand } from './commands'
 import { pairWeeklyDemand } from './market'
 import { negotiationDifficulty } from './negotiation'
 import {
+  airlinesOnPair,
   debtCeiling,
   maxRouteFrequency,
   roundTripsPerWeek,
@@ -34,6 +35,7 @@ interface Personality {
   orderChanceBp: number // per-quarter appetite for a new airframe
   fareLevel: number
   serviceLevel: number
+  fareFloor: number // how low retaliation will cut fares
   expandMinDemand: number // weekly-demand floor for opening a route
   negotiateBudgetBp: number // spend as bp of city difficulty
   homeRegionUntil: number // cities held before negotiating outside the HQ region
@@ -44,6 +46,7 @@ const PERSONALITIES: Record<string, Personality> = {
     orderChanceBp: 7000,
     fareLevel: 0,
     serviceLevel: 2,
+    fareFloor: -1,
     expandMinDemand: 300,
     negotiateBudgetBp: 10000,
     homeRegionUntil: 0,
@@ -52,6 +55,7 @@ const PERSONALITIES: Record<string, Personality> = {
     orderChanceBp: 8000,
     fareLevel: -1,
     serviceLevel: 1,
+    fareFloor: -2,
     expandMinDemand: 200,
     negotiateBudgetBp: 9000,
     homeRegionUntil: 0,
@@ -60,6 +64,7 @@ const PERSONALITIES: Record<string, Personality> = {
     orderChanceBp: 6000,
     fareLevel: 1,
     serviceLevel: 3,
+    fareFloor: 0,
     expandMinDemand: 400,
     negotiateBudgetBp: 11000,
     homeRegionUntil: 0,
@@ -68,6 +73,7 @@ const PERSONALITIES: Record<string, Personality> = {
     orderChanceBp: 7000,
     fareLevel: 0,
     serviceLevel: 2,
+    fareFloor: -1,
     expandMinDemand: 250,
     negotiateBudgetBp: 12000,
     homeRegionUntil: 6,
@@ -96,6 +102,22 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
       apply(state, idx, { type: 'close_route', routeId: route.id }, events)
     }
   }
+  // Retaliation (M3-lite): on a CONTESTED pair, a deep share loss — pax down
+  // more than a third with seats now going empty — answers with a fare cut,
+  // down to the personality's floor. The contest check keeps rivals from
+  // fare-warring themselves over demand noise.
+  for (const route of airline.routes) {
+    const h = route.history
+    if (h.length >= 2 && route.fareLevel > personality.fareFloor) {
+      const last = h[h.length - 1]!
+      const prev = h[h.length - 2]!
+      const contested = airlinesOnPair(state, route.from, route.to, idx) > 0
+      if (contested && last.pax * 3 < prev.pax * 2 && last.loadFactorBp < 7000) {
+        apply(state, idx, { type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel - 1 }, events)
+      }
+    }
+  }
+
   if (airline.fleet.length > 2) {
     let oldest: (typeof airline.fleet)[number] | null = null
     for (const ac of airline.fleet) {

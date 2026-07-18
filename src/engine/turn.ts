@@ -2,21 +2,43 @@
 // movement in this file flows through the quarterly P&L so the accounting test
 // can reconcile reported profit against the actual cash delta.
 
-import { getAircraftType } from '../data/aircraft'
+import { AIRCRAFT, getAircraftType } from '../data/aircraft'
 import {
   AIRCRAFT_ADMIN_PER_QUARTER,
   AIRLINE_OVERHEAD_PER_QUARTER,
   INSOLVENCY_QUARTERS_TO_FAIL,
+  LEASE_BP_PER_QUARTER,
   MAINT_AGE_BP_PER_QUARTER,
   OWNERSHIP_BP_PER_QUARTER,
+  USED_MARGIN_BP,
+  USED_OFFERS_PER_QUARTER,
 } from '../data/constants'
+import { fnv1a } from './rng'
 import { getScenario } from '../data/scenarios'
 import { inflationBp, resolveMarket } from './market'
+import { resaleValue } from './queries'
 import { resolveNegotiations } from './negotiation'
-import { netWorth } from './queries'
+import { netWorth, yearOf } from './queries'
 import { runRivalTurn } from './rivals'
 import type { Airline, EngineResult, GameEvent, GameState } from './types'
 import { updateWorld } from './worldEvents'
+
+// This quarter's used-market offers: recently produced types, mid-life ages,
+// priced at resale plus a dealer margin. Stateless hashes keep it deterministic.
+function rollUsedMarket(state: GameState): GameState['world']['usedMarket'] {
+  const year = yearOf(state)
+  const candidates = AIRCRAFT.filter((a) => year >= a.availableFrom && year <= a.availableTo + 10)
+  if (candidates.length === 0) return []
+  const offers = []
+  for (let i = 0; i < USED_OFFERS_PER_QUARTER; i++) {
+    const h = fnv1a(`${state.seed}|used|${state.turn}|${i}`)
+    const type = candidates[h % candidates.length]!
+    const ageQuarters = 16 + ((h >>> 8) % 32)
+    const price = Math.floor((resaleValue(type.id, ageQuarters) * (10000 + USED_MARGIN_BP)) / 10000)
+    offers.push({ id: state.turn * 100 + i, type: type.id, ageQuarters, price })
+  }
+  return offers
+}
 
 function liquidate(airline: Airline): void {
   airline.bankrupt = true
@@ -47,7 +69,13 @@ export function endQuarter(prev: GameState): EngineResult {
       if (order.quartersLeft > 0) {
         remaining.push(order)
       } else {
-        const aircraft = { id: airline.nextId++, type: order.type, ageQuarters: 0, routeId: null }
+        const aircraft = {
+          id: airline.nextId++,
+          type: order.type,
+          ageQuarters: 0,
+          routeId: null,
+          leased: order.leased,
+        }
         airline.fleet.push(aircraft)
         events.push({
           type: 'aircraft_delivered',
@@ -63,8 +91,10 @@ export function endQuarter(prev: GameState): EngineResult {
   // 3. Slot negotiations.
   resolveNegotiations(state, events)
 
-  // 4. World economy and events.
+  // 4. World economy and events, plus this quarter's used-aircraft market
+  // (stateless hash picks — deterministic, order-independent).
   events.push(...updateWorld(state))
+  state.world.usedMarket = rollUsedMarket(state)
 
   // 5. Route economics.
   const totals = resolveMarket(state, events)
@@ -92,7 +122,11 @@ export function endQuarter(prev: GameState): EngineResult {
       const type = getAircraftType(ac.type)
       inflatable += Math.floor((type.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * ac.ageQuarters)) / 10000)
       inflatable += AIRCRAFT_ADMIN_PER_QUARTER
-      fixedCosts += Math.floor((type.price * OWNERSHIP_BP_PER_QUARTER) / 10000)
+      // Owned airframes carry ownership (depreciation+insurance); leased ones
+      // pay the lessor instead.
+      fixedCosts += ac.leased
+        ? Math.floor((type.price * LEASE_BP_PER_QUARTER) / 10000)
+        : Math.floor((type.price * OWNERSHIP_BP_PER_QUARTER) / 10000)
     }
     fixedCosts += Math.floor((inflatable * inflationBp(state.turn)) / 10000)
     let interest = 0
@@ -104,8 +138,12 @@ export function endQuarter(prev: GameState): EngineResult {
     const profit = revenue - costs
     airline.cash += profit
 
-    // 7. Aging, solvency, stats.
+    // 7. Aging, hedge runoff, solvency, stats.
     for (const ac of airline.fleet) ac.ageQuarters++
+    if (airline.fuelHedge !== null) {
+      airline.fuelHedge.quartersLeft--
+      if (airline.fuelHedge.quartersLeft <= 0) airline.fuelHedge = null
+    }
     if (airline.cash < 0) airline.insolventQuarters++
     else airline.insolventQuarters = 0
 

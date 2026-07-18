@@ -7,11 +7,16 @@ import { getAircraftType, isAircraftType } from '../data/aircraft'
 import { distanceKm, getCity, isCity } from '../data/cities'
 import {
   BASE_LOAN_RATE_BP,
+  HEDGE_MAX_QUARTERS,
+  HEDGE_MIN_QUARTERS,
+  HEDGE_PREMIUM_PER_AIRCRAFT,
+  LEASE_BP_PER_QUARTER,
   LOAN_RATE_ECONOMY_SLOPE,
   MIN_LOAN_RATE_BP,
   MIN_ROUTE_KM,
   NEG_MIN_SPEND,
 } from '../data/constants'
+import { effFuelBp } from './worldEvents'
 import {
   debtCeiling,
   findRoute,
@@ -157,7 +162,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         return reject(airlineIdx, command, `${type.name} is not on sale in ${year}`)
       if (airline.cash < type.price) return reject(airlineIdx, command, 'insufficient cash')
       airline.cash -= type.price
-      const order = { id: airline.nextId++, type: type.id, quartersLeft: type.deliveryQuarters }
+      const order = { id: airline.nextId++, type: type.id, quartersLeft: type.deliveryQuarters, leased: false }
       airline.orders.push(order)
       return {
         events: [
@@ -166,10 +171,82 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       }
     }
 
+    case 'lease_aircraft': {
+      if (!isAircraftType(command.aircraftType)) return reject(airlineIdx, command, 'unknown aircraft type')
+      const type = getAircraftType(command.aircraftType)
+      const year = yearOf(state)
+      if (year < type.availableFrom || year > type.availableTo)
+        return reject(airlineIdx, command, `${type.name} is not on sale in ${year}`)
+      const payment = Math.floor((type.price * LEASE_BP_PER_QUARTER) / 10000)
+      if (airline.cash < payment) return reject(airlineIdx, command, 'insufficient cash for the first payment')
+      // Leases deliver fast — the lessor has airframes on the ramp.
+      const order = { id: airline.nextId++, type: type.id, quartersLeft: 1, leased: true }
+      airline.orders.push(order)
+      return {
+        events: [
+          {
+            type: 'aircraft_leased',
+            airline: airlineIdx,
+            orderId: order.id,
+            aircraftType: type.id,
+            paymentPerQuarter: payment,
+          },
+        ],
+      }
+    }
+
+    case 'buy_used': {
+      const offer = state.world.usedMarket.find((o) => o.id === command.offerId)
+      if (!offer) return reject(airlineIdx, command, 'that airframe is gone')
+      if (airline.cash < offer.price) return reject(airlineIdx, command, 'insufficient cash')
+      airline.cash -= offer.price
+      state.world.usedMarket = state.world.usedMarket.filter((o) => o.id !== offer.id)
+      const aircraft = {
+        id: airline.nextId++,
+        type: offer.type,
+        ageQuarters: offer.ageQuarters,
+        routeId: null,
+        leased: false,
+      }
+      airline.fleet.push(aircraft)
+      return {
+        events: [
+          {
+            type: 'used_bought',
+            airline: airlineIdx,
+            aircraftId: aircraft.id,
+            aircraftType: aircraft.type,
+            price: offer.price,
+            ageQuarters: offer.ageQuarters,
+          },
+        ],
+      }
+    }
+
+    case 'hedge_fuel': {
+      if (
+        !Number.isInteger(command.quarters) ||
+        command.quarters < HEDGE_MIN_QUARTERS ||
+        command.quarters > HEDGE_MAX_QUARTERS
+      )
+        return reject(airlineIdx, command, `hedge must run ${HEDGE_MIN_QUARTERS}..${HEDGE_MAX_QUARTERS} quarters`)
+      if (airline.fuelHedge !== null) return reject(airlineIdx, command, 'a hedge is already running')
+      if (airline.fleet.length === 0) return reject(airlineIdx, command, 'no fleet to hedge')
+      const premium = HEDGE_PREMIUM_PER_AIRCRAFT * airline.fleet.length * command.quarters
+      if (airline.cash < premium) return reject(airlineIdx, command, 'insufficient cash')
+      airline.cash -= premium
+      const bp = effFuelBp(state.world)
+      airline.fuelHedge = { bp, quartersLeft: command.quarters }
+      return {
+        events: [{ type: 'fuel_hedged', airline: airlineIdx, bp, quarters: command.quarters, premium }],
+      }
+    }
+
     case 'sell_aircraft': {
       const aircraft = airline.fleet.find((a) => a.id === command.aircraftId)
       if (!aircraft) return reject(airlineIdx, command, 'no such aircraft')
-      const proceeds = resaleValue(aircraft.type, aircraft.ageQuarters)
+      // Leased airframes go back to the lessor: no proceeds, no more payments.
+      const proceeds = aircraft.leased ? 0 : resaleValue(aircraft.type, aircraft.ageQuarters)
       airline.fleet = airline.fleet.filter((a) => a.id !== aircraft.id)
       airline.cash += proceeds
       return { events: [{ type: 'aircraft_sold', airline: airlineIdx, aircraftId: aircraft.id, proceeds }] }

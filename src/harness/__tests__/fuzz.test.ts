@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import { fuzzBuilds, runGenomeCareer, type Genome } from '../fuzz'
 
-const RUNAWAY_CAP = 20_000_000 // $20B, same tripwire as the balance envelope
+const RUNAWAY_CAP = 15_000_000 // $15B — the fuzzer searches harder than the pinned bots
 
 const POP = Number(process.env.FUZZ_POP ?? 6)
 const GENS = Number(process.env.FUZZ_GENS ?? 2)

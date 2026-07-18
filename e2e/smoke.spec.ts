@@ -235,3 +235,20 @@ test('the harness replays deterministically', async ({ page }) => {
   })
   expect(second).toBe(first)
 })
+
+test('M2 tools: daily challenge, leasing, used market, fuel hedge', async ({ page }) => {
+  await page.goto('/')
+  await page.getByTestId('start-daily').click()
+  await expect(page.getByTestId('date')).toHaveText('1960 Q1')
+  // Lease from the shop: no capex, delivers next quarter.
+  await page.getByTestId('tab-fleet').click()
+  await page.getByTestId('lease-meridian80').click()
+  await expect(page.getByTestId('cash')).toContainText('$18.0M')
+  await page.evaluate(() => window.__harness.endQuarter())
+  await expect(page.locator('text=(leased)')).toBeVisible()
+  // The used market rotated in offers; the fuel hedge is armable in finance.
+  await expect(page.getByTestId('used-market')).toBeVisible()
+  await page.getByTestId('tab-finance').click()
+  await page.getByTestId('hedge-4').click()
+  await expect(page.getByTestId('hedge-panel')).toContainText('Fuel hedged')
+})

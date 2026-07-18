@@ -26,11 +26,29 @@ export interface OwnedAircraft {
   type: string // AircraftType id
   ageQuarters: number
   routeId: number | null
+  // Leased airframes cost a quarterly payment instead of capital: no resale
+  // value, no ownership cost, returned (not sold) when disposed.
+  leased: boolean
 }
 
 export interface AircraftOrder {
   id: number
   type: string
+  quartersLeft: number
+  leased: boolean
+}
+
+// A used airframe on this quarter's market: instant delivery, already aged.
+export interface UsedOffer {
+  id: number
+  type: string
+  ageQuarters: number
+  price: number // $k
+}
+
+// A fuel hedge locks the airline's effective fuel index for a few quarters.
+export interface FuelHedge {
+  bp: number
   quartersLeft: number
 }
 
@@ -90,6 +108,7 @@ export interface Airline {
   routes: Route[]
   slots: Record<string, number> // city id → slots held (read via sorted keys only)
   negotiations: PendingNegotiation[]
+  fuelHedge: FuelHedge | null
   insolventQuarters: number
   bankrupt: boolean
   history: QuarterStats[]
@@ -107,6 +126,7 @@ export interface WorldState {
   economyBp: number // random-walk index, 10000 = neutral
   fuelBp: number // random-walk fuel price index, 10000 = baseline
   events: ActiveEvent[]
+  usedMarket: UsedOffer[] // rotates deterministically each quarter
 }
 
 export interface GameState {
@@ -139,6 +159,9 @@ export type Command =
   | { type: 'set_frequency'; routeId: number; frequency: number }
   | { type: 'assign_aircraft'; aircraftId: number; routeId: number | null }
   | { type: 'order_aircraft'; aircraftType: string }
+  | { type: 'lease_aircraft'; aircraftType: string }
+  | { type: 'buy_used'; offerId: number }
+  | { type: 'hedge_fuel'; quarters: number }
   | { type: 'sell_aircraft'; aircraftId: number }
   | { type: 'negotiate_slots'; city: string; spend: number }
   | { type: 'take_loan'; amount: number }
@@ -156,6 +179,9 @@ export type GameEvent =
   | { type: 'frequency_set'; airline: number; routeId: number; frequency: number }
   | { type: 'aircraft_assigned'; airline: number; aircraftId: number; routeId: number | null }
   | { type: 'aircraft_ordered'; airline: number; orderId: number; aircraftType: string; price: number }
+  | { type: 'aircraft_leased'; airline: number; orderId: number; aircraftType: string; paymentPerQuarter: number }
+  | { type: 'used_bought'; airline: number; aircraftId: number; aircraftType: string; price: number; ageQuarters: number }
+  | { type: 'fuel_hedged'; airline: number; bp: number; quarters: number; premium: number }
   | { type: 'aircraft_delivered'; airline: number; aircraftId: number; aircraftType: string }
   | { type: 'aircraft_sold'; airline: number; aircraftId: number; proceeds: number }
   | { type: 'negotiation_started'; airline: number; city: string; spend: number }

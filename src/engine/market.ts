@@ -6,6 +6,8 @@ import { getAircraftType } from '../data/aircraft'
 import { distanceKm, getCity, pairKey } from '../data/cities'
 import {
   AIRCRAFT_ADMIN_PER_QUARTER,
+  DEMAND_GROWTH_LATE_BP_PER_QUARTER,
+  DEMAND_GROWTH_TAPER_TURN,
   COST_INFLATION_BP_PER_QUARTER,
   CREW_COST_PER_BLOCK_HOUR,
   OWNERSHIP_BP_PER_QUARTER,
@@ -94,7 +96,11 @@ export function pairWeeklyDemand(state: GameState, a: string, b: string): number
   const km = distanceKm(a, b)
   let demand = Math.floor((raw * 100) / distBandFactor(km))
   demand = Math.floor((demand * effEconomyBp(state.world)) / 10000)
-  demand = Math.floor((demand * (10000 + DEMAND_GROWTH_BP_PER_QUARTER * state.turn)) / 10000)
+  const earlyTurns = Math.min(state.turn, DEMAND_GROWTH_TAPER_TURN)
+  const lateTurns = Math.max(0, state.turn - DEMAND_GROWTH_TAPER_TURN)
+  const growthBp =
+    10000 + DEMAND_GROWTH_BP_PER_QUARTER * earlyTurns + DEMAND_GROWTH_LATE_BP_PER_QUARTER * lateTurns
+  demand = Math.floor((demand * growthBp) / 10000)
   demand = Math.floor((demand * cityDemandModBp(state.world, a, getCity(a).region)) / 10000)
   demand = Math.floor((demand * cityDemandModBp(state.world, b, getCity(b).region)) / 10000)
   demand = Math.floor((demand * hashNoiseBp(state.seed, state.turn, pairKey(a, b), DEMAND_NOISE_SPREAD_BP)) / 10000)
@@ -120,7 +126,12 @@ interface AirlineTotals {
 // (callers clone at the entry point).
 export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTotals[] {
   const totals: AirlineTotals[] = state.airlines.map(() => ({ revenue: 0, cost: 0, pax: 0 }))
-  const fuelBp = effFuelBp(state.world)
+  const marketFuelBp = effFuelBp(state.world)
+  // A live hedge freezes that airline's fuel index regardless of the market.
+  const fuelBpFor = (idx: number): number => {
+    const hedge = state.airlines[idx]!.fuelHedge
+    return hedge !== null && hedge.quartersLeft > 0 ? hedge.bp : marketFuelBp
+  }
 
   // Collect entrants per pair in stable order (airline index, then route id).
   // Each route flies its scheduled frequency (requested, capped by fleet).
@@ -185,6 +196,7 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       let weeklyFees = 0
       let weeklyCrewMin = 0
       const airline = state.airlines[e.airlineIdx]!
+      const fuelBp = fuelBpFor(e.airlineIdx)
       for (const alloc of allocateTrips(airline, e.route)) {
         const t = getAircraftType(alloc.type)
         weeklyFuel += Math.floor((alloc.trips * 2 * km * t.fuelPerKm * fuelBp) / 10000)

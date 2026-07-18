@@ -7,6 +7,7 @@ import { CITIES, distanceKm } from '../data/cities'
 import { NEG_MIN_SPEND } from '../data/constants'
 import type { GameEvent, GameState } from '../engine'
 import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor } from '../engine/market'
+import { HEDGE_MAX_QUARTERS, HEDGE_MIN_QUARTERS, HEDGE_PREMIUM_PER_AIRCRAFT, LEASE_BP_PER_QUARTER } from '../data/constants'
 import { negotiationDifficulty } from '../engine/negotiation'
 import {
   airlinesOnPair,
@@ -131,7 +132,8 @@ export function FleetPanel({ state }: { state: GameState }) {
             return (
               <tr key={a.id}>
                 <td>
-                  {type.name} <span className="dim">({type.seats} seats, {type.rangeKm}km)</span>
+                  {type.name} {a.leased && <span className="dim">(leased)</span>}{' '}
+                  <span className="dim">({type.seats} seats, {type.rangeKm}km)</span>
                 </td>
                 <td>{(a.ageQuarters / 4).toFixed(1)}y</td>
                 <td>
@@ -237,6 +239,13 @@ function Shop({ state }: { state: GameState }) {
                       onClick={() => dispatch({ type: 'order_aircraft', aircraftType: t.id })}
                     >
                       order
+                    </button>{' '}
+                    <button
+                      data-testid={`lease-${t.id}`}
+                      title="no capital outlay; quarterly payments, no resale value"
+                      onClick={() => dispatch({ type: 'lease_aircraft', aircraftType: t.id })}
+                    >
+                      lease {money(Math.floor((t.price * LEASE_BP_PER_QUARTER) / 10000))}/q
                     </button>
                   </td>
                 </tr>
@@ -245,6 +254,36 @@ function Shop({ state }: { state: GameState }) {
           </tbody>
         </table>
       </div>
+      {state.world.usedMarket.length > 0 && (
+        <>
+          <h3>Used market (this quarter)</h3>
+          <div className="table-scroll">
+            <table data-testid="used-market">
+              <tbody>
+                {state.world.usedMarket.map((o) => {
+                  const t = getAircraftType(o.type)
+                  return (
+                    <tr key={o.id}>
+                      <td>{t.name}</td>
+                      <td>{(o.ageQuarters / 4).toFixed(1)}y old</td>
+                      <td>{money(o.price)}</td>
+                      <td>
+                        <button
+                          disabled={player.cash < o.price}
+                          data-testid={`buy-used-${o.id}`}
+                          onClick={() => dispatch({ type: 'buy_used', offerId: o.id })}
+                        >
+                          buy — flies next quarter
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -337,6 +376,34 @@ export function FinancePanel({ state }: { state: GameState }) {
       <p>
         Debt {money(debt)} of {money(ceiling)} ceiling
       </p>
+      <div className="city-negotiate" data-testid="hedge-panel">
+        {player.fuelHedge !== null ? (
+          <span>
+            ⛽ Fuel hedged at index {(player.fuelHedge.bp / 100).toFixed(0)}% for{' '}
+            {player.fuelHedge.quartersLeft} more quarter(s)
+          </span>
+        ) : (
+          <>
+            <span>Fuel hedge:</span>
+            {[4, 8].map((q) => (
+              <button
+                key={q}
+                data-testid={`hedge-${q}`}
+                disabled={
+                  player.fleet.length === 0 ||
+                  q < HEDGE_MIN_QUARTERS ||
+                  q > HEDGE_MAX_QUARTERS ||
+                  player.cash < HEDGE_PREMIUM_PER_AIRCRAFT * player.fleet.length * q
+                }
+                title="lock today's fuel index for your whole fleet"
+                onClick={() => dispatch({ type: 'hedge_fuel', quarters: q })}
+              >
+                {q}q — {money(HEDGE_PREMIUM_PER_AIRCRAFT * player.fleet.length * q)}
+              </button>
+            ))}
+          </>
+        )}
+      </div>
       <label>
         Amount:{' '}
         <input type="number" value={amount} min={100} step={100} onChange={(e) => setAmount(Number(e.target.value))} />{' '}

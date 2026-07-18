@@ -31,7 +31,9 @@ export function resaleValue(type: string, ageQuarters: number): number {
 
 export function fleetValue(airline: Airline): number {
   let total = 0
-  for (const a of airline.fleet) total += resaleValue(a.type, a.ageQuarters)
+  for (const a of airline.fleet) {
+    if (!a.leased) total += resaleValue(a.type, a.ageQuarters)
+  }
   return total
 }
 

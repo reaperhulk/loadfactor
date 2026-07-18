@@ -16,8 +16,12 @@ export const DEMAND_DIST_BANDS: readonly (readonly [number, number])[] = [
   [8000, 110],
   [Infinity, 170],
 ]
-// Era growth: +1.25%/quarter compounding-ish (linear approx) ≈ 5%/yr jet-age boom.
+// Era growth: +1.25%/quarter for the first decade of a scenario, tapering to
+// +0.5%/quarter after — early jet-age boom, then a maturing market. Compresses
+// the late-game money curve (M2 anti-compounding rule #2).
 export const DEMAND_GROWTH_BP_PER_QUARTER = 125
+export const DEMAND_GROWTH_TAPER_TURN = 40
+export const DEMAND_GROWTH_LATE_BP_PER_QUARTER = 50
 // Operating-cost inflation trails demand growth slightly: a saturated route's
 // margin decays over the years, so growth must come from expansion and fleet
 // renewal, never from sitting on a full plane (M1 anti-compounding rule).
@@ -61,6 +65,17 @@ export const MAINT_AGE_BP_PER_QUARTER = 300
 export const OWNERSHIP_BP_PER_QUARTER = 250
 export const AIRLINE_OVERHEAD_PER_QUARTER = 400 // $k
 export const AIRCRAFT_ADMIN_PER_QUARTER = 40 // $k per airframe
+
+// --- Leasing, used market, hedging (M2 fleet depth) ---
+// Quarterly lease payment as bp of list price (no capex, no resale).
+export const LEASE_BP_PER_QUARTER = 350
+export const USED_OFFERS_PER_QUARTER = 3
+// Used price: resale value plus a dealer margin.
+export const USED_MARGIN_BP = 800
+export const HEDGE_MIN_QUARTERS = 2
+export const HEDGE_MAX_QUARTERS = 8
+// Hedge premium per quarter hedged, per airframe in the fleet ($k).
+export const HEDGE_PREMIUM_PER_AIRCRAFT = 30
 
 // --- Fleet market ---
 // Resale value: price * (RESALE_INITIAL_BP - RESALE_DECAY_BP*ageQuarters),

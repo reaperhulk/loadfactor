@@ -8,7 +8,7 @@ import { NEG_MIN_SPEND } from '../data/constants'
 import { getEventDef } from '../data/events'
 import type { GameState } from '../engine'
 import { baseFare, pairWeeklyDemand } from '../engine/market'
-import { negotiationChanceBp, negotiationDifficulty } from '../engine/negotiation'
+import { negotiationDifficulty, scarcityChanceBp } from '../engine/negotiation'
 import { airlinesOnPair, slotsAllocated, slotsFree, slotsHeld, slotsUsed } from '../engine/queries'
 import { cityMass, cityTier } from './MapView'
 import { dispatch } from './session'
@@ -162,7 +162,7 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onClose }: Ci
               disabled={player.cash < spend || spend < NEG_MIN_SPEND}
               onClick={() => dispatch({ type: 'negotiate_slots', city: cityId, spend })}
             >
-              Negotiate ({(negotiationChanceBp(cityId, spend) / 100).toFixed(0)}%)
+              Negotiate ({(scarcityChanceBp(state, cityId, spend) / 100).toFixed(0)}%)
             </button>
             <span className="dim">difficulty {money(difficulty)}</span>
           </>

@@ -24,13 +24,22 @@ export function negotiationChanceBp(cityId: string, spend: number): number {
   return Math.min(NEG_MAX_CHANCE_BP, NEG_BASE_CHANCE_BP + Math.floor((spend * NEG_SPEND_CHANCE_BP) / difficulty))
 }
 
+// Scarcity pressure: as the pool fills, odds fall — the last slots at a
+// packed airport are twice as hard as the first.
+export function scarcityChanceBp(state: GameState, cityId: string, spend: number): number {
+  const city = getCity(cityId)
+  const remaining = Math.max(0, city.slotPool - slotsAllocated(state, cityId))
+  const scarcity = 5000 + Math.floor((5000 * remaining) / city.slotPool)
+  return Math.floor((negotiationChanceBp(cityId, spend) * scarcity) / 10000)
+}
+
 // Mutates state (callers clone at the entry point). Airlines resolve in
 // ascending index, attempts in command order — both deterministic.
 export function resolveNegotiations(state: GameState, events: GameEvent[]): void {
   let rng = state.rng.negotiations
   for (const airline of state.airlines) {
     for (const attempt of airline.negotiations) {
-      const roll = chanceBp(rng, negotiationChanceBp(attempt.city, attempt.spend))
+      const roll = chanceBp(rng, scarcityChanceBp(state, attempt.city, attempt.spend))
       rng = roll.rng
       const city = getCity(attempt.city)
       const remaining = city.slotPool - slotsAllocated(state, city.id)

@@ -54,6 +54,16 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           data-testid="seed-input"
         />
       </label>
+      <div className="scenario-card continue-card">
+        <h2>Daily challenge</h2>
+        <p className="dim">Everyone flies the same seed today. Compare final net worth with your friends.</p>
+        <button
+          data-testid="start-daily"
+          onClick={() => startGame('jet_age', `daily-${new Date().toISOString().slice(0, 10)}`)}
+        >
+          ▶ Fly today’s seed
+        </button>
+      </div>
       {SCENARIOS.map((s) => (
         <div key={s.id} className="scenario-card">
           <h2>{s.name}</h2>
