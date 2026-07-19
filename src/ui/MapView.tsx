@@ -134,7 +134,7 @@ interface GlobePoint {
   vis: boolean
 }
 
-function globeProjectFull(
+export function globeProjectFull(
   g: GlobeView,
   lonDeg: number,
   latDeg: number,
@@ -154,6 +154,27 @@ function globeProjectFull(
 function globeProject(g: GlobeView, lonDeg: number, latDeg: number): GlobePoint {
   const p = globeProjectFull(g, lonDeg, latDeg)
   return { X: p.X, Y: p.Y, vis: p.cosc > 0.001 }
+}
+
+// Inverse orthographic: which lon/lat sits under a viewBox point — null when
+// the point is off the disc. Lets wheel zoom anchor on the terrain under the
+// cursor instead of the disc center.
+export function globeUnproject(g: GlobeView, X: number, Y: number): { lon: number; lat: number } | null {
+  const R = GLOBE_R * g.s
+  const x = (X - W / 2) / R
+  const y = -(Y - H / 2) / R
+  const rho = Math.sqrt(x * x + y * y)
+  if (rho > 1) return null
+  const c = Math.asin(rho)
+  const phi0 = (g.cLat * Math.PI) / 180
+  const sinc = Math.sin(c)
+  const cosc = Math.cos(c)
+  const lat = rho === 0 ? g.cLat : (Math.asin(cosc * Math.sin(phi0) + (y * sinc * Math.cos(phi0)) / rho) * 180) / Math.PI
+  const lon =
+    rho === 0
+      ? g.cLon
+      : g.cLon + (Math.atan2(x * sinc, rho * Math.cos(phi0) * cosc - y * Math.sin(phi0) * sinc) * 180) / Math.PI
+  return { lon, lat }
 }
 
 // Landmass on the sphere. Hidden points clamp to the limb along their
@@ -514,8 +535,29 @@ export function MapView({
       // Proportional to scroll delta: gentle on trackpads (many small
       // deltas), one comfortable step per mouse-wheel notch, hard-clamped.
       const factor = Math.min(1.6, Math.max(0.625, Math.pow(1.0018, -e.deltaY)))
-      if (isGlobe) setGlobe((g) => clampGlobe({ ...g, s: g.s * factor }))
-      else zoomAt(e.clientX, e.clientY, factor)
+      if (isGlobe) {
+        // Zoom toward the terrain under the cursor: drift the globe center a
+        // share of the way to the cursor's geo point as the scale grows, so
+        // what you point at is what you approach.
+        const rect = svgRef.current?.getBoundingClientRect()
+        setGlobe((g) => {
+          const next = { ...g, s: g.s * factor }
+          if (rect && factor > 1) {
+            const sx = ((e.clientX - rect.left) / rect.width) * W
+            const sy = ((e.clientY - rect.top) / rect.height) * H
+            const geo = globeUnproject(g, sx, sy)
+            if (geo) {
+              const t = 1 - 1 / factor
+              let dLon = geo.lon - g.cLon
+              while (dLon > 180) dLon -= 360
+              while (dLon < -180) dLon += 360
+              next.cLon = g.cLon + dLon * t
+              next.cLat = g.cLat + (geo.lat - g.cLat) * t
+            }
+          }
+          return clampGlobe(next)
+        })
+      } else zoomAt(e.clientX, e.clientY, factor)
     }
   })
   useEffect(() => {
