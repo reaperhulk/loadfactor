@@ -878,6 +878,32 @@ export function MapView({
             )
           })
         })}
+        {/* Planning a route: a dashed ring shows how far the longest-legged
+            idle airframe can fly from the origin — why a target is (or isn't)
+            reachable, drawn instead of guessed. Flat map only; the globe's
+            great-circle disc would lie near the poles. */}
+        {!isGlobe &&
+          routeFrom !== null &&
+          idleReachKm > 0 &&
+          (() => {
+            const origin = getCity(routeFrom)
+            const p = pt(origin.lon, origin.lat)
+            if (!p.vis) return null
+            // Local px-per-km at the origin's latitude (equirectangular).
+            const kmPerLonDeg = 111.32 * Math.max(0.2, Math.cos((origin.lat * Math.PI) / 180))
+            const rx = (idleReachKm / kmPerLonDeg) * (W / 360)
+            const ry = (idleReachKm / 111.32) * (((H * 175) / 180) / 180) // px per lat degree, mirrors y()
+            return (
+              <ellipse
+                cx={p.X}
+                cy={p.Y}
+                rx={rx}
+                ry={ry}
+                className="range-ring"
+                data-testid="range-ring"
+              />
+            )
+          })()}
         {visible.map((c) => {
           const held = slotsHeld(player, c.id)
           // In route-planning mode, legal destinations light up as targets —

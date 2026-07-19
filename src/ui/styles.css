@@ -255,6 +255,16 @@ button:disabled {
   margin: 6px 0;
 }
 
+/* Route-planning reach: how far the best idle airframe can fly. */
+.range-ring {
+  fill: #4fa3ff0d;
+  stroke: #4fa3ff88;
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
 /* A city with a slot negotiation pending: amber dashed ring, slow pulse. */
 .negotiating-ring {
   fill: none;

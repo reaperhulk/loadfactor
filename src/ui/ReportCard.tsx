@@ -168,6 +168,22 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
           )
         })()}
 
+        {(() => {
+          // Records are reward moments: call them out the quarter they land.
+          if (player.history.length < 5) return null
+          const older = player.history.slice(0, -1)
+          const records: string[] = []
+          if (now.pax > Math.max(...older.map((h) => h.pax))) records.push('most passengers ever')
+          if (now.profit > 0 && now.profit > Math.max(...older.map((h) => h.profit)))
+            records.push('best profit ever')
+          if (records.length === 0) return null
+          return (
+            <p className="pos" data-testid="report-records">
+              🎉 Record quarter — {records.join(' · ')}
+            </p>
+          )
+        })()}
+
         {best && (
           <p>
             Best route: <strong>{routeName(best.routeId)}</strong>{' '}
