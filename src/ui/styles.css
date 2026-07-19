@@ -176,6 +176,31 @@ button:disabled {
   fill: var(--accent);
 }
 
+/* Armed destructive buttons run hot until they decay or fire. */
+.confirm-armed {
+  background: #7a2c34;
+  border-color: #d0636e;
+}
+
+.insolvency-warning {
+  font-weight: 600;
+  animation: insolvency-pulse 1.2s ease-in-out infinite;
+}
+@keyframes insolvency-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .insolvency-warning {
+    animation: none;
+  }
+}
+
 /* Airline setup on the menu: identity before the first quarter. */
 .airline-setup {
   background: #131b2c;
@@ -206,6 +231,12 @@ button:disabled {
 /* The globe: a lit disc for the visible hemisphere, a crisp limb ring. */
 .globe-disc {
   fill: #101a2b;
+}
+.graticule {
+  fill: none;
+  stroke: #1b2740;
+  stroke-width: 0.6;
+  vector-effect: non-scaling-stroke;
 }
 .globe-limb {
   fill: none;

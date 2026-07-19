@@ -2,7 +2,7 @@
 // every End Quarter. Built purely from the session's reportEvents plus the
 // player's stats history (this quarter vs last).
 
-import { getAircraftType } from '../data/aircraft'
+import { AIRCRAFT, getAircraftType } from '../data/aircraft'
 import { pairKey } from '../data/cities'
 import { getEventDef } from '../data/events'
 import type { GameEvent, GameState } from '../engine'
@@ -182,6 +182,16 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
               .join(' · ')}
           </p>
         )}
+
+        {quarterOf(state) === 1 &&
+          AIRCRAFT.some((t) => t.availableFrom === yearOf(state)) && (
+            <p className="pos" data-testid="new-aircraft-news">
+              🛒{' '}
+              {AIRCRAFT.filter((t) => t.availableFrom === yearOf(state))
+                .map((t) => `${t.name} enters the market`)
+                .join(' · ')}
+            </p>
+          )}
 
         {worldNews.length > 0 && (
           <p className="dim">

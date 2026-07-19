@@ -3,9 +3,10 @@
 // auto-dismiss; animations respect prefers-reduced-motion via CSS.
 
 import { useEffect, useRef, useState } from 'react'
-import { getAircraftType } from '../data/aircraft'
+import { AIRCRAFT, getAircraftType } from '../data/aircraft'
 import { pairKey } from '../data/cities'
 import type { GameEvent, GameState } from '../engine'
+import { quarterOf, yearOf } from '../engine/queries'
 
 export interface Toast {
   id: number
@@ -40,6 +41,15 @@ const EVENT_NAMES: Record<string, string> = {
 export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, 'id'>[] {
   const out: Omit<Toast, 'id'>[] = []
   const myPairs = new Set(state?.airlines[0]?.routes.map((r) => pairKey(r.from, r.to)) ?? [])
+  // A new year begins as a quarter resolves into Q1 — announce airframes
+  // hitting the market. Fleet transitions are the era's drumbeat.
+  if (state && quarterOf(state) === 1 && events.some((e) => e.type === 'quarter_report')) {
+    for (const t of AIRCRAFT) {
+      if (t.availableFrom === yearOf(state)) {
+        out.push({ kind: 'delivery', icon: '🛒', text: `${t.name} is now on sale — ${t.seats} seats, ${t.rangeKm}km` })
+      }
+    }
+  }
   for (const e of events) {
     switch (e.type) {
       case 'command_rejected':

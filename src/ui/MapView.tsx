@@ -192,6 +192,31 @@ function globeLandPath(g: GlobeView): string {
   return parts.join('')
 }
 
+// Subtle meridians and parallels every 30° — the globe reads as a globe even
+// over open ocean. Same pen-down visibility walk the routes use.
+function globeGraticule(g: GlobeView): string {
+  let d = ''
+  const line = (points: [number, number][]): void => {
+    let penDown = false
+    for (const [lon, lat] of points) {
+      const p = globeProject(g, lon, lat)
+      if (!p.vis) {
+        penDown = false
+        continue
+      }
+      d += `${penDown ? 'L' : 'M'}${p.X.toFixed(1)} ${p.Y.toFixed(1)}`
+      penDown = true
+    }
+  }
+  for (let lon = -180; lon < 180; lon += 30) {
+    line(Array.from({ length: 37 }, (_, i) => [lon, -90 + i * 5] as [number, number]))
+  }
+  for (let lat = -60; lat <= 60; lat += 30) {
+    line(Array.from({ length: 73 }, (_, i) => [-180 + i * 5, lat] as [number, number]))
+  }
+  return d
+}
+
 // Sample the great circle between two cities as lon/lat waypoints (slerp on
 // the unit sphere).
 function greatCircle(fromId: string, toId: string, n = 24): [number, number][] {
@@ -596,6 +621,7 @@ export function MapView({
         {isGlobe ? (
           <>
             <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} className="globe-disc" />
+            <path d={globeGraticule(globe)} className="graticule" />
             <path d={globeLandPath(globe)} className="map-land" data-testid="globe-land" />
             <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} className="globe-limb" />
           </>

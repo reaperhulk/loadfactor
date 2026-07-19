@@ -191,6 +191,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const [routeFrom, setRouteFrom] = useState<string | null>(null)
   const [pendingRoute, setPendingRoute] = useState<{ from: string; to: string } | null>(null)
   const [showReport, setShowReport] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const state = session.state
   const player = state.airlines[0]!
   const scenario = getScenario(state.scenario)
@@ -244,7 +245,10 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         })
       } else if (e.key >= '1' && e.key <= String(TABS.length)) {
         setTab(TABS[Number(e.key) - 1]!)
+      } else if (e.key === '?') {
+        setShowHelp((h) => !h)
       } else if (e.key === 'Escape') {
+        setShowHelp(false)
         setShowReport(false)
         setSelectedRoute(null)
         setPendingRoute(null)
@@ -271,6 +275,14 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         <span data-testid="date">
           {yearOf(state)} Q{quarterOf(state)}
         </span>
+        <span className="dim" data-testid="race-clock" title="quarters until the race is scored">
+          {Math.max(0, scenario.quarters - state.turn)}q left
+        </span>
+        {(player.insolventQuarters > 0 || player.cash < 0) && state.phase === 'planning' && (
+          <span className="neg insolvency-warning" data-testid="insolvency-warning">
+            ⚠ INSOLVENT — {player.insolventQuarters > 0 ? 'one more losing quarter folds the airline' : 'end the quarter in the red and the clock starts'}
+          </span>
+        )}
         <span data-testid="cash">Cash {money(shownCash)}</span>
         <span data-testid="networth">
           Net worth {money(shownWorth)} / {money(scenario.targetNetWorth)}
@@ -317,6 +329,44 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         />
       )}
       {state.phase !== 'planning' && <GameOverOverlay state={state} onWatchReplay={onWatchReplay} />}
+      {showHelp && (
+        <div className="gameover-overlay" data-testid="help-overlay" onClick={() => setShowHelp(false)}>
+          <div className="gameover-card report-card" onClick={(e) => e.stopPropagation()}>
+            <h2>Shortcuts</h2>
+            <table className="report-lines">
+              <tbody>
+                <tr>
+                  <td>Space / E</td>
+                  <td>end the quarter (and dismiss the report)</td>
+                </tr>
+                <tr>
+                  <td>1–6</td>
+                  <td>switch panels</td>
+                </tr>
+                <tr>
+                  <td>Esc</td>
+                  <td>back out of route mode, panels, overlays</td>
+                </tr>
+                <tr>
+                  <td>Drag / wheel</td>
+                  <td>pan and zoom the map (spin the globe)</td>
+                </tr>
+                <tr>
+                  <td>⚔ / ◐ / 🌐</td>
+                  <td>rival overlay · data lens · globe projection</td>
+                </tr>
+                <tr>
+                  <td>?</td>
+                  <td>this card</td>
+                </tr>
+              </tbody>
+            </table>
+            <button data-testid="help-close" onClick={() => setShowHelp(false)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
       <div className="map-area">
         <MapView
           state={state}
@@ -352,7 +402,12 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           />
         )}
         {selectedRoute !== null && (
-          <RouteDossier state={state} routeId={selectedRoute} onClose={() => setSelectedRoute(null)} />
+          <RouteDossier
+            state={state}
+            routeId={selectedRoute}
+            onClose={() => setSelectedRoute(null)}
+            onSelectRoute={setSelectedRoute}
+          />
         )}
       </div>
       <ToastStack events={session.lastEvents} state={state} />

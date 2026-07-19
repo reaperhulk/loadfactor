@@ -19,7 +19,7 @@ import {
   ROUTE_OVERHEAD_QUAD,
 } from '../data/constants'
 import { inflationBp } from '../engine/market'
-import { negotiationDifficulty } from '../engine/negotiation'
+import { negotiationDifficulty, scarcityChanceBp } from '../engine/negotiation'
 import {
   airlinesOnPair,
   allocateTrips,
@@ -36,6 +36,7 @@ import {
   yearOf,
 } from '../engine/queries'
 import { assignAndSchedule } from './assign'
+import { ConfirmButton } from './ConfirmButton'
 import { dispatch } from './session'
 import { Sparkline } from './Sparkline'
 import { COST_LABELS, money } from './format'
@@ -195,7 +196,11 @@ export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect:
                 )}
               </td>
               <td>
-                <button onClick={() => dispatch({ type: 'close_route', routeId: r.id })}>close</button>
+                <ConfirmButton
+                  label="close"
+                  confirmLabel="sure?"
+                  onConfirm={() => dispatch({ type: 'close_route', routeId: r.id })}
+                />
               </td>
             </tr>
           )
@@ -293,7 +298,11 @@ export function FleetPanel({ state }: { state: GameState }) {
                       </option>
                     ))}
                   </select>
-                  <button onClick={() => dispatch({ type: 'sell_aircraft', aircraftId: a.id })}>sell</button>
+                  <ConfirmButton
+                    label={a.leased ? 'return' : 'sell'}
+                    confirmLabel="sure?"
+                    onConfirm={() => dispatch({ type: 'sell_aircraft', aircraftId: a.id })}
+                  />
                 </td>
               </tr>
             )
@@ -552,13 +561,16 @@ export function AirportsPanel({ state }: { state: GameState }) {
                 <td>{money(negotiationDifficulty(c.id))}</td>
                 <td>
                   {negotiating ? (
-                    <span className="dim">negotiating…</span>
+                    <span className="dim" title="resolves at quarter end">
+                      🤝 negotiating…
+                    </span>
                   ) : (
                     <button
-                      disabled={player.cash < spend}
+                      disabled={player.cash < spend || allocated >= c.slotPool}
+                      title={allocated >= c.slotPool ? 'slot pool is full' : 'chance at this budget'}
                       onClick={() => dispatch({ type: 'negotiate_slots', city: c.id, spend })}
                     >
-                      negotiate
+                      negotiate ({(scarcityChanceBp(state, c.id, spend) / 100).toFixed(0)}%)
                     </button>
                   )}
                 </td>

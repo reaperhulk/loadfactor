@@ -14,6 +14,7 @@ import {
   roundTripsPerWeek,
   routeWeeklyCapacity,
 } from '../engine/queries'
+import { ConfirmButton } from './ConfirmButton'
 import { Sparkline } from './Sparkline'
 import { assignAndSchedule } from './assign'
 import { dispatch } from './session'
@@ -23,9 +24,10 @@ interface RouteDossierProps {
   state: GameState
   routeId: number
   onClose: () => void
+  onSelectRoute?: (routeId: number) => void
 }
 
-export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
+export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDossierProps) {
   const player = state.airlines[0]!
   const route = player.routes.find((r) => r.id === routeId)
   if (!route) return null
@@ -74,9 +76,37 @@ export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
             {km}km · demand {demand}/wk · fare ${fareFor(km, route.fareLevel)}
           </span>
         </div>
-        <button onClick={onClose} aria-label="close route dossier" data-testid="route-dossier-close">
-          ✕
-        </button>
+        <span>
+          {onSelectRoute && player.routes.length > 1 && (
+            <>
+              <button
+                aria-label="previous route"
+                data-testid="route-dossier-prev"
+                onClick={() => {
+                  const idx = player.routes.findIndex((r) => r.id === routeId)
+                  const prev = player.routes[(idx - 1 + player.routes.length) % player.routes.length]!
+                  onSelectRoute(prev.id)
+                }}
+              >
+                ‹
+              </button>{' '}
+              <button
+                aria-label="next route"
+                data-testid="route-dossier-next"
+                onClick={() => {
+                  const idx = player.routes.findIndex((r) => r.id === routeId)
+                  const next = player.routes[(idx + 1) % player.routes.length]!
+                  onSelectRoute(next.id)
+                }}
+              >
+                ›
+              </button>{' '}
+            </>
+          )}
+          <button onClick={onClose} aria-label="close route dossier" data-testid="route-dossier-close">
+            ✕
+          </button>
+        </span>
       </header>
 
       <h3>Trend (last {route.history.length}q)</h3>
@@ -178,7 +208,11 @@ export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
             +
           </button>
         </span>
-        <button onClick={() => dispatch({ type: 'close_route', routeId: route.id })}>close route</button>
+        <ConfirmButton
+          label="close route"
+          confirmLabel="really close it?"
+          onConfirm={() => dispatch({ type: 'close_route', routeId: route.id })}
+        />
       </div>
 
       <h3>The pair{contenders.length > 1 ? ' — contested' : ''}</h3>
