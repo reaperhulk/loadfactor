@@ -16,6 +16,7 @@ import { RivalsPanel } from './RivalsPanel'
 import { RouteDossier } from './RouteDossier'
 import { RouteSetupDialog } from './RouteSetupDialog'
 import {
+  clearAllData,
   clearSaveAt,
   dispatch,
   getPlayerColor,
@@ -174,6 +175,19 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           </div>
         )
       })()}
+      {(savedRows.length > 0 || loadFame().length > 0) && (
+        <p className="dim menu-housekeeping">
+          <ConfirmButton
+            data-testid="clear-all-data"
+            label="clear all data"
+            confirmLabel="delete every save and the hall of fame?"
+            onConfirm={() => {
+              clearAllData()
+              bumpSaves()
+            }}
+          />
+        </p>
+      )}
       {SCENARIOS.map((s) => (
         <div key={s.id} className="scenario-card">
           <h2>{s.name}</h2>

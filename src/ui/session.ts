@@ -191,6 +191,18 @@ export interface FameEntry {
   years: number
 }
 
+// Forget everything: every save slot, the hall of fame, and the coach
+// dismissal. The menu's start-fresh escape hatch.
+export function clearAllData(): void {
+  for (let i = 0; i < SAVE_SLOTS; i++) clearSaveAt(i)
+  try {
+    localStorage.removeItem(FAME_KEY)
+    localStorage.removeItem('loadfactor:coach:v1')
+  } catch {
+    // ignore
+  }
+}
+
 export function loadFame(): FameEntry[] {
   try {
     const raw = localStorage.getItem(FAME_KEY)

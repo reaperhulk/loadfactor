@@ -785,16 +785,21 @@ export function MapView({
           const km = distanceKm(r.from, r.to)
           const freq = effectiveFrequency(player, r)
           const planes = Math.max(1, Math.min(4, Math.round(freq / 8)))
-          const dur = 4 + Math.min(14, km / 900)
           const path = tripPathFor(r.from, r.to)
           if (path === null) return [] // route crosses the horizon — no shuttle
           // The glyph wears the metal: widebodies render visibly larger than
-          // regional jets (biggest airframe assigned to the route).
+          // regional jets, and fast airframes visibly outrun the fleet
+          // (Concorde zips). Biggest/fastest airframe assigned to the route.
           let biggestSeats = 100
+          let fastestKmh = 850
           for (const ac of player.fleet) {
-            if (ac.routeId === r.id) biggestSeats = Math.max(biggestSeats, getAircraftType(ac.type).seats)
+            if (ac.routeId !== r.id) continue
+            const t = getAircraftType(ac.type)
+            biggestSeats = Math.max(biggestSeats, t.seats)
+            fastestKmh = Math.max(fastestKmh, t.speedKmh)
           }
           const glyphScale = (0.62 + Math.min(0.5, biggestSeats / 800)) / uiScale
+          const dur = (4 + Math.min(14, km / 900)) * (850 / fastestKmh)
           return Array.from({ length: planes }, (_, i) => (
             <g key={`plane-${r.id}-${i}`} className="plane" data-testid={i === 0 ? `plane-${r.id}` : undefined}>
               {/* A silhouette whose nose points along +x: rotate="auto" then
