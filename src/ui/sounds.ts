@@ -80,6 +80,16 @@ const JINGLES: Record<string, () => void> = {
     note(220, 0, 0.4, 0.07, 'sawtooth')
     note(208, 0.25, 0.6, 0.06, 'sawtooth')
   },
+  // A rival marches onto your pair — two low war-drum hits.
+  incursion: () => {
+    note(196, 0, 0.14, 0.07, 'square')
+    note(147, 0.1, 0.22, 0.07, 'square')
+  },
+  // Something was taken away (slot forfeited, negotiation failed).
+  loss: () => {
+    note(294, 0, 0.14, 0.05, 'triangle')
+    note(247, 0.09, 0.24, 0.05, 'triangle')
+  },
 }
 
 function soundFor(events: GameEvent[]): string | null {
@@ -93,6 +103,19 @@ function soundFor(events: GameEvent[]): string | null {
   for (const e of events) {
     if (e.type === 'route_opened' && e.airline === 0) return 'route'
     if (e.type === 'aircraft_delivered' && e.airline === 0) return 'delivery'
+  }
+  for (const e of events) {
+    // A rival opening on a pair the player serves is an act of war.
+    if (e.type === 'route_opened' && e.airline !== 0) {
+      const mine = getSession()?.state.airlines[0]?.routes ?? []
+      if (mine.some((r) => (r.from === e.from && r.to === e.to) || (r.from === e.to && r.to === e.from))) {
+        return 'incursion'
+      }
+    }
+  }
+  for (const e of events) {
+    if (e.type === 'slot_lost' && e.airline === 0) return 'loss'
+    if (e.type === 'negotiation_failed' && e.airline === 0) return 'loss'
   }
   for (const e of events) {
     if (e.type === 'quarter_report' && e.airline === 0) return 'quarter'

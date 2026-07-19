@@ -404,6 +404,21 @@ button.toast {
   stroke: #d8a052;
 }
 
+/* Rival planes fly in their airline's color, dimmer than yours. */
+.plane-rival {
+  opacity: 0.7;
+  filter: none;
+}
+.plane-rival.rival-c0 {
+  fill: #d0636e;
+}
+.plane-rival.rival-c1 {
+  fill: #9d7bd8;
+}
+.plane-rival.rival-c2 {
+  fill: #d8a052;
+}
+
 /* A pair a rival also serves: your arc runs hot. */
 .route-player.route-contested {
   stroke: #e08a4a;

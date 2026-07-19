@@ -744,6 +744,34 @@ export function MapView({
             </g>
           ))
         })}
+        {/* Rival traffic: one small plane per rival route (capped) so their
+            networks read as alive, in the rival's own color. */}
+        {showRivals &&
+          state.airlines
+            .slice(1)
+            .flatMap((airline) => airline.routes.map((r) => ({ airline, r })))
+            .slice(0, 12)
+            .map(({ airline, r }) => {
+              const path = tripPathFor(r.from, r.to)
+              if (path === null) return null
+              const km = distanceKm(r.from, r.to)
+              const dur = 5 + Math.min(15, km / 900)
+              return (
+                <g key={`rplane-${airline.id}-${r.id}`} className={`plane plane-rival ${rivalColorClass(airline.id)}`}>
+                  <path d={PLANE_GLYPH} transform={`scale(${0.55 / uiScale})`} />
+                  <animateMotion
+                    dur={`${dur.toFixed(1)}s`}
+                    begin={`${(-((r.id * 17 + airline.id * 7) % 70) / 10).toFixed(1)}s`}
+                    repeatCount="indefinite"
+                    keyPoints="0;0.5;0.5;1;1"
+                    keyTimes="0;0.45;0.5;0.95;1"
+                    calcMode="linear"
+                    rotate="auto"
+                    path={path}
+                  />
+                </g>
+              )
+            })}
         {/* Fresh slot wins ping gold at the airport. */}
         {[...newSlotCities].sort().map((cityId) => {
           const p = cityPt(cityId)
