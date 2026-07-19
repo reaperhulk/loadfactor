@@ -5,7 +5,7 @@
 
 import { typesOnSale, getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey } from '../data/cities'
-import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
+import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND, ROUTE_MEMORY_QUARTERS, ROUTE_SPOOL_BP } from '../data/constants'
 import { applyPlanningCommand } from './commands'
 import { pairWeeklyDemand, routeSpoolBp } from './market'
 import { negotiationDifficulty } from './negotiation'
@@ -271,11 +271,20 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
         const km = distanceKm(a, b)
         if (km > maxRange || km < AI_MIN_ROUTE_KM) continue
         // Read the market, not just the map: demand net of seats everyone
-        // already flies there, at the personality's contest appetite.
-        const score = expansionScore(
-          pairWeeklyDemand(state, a, b),
-          pairWeeklySeats(state, a, b),
-          personality.contestDiscountBp,
+        // already flies there, at the personality's contest appetite —
+        // valued at true first-quarter strength (a remembered pair flies at
+        // 100% while a genuinely new one spools up).
+        const mem = airline.servedUntil[pairKey(a, b)]
+        const spoolBp =
+          mem !== undefined && state.turn - mem <= ROUTE_MEMORY_QUARTERS ? 10000 : ROUTE_SPOOL_BP[0]!
+        const score = Math.floor(
+          (expansionScore(
+            pairWeeklyDemand(state, a, b),
+            pairWeeklySeats(state, a, b),
+            personality.contestDiscountBp,
+          ) *
+            spoolBp) /
+            10000,
         )
         if (score > bestScore) {
           bestScore = score

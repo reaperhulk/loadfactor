@@ -285,6 +285,9 @@ test('the route dossier and rivals intel expose the numbers', async ({ page }) =
 
 test('the shop estimates per-route economics, coach marks guide, mute persists', async ({ page }) => {
   await startGame(page)
+  // The shop teases airframes entering the market in the next few years.
+  await page.getByTestId('tab-fleet').click()
+  await expect(page.getByTestId('shop-horizon')).toContainText('On the horizon')
   // Coach mark points at the first move and is dismissable forever.
   await expect(page.getByTestId('coach')).toContainText('Open route from here')
   await page.getByTestId('coach-dismiss').click()
