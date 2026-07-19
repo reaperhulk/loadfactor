@@ -8,9 +8,11 @@
 import { applyPlanningCommand } from './commands'
 import { newGame } from './newGame'
 import { endQuarter } from './turn'
+import type { PlayerSetup } from './newGame'
 import type { Command, EngineResult, GameEvent, GameState } from './types'
 
-export { newGame } from './newGame'
+export { deriveFootholds, newGame } from './newGame'
+export type { PlayerSetup } from './newGame'
 export { endQuarter } from './turn'
 export * from './types'
 
@@ -24,11 +26,14 @@ export function applyCommand(prev: GameState, command: Command): EngineResult {
 export interface Replay {
   scenario: string
   seed: string
+  // Optional player customization (name, HQ) — part of the replay so a
+  // customized career reproduces bit-for-bit.
+  player?: PlayerSetup
   commands: Command[]
 }
 
 export function runReplay(replay: Replay): { state: GameState; events: GameEvent[] } {
-  let state = newGame(replay.scenario, replay.seed)
+  let state = newGame(replay.scenario, replay.seed, replay.player)
   const allEvents: GameEvent[] = []
   for (const command of replay.commands) {
     const result = applyCommand(state, command)

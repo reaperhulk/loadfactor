@@ -61,9 +61,19 @@ function makeAirline(id: number, setup: AirlineSetup, controller: 'player' | 'ri
   return airline
 }
 
-export function newGame(scenarioId: string, seed: string): GameState {
+export function newGame(scenarioId: string, seed: string, player?: PlayerSetup): GameState {
   const scenario = getScenario(scenarioId)
-  const airlines = [makeAirline(0, scenario.player, 'player')]
+  // Customization overlays the scenario's authored player seat. A custom HQ
+  // swaps the authored footholds for ones derived around the new home.
+  let playerSetup: AirlineSetup = scenario.player
+  if (player?.name !== undefined && player.name.trim() !== '') {
+    playerSetup = { ...playerSetup, name: player.name.trim().slice(0, 40) }
+  }
+  if (player?.hq !== undefined && player.hq !== scenario.player.hq) {
+    getCity(player.hq) // throws on unknown city
+    playerSetup = { ...playerSetup, hq: player.hq, extraSlots: deriveFootholds(player.hq) }
+  }
+  const airlines = [makeAirline(0, playerSetup, 'player')]
   scenario.rivals.forEach((r, i) => airlines.push(makeAirline(i + 1, r, 'rival')))
   return {
     scenario: scenarioId,

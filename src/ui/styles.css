@@ -176,6 +176,33 @@ button:disabled {
   fill: var(--accent);
 }
 
+/* Airline setup on the menu: identity before the first quarter. */
+.airline-setup {
+  background: #131b2c;
+  border: 1px solid #26304a;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 10px 0;
+}
+.airline-setup h2 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+.livery-row {
+  margin-top: 6px;
+}
+.livery-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  margin-right: 6px;
+  cursor: pointer;
+}
+.livery-swatch.active {
+  border-color: #fff;
+}
+
 /* The globe: a lit disc for the visible hemisphere, a crisp limb ring. */
 .globe-disc {
   fill: #101a2b;

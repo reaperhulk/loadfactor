@@ -1,6 +1,7 @@
 // Competitor intelligence: the net-worth race and a dossier card per rival —
 // personality, hubs, fleet composition, network size, momentum.
 
+import { useState } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { pairKey } from '../data/cities'
 import type { Airline, GameState } from '../engine'
@@ -36,18 +37,106 @@ function fieldedSeats(airline: Airline): number {
   return seats
 }
 
+// The vitals every airline reports each quarter, side by side. One row per
+// airline (you first), best value per column highlighted — the spreadsheet
+// answer to "how am I doing relative to them".
+function StandingsTable({ state }: { state: GameState }) {
+  const rows = state.airlines.map((a) => {
+    const last = a.history[a.history.length - 1]
+    return {
+      id: a.id,
+      name: a.id === 0 ? `${a.name} (you)` : a.name,
+      bankrupt: a.bankrupt,
+      netWorth: netWorth(a),
+      cash: a.cash,
+      revenue: last?.revenue ?? 0,
+      profit: last?.profit ?? 0,
+      marginBp: last && last.revenue > 0 ? Math.floor((last.profit * 10000) / last.revenue) : 0,
+      pax: last?.pax ?? 0,
+      seats: fieldedSeats(a),
+      routes: a.routes.length,
+      cities: slotCities(a).length,
+      fleet: a.fleet.length,
+    }
+  })
+  const best = (key: keyof (typeof rows)[number]): number =>
+    Math.max(...rows.filter((r) => !r.bankrupt).map((r) => r[key] as number))
+  const cell = (r: (typeof rows)[number], key: keyof (typeof rows)[number], text: string) => (
+    <td className={!r.bankrupt && (r[key] as number) === best(key) ? 'pos' : ''}>{text}</td>
+  )
+  return (
+    <div className="table-scroll">
+      <table data-testid="standings">
+        <thead>
+          <tr className="dim">
+            <th>airline</th>
+            <th>net worth</th>
+            <th>cash</th>
+            <th>rev/q</th>
+            <th>profit/q</th>
+            <th>margin</th>
+            <th>pax/q</th>
+            <th>seats/wk</th>
+            <th>routes</th>
+            <th>cities</th>
+            <th>fleet</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id} className={r.id === 0 ? 'me' : r.bankrupt ? 'dim' : ''}>
+              <td>{r.bankrupt ? `${r.name} ✝` : r.name}</td>
+              {cell(r, 'netWorth', money(r.netWorth))}
+              {cell(r, 'cash', money(r.cash))}
+              {cell(r, 'revenue', money(r.revenue))}
+              {cell(r, 'profit', money(r.profit))}
+              {cell(r, 'marginBp', `${(r.marginBp / 100).toFixed(1)}%`)}
+              {cell(r, 'pax', r.pax.toLocaleString('en-US'))}
+              {cell(r, 'seats', r.seats.toLocaleString('en-US'))}
+              {cell(r, 'routes', String(r.routes))}
+              {cell(r, 'cities', String(r.cities))}
+              {cell(r, 'fleet', String(r.fleet))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+const RACE_METRICS = [
+  { key: 'netWorth', label: 'net worth' },
+  { key: 'revenue', label: 'revenue' },
+  { key: 'pax', label: 'passengers' },
+] as const
+
 export function RivalsPanel({ state }: { state: GameState }) {
+  const [metric, setMetric] = useState<(typeof RACE_METRICS)[number]['key']>('netWorth')
   const series = state.airlines.map((a, i) => ({
     label: a.name,
-    points: a.history.map((h) => h.netWorth),
+    points: a.history.map((h) => h[metric]),
     className: i === 0 ? 'race-me' : `race-rival-${i}`,
   }))
   const mySeats = fieldedSeats(state.airlines[0]!)
 
   return (
     <div data-testid="rivals-panel">
-      <h3>The race — net worth by quarter</h3>
-      <RaceChart series={series} />
+      <h3>
+        The race —{' '}
+        {RACE_METRICS.map((m) => (
+          <button
+            key={m.key}
+            className={`link-btn sort-btn${metric === m.key ? ' active' : ''}`}
+            data-testid={`race-metric-${m.key}`}
+            onClick={() => setMetric(m.key)}
+          >
+            {m.label}
+          </button>
+        ))}{' '}
+        by quarter
+      </h3>
+      <RaceChart series={series} format={metric === 'pax' ? (v) => v.toLocaleString('en-US') : undefined} />
+      <StandingsTable state={state} />
       <div className="race-legend">
         {state.airlines.map((a, i) => (
           <span key={a.id} className={i === 0 ? 'race-key me' : `race-key rival-${i}`}>

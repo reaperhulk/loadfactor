@@ -10,6 +10,7 @@ import {
   type Command,
   type GameEvent,
   type GameState,
+  type PlayerSetup,
   type Replay,
 } from '../engine'
 import { getScenario } from '../data/scenarios'
@@ -21,11 +22,21 @@ export interface Session {
   commandLog: Command[]
 }
 
-// A save IS a replay: (scenario, seed, command log). Determinism does the rest.
+// A save IS a replay: (scenario, seed, customization, command log).
+// Determinism does the rest. The airline color is presentation-only and
+// rides along so identity survives a reload.
 const SAVE_KEY = 'loadfactor:save:v1'
 
 interface SaveV1 extends Replay {
   version: 1
+  color?: string
+}
+
+// The player's chosen livery color (a CSS color), applied as the accent.
+let playerColor: string | null = null
+
+export function getPlayerColor(): string | null {
+  return playerColor
 }
 
 function persist(): void {
@@ -34,6 +45,8 @@ function persist(): void {
     version: 1,
     scenario: session.state.scenario,
     seed: session.state.seed,
+    player: sessionPlayer ?? undefined,
+    color: playerColor ?? undefined,
     commands: session.commandLog,
   }
   try {
@@ -42,6 +55,9 @@ function persist(): void {
     // Storage may be full or unavailable (private mode) — play on without saves.
   }
 }
+
+// The customization the current session was started with (part of its replay).
+let sessionPlayer: PlayerSetup | null = null
 
 export function loadSave(): SaveV1 | null {
   try {
@@ -68,6 +84,8 @@ export function clearSave(): void {
 export function resumeSave(): boolean {
   const save = loadSave()
   if (!save) return false
+  sessionPlayer = save.player ?? null
+  playerColor = save.color ?? null
   const { state } = runReplay(save)
   // Recover the last quarter's report so the Report panel isn't empty on resume.
   let lastEnd = -1
@@ -105,9 +123,19 @@ export function getSession(): Session | null {
   return session
 }
 
-export function startGame(scenarioId: string, seed: string): void {
+export function startGame(
+  scenarioId: string,
+  seed: string,
+  custom?: PlayerSetup & { color?: string },
+): void {
+  const player: PlayerSetup | null =
+    custom && (custom.name !== undefined || custom.hq !== undefined)
+      ? { name: custom.name, hq: custom.hq }
+      : null
+  sessionPlayer = player
+  playerColor = custom?.color ?? null
   session = {
-    state: newGame(scenarioId, seed),
+    state: newGame(scenarioId, seed, player ?? undefined),
     lastEvents: [],
     reportEvents: [],
     commandLog: [],
@@ -135,12 +163,15 @@ export function getReplay(): Replay | null {
   return {
     scenario: session.state.scenario,
     seed: session.state.seed,
+    player: sessionPlayer ?? undefined,
     commands: session.commandLog,
   }
 }
 
 export function reset(): void {
   session = null
+  sessionPlayer = null
+  playerColor = null
   clearSave()
   notify()
 }

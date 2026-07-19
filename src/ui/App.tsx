@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { CITIES } from '../data/cities'
 import { SCENARIOS, getScenario } from '../data/scenarios'
 import { netWorth, quarterOf, yearOf } from '../engine/queries'
 import { CityPanel } from './CityPanel'
@@ -12,7 +13,7 @@ import { ReportCard } from './ReportCard'
 import { RivalsPanel } from './RivalsPanel'
 import { RouteDossier } from './RouteDossier'
 import { RouteSetupDialog } from './RouteSetupDialog'
-import { dispatch, getReplay, getSession, loadSave, resumeSave, startGame, reset } from './session'
+import { dispatch, getPlayerColor, getReplay, getSession, loadSave, resumeSave, startGame, reset } from './session'
 import { subscribe } from './session'
 import { ToastStack } from './toasts'
 import type { GameState, Replay } from '../engine'
@@ -20,9 +21,20 @@ import { money } from './format'
 
 type Tab = 'routes' | 'fleet' | 'airports' | 'rivals' | 'finance' | 'report'
 
+// Livery choices: the player's accent color across the whole UI.
+const LIVERY_COLORS = ['#4fa3ff', '#4fae62', '#d0636e', '#d8a052', '#9d7bd8', '#3fbfb0'] as const
+
 function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => void }) {
   const [seed, setSeed] = useState('')
+  const [airlineName, setAirlineName] = useState('')
+  const [color, setColor] = useState<string>(LIVERY_COLORS[0])
+  const [hq, setHq] = useState('') // '' = the scenario's authored HQ
   const save = loadSave()
+  const custom = () => ({
+    name: airlineName.trim() !== '' ? airlineName.trim() : undefined,
+    hq: hq !== '' ? hq : undefined,
+    color: color !== LIVERY_COLORS[0] ? color : undefined,
+  })
   return (
     <main className="menu">
       <h1>Load Factor</h1>
@@ -42,6 +54,48 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           </button>
         </div>
       )}
+      <div className="airline-setup" data-testid="airline-setup">
+        <h2>Your airline</h2>
+        <label>
+          Name:{' '}
+          <input
+            value={airlineName}
+            placeholder="scenario default"
+            maxLength={40}
+            onChange={(e) => setAirlineName(e.target.value)}
+            data-testid="airline-name"
+          />
+        </label>{' '}
+        <label>
+          HQ:{' '}
+          <select value={hq} onChange={(e) => setHq(e.target.value)} data-testid="airline-hq">
+            <option value="">scenario default</option>
+            {[...CITIES]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.id})
+                </option>
+              ))}
+          </select>
+        </label>
+        <div className="livery-row">
+          Livery:{' '}
+          {LIVERY_COLORS.map((c) => (
+            <button
+              key={c}
+              className={`livery-swatch${color === c ? ' active' : ''}`}
+              style={{ background: c }}
+              aria-label={`livery color ${c}`}
+              data-testid={`livery-${c.slice(1)}`}
+              onClick={() => setColor(c)}
+            />
+          ))}
+        </div>
+        <p className="dim">
+          A custom HQ starts you with slots there plus footholds at the strongest nearby cities.
+        </p>
+      </div>
       <label className="seed-field">
         Seed (optional):{' '}
         <input
@@ -56,7 +110,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
         <p className="dim">Everyone flies the same seed today. Compare final net worth with your friends.</p>
         <button
           data-testid="start-daily"
-          onClick={() => startGame('jet_age', `daily-${new Date().toISOString().slice(0, 10)}`)}
+          onClick={() => startGame('jet_age', `daily-${new Date().toISOString().slice(0, 10)}`, custom())}
         >
           ▶ Fly today’s seed
         </button>
@@ -67,7 +121,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           <p>{s.description}</p>
           <button
             data-testid={`start-${s.id}`}
-            onClick={() => startGame(s.id, seed || new Date().toISOString().slice(0, 10))}
+            onClick={() => startGame(s.id, seed || new Date().toISOString().slice(0, 10), custom())}
           >
             Start
           </button>
@@ -207,8 +261,11 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const shownCash = useCountUp(player.cash)
   const shownWorth = useCountUp(netWorth(player))
 
+  // The chosen livery recolors the player's accent everywhere — arcs, dots,
+  // bars, chips — via the CSS custom property the whole UI already uses.
+  const livery = getPlayerColor()
   return (
-    <main className="game">
+    <main className="game" style={livery ? ({ '--accent': livery } as React.CSSProperties) : undefined}>
       <header>
         <h1>Load Factor</h1>
         <span data-testid="date">

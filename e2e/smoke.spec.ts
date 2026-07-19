@@ -156,6 +156,34 @@ test('wheel over the map zooms without scrolling the page', async ({ page }) => 
   expect(await page.evaluate(() => window.scrollY)).toBe(0)
 })
 
+test('airline identity: name, livery, and a custom HQ with derived footholds', async ({ page }) => {
+  await page.goto('/')
+  await page.getByTestId('airline-name').fill('Pan Galactic')
+  await page.getByTestId('airline-hq').selectOption({ label: 'Los Angeles (LAX)' })
+  await page.getByTestId('livery-4fae62').click()
+  await page.getByTestId('seed-input').fill('identity-seed')
+  await page.getByTestId('start-jet_age').click()
+  await expect(page.getByTestId('date')).toHaveText('1960 Q1')
+  // The engine took the identity: name, HQ, and derived nearby footholds.
+  const me = await page.evaluate(() => {
+    const s = window.__harness.getState()!
+    return { name: s.airlines[0]!.name, hq: s.airlines[0]!.hq, slots: s.airlines[0]!.slots }
+  })
+  expect(me.name).toBe('Pan Galactic')
+  expect(me.hq).toBe('LAX')
+  expect(Object.keys(me.slots).length).toBe(4) // HQ + three footholds
+  // The livery recolors the accent, and the standings sheet knows the name.
+  await expect(page.locator('main.game')).toHaveAttribute('style', /--accent/)
+  await page.getByTestId('tab-rivals').click()
+  await expect(page.getByTestId('standings')).toContainText('Pan Galactic (you)')
+  await expect(page.getByTestId('standings')).toContainText('Albion Airways')
+  // The identity survives a reload through the save.
+  await page.reload()
+  await page.getByTestId('continue-save').click()
+  const resumed = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.name)
+  expect(resumed).toBe('Pan Galactic')
+})
+
 test('the globe projection renders, culls the far side, and spins', async ({ page }) => {
   await startGame(page)
   await expect(page.getByTestId('city-HND')).toHaveCount(1) // flat: whole world at once
@@ -217,7 +245,10 @@ test('the route dossier and rivals intel expose the numbers', async ({ page }) =
   // Rivals intel tab.
   await page.getByTestId('tab-rivals').click()
   await expect(page.getByTestId('rivals-panel')).toContainText('Albion Airways')
-  await expect(page.getByTestId('rivals-panel')).toContainText('net worth by quarter')
+  await expect(page.getByTestId('rivals-panel')).toContainText('The race')
+  // The race chart switches metrics and the standings sheet lines everyone up.
+  await page.getByTestId('race-metric-pax').click()
+  await expect(page.getByTestId('standings')).toContainText('Meridian Air (you)')
   // Rival networks draw on the map (rivals expanded during the two resolved
   // quarters) and the toggle hides them.
   await expect(page.locator('.route-rival').first()).toBeVisible()

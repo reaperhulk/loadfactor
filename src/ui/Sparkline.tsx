@@ -45,7 +45,17 @@ export interface RaceSeries {
 // Multi-series chart with a shared y-scale — who's winning, at a glance.
 // Gridlines with real values and per-series end labels turn the picture
 // into data: no guessing what a line is worth.
-export function RaceChart({ series, width = 320, height = 120 }: { series: readonly RaceSeries[]; width?: number; height?: number }) {
+export function RaceChart({
+  series,
+  width = 320,
+  height = 120,
+  format = money,
+}: {
+  series: readonly RaceSeries[]
+  width?: number
+  height?: number
+  format?: (v: number) => string
+}) {
   const all = series.flatMap((s) => s.points)
   if (all.length < 2) return <p className="hint">Play a few quarters to see the race.</p>
   const lo = Math.min(0, ...all)
@@ -66,7 +76,7 @@ export function RaceChart({ series, width = 320, height = 120 }: { series: reado
         <g key={g.y}>
           <line x1={0} x2={plotW} y1={g.y} y2={g.y} className="chart-grid" />
           <text x={2} y={g.y - 2} className="chart-grid-label">
-            {money(Math.round(g.v))}
+            {format(Math.round(g.v))}
           </text>
         </g>
       ))}
@@ -79,7 +89,7 @@ export function RaceChart({ series, width = 320, height = 120 }: { series: reado
               y={Math.max(8, Math.min(height - 2, yFor(s.points[s.points.length - 1]!) + 3))}
               className={`chart-end-label ${s.className}`}
             >
-              {money(Math.round(s.points[s.points.length - 1]!))}
+              {format(Math.round(s.points[s.points.length - 1]!))}
             </text>
           </g>
         ) : null,

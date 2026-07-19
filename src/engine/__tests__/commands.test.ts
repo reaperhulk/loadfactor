@@ -195,6 +195,24 @@ describe('command validation', () => {
     }
   })
 
+  it('player customization: name, HQ, and derived footholds ride the replay', () => {
+    const custom = newGame('jet_age', 'custom-seed', { name: 'Pan Galactic', hq: 'LAX' })
+    const me = custom.airlines[0]!
+    expect(me.name).toBe('Pan Galactic')
+    expect(me.hq).toBe('LAX')
+    expect(me.slots['LAX']).toBe(8) // scenario hqSlots follow the new home
+    // Footholds derive near the HQ: three cities, strongest gets 4 slots,
+    // all clear of the ground-competition band.
+    const footholds = Object.keys(me.slots).filter((c) => c !== 'LAX')
+    expect(footholds).toHaveLength(3)
+    expect(Object.values(me.slots).reduce((a, b) => a + b, 0)).toBe(8 + 4 + 2 + 2)
+    // Deterministic: the same customization reproduces the same start.
+    const again = newGame('jet_age', 'custom-seed', { name: 'Pan Galactic', hq: 'LAX' })
+    expect(JSON.stringify(again)).toBe(JSON.stringify(custom))
+    // No customization → the authored scenario, untouched.
+    expect(newGame('jet_age', 'custom-seed').airlines[0]!.hq).toBe('JFK')
+  })
+
   it('never mutates the input state', () => {
     const state = fresh()
     const snapshot = JSON.stringify(state)
