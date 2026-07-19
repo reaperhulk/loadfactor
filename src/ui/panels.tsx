@@ -36,10 +36,7 @@ import {
 import { assignAndSchedule } from './assign'
 import { dispatch } from './session'
 import { Sparkline } from './Sparkline'
-
-function money(k: number): string {
-  return k >= 1000 || k <= -1000 ? `$${(k / 1000).toFixed(1)}M` : `$${k}k`
-}
+import { COST_LABELS, money } from './format'
 
 // Sort keys for the routes comparison table. Each computes from the same row
 // model the cells render, so what you sort is exactly what you see.
@@ -518,19 +515,11 @@ export function AirportsPanel({ state }: { state: GameState }) {
   )
 }
 
-// Human labels for the cost buckets, in a stable presentation order.
-const COST_BUCKETS: readonly { key: keyof CostBreakdown; label: string }[] = [
-  { key: 'fuel', label: 'Fuel' },
-  { key: 'salaries', label: 'Crew salaries' },
-  { key: 'ownership', label: 'Ownership & leases' },
-  { key: 'maintenance', label: 'Maintenance' },
-  { key: 'fees', label: 'Landing fees' },
-  { key: 'service', label: 'Cabin service' },
-  { key: 'flightPay', label: 'Flight pay' },
-  { key: 'overhead', label: 'Overhead' },
-  { key: 'admin', label: 'Fleet admin' },
-  { key: 'interest', label: 'Interest' },
-]
+// The cost buckets in a stable presentation order, labelled from the shared
+// format module so every surface names them identically.
+const COST_BUCKETS: readonly { key: keyof CostBreakdown; label: string }[] = (
+  ['fuel', 'salaries', 'ownership', 'maintenance', 'fees', 'service', 'flightPay', 'overhead', 'admin', 'interest'] as const
+).map((key) => ({ key, label: COST_LABELS[key] }))
 
 // Where the money went last quarter: exact engine attribution (the buckets
 // sum to reported costs), largest first, with proportional bars and the

@@ -16,12 +16,9 @@ import { dispatch, getReplay, getSession, loadSave, resumeSave, startGame, reset
 import { subscribe } from './session'
 import { ToastStack } from './toasts'
 import type { GameState, Replay } from '../engine'
+import { money } from './format'
 
 type Tab = 'routes' | 'fleet' | 'airports' | 'rivals' | 'finance' | 'report'
-
-function money(k: number): string {
-  return k >= 1000 || k <= -1000 ? `$${(k / 1000).toFixed(1)}M` : `$${k}k`
-}
 
 function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => void }) {
   const [seed, setSeed] = useState('')

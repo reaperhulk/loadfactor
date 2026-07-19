@@ -7,10 +7,7 @@ import type { Airline, GameState } from '../engine'
 import { netWorth, slotCities } from '../engine/queries'
 import { RIVAL_COLORS } from './MapView'
 import { RaceChart, Sparkline } from './Sparkline'
-
-function money(k: number): string {
-  return k >= 1000 || k <= -1000 ? `$${(k / 1000).toFixed(1)}M` : `$${k}k`
-}
+import { money } from './format'
 
 const PERSONALITY_BLURBS: Record<string, string> = {
   player: '',

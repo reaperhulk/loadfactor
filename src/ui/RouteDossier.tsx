@@ -17,10 +17,7 @@ import {
 import { Sparkline } from './Sparkline'
 import { assignAndSchedule } from './assign'
 import { dispatch } from './session'
-
-function money(k: number): string {
-  return k >= 1000 || k <= -1000 ? `$${(k / 1000).toFixed(1)}M` : `$${k}k`
-}
+import { money } from './format'
 
 interface RouteDossierProps {
   state: GameState

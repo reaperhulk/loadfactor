@@ -9,10 +9,7 @@ import type { GameState } from '../engine'
 import { estimateAircraftQuarterCost, fareFor, pairWeeklyDemand } from '../engine/market'
 import { roundTripsPerWeek } from '../engine/queries'
 import { dispatch } from './session'
-
-function money(k: number): string {
-  return k >= 1000 || k <= -1000 ? `$${(k / 1000).toFixed(1)}M` : `$${k}k`
-}
+import { money } from './format'
 
 interface RouteSetupDialogProps {
   state: GameState

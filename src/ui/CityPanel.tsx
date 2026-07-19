@@ -12,10 +12,7 @@ import { negotiationDifficulty, scarcityChanceBp } from '../engine/negotiation'
 import { airlinesOnPair, networkCities, slotsAllocated, slotsFree, slotsHeld, slotsUsed } from '../engine/queries'
 import { cityMass, cityTier } from './MapView'
 import { dispatch } from './session'
-
-function money(k: number): string {
-  return k >= 1000 || k <= -1000 ? `$${(k / 1000).toFixed(1)}M` : `$${k}k`
-}
+import { money } from './format'
 
 const REGION_NAMES: Record<string, string> = {
   na: 'North America',

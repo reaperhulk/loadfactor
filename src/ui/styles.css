@@ -287,6 +287,32 @@ button:disabled {
   stroke: #d0636e;
 }
 
+.chart-grid {
+  stroke: #2b3a5a;
+  stroke-width: 0.5;
+  stroke-dasharray: 3 4;
+}
+.chart-grid-label {
+  fill: var(--dim);
+  font-size: 8px;
+}
+.chart-end-label {
+  font-size: 8px;
+  stroke: none;
+}
+.chart-end-label.race-me {
+  fill: var(--accent);
+}
+.chart-end-label.race-rival-1 {
+  fill: #d78fae;
+}
+.chart-end-label.race-rival-2 {
+  fill: #8fd7b8;
+}
+.chart-end-label.race-rival-3 {
+  fill: #d7c98f;
+}
+
 .sort-btn {
   font: inherit;
   color: inherit;

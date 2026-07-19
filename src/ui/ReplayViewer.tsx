@@ -6,10 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { applyCommand, newGame, type GameState, type Replay } from '../engine'
 import { netWorth, quarterOf, yearOf } from '../engine/queries'
 import { MapView } from './MapView'
-
-function money(k: number): string {
-  return k >= 1000 || k <= -1000 ? `$${(k / 1000).toFixed(1)}M` : `$${k}k`
-}
+import { money } from './format'
 
 const EMPTY = new Set<never>()
 

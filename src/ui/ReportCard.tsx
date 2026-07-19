@@ -7,10 +7,7 @@ import { pairKey } from '../data/cities'
 import { getEventDef } from '../data/events'
 import type { GameEvent, GameState } from '../engine'
 import { quarterOf, yearOf } from '../engine/queries'
-
-function money(k: number): string {
-  return k >= 1000 || k <= -1000 ? `$${(k / 1000).toFixed(1)}M` : `$${k}k`
-}
+import { COST_LABELS, money } from './format'
 
 function delta(now: number, prev: number | undefined): string {
   if (prev === undefined) return ''
@@ -95,6 +92,15 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
               <td className={now.profit >= 0 ? 'pos' : 'neg'}>{money(now.profit)}</td>
               <td className="dim">{delta(now.profit, prev?.profit)}</td>
             </tr>
+            {now.revenue > 0 && (
+              <tr>
+                <td className="dim">margin</td>
+                <td className={now.profit >= 0 ? 'pos' : 'neg'}>
+                  {((now.profit * 100) / now.revenue).toFixed(1)}%
+                </td>
+                <td />
+              </tr>
+            )}
             <tr>
               <td>Passengers</td>
               <td>{now.pax.toLocaleString('en-US')}</td>
@@ -114,6 +120,29 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
             </tr>
           </tbody>
         </table>
+
+        {(() => {
+          // The quarter's biggest cost move, from the exact engine breakdown.
+          if (!prev) return null
+          let bigKey: keyof typeof now.breakdown | null = null
+          let bigDelta = 0
+          for (const key of Object.keys(now.breakdown) as (keyof typeof now.breakdown)[]) {
+            const d = now.breakdown[key] - prev.breakdown[key]
+            if (Math.abs(d) > Math.abs(bigDelta)) {
+              bigDelta = d
+              bigKey = key
+            }
+          }
+          if (bigKey === null || Math.abs(bigDelta) < 500) return null
+          return (
+            <p className="dim" data-testid="cost-mover">
+              Biggest cost move: {COST_LABELS[bigKey]}{' '}
+              <span className={bigDelta > 0 ? 'neg' : 'pos'}>
+                {bigDelta > 0 ? '▲' : '▼'} {money(Math.abs(bigDelta))}
+              </span>
+            </p>
+          )
+        })()}
 
         {best && (
           <p>
