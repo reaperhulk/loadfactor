@@ -76,6 +76,28 @@ function arcPath(fromId: string, toId: string): string {
   return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`
 }
 
+// The same arc out AND back in one path. Traffic animation uses this so
+// rotate="auto" always sees the true direction of travel. Reversing via
+// keyPoints instead relies on each engine negating the tangent — WebKit
+// (and others) get that wrong and planes flew tail-first on the return
+// leg. With the return baked into the geometry, forward-only traversal is
+// correct everywhere, even in engines that ignore keyPoints outright.
+function roundTripPath(fromId: string, toId: string): string {
+  const a = getCity(fromId)
+  const b = getCity(toId)
+  const x1 = x(a.lon)
+  const y1 = y(a.lat)
+  const x2 = x(b.lon)
+  const y2 = y(b.lat)
+  const dx = x2 - x1
+  const dy = y2 - y1
+  const len = Math.sqrt(dx * dx + dy * dy) || 1
+  const lift = Math.min(40, len * 0.18)
+  const mx = (x1 + x2) / 2 + (dy / len) * lift
+  const my = (y1 + y2) / 2 - (dx / len) * lift
+  return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2} Q ${mx} ${my} ${x1} ${y1}`
+}
+
 // Short hops, medium stages, and long-haul trunks each get their own line
 // language (width/dash), on top of the arc lift that grows with distance.
 function haulClass(km: number): string {
@@ -440,7 +462,7 @@ export function MapView({
           const freq = effectiveFrequency(player, r)
           const planes = Math.max(1, Math.min(4, Math.round(freq / 8)))
           const dur = 4 + Math.min(14, km / 900)
-          const path = arcPath(r.from, r.to)
+          const path = roundTripPath(r.from, r.to)
           return Array.from({ length: planes }, (_, i) => (
             <g key={`plane-${r.id}-${i}`} className="plane" data-testid={i === 0 ? `plane-${r.id}` : undefined}>
               {/* A silhouette whose nose points along +x: rotate="auto" then
@@ -448,11 +470,16 @@ export function MapView({
                   ✈ text glyph points 45° off-axis and read as flying
                   backwards on the return leg. */}
               <path d={PLANE_GLYPH} transform={`scale(${0.8 / scale})`} />
+              {/* The path itself runs out AND back, traversed forward only —
+                  brief dwells at each end, correct nose-first orientation on
+                  both legs in every engine (keyPoints reversal breaks
+                  rotate="auto" in WebKit; if an engine ignores keyPoints the
+                  shuttle still reads correctly, just without the dwells). */}
               <animateMotion
                 dur={`${dur.toFixed(1)}s`}
                 begin={`${(-((r.id * 13) % 60) / 10 - (i * dur) / planes).toFixed(1)}s`}
                 repeatCount="indefinite"
-                keyPoints="0;1;1;0;0"
+                keyPoints="0;0.5;0.5;1;1"
                 keyTimes="0;0.45;0.5;0.95;1"
                 calcMode="linear"
                 rotate="auto"
