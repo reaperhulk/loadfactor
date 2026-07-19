@@ -25,11 +25,15 @@ export interface Session {
 // A save IS a replay: (scenario, seed, customization, command log).
 // Determinism does the rest. The airline color is presentation-only and
 // rides along so identity survives a reload.
-const SAVE_KEY = 'loadfactor:save:v1'
+//
+// Three slots. Slot 0 keeps the original key so pre-slot saves load as-is.
+const SLOT_KEYS = ['loadfactor:save:v1', 'loadfactor:save:v1:1', 'loadfactor:save:v1:2'] as const
+export const SAVE_SLOTS = SLOT_KEYS.length
 
 interface SaveV1 extends Replay {
   version: 1
   color?: string
+  savedAt?: number // wall-clock ms, presentation only (slot ordering/labels)
 }
 
 // The player's chosen livery color (a CSS color), applied as the accent.
@@ -39,6 +43,9 @@ export function getPlayerColor(): string | null {
   return playerColor
 }
 
+// The slot the current career auto-saves into (claimed at start/resume).
+let activeSlot = 0
+
 function persist(): void {
   if (!session) return
   const save: SaveV1 = {
@@ -47,10 +54,11 @@ function persist(): void {
     seed: session.state.seed,
     player: sessionPlayer ?? undefined,
     color: playerColor ?? undefined,
+    savedAt: Date.now(),
     commands: session.commandLog,
   }
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(save))
+    localStorage.setItem(SLOT_KEYS[activeSlot]!, JSON.stringify(save))
   } catch {
     // Storage may be full or unavailable (private mode) — play on without saves.
   }
@@ -59,9 +67,9 @@ function persist(): void {
 // The customization the current session was started with (part of its replay).
 let sessionPlayer: PlayerSetup | null = null
 
-export function loadSave(): SaveV1 | null {
+export function loadSaveAt(slot: number): SaveV1 | null {
   try {
-    const raw = localStorage.getItem(SAVE_KEY)
+    const raw = localStorage.getItem(SLOT_KEYS[slot] ?? '')
     if (!raw) return null
     const save = JSON.parse(raw) as SaveV1
     if (save.version !== 1 || typeof save.seed !== 'string' || !Array.isArray(save.commands)) return null
@@ -72,18 +80,44 @@ export function loadSave(): SaveV1 | null {
   }
 }
 
-export function clearSave(): void {
+// The legacy single-save read: slot 0.
+export function loadSave(): SaveV1 | null {
+  return loadSaveAt(0)
+}
+
+export function listSaves(): (SaveV1 | null)[] {
+  return SLOT_KEYS.map((_, i) => loadSaveAt(i))
+}
+
+// The slot a new career will claim: first free, else the stalest save.
+export function nextFreeSlot(): { slot: number; overwrites: SaveV1 | null } {
+  const saves = listSaves()
+  const free = saves.findIndex((s) => s === null)
+  if (free >= 0) return { slot: free, overwrites: null }
+  let oldest = 0
+  for (let i = 1; i < saves.length; i++) {
+    if ((saves[i]?.savedAt ?? 0) < (saves[oldest]?.savedAt ?? 0)) oldest = i
+  }
+  return { slot: oldest, overwrites: saves[oldest]! }
+}
+
+export function clearSaveAt(slot: number): void {
   try {
-    localStorage.removeItem(SAVE_KEY)
+    localStorage.removeItem(SLOT_KEYS[slot] ?? '')
   } catch {
     // ignore
   }
 }
 
+export function clearSave(): void {
+  clearSaveAt(activeSlot)
+}
+
 // Rebuild a session from a save by replaying it through the engine.
-export function resumeSave(): boolean {
-  const save = loadSave()
+export function resumeSave(slot = 0): boolean {
+  const save = loadSaveAt(slot)
   if (!save) return false
+  activeSlot = slot
   sessionPlayer = save.player ?? null
   playerColor = save.color ?? null
   const { state } = runReplay(save)
@@ -134,6 +168,7 @@ export function startGame(
       : null
   sessionPlayer = player
   playerColor = custom?.color ?? null
+  activeSlot = nextFreeSlot().slot
   session = {
     state: newGame(scenarioId, seed, player ?? undefined),
     lastEvents: [],

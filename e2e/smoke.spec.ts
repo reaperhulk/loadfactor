@@ -76,6 +76,8 @@ test('the city panel shows stats and negotiates in context', async ({ page }) =>
   await page.getByTestId('negotiate-spend').fill('1500')
   await page.getByTestId('panel-negotiate').click()
   await expect(page.getByTestId('negotiating-note')).toBeVisible()
+  // The pending negotiation also marks the city on the map.
+  await expect(page.getByTestId('negotiating-LAX')).toBeVisible()
   // Rejected commands surface as toasts (no free slots at an unheld city).
   await page.getByTestId('city-panel-close').click()
   await expect(page.getByTestId('city-panel')).toHaveCount(0)

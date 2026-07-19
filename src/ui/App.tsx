@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useReducer, useState, useSyncExternalStore } from 'react'
 import { CITIES } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { SCENARIOS, getScenario } from '../data/scenarios'
@@ -16,12 +16,14 @@ import { RivalsPanel } from './RivalsPanel'
 import { RouteDossier } from './RouteDossier'
 import { RouteSetupDialog } from './RouteSetupDialog'
 import {
+  clearSaveAt,
   dispatch,
   getPlayerColor,
   getReplay,
   getSession,
+  listSaves,
   loadFame,
-  loadSave,
+  nextFreeSlot,
   resumeSave,
   startGame,
   reset,
@@ -41,7 +43,10 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
   const [airlineName, setAirlineName] = useState('')
   const [color, setColor] = useState<string>(LIVERY_COLORS[0])
   const [hq, setHq] = useState('') // '' = the scenario's authored HQ
-  const save = loadSave()
+  const [, bumpSaves] = useReducer((n: number) => n + 1, 0)
+  const saves = listSaves()
+  const savedRows = saves.map((s, slot) => ({ save: s, slot })).filter((r) => r.save !== null)
+  const { overwrites } = nextFreeSlot()
   const custom = () => ({
     name: airlineName.trim() !== '' ? airlineName.trim() : undefined,
     hq: hq !== '' ? hq : undefined,
@@ -51,19 +56,35 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
     <main className="menu">
       <h1>Load Factor</h1>
       <p className="tagline">Routes. Jets. Margins. Fill the seats.</p>
-      {save && (
+      {savedRows.length > 0 && (
         <div className="scenario-card continue-card">
-          <h2>Saved game</h2>
-          <p className="dim">
-            {save.scenario} · seed “{save.seed}” · {save.commands.filter((c) => c.type === 'end_quarter').length}{' '}
-            quarters played
-          </p>
-          <button data-testid="continue-save" onClick={() => resumeSave()}>
-            Continue
-          </button>{' '}
-          <button data-testid="watch-save-replay" onClick={() => onWatchReplay(save)}>
-            Watch replay
-          </button>
+          <h2>Saved games</h2>
+          {savedRows.map(({ save, slot }, i) => (
+            <p key={slot} className="save-row" data-testid={`save-slot-${slot}`}>
+              <span>
+                {save!.player?.name ?? 'Your airline'} <span className="dim">— {save!.scenario} · seed “{save!.seed}” ·{' '}
+                {save!.commands.filter((c) => c.type === 'end_quarter').length} quarters</span>
+              </span>{' '}
+              <button data-testid={i === 0 ? 'continue-save' : `continue-save-${slot}`} onClick={() => resumeSave(slot)}>
+                Continue
+              </button>{' '}
+              <button
+                data-testid={i === 0 ? 'watch-save-replay' : `watch-save-replay-${slot}`}
+                onClick={() => onWatchReplay(save!)}
+              >
+                Watch replay
+              </button>{' '}
+              <ConfirmButton
+                data-testid={`delete-save-${slot}`}
+                label="delete"
+                confirmLabel="really delete?"
+                onConfirm={() => {
+                  clearSaveAt(slot)
+                  bumpSaves()
+                }}
+              />
+            </p>
+          ))}
         </div>
       )}
       <div className="airline-setup" data-testid="airline-setup">
@@ -120,11 +141,11 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
       <div className="scenario-card continue-card">
         <h2>Daily challenge</h2>
         <p className="dim">Everyone flies the same seed today. Compare final net worth with your friends.</p>
-        {save ? (
+        {overwrites !== null ? (
           <ConfirmButton
             data-testid="start-daily"
             label="▶ Fly today’s seed"
-            confirmLabel="overwrite your saved game?"
+            confirmLabel="all slots full — overwrite your oldest save?"
             onConfirm={() => startGame('jet_age', `daily-${new Date().toISOString().slice(0, 10)}`, custom())}
           />
         ) : (
@@ -162,11 +183,11 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
             {money(s.targetNetWorth)} · vs{' '}
             {s.rivals.map((r) => `${r.name} (${r.personality ?? 'balanced'})`).join(', ')}
           </p>
-          {save ? (
+          {overwrites !== null ? (
             <ConfirmButton
               data-testid={`start-${s.id}`}
               label="Start"
-              confirmLabel="overwrite your saved game?"
+              confirmLabel="all slots full — overwrite your oldest save?"
               onConfirm={() => startGame(s.id, seed || new Date().toISOString().slice(0, 10), custom())}
             />
           ) : (

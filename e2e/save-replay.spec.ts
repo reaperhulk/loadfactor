@@ -47,6 +47,33 @@ test('a game auto-saves and resumes across a page reload', async ({ page }) => {
   await expect(page.getByTestId('date')).toHaveText('1960 Q4')
 })
 
+test('two careers live in separate slots; delete frees one', async ({ page }) => {
+  await startGame(page, 'slot-seed-a')
+  await page.evaluate(() => window.__harness.endQuarter())
+  await expect(page.getByTestId('date')).toHaveText('1960 Q2')
+  await page.reload()
+  await expect(page.getByTestId('save-slot-0')).toContainText('slot-seed-a')
+  // A free slot exists, so starting again is a plain click (no overwrite arm).
+  await page.getByTestId('seed-input').fill('slot-seed-b')
+  await page.getByTestId('start-jet_age').click()
+  await expect(page.getByTestId('date')).toHaveText('1960 Q1')
+  await page.evaluate(() => window.__harness.endQuarter())
+  await page.reload()
+  await expect(page.getByTestId('save-slot-0')).toContainText('slot-seed-a')
+  await expect(page.getByTestId('save-slot-1')).toContainText('slot-seed-b')
+  // The first row resumes the first career untouched.
+  await page.getByTestId('continue-save').click()
+  await expect(page.getByTestId('date')).toHaveText('1960 Q2')
+  const seed = await page.evaluate(() => window.__harness.getState()!.seed)
+  expect(seed).toBe('slot-seed-a')
+  // Deleting the second save is a two-step confirm and frees the slot.
+  await page.reload()
+  await page.getByTestId('delete-save-1').click()
+  await page.getByTestId('delete-save-1').click()
+  await expect(page.getByTestId('save-slot-1')).toHaveCount(0)
+  await expect(page.getByTestId('save-slot-0')).toBeVisible()
+})
+
 test('the replay viewer scrubs a saved career quarter by quarter', async ({ page }) => {
   await startGame(page, 'replay-seed')
   await page.evaluate(() => {

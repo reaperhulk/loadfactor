@@ -176,6 +176,40 @@ button:disabled {
   fill: var(--accent);
 }
 
+/* Save slots on the menu. */
+.save-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+
+/* A city with a slot negotiation pending: amber dashed ring, slow pulse. */
+.negotiating-ring {
+  fill: none;
+  stroke: #ffd166;
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+  opacity: 0.8;
+  animation: negotiating-spin 6s linear infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+@keyframes negotiating-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .negotiating-ring {
+    animation: none;
+  }
+}
+
 /* Year-in-review block on the Q1 report card. */
 .year-review {
   border-top: 1px solid #2b3a5a;
