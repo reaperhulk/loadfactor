@@ -7,7 +7,7 @@ import { getAircraftType } from '../data/aircraft'
 import { distanceKm, pairKey } from '../data/cities'
 import type { GameState } from '../engine'
 import { FARE_DEMAND_BP, ROUTE_MEMORY_QUARTERS, ROUTE_SPOOL_BP } from '../data/constants'
-import { estimateAircraftQuarterCost, fareFor, pairWeeklyDemand } from '../engine/market'
+import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor, pairWeeklyDemand } from '../engine/market'
 import { airlinesOnPair, roundTripsPerWeek } from '../engine/queries'
 import { dispatch } from './session'
 import { money } from './format'
@@ -22,9 +22,17 @@ interface RouteSetupDialogProps {
 export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogProps) {
   const player = state.airlines[0]!
   const km = distanceKm(from, to)
-  const candidates = player.fleet.filter(
-    (ac) => ac.routeId === null && getAircraftType(ac.type).rangeKm >= km,
-  )
+  const candidates = player.fleet
+    .filter((ac) => ac.routeId === null && getAircraftType(ac.type).rangeKm >= km)
+    .sort((a, b) => {
+      // Best default first: cheapest quarterly cost per seat on THIS route.
+      const perSeat = (ac: typeof a) => {
+        const cost = estimateAircraftQuarterCost(state, ac.type, km)
+        const seats = estimateWeeklySeats(ac.type, km) * 13
+        return seats > 0 ? Math.floor((cost * 1000) / seats) : Number.MAX_SAFE_INTEGER
+      }
+      return perSeat(a) - perSeat(b) || a.id - b.id
+    })
   const [aircraftId, setAircraftId] = useState<number | null>(candidates[0]?.id ?? null)
   const chosen = candidates.find((ac) => ac.id === aircraftId) ?? null
   const maxFreq = chosen ? roundTripsPerWeek(chosen.type, km) : 0

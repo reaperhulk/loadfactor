@@ -3,7 +3,7 @@
 An airline business simulation inspired by Aerobiz Supersonic — with the dial
 turned toward the parts we loved most: route building, fleet strategy, and
 cold-blooded quarterly economics. Negotiate airport slots, open routes, buy
-real airframes across the eras — Caravelles to 747s to MD-11s, set fares and service, ride out
+real airframes across the eras — Caravelles to Concordes to 777s, set fares and service, ride out
 oil shocks and recessions, and out-grow rival airlines before the scenario
 clock runs out.
 
@@ -34,7 +34,12 @@ npm run dev     # then open http://localhost:5173
   maintenance hogs before the renewal forecast bites.
 - **Price**: set each route's fare and service tier — chase load factor with
   cheap seats or yield with premium — and fight rivals seat-for-seat on
-  contested pairs (the dossier's battle card shows the exact share math).
+  contested pairs (the dossier's battle card shows the exact share math, and
+  a fare what-if table replays it at every posture). Brand spend (marketing
+  levels 0–3) buys appeal in every share battle.
+- **Time it**: new routes spool up over three quarters (market memory makes
+  re-entries instant), tourism demand breathes with the seasons by
+  hemisphere, and loan rates follow the economy — borrow in booms.
 - **Connect**: unserved pairs one-stop over your own hubs; transfer hubs glow
   with connecting traffic on the map (flat or rotatable globe projection).
 - **Survive**: quarterly interest, fuel indexes and hedges, recessions, oil
@@ -68,13 +73,17 @@ enabled for the repository (Settings → Pages → Source: GitHub Actions).
 
 **In continuous iteration.** Deterministic engine (quarterly turns, route
 economics with era cost inflation, slot negotiations, world events, loans),
-81 real cities on a real landmass map with zoom + level-of-detail, city
-dossier panels with in-context negotiation, three race scenarios (Jet Age
-1960, Oil Crisis 1972, Deregulation 1985) against rival archetypes
-(price-war / premium / fortress), save/resume + watchable replays, and a
-reward layer (route draw-in arcs, ambient planes, event halos, toasts,
-money roll-ups, ranked podium) — responsive from phone to desktop with
-keyboard shortcuts, all reduced-motion aware. Testing: determinism,
+route spool-up with market memory, hemisphere seasonality, brand/marketing,
+real cities on a real landmass map (flat or globe projection) with zoom +
+level-of-detail, city dossier panels with in-context negotiation, four race
+scenarios (Jet Age 1960, Oil Crisis 1972, Deregulation 1985, Open Skies
+1995) against rival archetypes (price-war / premium / fortress / balanced),
+a real-airframe catalog from the Convair 240 through Concorde to the 777,
+three save slots + watchable replays with the race chart, and a reward
+layer (route draw-in arcs, ambient planes that wear their metal, event
+halos, actionable toasts, records and year-in-review, victory confetti) —
+responsive from phone to desktop with keyboard shortcuts, all
+reduced-motion aware. Testing: determinism,
 property, golden, balance-envelope, scenario-smoke, perf, browser e2e, and
 a deterministic evolutionary build fuzzer (CI smoke + weekly deep hunt).
 See PLAN.md §8 for the milestone ladder.
