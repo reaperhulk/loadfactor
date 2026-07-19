@@ -519,7 +519,15 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
                 </tr>
                 <tr>
                   <td>⚔ / ◐ / 🌐</td>
-                  <td>rival overlay · data lens · globe projection</td>
+                  <td>rival overlay · data lens (load → P&L → season) · globe projection</td>
+                </tr>
+                <tr>
+                  <td>Fleet tab</td>
+                  <td>🛠 puts every idle plane on its best route in one click</td>
+                </tr>
+                <tr>
+                  <td>Finance tab</td>
+                  <td>marketing (brand appeal), fuel hedges, loans at today's rate</td>
                 </tr>
                 <tr>
                   <td>?</td>

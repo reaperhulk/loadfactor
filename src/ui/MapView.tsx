@@ -8,6 +8,7 @@ import type { PointerEvent } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
+import { seasonalBp } from '../engine/market'
 import { WORLD_PATH, WORLD_RINGS } from '../data/worldmap.gen'
 import type { GameState, Route } from '../engine'
 import { effectiveFrequency, networkCities, routeWeeklyCapacity, slotsHeld, yearOf } from '../engine/queries'
@@ -464,8 +465,13 @@ export function MapView({
   }
   // Data lens: recolor your arcs by an operational metric so the network's
   // health reads at a glance.
-  const [lens, setLens] = useState<'none' | 'load' | 'profit'>('none')
+  const [lens, setLens] = useState<'none' | 'load' | 'profit' | 'season'>('none')
   const lensClass = (r: Route): string => {
+    if (lens === 'season') {
+      // The calendar's lean on this pair right now (tourism seasonality).
+      const bp = Math.floor((seasonalBp(r.from, state.turn) * seasonalBp(r.to, state.turn)) / 10000)
+      return bp > 10100 ? ' lens-good' : bp < 9900 ? ' lens-bad' : ''
+    }
     if (lens === 'none' || r.lastCapacity === 0) return ''
     if (lens === 'load') {
       return r.lastLoadFactorBp >= 8000 ? ' lens-good' : r.lastLoadFactorBp >= 5500 ? ' lens-mid' : ' lens-bad'
@@ -1035,12 +1041,12 @@ export function MapView({
         </button>
         <button
           data-testid="map-lens"
-          aria-label={`data lens: ${lens === 'none' ? 'off' : lens === 'load' ? 'load factor' : 'profit'} — click to cycle`}
-          title={`lens: ${lens === 'none' ? 'off' : lens === 'load' ? 'load factor' : 'P&L'}`}
+          aria-label={`data lens: ${lens === 'none' ? 'off' : lens === 'load' ? 'load factor' : lens === 'profit' ? 'profit' : 'season'} — click to cycle`}
+          title={`lens: ${lens === 'none' ? 'off' : lens === 'load' ? 'load factor' : lens === 'profit' ? 'P&L' : 'season'}`}
           className={lens !== 'none' ? 'active' : ''}
-          onClick={() => setLens(lens === 'none' ? 'load' : lens === 'load' ? 'profit' : 'none')}
+          onClick={() => setLens(lens === 'none' ? 'load' : lens === 'load' ? 'profit' : lens === 'profit' ? 'season' : 'none')}
         >
-          {lens === 'profit' ? '$' : '◐'}
+          {lens === 'profit' ? '$' : lens === 'season' ? '🌞' : '◐'}
         </button>
       </div>
     </div>
