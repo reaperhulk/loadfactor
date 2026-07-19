@@ -10,6 +10,7 @@ import {
   LEASE_BP_PER_QUARTER,
   MAINT_AGE_BP_PER_QUARTER,
   OWNERSHIP_BP_PER_QUARTER,
+  ROUTE_OVERHEAD_QUAD,
   USED_MARGIN_BP,
   USED_OFFERS_PER_QUARTER,
 } from '../data/constants'
@@ -116,7 +117,9 @@ export function endQuarter(prev: GameState): EngineResult {
     const t = totals[airline.id]!
     // Overhead, maintenance, and admin inflate with the era (market.ts
     // inflates the per-route operating costs); ownership tracks list price.
-    let inflatable = AIRLINE_OVERHEAD_PER_QUARTER
+    // Management complexity: sprawl carries a quadratic overhead.
+    let inflatable =
+      AIRLINE_OVERHEAD_PER_QUARTER + ROUTE_OVERHEAD_QUAD * airline.routes.length * airline.routes.length
     let fixedCosts = 0
     for (const ac of airline.fleet) {
       const type = getAircraftType(ac.type)

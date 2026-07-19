@@ -65,7 +65,7 @@ const PERSONALITIES: Record<string, Personality> = {
     fareLevel: 1,
     serviceLevel: 3,
     fareFloor: 0,
-    expandMinDemand: 400,
+    expandMinDemand: 300,
     negotiateBudgetBp: 11000,
     homeRegionUntil: 0,
   },
@@ -102,6 +102,17 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
       apply(state, idx, { type: 'close_route', routeId: route.id }, events)
     }
   }
+  // Yield management, same instincts as the competent player bot: packed
+  // planes raise fares, slack ones cut toward the personality floor.
+  for (const route of airline.routes) {
+    if (route.lastCapacity === 0) continue
+    if (route.lastLoadFactorBp >= 9700 && route.fareLevel < 2) {
+      apply(state, idx, { type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel + 1 }, events)
+    } else if (route.lastLoadFactorBp < 5500 && route.fareLevel > personality.fareFloor) {
+      apply(state, idx, { type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel - 1 }, events)
+    }
+  }
+
   // Retaliation (M3-lite): on a CONTESTED pair, a deep share loss — pax down
   // more than a third with seats now going empty — answers with a fare cut,
   // down to the personality's floor. The contest check keeps rivals from
@@ -212,8 +223,19 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   const flip = chanceBp(state.rng.rivals, personality.orderChanceBp)
   state.rng.rivals = flip.rng
   if (flip.value && (networkFull || bootstrapping) && airline.orders.length === 0) {
+    // Expansion credit, same as the player bot: full-but-poor while
+    // profitable is exactly when borrowing to grow is right.
+    const lastProfit = airline.history[airline.history.length - 1]?.profit ?? 0
+    let expectedCash = airline.cash
+    if (airline.cash < 12000 && lastProfit > 0) {
+      const room = debtCeiling(airline) - totalDebt(airline)
+      if (room >= 8000) {
+        apply(state, idx, { type: 'take_loan', amount: 10000 }, events)
+        expectedCash += 10000
+      }
+    }
     const buffer = 5000
-    const affordable = typesOnSale(yearOf(state)).filter((t) => t.price + buffer <= airline.cash)
+    const affordable = typesOnSale(yearOf(state)).filter((t) => t.price + buffer <= expectedCash)
     if (affordable.length > 0) {
       let pick = affordable[0]!
       for (const t of affordable) if (t.seats > pick.seats) pick = t

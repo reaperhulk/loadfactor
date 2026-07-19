@@ -21,13 +21,15 @@ export const DEMAND_DIST_BANDS: readonly (readonly [number, number])[] = [
 // the late-game money curve (M2 anti-compounding rule #2).
 export const DEMAND_GROWTH_BP_PER_QUARTER = 125
 export const DEMAND_GROWTH_TAPER_TURN = 40
-export const DEMAND_GROWTH_LATE_BP_PER_QUARTER = 50
+export const DEMAND_GROWTH_LATE_BP_PER_QUARTER = 25
 // Operating-cost inflation trails demand growth slightly: a saturated route's
 // margin decays over the years, so growth must come from expansion and fleet
 // renewal, never from sitting on a full plane (M1 anti-compounding rule).
 // Applies to crew, fees, service, maintenance, admin, and overhead — not fuel
 // (its own index) and not aircraft list prices (era-designed).
 export const COST_INFLATION_BP_PER_QUARTER = 100
+// Fuel's own nominal drift is gentler — the index walk supplies the drama.
+export const FUEL_INFLATION_BP_PER_QUARTER = 50
 export const DEMAND_NOISE_SPREAD_BP = 800
 
 // --- Fares & service ---
@@ -41,8 +43,18 @@ export const FARE_PER_100KM_FAR = 6
 export const FARE_LEVEL_PRICE_BP: readonly number[] = [8000, 9000, 10000, 11500, 13000]
 // Fare level -2..+2 → attractiveness weight (cheap wins share).
 export const FARE_LEVEL_WEIGHT: readonly number[] = [150, 125, 100, 80, 65]
+// Fare level -2..+2 → demand elasticity bp: gouging sheds passengers even
+// with no competitor on the pair (monopolies are not a free +30%).
+export const FARE_DEMAND_BP: readonly number[] = [11000, 10500, 10000, 8600, 7400]
+// Hub feed: each additional route at an endpoint funnels connecting traffic
+// onto this one, up to a cap — hub-and-spoke beats scattered point-to-point.
+export const HUB_CONN_BP_PER_ROUTE = 150
+export const HUB_CONN_MAX_BP = 1500
+// Management complexity: quarterly overhead grows with the SQUARE of route
+// count ($k × routes²) — sprawl has a real carrying cost.
+export const ROUTE_OVERHEAD_QUAD = 25
 // Service level 1..3 → attractiveness weight and cost per pax ($).
-export const SERVICE_LEVEL_WEIGHT: readonly number[] = [100, 115, 128]
+export const SERVICE_LEVEL_WEIGHT: readonly number[] = [100, 118, 140]
 export const SERVICE_COST_PER_PAX: readonly number[] = [10, 18, 28]
 
 // --- Operations ---

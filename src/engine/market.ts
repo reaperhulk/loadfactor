@@ -9,6 +9,7 @@ import {
   DEMAND_GROWTH_LATE_BP_PER_QUARTER,
   DEMAND_GROWTH_TAPER_TURN,
   COST_INFLATION_BP_PER_QUARTER,
+  FUEL_INFLATION_BP_PER_QUARTER,
   CREW_COST_PER_BLOCK_HOUR,
   OWNERSHIP_BP_PER_QUARTER,
   DEMAND_DIST_BANDS,
@@ -16,7 +17,10 @@ import {
   DEMAND_MASS_FLOOR,
   DEMAND_NOISE_SPREAD_BP,
   FARE_BASE,
+  FARE_DEMAND_BP,
   FARE_LEVEL_PRICE_BP,
+  HUB_CONN_BP_PER_ROUTE,
+  HUB_CONN_MAX_BP,
   FARE_LEVEL_WEIGHT,
   FARE_PER_100KM_FAR,
   FARE_PER_100KM_NEAR,
@@ -50,6 +54,10 @@ export function inflationBp(turn: number): number {
   return 10000 + COST_INFLATION_BP_PER_QUARTER * turn
 }
 
+export function fuelInflationBp(turn: number): number {
+  return 10000 + FUEL_INFLATION_BP_PER_QUARTER * turn
+}
+
 // What one airframe of this type costs per quarter on a route of this length,
 // $k, at today's fuel index and inflation — the shop's honest sticker. Mirrors
 // resolveMarket's per-flight costs plus the fixed ownership stack from turn.ts.
@@ -57,7 +65,7 @@ export function estimateAircraftQuarterCost(state: GameState, typeId: string, km
   const t = getAircraftType(typeId)
   if (km > t.rangeKm) return -1
   const rt = roundTripsPerWeek(typeId, km)
-  const fuelBp = effFuelBp(state.world)
+  const fuelBp = Math.floor((effFuelBp(state.world) * fuelInflationBp(state.turn)) / 10000)
   const weeklyFuel = Math.floor((rt * 2 * km * t.fuelPerKm * fuelBp) / 10000)
   const weeklyFees = rt * 2 * (LANDING_FEE_BASE + t.seats * LANDING_FEE_PER_SEAT)
   const weeklyCrewMin = rt * 2 * Math.floor((km * 60) / t.speedKmh)
@@ -133,6 +141,21 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
     return hedge !== null && hedge.quartersLeft > 0 ? hedge.bp : marketFuelBp
   }
 
+  // Hub feed: routes per airline per city, for the connectivity bonus.
+  const routesAt: Map<string, number>[] = state.airlines.map((airline) => {
+    const counts = new Map<string, number>()
+    for (const r of airline.routes) {
+      counts.set(r.from, (counts.get(r.from) ?? 0) + 1)
+      counts.set(r.to, (counts.get(r.to) ?? 0) + 1)
+    }
+    return counts
+  })
+  const connBpFor = (idx: number, route: Route): number => {
+    const counts = routesAt[idx]!
+    const extra = (counts.get(route.from)! - 1) + (counts.get(route.to)! - 1)
+    return 10000 + Math.min(HUB_CONN_MAX_BP, HUB_CONN_BP_PER_ROUTE * extra)
+  }
+
   // Collect entrants per pair in stable order (airline index, then route id).
   // Each route flies its scheduled frequency (requested, capped by fleet).
   const pairs = new Map<string, Entrant[]>()
@@ -164,13 +187,19 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
     const km = distanceKm(from, to)
     const demand = pairWeeklyDemand(state, from, to)
 
-    // Split demand by attractiveness, cap at capacity, then one spill pass:
-    // unmet demand flows to entrants with spare seats, pro rata.
+    // Split demand by attractiveness, then shape each entrant's share by fare
+    // elasticity (gouging sheds pax even in a monopoly) and hub connectivity
+    // (a hub endpoint feeds connecting traffic in). Cap at capacity, then one
+    // spill pass: unmet demand flows to entrants with spare seats, pro rata.
     let totalWeight = 0
     for (const e of entrants) totalWeight += e.weight
-    const attracted = entrants.map((e) =>
-      totalWeight === 0 ? 0 : Math.floor((demand * e.weight) / totalWeight),
-    )
+    const attracted = entrants.map((e) => {
+      if (totalWeight === 0) return 0
+      let a = Math.floor((demand * e.weight) / totalWeight)
+      a = Math.floor((a * FARE_DEMAND_BP[e.route.fareLevel + 2]!) / 10000)
+      a = Math.floor((a * connBpFor(e.airlineIdx, e.route)) / 10000)
+      return a
+    })
     const pax = entrants.map((e, i) => Math.min(attracted[i]!, e.weeklyCapacity))
     let unmet = 0
     let spare = 0
@@ -196,7 +225,9 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       let weeklyFees = 0
       let weeklyCrewMin = 0
       const airline = state.airlines[e.airlineIdx]!
-      const fuelBp = fuelBpFor(e.airlineIdx)
+      // The fuel index rides its walk (or a hedge), and the nominal price per
+      // index point inflates with the era like every other cost.
+      const fuelBp = Math.floor((fuelBpFor(e.airlineIdx) * fuelInflationBp(state.turn)) / 10000)
       for (const alloc of allocateTrips(airline, e.route)) {
         const t = getAircraftType(alloc.type)
         weeklyFuel += Math.floor((alloc.trips * 2 * km * t.fuelPerKm * fuelBp) / 10000)
