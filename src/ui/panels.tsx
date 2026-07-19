@@ -882,7 +882,16 @@ export function AirportsPanel({ state }: { state: GameState }) {
                 <td className={cityPax === 0 ? 'dim' : cityProfit >= 0 ? 'pos' : 'neg'}>
                   {cityPax > 0 ? money(cityProfit) : '—'}
                 </td>
-                <td>{money(negotiationDifficulty(c.id))}</td>
+                <td>
+                  <button
+                    className="link-btn"
+                    title="set the negotiation budget to this city's difficulty"
+                    data-testid={`suggest-budget-${c.id}`}
+                    onClick={() => setSpend(negotiationDifficulty(c.id))}
+                  >
+                    {money(negotiationDifficulty(c.id))}
+                  </button>
+                </td>
                 <td>
                   {negotiating ? (
                     <span className="dim" title="resolves at quarter end">

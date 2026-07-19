@@ -191,6 +191,27 @@ export interface FameEntry {
   years: number
 }
 
+// Export/import: a save is plain JSON, so a career can travel between
+// browsers as text. Import validates the same way loadSaveAt does and
+// claims the given slot.
+export function exportSave(slot: number): string | null {
+  const save = loadSaveAt(slot)
+  return save ? JSON.stringify(save) : null
+}
+
+export function importSave(raw: string, slot: number): boolean {
+  try {
+    const save = JSON.parse(raw) as SaveV1
+    if (save.version !== 1 || typeof save.seed !== 'string' || !Array.isArray(save.commands)) return false
+    getScenario(save.scenario) // throws on unknown scenario
+    runReplay(save) // must replay cleanly before we store it
+    localStorage.setItem(SLOT_KEYS[slot] ?? '', JSON.stringify(save))
+    return true
+  } catch {
+    return false
+  }
+}
+
 // Forget everything: every save slot, the hall of fame, and the coach
 // dismissal. The menu's start-fresh escape hatch.
 export function clearAllData(): void {

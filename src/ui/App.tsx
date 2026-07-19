@@ -18,6 +18,8 @@ import { RouteSetupDialog } from './RouteSetupDialog'
 import {
   clearAllData,
   clearSaveAt,
+  exportSave,
+  importSave,
   dispatch,
   getPlayerColor,
   getReplay,
@@ -45,6 +47,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
   const [color, setColor] = useState<string>(LIVERY_COLORS[0])
   const [hq, setHq] = useState('') // '' = the scenario's authored HQ
   const [, bumpSaves] = useReducer((n: number) => n + 1, 0)
+  const [importText, setImportText] = useState('')
   const saves = listSaves()
   const savedRows = saves.map((s, slot) => ({ save: s, slot })).filter((r) => r.save !== null)
   const { overwrites } = nextFreeSlot()
@@ -75,6 +78,16 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
               >
                 Watch replay
               </button>{' '}
+              <button
+                data-testid={`export-save-${slot}`}
+                title="copy this career as JSON — paste it into Import on any browser"
+                onClick={() => {
+                  const json = exportSave(slot)
+                  if (json) void navigator.clipboard?.writeText(json)
+                }}
+              >
+                export
+              </button>{' '}
               <ConfirmButton
                 data-testid={`delete-save-${slot}`}
                 label="delete"
@@ -86,6 +99,35 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
               />
             </p>
           ))}
+          <details>
+            <summary className="dim">Import a career</summary>
+            <textarea
+              data-testid="import-save-text"
+              placeholder="paste exported save JSON here"
+              rows={3}
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+            />{' '}
+            <button
+              data-testid="import-save"
+              disabled={importText.trim() === ''}
+              onClick={() => {
+                const { slot, overwrites: taken } = nextFreeSlot()
+                if (taken !== null) {
+                  setImportText('— all slots full — delete one first —')
+                  return
+                }
+                if (importSave(importText.trim(), slot)) {
+                  setImportText('')
+                  bumpSaves()
+                } else {
+                  setImportText('— that JSON did not replay cleanly —')
+                }
+              }}
+            >
+              import into a slot
+            </button>
+          </details>
         </div>
       )}
       <div className="airline-setup" data-testid="airline-setup">
