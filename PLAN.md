@@ -51,7 +51,8 @@ One turn = one calendar quarter. A scenario spans decades (e.g. 1960–1980 =
 - Set each route's fare level (±2 steps around a distance-based base fare) and
   service level (1–3: no-frills → premium).
 - Assign/unassign owned aircraft to routes; order new aircraft (delivered
-  after a lag of 2–4 quarters); sell old ones.
+  after a lag of 2–4 quarters) or cancel an order (the maker keeps a
+  deposit); lease, buy used, refit cabins; sell old ones.
 - Start slot negotiations at new airports (spend cash for a chance at slots).
 - Take or repay loans.
 

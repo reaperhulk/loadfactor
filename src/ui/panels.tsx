@@ -583,6 +583,7 @@ function Shop({ state }: { state: GameState }) {
                   <td>
                     <button
                       disabled={player.cash < t.price}
+                      title={player.cash < t.price ? `need ${money(t.price)} cash — you have ${money(player.cash)}` : undefined}
                       data-testid={`order-${t.id}`}
                       onClick={() => dispatch({ type: 'order_aircraft', aircraftType: t.id })}
                     >
