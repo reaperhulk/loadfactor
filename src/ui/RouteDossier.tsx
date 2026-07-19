@@ -6,7 +6,7 @@ import { getAircraftType } from '../data/aircraft'
 import { distanceKm, pairKey } from '../data/cities'
 import { FARE_DEMAND_BP } from '../data/constants'
 import type { GameState } from '../engine'
-import { fareFor, fuelInflationBp, pairWeeklyDemand, routeShareWeight } from '../engine/market'
+import { fareFor, fuelInflationBp, pairWeeklyDemand, routeShareWeight, routeSpoolBp } from '../engine/market'
 import { effFuelBp } from '../engine/worldEvents'
 import {
   allocateTrips,
@@ -76,6 +76,12 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
           </h2>
           <span className="dim">
             {km}km · demand {demand}/wk · fare ${fareFor(km, route.fareLevel)}
+            {routeSpoolBp(player, route, state.turn) < 10000 && (
+              <span className="neg" data-testid="route-ramping">
+                {' '}
+                · ramping — attaches {routeSpoolBp(player, route, state.turn) / 100}% of its share this quarter
+              </span>
+            )}
           </span>
         </div>
         <span>

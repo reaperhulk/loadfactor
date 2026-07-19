@@ -7,7 +7,7 @@ import { typesOnSale, getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey } from '../data/cities'
 import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
 import { applyPlanningCommand } from './commands'
-import { pairWeeklyDemand } from './market'
+import { pairWeeklyDemand, routeSpoolBp } from './market'
 import { negotiationDifficulty } from './negotiation'
 import {
   airlinesOnPair,
@@ -148,7 +148,7 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   // the network to paper-losers at once; closing everything in one quarter
   // collapses revenue while the freed planes keep drawing salaries.
   const losers = airline.routes
-    .filter((r) => r.lastCapacity > 0 && r.lastRevenue * 100 < r.lastCost * 85)
+    .filter((r) => routeSpoolBp(airline, r, state.turn) === 10000 && r.lastCapacity > 0 && r.lastRevenue * 100 < r.lastCost * 85)
     .sort((a, b) => a.lastRevenue * b.lastCost - b.lastRevenue * a.lastCost)
     .slice(0, 2)
   for (const route of losers) {

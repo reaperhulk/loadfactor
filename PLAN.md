@@ -93,6 +93,10 @@ points where precision matters).
 - **Load factor & revenue.** Pax flown = min(share of pair demand adjusted by
   fare elasticity, capacity). Load factor = pax/capacity. Revenue = pax ×
   fare (distance-based base × fare-level multiplier).
+- **Spool-up.** A route attaches only part of its demand share for its first
+  quarters flown (`ROUTE_SPOOL_BP`, monopoly or contested alike) — travelers
+  have to learn it exists. Incumbency is worth something, and a raid takes
+  quarters to bite.
 - **Connecting traffic.** After direct demand is seated, a share of demand on
   city pairs an airline serves at both ends *without* a direct flight will
   take a one-stop over the airline's own network: best hub by total distance,

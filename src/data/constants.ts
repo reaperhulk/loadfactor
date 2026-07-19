@@ -73,6 +73,14 @@ export const CABIN_REFIT_COST_BP = 250
 export const WEEKS_PER_QUARTER = 13
 // Quarters of per-route results kept for the UI (rolling window).
 export const ROUTE_HISTORY_QUARTERS = 24
+// Spool-up: a route attaches only part of its demand share until travelers
+// learn it exists — indexed by resolved quarters flown, then full strength.
+// Incumbency is worth something; a raid takes quarters to bite.
+export const ROUTE_SPOOL_BP = [8200, 9200, 9700] as const
+// Market memory: re-entering a pair the airline served this recently skips
+// the spool — travelers still know the product. Only genuinely new markets
+// (or long-abandoned ones) ramp.
+export const ROUTE_MEMORY_QUARTERS = 8
 // Minutes of weekly block time one airframe can fly.
 export const WEEKLY_BLOCK_MINUTES = 6000
 export const MIN_ROUTE_KM = 300

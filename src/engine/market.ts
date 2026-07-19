@@ -35,6 +35,8 @@ import {
   MARKETING_WEIGHT_BP_PER_LEVEL,
   OWNERSHIP_BP_PER_QUARTER,
   ROUTE_HISTORY_QUARTERS,
+  ROUTE_MEMORY_QUARTERS,
+  ROUTE_SPOOL_BP,
   SERVICE_COST_PER_PAX,
   SERVICE_LEVEL_WEIGHT,
   WEEKS_PER_QUARTER,
@@ -152,6 +154,17 @@ export function routeShareWeight(airline: Airline, route: Route): number {
   return Math.floor((base * (10000 + airline.marketing * MARKETING_WEIGHT_BP_PER_LEVEL)) / 10000)
 }
 
+// How much of its demand share a route actually attaches, by quarters flown.
+// Re-entering a recently served pair skips the ramp entirely — the market
+// remembers. Exported so the UI can show "ramping" honestly.
+export function routeSpoolBp(airline: Airline, route: Route, turn: number): number {
+  const flown = route.history.length
+  if (flown >= ROUTE_SPOOL_BP.length) return 10000
+  const last = airline.servedUntil[pairKey(route.from, route.to)]
+  if (last !== undefined && turn - last <= ROUTE_MEMORY_QUARTERS) return 10000
+  return ROUTE_SPOOL_BP[flown] ?? 10000
+}
+
 // Per-route weekly accumulator, finalized to quarterly numbers at the end.
 // Cost components are tracked separately (inflation already applied) so the
 // quarterly report can attribute every dollar; weeklyCost is their sum.
@@ -241,6 +254,9 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       if (totalWeight === 0) return 0
       let a = Math.floor((demand * e.weight) / totalWeight)
       a = Math.floor((a * FARE_DEMAND_BP[e.route.fareLevel + 2]!) / 10000)
+      // Spool-up: young routes attach only part of their share until the
+      // market learns them (monopoly or contested alike).
+      a = Math.floor((a * routeSpoolBp(state.airlines[e.airlineIdx]!, e.route, state.turn)) / 10000)
       return a
     })
     const pax = entrants.map((e, i) => Math.min(attracted[i]!, e.weeklyCapacity))

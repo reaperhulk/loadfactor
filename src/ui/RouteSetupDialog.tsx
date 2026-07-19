@@ -4,9 +4,9 @@
 
 import { useState } from 'react'
 import { getAircraftType } from '../data/aircraft'
-import { distanceKm } from '../data/cities'
+import { distanceKm, pairKey } from '../data/cities'
 import type { GameState } from '../engine'
-import { FARE_DEMAND_BP } from '../data/constants'
+import { FARE_DEMAND_BP, ROUTE_MEMORY_QUARTERS, ROUTE_SPOOL_BP } from '../data/constants'
 import { estimateAircraftQuarterCost, fareFor, pairWeeklyDemand } from '../engine/market'
 import { airlinesOnPair, roundTripsPerWeek } from '../engine/queries'
 import { dispatch } from './session'
@@ -112,17 +112,24 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
               </label>
             </div>
             {(() => {
-              // Honest preview: demand shaped by the chosen fare's elasticity,
-              // capped by the seats actually flown, priced at the chosen fare.
-              const shaped = Math.floor((demand * FARE_DEMAND_BP[fareLevel + 2]!) / 10000)
+              // Honest preview: demand shaped by the chosen fare's elasticity
+              // and the first-quarter spool-up, capped by the seats actually
+              // flown, priced at the chosen fare.
+              const memoryTurn = player.servedUntil[pairKey(from, to)]
+              const remembered = memoryTurn !== undefined && state.turn - memoryTurn <= ROUTE_MEMORY_QUARTERS
+              let shaped = Math.floor((demand * FARE_DEMAND_BP[fareLevel + 2]!) / 10000)
+              if (!remembered) shaped = Math.floor((shaped * ROUTE_SPOOL_BP[0]!) / 10000)
               const estPax = Math.min(shaped, seats)
               const estRev = Math.floor((estPax * fareFor(km, fareLevel) * 13) / 1000)
               const rivalsHere = airlinesOnPair(state, from, to, 0)
               return (
                 <p data-testid="route-setup-estimate">
-                  Est. revenue{' '}
+                  First-quarter revenue{' '}
                   <strong className={estRev >= estCost ? 'pos' : 'neg'}>{money(estRev)}/q</strong> vs aircraft
                   cost {money(estCost)}/q at full schedule
+                  {!remembered && (
+                    <span className="dim"> — new routes ramp to full demand over 3 quarters</span>
+                  )}
                   {rivalsHere > 0 && (
                     <span className="neg"> — before splitting the pair with {rivalsHere} rival{rivalsHere > 1 ? 's' : ''}</span>
                   )}

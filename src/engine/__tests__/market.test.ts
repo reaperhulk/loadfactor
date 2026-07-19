@@ -107,6 +107,49 @@ describe('market resolution', () => {
     }
   })
 
+  it('a new route spools up: it attaches less demand than a mature one', () => {
+    const fresh = newGame('jet_age', 'spool-seed')
+    const freshRoute = withRoute(fresh, 0, 'MIA', 'YYZ', 0)
+    fresh.airlines[0]!.fleet[0]!.routeId = freshRoute
+    const freshEvents: GameEvent[] = []
+    resolveMarket(fresh, freshEvents)
+    const freshPax = freshEvents.find((e) => e.type === 'route_result' && e.airline === 0)
+
+    const mature = newGame('jet_age', 'spool-seed')
+    const matureRoute = withRoute(mature, 0, 'MIA', 'YYZ', 0)
+    mature.airlines[0]!.fleet[0]!.routeId = matureRoute
+    // Backfill three flown quarters — the market knows this route.
+    const r = mature.airlines[0]!.routes[0]!
+    for (let q = 0; q < 3; q++) {
+      r.history.push({ turn: q, pax: 0, transferPax: 0, capacity: 0, loadFactorBp: 0, revenue: 0, cost: 0 })
+    }
+    const matureEvents: GameEvent[] = []
+    resolveMarket(mature, matureEvents)
+    const maturePax = matureEvents.find((e) => e.type === 'route_result' && e.airline === 0)
+
+    // Market memory: re-entering the pair recently served skips the ramp.
+    const reentry = newGame('jet_age', 'spool-seed')
+    const reentryRoute = withRoute(reentry, 0, 'MIA', 'YYZ', 0)
+    reentry.airlines[0]!.fleet[0]!.routeId = reentryRoute
+    reentry.airlines[0]!.servedUntil['MIA-YYZ'] = 0
+    const reentryEvents: GameEvent[] = []
+    resolveMarket(reentry, reentryEvents)
+    const reentryPax = reentryEvents.find((e) => e.type === 'route_result' && e.airline === 0)
+
+    if (
+      freshPax?.type === 'route_result' &&
+      maturePax?.type === 'route_result' &&
+      reentryPax?.type === 'route_result'
+    ) {
+      expect(freshPax.pax).toBeLessThan(maturePax.pax)
+      // First quarter attaches ~82% (ROUTE_SPOOL_BP[0]) of the mature share.
+      expect(freshPax.pax).toBeGreaterThan(Math.floor((maturePax.pax * 7500) / 10000))
+      expect(reentryPax.pax).toBe(maturePax.pax)
+    } else {
+      expect.unreachable('all route results must exist')
+    }
+  })
+
   it('brand spend wins share on an otherwise identical contested pair', () => {
     const state = newGame('jet_age', 'brand-seed')
     // Identical schedules, fares, service — the only difference is marketing.

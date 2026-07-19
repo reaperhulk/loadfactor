@@ -2,7 +2,7 @@
 // report. Every button is a Command dispatch — no state is touched directly.
 
 import { useState } from 'react'
-import { getAircraftType, typesOnSale } from '../data/aircraft'
+import { AIRCRAFT, getAircraftType, typesOnSale } from '../data/aircraft'
 import { CITIES, distanceKm, pairKey } from '../data/cities'
 import { MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
 import type { CostBreakdown, GameEvent, GameState } from '../engine'
@@ -607,6 +607,20 @@ function Shop({ state }: { state: GameState }) {
           </tbody>
         </table>
       </div>
+      {(() => {
+        // The horizon: airframes entering the market in the next few years —
+        // fleet planning is an era decision, not an impulse buy.
+        const coming = AIRCRAFT.filter((t) => t.availableFrom > year && t.availableFrom <= year + 4).sort(
+          (a, b) => a.availableFrom - b.availableFrom,
+        )
+        if (coming.length === 0) return null
+        return (
+          <p className="dim" data-testid="shop-horizon">
+            On the horizon:{' '}
+            {coming.map((t) => `${t.name} (${t.availableFrom} · ${t.seats} seats · ${t.rangeKm}km)`).join(' · ')}
+          </p>
+        )
+      })()}
       {state.world.usedMarket.length > 0 && (
         <>
           <h3>Used market (this quarter)</h3>

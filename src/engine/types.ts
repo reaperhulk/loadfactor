@@ -132,6 +132,9 @@ export interface Airline {
   negotiations: PendingNegotiation[]
   // Consecutive quarters each city's slots sat ≥2 unused (use it or lose it).
   slotIdle: Record<string, number>
+  // Market memory: pair key → last turn the airline flew it (stamped when a
+  // route closes). Re-entry within ROUTE_MEMORY_QUARTERS skips the spool-up.
+  servedUntil: Record<string, number>
   fuelHedge: FuelHedge | null
   marketing: number // brand spend level 0..MARKETING_MAX_LEVEL
   insolventQuarters: number

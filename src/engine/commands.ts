@@ -4,7 +4,7 @@
 // user input.
 
 import { getAircraftType, isAircraftType } from '../data/aircraft'
-import { distanceKm, getCity, isCity } from '../data/cities'
+import { distanceKm, getCity, isCity, pairKey } from '../data/cities'
 import {
   BASE_LOAN_RATE_BP,
   CABIN_REFIT_COST_BP,
@@ -123,6 +123,11 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       if (!route) return reject(airlineIdx, command, 'no such route')
       for (const ac of airline.fleet) if (ac.routeId === route.id) ac.routeId = null
       airline.routes = airline.routes.filter((r) => r.id !== route.id)
+      // Market memory: a flown pair stays known for a while — re-entry
+      // within the window skips the spool-up.
+      if (route.history.length > 0) {
+        airline.servedUntil[pairKey(route.from, route.to)] = state.turn
+      }
       return { events: [{ type: 'route_closed', airline: airlineIdx, routeId: route.id }] }
     }
 

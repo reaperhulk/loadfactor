@@ -5,8 +5,8 @@
 
 import { getAircraftType, typesOnSale } from '../data/aircraft'
 import { CITIES, distanceKm, pairKey } from '../data/cities'
-import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
-import { pairWeeklyDemand } from '../engine/market'
+import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND, ROUTE_MEMORY_QUARTERS, ROUTE_SPOOL_BP } from '../data/constants'
+import { pairWeeklyDemand, routeSpoolBp } from '../engine/market'
 import { negotiationDifficulty } from '../engine/negotiation'
 import { effFuelBp } from '../engine/worldEvents'
 import {
@@ -124,7 +124,12 @@ export function bestUnservedPair(state: GameState): { from: string; to: string; 
       if (slotsFree(airline, a) < 1 || slotsFree(airline, b) < 1) continue
       const km = distanceKm(a, b)
       if (km > maxRange || km < AI_MIN_ROUTE_KM) continue
-      const score = pairScore(state, a, b)
+      // Value pairs at their true first-quarter strength: a remembered
+      // market flies at 100% while a genuinely new one spools up.
+      const mem = airline.servedUntil[pairKey(a, b)]
+      const spoolBp =
+        mem !== undefined && state.turn - mem <= ROUTE_MEMORY_QUARTERS ? 10000 : ROUTE_SPOOL_BP[0]!
+      const score = Math.floor((pairScore(state, a, b) * spoolBp) / 10000)
       if (score > (best?.score ?? 0)) best = { from: a, to: b, score }
     }
   }
@@ -176,6 +181,17 @@ function greedyCommands(state: GameState): Command[] {
     commands.push({ type: 'hedge_fuel', quarters: 4 })
   }
 
+  // Distress: under water, an idle airframe is a liability with a payroll.
+  // Sell up to two (oldest first) — the same reflex the rivals have. Cash
+  // today breaks an insolvency streak that would otherwise be fatal.
+  if (airline.cash < 0) {
+    const idle = airline.fleet
+      .filter((a) => a.routeId === null && !a.leased)
+      .sort((a, b) => b.ageQuarters - a.ageQuarters)
+      .slice(0, 2)
+    for (const ac of idle) commands.push({ type: 'sell_aircraft', aircraftId: ac.id })
+  }
+
   // Brand: hold a modest marketing level while liquid, go dark when thin —
   // the share edge on contested pairs beats the spend, but never over debt.
   const wantMarketing = airline.cash >= cashBuffer && airline.routes.length >= 3 ? 1 : 0
@@ -184,9 +200,16 @@ function greedyCommands(state: GameState): Command[] {
   }
 
   // Prune routes losing >15% of their costs — deeper than demand noise (±8%)
-  // can explain, so it's structural, not a bad quarter.
+  // can explain, so it's structural, not a bad quarter. A route spooling in
+  // a genuinely NEW market is exempt (its economics aren't steady-state
+  // yet); re-entries carry market memory and answer for their numbers
+  // immediately, so a teardown-and-rebuild in a fuel spike stays viable.
   for (const route of airline.routes) {
-    if (route.lastCapacity > 0 && route.lastRevenue * 100 < route.lastCost * 85) {
+    if (
+      routeSpoolBp(airline, route, state.turn) === 10000 &&
+      route.lastCapacity > 0 &&
+      route.lastRevenue * 100 < route.lastCost * 85
+    ) {
       commands.push({ type: 'close_route', routeId: route.id })
     }
   }
@@ -224,7 +247,9 @@ function greedyCommands(state: GameState): Command[] {
         expectedCash += 10000
       }
     }
-    const buffer = 5000
+    // The post-purchase cushion scales with the cost base: in an expensive
+    // era (oil crisis) a flat floor lets one order push cash under water.
+    const buffer = Math.max(5000, cashBuffer)
     const affordable = typesOnSale(yearOf(state)).filter((t) => t.price + buffer <= expectedCash)
     if (affordable.length > 0) {
       let pick = affordable[0]!
