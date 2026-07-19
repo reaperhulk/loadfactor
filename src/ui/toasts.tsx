@@ -98,6 +98,7 @@ export function ToastStack({ events, state }: { events: GameEvent[]; state?: Gam
   const [toasts, setToasts] = useState<Toast[]>([])
   const nextId = useRef(1)
   const seen = useRef<GameEvent[] | null>(null)
+  const timers = useRef<number[]>([])
 
   useEffect(() => {
     if (seen.current === events) return // only react to a new engine result
@@ -107,20 +108,36 @@ export function ToastStack({ events, state }: { events: GameEvent[]; state?: Gam
     const stamped = fresh.map((t) => ({ ...t, id: nextId.current++ }))
     setToasts((prev) => [...prev, ...stamped].slice(-4)) // keep the stack short
     const ids = new Set(stamped.map((t) => t.id))
-    const timer = setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => !ids.has(t.id)))
-    }, TOAST_MS)
-    return () => clearTimeout(timer)
+    // Each batch owns its removal timer. Cancelling it when the next batch
+    // arrived (the old cleanup) left earlier toasts on screen forever.
+    timers.current.push(
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => !ids.has(t.id)))
+      }, TOAST_MS),
+    )
   }, [events, state])
+
+  // Timers are cleared only on unmount, never between batches.
+  useEffect(() => {
+    const pending = timers.current
+    return () => {
+      for (const t of pending) clearTimeout(t)
+    }
+  }, [])
 
   if (toasts.length === 0) return null
   return (
     <div className="toast-stack" data-testid="toasts" aria-live="polite">
       {toasts.map((t) => (
-        <div key={t.id} className={`toast toast-${t.kind}`}>
+        <button
+          key={t.id}
+          className={`toast toast-${t.kind}`}
+          title="dismiss"
+          onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+        >
           <span className="toast-icon">{t.icon}</span>
           {t.text}
-        </div>
+        </button>
       ))}
     </div>
   )

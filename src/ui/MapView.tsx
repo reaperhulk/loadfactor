@@ -168,6 +168,13 @@ export function MapView({
   const flownRoutes = player.routes.filter((r) => player.fleet.some((a) => a.routeId === r.id))
   const network = networkCities(player)
   const [showRivals, setShowRivals] = useState(true)
+  // Hub glow: each route's connecting pax land on both endpoints, so the
+  // transfer hub — riding two legs — naturally counts double and glows
+  // brightest. Makes the network's actual hub structure visible.
+  const hubVolume = new Map<string, number>()
+  for (const r of player.routes) {
+    for (const c of [r.from, r.to]) hubVolume.set(c, (hubVolume.get(c) ?? 0) + r.lastTransferPax)
+  }
   // Data lens: recolor your arcs by an operational metric so the network's
   // health reads at a glance.
   const [lens, setLens] = useState<'none' | 'load' | 'profit'>('none')
@@ -357,6 +364,25 @@ export function MapView({
       >
         <rect x={0} y={0} width={W} height={H} className="map-sea" />
         <path d={WORLD_PATH} className="map-land" />
+        {/* Transfer hubs glow in proportion to the connecting pax flowing
+            over them last quarter. */}
+        {[...hubVolume.entries()]
+          .filter(([, v]) => v >= 500)
+          .map(([cityId, v]) => {
+            const c = getCity(cityId)
+            return (
+              <circle
+                key={`hub-${cityId}`}
+                cx={x(c.lon)}
+                cy={y(c.lat)}
+                r={(5 + Math.min(14, Math.sqrt(v) / 6)) / scale}
+                className="hub-glow"
+                data-testid={`hub-glow-${cityId}`}
+              >
+                <title>{`${cityId}: ${v.toLocaleString('en-US')} connecting pax last quarter`}</title>
+              </circle>
+            )
+          })}
         {/* Rival networks, thin and color-coded per airline, under the
             player's arcs. Toggleable for decluttering. */}
         {showRivals &&

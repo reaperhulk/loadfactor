@@ -133,12 +133,14 @@ export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
         <span data-testid="dossier-frequency">
           Schedule{' '}
           <button
+            disabled={route.frequency <= 1}
             onClick={() => dispatch({ type: 'set_frequency', routeId: route.id, frequency: route.frequency - 1 })}
           >
             −
           </button>{' '}
           {effectiveFrequency(player, route)}/{maxRouteFrequency(player, route)} rt/wk{' '}
           <button
+            disabled={route.frequency >= maxRouteFrequency(player, route)}
             onClick={() => dispatch({ type: 'set_frequency', routeId: route.id, frequency: route.frequency + 1 })}
           >
             +
@@ -146,23 +148,31 @@ export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
         </span>
         <span>
           Fare{' '}
-          <button onClick={() => dispatch({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel - 1 })}>
+          <button
+            disabled={route.fareLevel <= -2}
+            onClick={() => dispatch({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel - 1 })}
+          >
             −
           </button>{' '}
           ${fareFor(km, route.fareLevel)}{' '}
-          <button onClick={() => dispatch({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel + 1 })}>
+          <button
+            disabled={route.fareLevel >= 2}
+            onClick={() => dispatch({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel + 1 })}
+          >
             +
           </button>
         </span>
         <span>
           Service{' '}
           <button
+            disabled={route.serviceLevel <= 1}
             onClick={() => dispatch({ type: 'set_service', routeId: route.id, serviceLevel: route.serviceLevel - 1 })}
           >
             −
           </button>{' '}
           {['', 'basic', 'standard', 'premium'][route.serviceLevel]}{' '}
           <button
+            disabled={route.serviceLevel >= 3}
             onClick={() => dispatch({ type: 'set_service', routeId: route.id, serviceLevel: route.serviceLevel + 1 })}
           >
             +

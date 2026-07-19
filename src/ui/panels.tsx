@@ -145,22 +145,30 @@ export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect:
               </td>
               <td>{km}</td>
               <td>
-                <button onClick={() => dispatch({ type: 'set_fare', routeId: r.id, fareLevel: r.fareLevel - 1 })}>
+                <button
+                  disabled={r.fareLevel <= -2}
+                  onClick={() => dispatch({ type: 'set_fare', routeId: r.id, fareLevel: r.fareLevel - 1 })}
+                >
                   −
                 </button>
                 ${fareFor(km, r.fareLevel)}
-                <button onClick={() => dispatch({ type: 'set_fare', routeId: r.id, fareLevel: r.fareLevel + 1 })}>
+                <button
+                  disabled={r.fareLevel >= 2}
+                  onClick={() => dispatch({ type: 'set_fare', routeId: r.id, fareLevel: r.fareLevel + 1 })}
+                >
                   +
                 </button>
               </td>
               <td>
                 <button
+                  disabled={r.serviceLevel <= 1}
                   onClick={() => dispatch({ type: 'set_service', routeId: r.id, serviceLevel: r.serviceLevel - 1 })}
                 >
                   −
                 </button>
                 {['', 'basic', 'standard', 'premium'][r.serviceLevel]}
                 <button
+                  disabled={r.serviceLevel >= 3}
                   onClick={() => dispatch({ type: 'set_service', routeId: r.id, serviceLevel: r.serviceLevel + 1 })}
                 >
                   +
