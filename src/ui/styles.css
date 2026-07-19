@@ -176,6 +176,17 @@ button:disabled {
   fill: var(--accent);
 }
 
+/* The globe: a lit disc for the visible hemisphere, a crisp limb ring. */
+.globe-disc {
+  fill: #101a2b;
+}
+.globe-limb {
+  fill: none;
+  stroke: #35415d;
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+
 /* Toasts are buttons now (click to dismiss) — keep their toast look. */
 button.toast {
   font: inherit;

@@ -156,6 +156,26 @@ test('wheel over the map zooms without scrolling the page', async ({ page }) => 
   expect(await page.evaluate(() => window.scrollY)).toBe(0)
 })
 
+test('the globe projection renders, culls the far side, and spins', async ({ page }) => {
+  await startGame(page)
+  await expect(page.getByTestId('city-HND')).toHaveCount(1) // flat: whole world at once
+  await page.getByTestId('map-projection').click()
+  await expect(page.getByTestId('globe-land')).toBeVisible()
+  await expect(page.getByTestId('city-JFK')).toHaveCount(1) // the Atlantic side faces us
+  await expect(page.getByTestId('city-HND')).toHaveCount(0) // Tokyo is behind the globe
+  // Drag westward to spin Asia into view.
+  const box = (await page.getByTestId('map').boundingBox())!
+  await page.mouse.move(box.x + box.width * 0.65, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width * 0.2, box.y + box.height / 2, { steps: 10 })
+  await page.mouse.up()
+  await expect(page.getByTestId('city-HND')).toHaveCount(1)
+  // Back to the flat overview.
+  await page.getByTestId('map-projection').click()
+  await expect(page.getByTestId('globe-land')).toHaveCount(0)
+  await expect(page.getByTestId('city-JFK')).toHaveCount(1)
+})
+
 test('zoom reveals small cities that are hidden at world view', async ({ page }) => {
   await startGame(page)
   // Doha is a tier-3 field with no player stake: invisible at world zoom.

@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent } from 'react'
 import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
-import { WORLD_PATH } from '../data/worldmap.gen'
+import { WORLD_PATH, WORLD_RINGS } from '../data/worldmap.gen'
 import type { GameState, Route } from '../engine'
 import { effectiveFrequency, networkCities, slotsHeld } from '../engine/queries'
 
@@ -104,6 +104,129 @@ function haulClass(km: number): string {
   return km >= 4500 ? 'route-long' : km >= 1500 ? 'route-medium' : 'route-short'
 }
 
+// ---- Globe (orthographic) projection ----------------------------------
+// The map can render as a rotatable globe: drag spins it, wheel zooms it,
+// routes follow real great circles, and the back hemisphere is culled.
+
+interface GlobeView {
+  cLon: number // longitude at the center of the disc
+  cLat: number // latitude at the center of the disc
+  s: number // zoom, 1..MAX_SCALE
+}
+
+const GLOBE_HOME: GlobeView = { cLon: -40, cLat: 30, s: 1 } // the Atlantic, gently tilted north
+const GLOBE_R = 195 // disc radius at s = 1, sized for the 960×420 viewport
+
+interface GlobePoint {
+  X: number
+  Y: number
+  vis: boolean
+}
+
+function globeProject(g: GlobeView, lonDeg: number, latDeg: number): GlobePoint {
+  const R = GLOBE_R * g.s
+  const lam = ((lonDeg - g.cLon) * Math.PI) / 180
+  const phi = (latDeg * Math.PI) / 180
+  const phi0 = (g.cLat * Math.PI) / 180
+  const cosc = Math.sin(phi0) * Math.sin(phi) + Math.cos(phi0) * Math.cos(phi) * Math.cos(lam)
+  return {
+    X: W / 2 + R * Math.cos(phi) * Math.sin(lam),
+    Y: H / 2 - R * (Math.cos(phi0) * Math.sin(phi) - Math.sin(phi0) * Math.cos(phi) * Math.cos(lam)),
+    vis: cosc > 0.001,
+  }
+}
+
+// Landmass on the sphere: hidden points clamp to the limb along their
+// azimuth, so coastlines hug the horizon instead of folding through it.
+function globeLandPath(g: GlobeView): string {
+  const R = GLOBE_R * g.s
+  const cx = W / 2
+  const cy = H / 2
+  const parts: string[] = []
+  for (const ring of WORLD_RINGS) {
+    let d = ''
+    let anyVisible = false
+    for (const [lon, lat] of ring) {
+      const p = globeProject(g, lon, lat)
+      let px = p.X
+      let py = p.Y
+      if (p.vis) {
+        anyVisible = true
+      } else {
+        const dx = px - cx
+        const dy = py - cy
+        const len = Math.hypot(dx, dy) || 1
+        px = cx + (R * dx) / len
+        py = cy + (R * dy) / len
+      }
+      d += `${d === '' ? 'M' : 'L'}${px.toFixed(1)} ${py.toFixed(1)}`
+    }
+    if (anyVisible && d !== '') parts.push(d + 'Z')
+  }
+  return parts.join('')
+}
+
+// Sample the great circle between two cities as lon/lat waypoints (slerp on
+// the unit sphere).
+function greatCircle(fromId: string, toId: string, n = 24): [number, number][] {
+  const a = getCity(fromId)
+  const b = getCity(toId)
+  const toXYZ = (lonDeg: number, latDeg: number): [number, number, number] => {
+    const lon = (lonDeg * Math.PI) / 180
+    const lat = (latDeg * Math.PI) / 180
+    return [Math.cos(lat) * Math.cos(lon), Math.cos(lat) * Math.sin(lon), Math.sin(lat)]
+  }
+  const va = toXYZ(a.lon, a.lat)
+  const vb = toXYZ(b.lon, b.lat)
+  const dot = Math.min(1, Math.max(-1, va[0] * vb[0] + va[1] * vb[1] + va[2] * vb[2]))
+  const om = Math.acos(dot)
+  const so = Math.sin(om) || 1e-9
+  const out: [number, number][] = []
+  for (let i = 0; i <= n; i++) {
+    const t = i / n
+    const k1 = Math.sin((1 - t) * om) / so
+    const k2 = Math.sin(t * om) / so
+    const vx = k1 * va[0] + k2 * vb[0]
+    const vy = k1 * va[1] + k2 * vb[1]
+    const vz = k1 * va[2] + k2 * vb[2]
+    out.push([
+      (Math.atan2(vy, vx) * 180) / Math.PI,
+      (Math.asin(Math.max(-1, Math.min(1, vz))) * 180) / Math.PI,
+    ])
+  }
+  return out
+}
+
+// Visible runs of the great circle as subpaths ('' when fully hidden).
+function globeRoutePath(g: GlobeView, fromId: string, toId: string): string {
+  let d = ''
+  let penDown = false
+  for (const [lon, lat] of greatCircle(fromId, toId)) {
+    const p = globeProject(g, lon, lat)
+    if (!p.vis) {
+      penDown = false
+      continue
+    }
+    d += `${penDown ? 'L' : 'M'}${p.X.toFixed(1)} ${p.Y.toFixed(1)}`
+    penDown = true
+  }
+  return d
+}
+
+// Out-and-back great circle for the traffic shuttle — only when the whole
+// leg faces the viewer (a plane vanishing mid-flight reads as a glitch).
+function globeTripPath(g: GlobeView, fromId: string, toId: string): string | null {
+  const pts = greatCircle(fromId, toId).map(([lon, lat]) => globeProject(g, lon, lat))
+  if (pts.some((p) => !p.vis)) return null
+  const fwd = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.X.toFixed(1)} ${p.Y.toFixed(1)}`).join('')
+  const back = pts
+    .slice(0, -1)
+    .reverse()
+    .map((p) => `L${p.X.toFixed(1)} ${p.Y.toFixed(1)}`)
+    .join('')
+  return fwd + back
+}
+
 interface ViewBox {
   x: number
   y: number
@@ -193,8 +316,33 @@ export function MapView({
     }
   }, [])
 
+  // Projection: the flat overview or a rotatable orthographic globe. The
+  // choice persists — planning favors the whole-world view, the globe is the
+  // honest picture of what long-haul really flies.
+  const [projection, setProjection] = useState<'flat' | 'globe'>(() =>
+    localStorage.getItem('loadfactor:projection') === 'globe' ? 'globe' : 'flat',
+  )
+  const isGlobe = projection === 'globe'
+  const [globe, setGlobe] = useState<GlobeView>(GLOBE_HOME)
+  const clampGlobe = (g: GlobeView): GlobeView => ({
+    cLon: ((g.cLon + 540) % 360) - 180,
+    cLat: Math.min(80, Math.max(-80, g.cLat)),
+    s: Math.min(MAX_SCALE, Math.max(1, g.s)),
+  })
+
   const player = state.airlines[0]!
-  const scale = W / view.w
+  const scale = isGlobe ? globe.s : W / view.w
+  // One projection call for every feature on the map.
+  const pt = (lon: number, lat: number): GlobePoint =>
+    isGlobe ? globeProject(globe, lon, lat) : { X: x(lon), Y: y(lat), vis: true }
+  const cityPt = (cityId: string): GlobePoint => {
+    const c = getCity(cityId)
+    return pt(c.lon, c.lat)
+  }
+  const routePathFor = (fromId: string, toId: string): string =>
+    isGlobe ? globeRoutePath(globe, fromId, toId) : arcPath(fromId, toId)
+  const tripPathFor = (fromId: string, toId: string): string | null =>
+    isGlobe ? globeTripPath(globe, fromId, toId) : roundTripPath(fromId, toId)
   const flownRoutes = player.routes.filter((r) => player.fleet.some((a) => a.routeId === r.id))
   const network = networkCities(player)
   const [showRivals, setShowRivals] = useState(true)
@@ -278,7 +426,8 @@ export function MapView({
       // Proportional to scroll delta: gentle on trackpads (many small
       // deltas), one comfortable step per mouse-wheel notch, hard-clamped.
       const factor = Math.min(1.6, Math.max(0.625, Math.pow(1.0018, -e.deltaY)))
-      zoomAt(e.clientX, e.clientY, factor)
+      if (isGlobe) setGlobe((g) => clampGlobe({ ...g, s: g.s * factor }))
+      else zoomAt(e.clientX, e.clientY, factor)
     }
   })
   useEffect(() => {
@@ -328,6 +477,17 @@ export function MapView({
       const now = pinchGeometry()
       if (!now || !svgRef.current) return
       const rect = svgRef.current.getBoundingClientRect()
+      if (isGlobe) {
+        const ratio = now.dist / pinch.current.dist
+        const dmx = now.midX - pinch.current.midX
+        const dmy = now.midY - pinch.current.midY
+        setGlobe((g) => {
+          const deg = 57.3 / (GLOBE_R * g.s * (rect.width / W))
+          return clampGlobe({ cLon: g.cLon - dmx * deg, cLat: g.cLat + dmy * deg, s: g.s * ratio })
+        })
+        pinch.current = now
+        return
+      }
       // Zoom about the midpoint, then follow the midpoint's travel.
       zoomAt(now.midX, now.midY, now.dist / pinch.current.dist, true)
       const t = targetRef.current
@@ -353,8 +513,17 @@ export function MapView({
     }
     drag.current.moved = true
     const rect = svgRef.current!.getBoundingClientRect()
-    const t = targetRef.current
-    applyView({ ...t, x: t.x - (dx / rect.width) * t.w, y: t.y - (dy / rect.height) * t.h }, true)
+    if (isGlobe) {
+      // Trackball: the terrain follows the pointer. Degrees per pixel shrink
+      // as the globe grows.
+      setGlobe((g) => {
+        const deg = 57.3 / (GLOBE_R * g.s * (rect.width / W))
+        return clampGlobe({ ...g, cLon: g.cLon - dx * deg, cLat: g.cLat + dy * deg })
+      })
+    } else {
+      const t = targetRef.current
+      applyView({ ...t, x: t.x - (dx / rect.width) * t.w, y: t.y - (dy / rect.height) * t.h }, true)
+    }
     drag.current.px = e.clientX
     drag.current.py = e.clientY
   }
@@ -382,7 +551,7 @@ export function MapView({
     <div className="map-wrap">
       <svg
         ref={svgRef}
-        viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
+        viewBox={isGlobe ? `0 0 ${W} ${H}` : `${view.x} ${view.y} ${view.w} ${view.h}`}
         className="map"
         role="img"
         aria-label="World route map"
@@ -393,18 +562,27 @@ export function MapView({
         onPointerCancel={onPointerUp}
       >
         <rect x={0} y={0} width={W} height={H} className="map-sea" />
-        <path d={WORLD_PATH} className="map-land" />
+        {isGlobe ? (
+          <>
+            <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} className="globe-disc" />
+            <path d={globeLandPath(globe)} className="map-land" data-testid="globe-land" />
+            <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} className="globe-limb" />
+          </>
+        ) : (
+          <path d={WORLD_PATH} className="map-land" />
+        )}
         {/* Transfer hubs glow in proportion to the connecting pax flowing
             over them last quarter. */}
         {[...hubVolume.entries()]
           .filter(([, v]) => v >= 500)
           .map(([cityId, v]) => {
-            const c = getCity(cityId)
+            const p = cityPt(cityId)
+            if (!p.vis) return null
             return (
               <circle
                 key={`hub-${cityId}`}
-                cx={x(c.lon)}
-                cy={y(c.lat)}
+                cx={p.X}
+                cy={p.Y}
                 r={(5 + Math.min(14, Math.sqrt(v) / 6)) / scale}
                 className="hub-glow"
                 data-testid={`hub-glow-${cityId}`}
@@ -417,22 +595,28 @@ export function MapView({
             player's arcs. Toggleable for decluttering. */}
         {showRivals &&
           state.airlines.slice(1).map((airline) =>
-            airline.routes.map((r) => (
-              <path
-                key={`${airline.id}-${r.id}`}
-                d={arcPath(r.from, r.to)}
-                className={`route-rival ${rivalColorClass(airline.id)}`}
-              />
-            )),
+            airline.routes.map((r) => {
+              const d = routePathFor(r.from, r.to)
+              if (d === '') return null
+              return (
+                <path
+                  key={`${airline.id}-${r.id}`}
+                  d={d}
+                  className={`route-rival ${rivalColorClass(airline.id)}`}
+                />
+              )
+            }),
           )}
         {player.routes.map((r) => {
           const km = distanceKm(r.from, r.to)
           const isNew = newRouteIds.has(r.id)
           const contested = rivalPairs.has(pairKey(r.from, r.to))
+          const d = routePathFor(r.from, r.to)
+          if (d === '') return null
           return (
             <g key={r.id}>
               <path
-                d={arcPath(r.from, r.to)}
+                d={d}
                 pathLength={1}
                 className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
                 data-testid={isNew ? 'route-line-new' : undefined}
@@ -446,10 +630,9 @@ export function MapView({
               />
               {isNew &&
                 [r.from, r.to].map((cityId) => {
-                  const c = getCity(cityId)
-                  return (
-                    <circle key={cityId} cx={x(c.lon)} cy={y(c.lat)} r={10 / scale} className="endpoint-pulse" />
-                  )
+                  const p = cityPt(cityId)
+                  if (!p.vis) return null
+                  return <circle key={cityId} cx={p.X} cy={p.Y} r={10 / scale} className="endpoint-pulse" />
                 })}
             </g>
           )
@@ -462,7 +645,8 @@ export function MapView({
           const freq = effectiveFrequency(player, r)
           const planes = Math.max(1, Math.min(4, Math.round(freq / 8)))
           const dur = 4 + Math.min(14, km / 900)
-          const path = roundTripPath(r.from, r.to)
+          const path = tripPathFor(r.from, r.to)
+          if (path === null) return [] // route crosses the horizon — no shuttle
           return Array.from({ length: planes }, (_, i) => (
             <g key={`plane-${r.id}-${i}`} className="plane" data-testid={i === 0 ? `plane-${r.id}` : undefined}>
               {/* A silhouette whose nose points along +x: rotate="auto" then
@@ -490,12 +674,13 @@ export function MapView({
         })}
         {/* Fresh slot wins ping gold at the airport. */}
         {[...newSlotCities].sort().map((cityId) => {
-          const c = getCity(cityId)
+          const p = cityPt(cityId)
+          if (!p.vis) return null
           return (
             <circle
               key={`slots-${cityId}`}
-              cx={x(c.lon)}
-              cy={y(c.lat)}
+              cx={p.X}
+              cy={p.Y}
               r={11 / scale}
               className="slots-ping"
               data-testid={`slots-ping-${cityId}`}
@@ -509,16 +694,20 @@ export function MapView({
           if (def.demandModBp === undefined) return null
           const good = def.demandModBp >= 10000
           const cities = e.city !== null ? [getCity(e.city)] : CITIES.filter((c) => c.region === e.region)
-          return cities.map((c) => (
-            <circle
-              key={`${e.id}-${c.id}`}
-              cx={x(c.lon)}
-              cy={y(c.lat)}
-              r={12 / scale}
-              className={good ? 'event-halo halo-boom' : 'event-halo halo-bust'}
-              data-testid={`event-halo-${c.id}`}
-            />
-          ))
+          return cities.map((c) => {
+            const p = pt(c.lon, c.lat)
+            if (!p.vis) return null
+            return (
+              <circle
+                key={`${e.id}-${c.id}`}
+                cx={p.X}
+                cy={p.Y}
+                r={12 / scale}
+                className={good ? 'event-halo halo-boom' : 'event-halo halo-bust'}
+                data-testid={`event-halo-${c.id}`}
+              />
+            )
+          })
         })}
         {visible.map((c) => {
           const held = slotsHeld(player, c.id)
@@ -534,16 +723,16 @@ export function MapView({
               (r) =>
                 (r.from === c.id && r.to === routeFrom) || (r.from === routeFrom && r.to === c.id),
             )
+          const p = pt(c.lon, c.lat)
+          if (!p.vis) return null
           const r = (2 + cityMass(c) / 18) / Math.sqrt(scale)
           return (
             <g key={c.id} onClick={() => handleCityClick(c.id)} className="city">
-              {inNetwork && (
-                <circle cx={x(c.lon)} cy={y(c.lat)} r={r + 2.5 / scale} className="city-network-ring" />
-              )}
+              {inNetwork && <circle cx={p.X} cy={p.Y} r={r + 2.5 / scale} className="city-network-ring" />}
               <circle
                 data-testid={`city-${c.id}`}
-                cx={x(c.lon)}
-                cy={y(c.lat)}
+                cx={p.X}
+                cy={p.Y}
                 r={r}
                 className={
                   selected === c.id
@@ -563,12 +752,14 @@ export function MapView({
         {visible
           .filter((c) => labeled.has(c.id))
           .map((c) => {
+            const p = pt(c.lon, c.lat)
+            if (!p.vis) return null
             const r = (2 + cityMass(c) / 18) / Math.sqrt(scale)
             return (
               <text
                 key={`label-${c.id}`}
-                x={x(c.lon) + r + 3 / scale}
-                y={y(c.lat) + 3 / scale}
+                x={p.X + r + 3 / scale}
+                y={p.Y + 3 / scale}
                 fontSize={9 / scale}
                 className="city-label"
               >
@@ -578,14 +769,41 @@ export function MapView({
           })}
       </svg>
       <div className="map-controls">
-        <button data-testid="zoom-in" aria-label="zoom in" onClick={() => zoomAt(null, null, 1.5)}>
+        <button
+          data-testid="zoom-in"
+          aria-label="zoom in"
+          onClick={() => (isGlobe ? setGlobe((g) => clampGlobe({ ...g, s: g.s * 1.5 })) : zoomAt(null, null, 1.5))}
+        >
           +
         </button>
-        <button data-testid="zoom-out" aria-label="zoom out" onClick={() => zoomAt(null, null, 1 / 1.5)}>
+        <button
+          data-testid="zoom-out"
+          aria-label="zoom out"
+          onClick={() =>
+            isGlobe ? setGlobe((g) => clampGlobe({ ...g, s: g.s / 1.5 })) : zoomAt(null, null, 1 / 1.5)
+          }
+        >
           −
         </button>
-        <button data-testid="zoom-reset" aria-label="reset zoom" onClick={() => applyView(FULL_VIEW, false)}>
+        <button
+          data-testid="zoom-reset"
+          aria-label="reset zoom"
+          onClick={() => (isGlobe ? setGlobe(GLOBE_HOME) : applyView(FULL_VIEW, false))}
+        >
           ⤢
+        </button>
+        <button
+          data-testid="map-projection"
+          aria-label={isGlobe ? 'switch to flat map' : 'switch to globe'}
+          title={isGlobe ? 'flat map' : 'globe'}
+          className={isGlobe ? 'active' : ''}
+          onClick={() => {
+            const next = isGlobe ? 'flat' : 'globe'
+            setProjection(next)
+            localStorage.setItem('loadfactor:projection', next)
+          }}
+        >
+          🌐
         </button>
         <button
           data-testid="toggle-rivals"
