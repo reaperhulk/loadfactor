@@ -4,7 +4,7 @@
 
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm, pairKey } from '../data/cities'
-import { FARE_DEMAND_BP, ROUTE_MEMORY_QUARTERS } from '../data/constants'
+import { FARE_DEMAND_BP, ROUTE_MEMORY_QUARTERS, SERVICE_COST_PER_PAX } from '../data/constants'
 import type { GameState } from '../engine'
 import { fareFor, fuelInflationBp, pairWeeklyDemand, routeShareWeight, routeSpoolBp, seasonalBp } from '../engine/market'
 import { effFuelBp } from '../engine/worldEvents'
@@ -252,6 +252,52 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
             <p className="hint">
               Direct traffic at today's demand, rivals held fixed. Costs barely move with fare — the
               best revenue row is usually the best profit row.
+            </p>
+          </details>
+        )
+      })()}
+
+      {(() => {
+        // Service what-if: the same share replay along the soft-product
+        // axis, with the per-pax service cost shown against the pax gained.
+        const othersWeight = contenders.filter((c) => !c.me).reduce((sum, c) => sum + c.weight, 0)
+        const myCapacity = routeWeeklyCapacity(player, route)
+        if (myCapacity === 0) return null
+        const rows = [1, 2, 3].map((level) => {
+          const weight = routeShareWeight(player, { ...route, serviceLevel: level })
+          const total = weight + othersWeight
+          let pax = total > 0 ? Math.floor((demand * weight) / total) : 0
+          pax = Math.floor((pax * FARE_DEMAND_BP[route.fareLevel + 2]!) / 10000)
+          pax = Math.min(pax, myCapacity)
+          return { level, pax, costK: Math.floor((pax * SERVICE_COST_PER_PAX[level - 1]!) / 1000) }
+        })
+        return (
+          <details className="dossier-history" data-testid="service-whatif">
+            <summary className="dim">What-if: service level</summary>
+            <table>
+              <thead>
+                <tr className="dim">
+                  <th>service</th>
+                  <th>est. pax/wk</th>
+                  <th>service cost/wk</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.level} className={r.level === route.serviceLevel ? 'me' : ''}>
+                    <td>
+                      {['', 'basic', 'standard', 'premium'][r.level]}
+                      {r.level === route.serviceLevel && <span className="dim"> (now)</span>}
+                    </td>
+                    <td>{r.pax.toLocaleString('en-US')}</td>
+                    <td>{money(r.costK)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="hint">
+              Better service wins share but costs per passenger — worth most on contested pairs,
+              least in a monopoly.
             </p>
           </details>
         )

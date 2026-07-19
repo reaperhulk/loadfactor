@@ -209,8 +209,15 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
             <ul className="fame-list">
               {fame.slice(0, 5).map((f, i) => (
                 <li key={i}>
-                  {f.won ? '🏆' : '🕯'} {f.name} — {money(f.netWorth)} · {f.scenario} · “{f.seed}” ·{' '}
-                  {f.years}y
+                  {f.won ? '🏆' : '🕯'} {f.name} — {money(f.netWorth)} ·{' '}
+                  {(() => {
+                    try {
+                      return getScenario(f.scenario).name
+                    } catch {
+                      return f.scenario
+                    }
+                  })()}{' '}
+                  · “{f.seed}” · {f.years}y
                 </li>
               ))}
             </ul>
