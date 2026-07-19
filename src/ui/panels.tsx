@@ -3,10 +3,10 @@
 
 import { useState } from 'react'
 import { getAircraftType, typesOnSale } from '../data/aircraft'
-import { CITIES, distanceKm } from '../data/cities'
-import { NEG_MIN_SPEND } from '../data/constants'
+import { CITIES, distanceKm, pairKey } from '../data/cities'
+import { MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
 import type { CostBreakdown, GameEvent, GameState } from '../engine'
-import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor } from '../engine/market'
+import { baseFare, estimateAircraftQuarterCost, estimateWeeklySeats, fareFor, pairWeeklyDemand } from '../engine/market'
 import {
   CABIN_REFIT_COST_BP,
   MAINT_AGE_BP_PER_QUARTER,
@@ -23,13 +23,16 @@ import { negotiationDifficulty, scarcityChanceBp } from '../engine/negotiation'
 import {
   airlinesOnPair,
   allocateTrips,
+  networkCities,
   cabinSeats,
   debtCeiling,
   effectiveFrequency,
   maxRouteFrequency,
   resaleValue,
   roundTripsPerWeek,
+  slotCities,
   slotsAllocated,
+  slotsFree,
   slotsHeld,
   slotsUsed,
   totalDebt,
@@ -208,6 +211,69 @@ export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect:
       </tbody>
     </table></div>
     <ServiceLegend />
+    <Opportunities state={state} />
+    </div>
+  )
+}
+
+// The planning tool the bots keep to themselves: the richest unserved pairs
+// you could open from your current slots and network, market-dollars first.
+function Opportunities({ state }: { state: GameState }) {
+  const player = state.airlines[0]!
+  const network = networkCities(player)
+  const cities = slotCities(player)
+  const served = new Set(player.routes.map((r) => pairKey(r.from, r.to)))
+  let idleReach = 0
+  for (const a of player.fleet) {
+    if (a.routeId === null) idleReach = Math.max(idleReach, getAircraftType(a.type).rangeKm)
+  }
+  const rows: { from: string; to: string; km: number; demand: number; marketK: number; rivals: number }[] = []
+  for (let i = 0; i < cities.length; i++) {
+    for (let j = i + 1; j < cities.length; j++) {
+      const a = cities[i]!
+      const b = cities[j]!
+      if (served.has(pairKey(a, b))) continue
+      if (!network.has(a) && !network.has(b)) continue
+      if (slotsFree(player, a) < 1 || slotsFree(player, b) < 1) continue
+      const km = distanceKm(a, b)
+      if (km < MIN_ROUTE_KM) continue
+      const demand = pairWeeklyDemand(state, a, b)
+      rows.push({
+        from: a,
+        to: b,
+        km,
+        demand,
+        marketK: Math.floor((demand * baseFare(km)) / 1000),
+        rivals: airlinesOnPair(state, a, b, 0),
+      })
+    }
+  }
+  rows.sort((x, y) => y.marketK - x.marketK)
+  const top = rows.slice(0, 5)
+  if (top.length === 0) return null
+  return (
+    <div data-testid="opportunities">
+      <h3>Opportunities — unserved pairs you hold slots for</h3>
+      <div className="table-scroll">
+        <table>
+          <tbody>
+            {top.map((r) => (
+              <tr key={`${r.from}-${r.to}`}>
+                <td>
+                  {r.from}–{r.to}
+                </td>
+                <td>{r.km}km</td>
+                <td>{r.demand}/wk</td>
+                <td title="weekly demand × base fare">{money(r.marketK)}/wk</td>
+                <td className={r.rivals > 0 ? 'neg' : 'pos'}>
+                  {r.rivals > 0 ? `⚔ ${r.rivals} rival${r.rivals > 1 ? 's' : ''}` : 'open market'}
+                </td>
+                <td className="dim">{r.km > idleReach ? 'needs an idle aircraft with range' : 'launchable now'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
@@ -689,6 +755,9 @@ export function FinancePanel({ state }: { state: GameState }) {
           <span>
             ⛽ Fuel hedged at index {(player.fuelHedge.bp / 100).toFixed(0)}% for{' '}
             {player.fuelHedge.quartersLeft} more quarter(s)
+            {player.fuelHedge.quartersLeft === 1 && (
+              <span className="neg"> — expires next quarter, you'll be back on the market index</span>
+            )}
           </span>
         ) : (
           <>

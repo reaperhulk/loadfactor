@@ -205,7 +205,7 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onClose }: Ci
               </td>
               <td>{p.km}km</td>
               <td>{p.demand}</td>
-              <td>${p.marketK}k</td>
+              <td>{money(p.marketK)}</td>
               <td className="dim">
                 {p.mine
                   ? '✓ yours'
