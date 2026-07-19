@@ -9,6 +9,7 @@ import type { CostBreakdown, GameEvent, GameState } from '../engine'
 import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor } from '../engine/market'
 import {
   CABIN_REFIT_COST_BP,
+  MAINT_AGE_BP_PER_QUARTER,
   SLOT_IDLE_QUARTERS_TO_LOSE,
   SLOT_IDLE_THRESHOLD,
   HEDGE_MAX_QUARTERS,
@@ -209,6 +210,7 @@ export function FleetPanel({ state }: { state: GameState }) {
             <th>Aircraft</th>
             <th>Age</th>
             <th title="round trips flown vs what this airframe could fly on its route">Utilization</th>
+            <th title="this quarter's maintenance — escalates with age and inflation">Maint/q</th>
             <th>Value</th>
             <th>Cabin</th>
             <th>Assignment</th>
@@ -243,6 +245,15 @@ export function FleetPanel({ state }: { state: GameState }) {
                     <span className="neg" title="idle metal still draws salaries and ownership">
                       parked
                     </span>
+                  )}
+                </td>
+                <td className={geriatric ? 'neg' : 'dim'}>
+                  {money(
+                    Math.floor(
+                      (Math.floor((type.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * a.ageQuarters)) / 10000) *
+                        inflationBp(state.turn)) /
+                        10000,
+                    ),
                   )}
                 </td>
                 <td className="dim">{a.leased ? '—' : money(resaleValue(a.type, a.ageQuarters))}</td>
@@ -282,7 +293,7 @@ export function FleetPanel({ state }: { state: GameState }) {
           {player.orders.map((o) => (
             <tr key={`order-${o.id}`} className="dim">
               <td>{getAircraftType(o.type).name}</td>
-              <td colSpan={5}>on order — delivers in {o.quartersLeft} quarter(s)</td>
+              <td colSpan={6}>on order — delivers in {o.quartersLeft} quarter(s)</td>
             </tr>
           ))}
         </tbody>

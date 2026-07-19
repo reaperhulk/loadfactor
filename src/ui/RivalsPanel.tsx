@@ -4,7 +4,7 @@
 import { getAircraftType } from '../data/aircraft'
 import { pairKey } from '../data/cities'
 import type { Airline, GameState } from '../engine'
-import { netWorth, slotCities } from '../engine/queries'
+import { netWorth, routeWeeklyCapacity, slotCities } from '../engine/queries'
 import { RIVAL_COLORS } from './MapView'
 import { RaceChart, Sparkline } from './Sparkline'
 import { money } from './format'
@@ -28,12 +28,21 @@ function fleetSummary(airline: Airline): string {
   )
 }
 
+// Total weekly seats an airline fields across its whole network — the
+// hardware race behind the money race.
+function fieldedSeats(airline: Airline): number {
+  let seats = 0
+  for (const r of airline.routes) seats += routeWeeklyCapacity(airline, r)
+  return seats
+}
+
 export function RivalsPanel({ state }: { state: GameState }) {
   const series = state.airlines.map((a, i) => ({
     label: a.name,
     points: a.history.map((h) => h.netWorth),
     className: i === 0 ? 'race-me' : `race-rival-${i}`,
   }))
+  const mySeats = fieldedSeats(state.airlines[0]!)
 
   return (
     <div data-testid="rivals-panel">
@@ -71,6 +80,14 @@ export function RivalsPanel({ state }: { state: GameState }) {
                       <span className="neg">
                         {' '}
                         · ⚔ {contested} pair{contested === 1 ? '' : 's'} contested with you
+                      </span>
+                    )}
+                  </p>
+                  <p className="dim">
+                    Fields {fieldedSeats(rival).toLocaleString('en-US')} seats/wk{' '}
+                    {mySeats > 0 && (
+                      <span title="their weekly seats vs yours">
+                        ({Math.round((fieldedSeats(rival) * 100) / mySeats)}% of your capacity)
                       </span>
                     )}
                   </p>
