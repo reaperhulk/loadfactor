@@ -81,6 +81,12 @@ points where precision matters).
 - **Load factor & revenue.** Pax flown = min(share of pair demand adjusted by
   fare elasticity, capacity). Load factor = pax/capacity. Revenue = pax ×
   fare (distance-based base × fare-level multiplier).
+- **Connecting traffic.** After direct demand is seated, a share of demand on
+  city pairs an airline serves at both ends *without* a direct flight will
+  take a one-stop over the airline's own network: best hub by total distance,
+  detour capped, riding only spare seats on both legs, each leg sold at a
+  through-fare discount. Hub-and-spoke emerges from real itineraries, not a
+  bonus multiplier.
 - **Costs.** Per flight: fuel (burn/km × distance × fuel index), landing
   fees, crew by block time. Per aircraft: maintenance rising with age,
   ownership overhead. Per airline: fixed overhead. Per pax: service cost by
@@ -104,7 +110,9 @@ points where precision matters).
   maintenance hogs — fleet renewal is a strategic drumbeat.
 - **Slots.** Airports have finite slot pools by city size. Negotiations cost
   cash and resolve with a seeded roll whose odds scale with spend and slot
-  scarcity. Rivals compete for the same pools.
+  scarcity. Rivals compete for the same pools. Slots are use-it-or-lose-it:
+  a city where an airline leaves 2+ slots unused for 4 consecutive quarters
+  hands one back to the authority (the HQ is exempt).
 
 ### 2.4 Scenarios & difficulty
 
@@ -172,11 +180,13 @@ The difficulty contract (asserted by balance tests, tuned over milestones):
 4. World update: economy index walk, fuel walk, event expiry, new event draw
    (`economy`/`events` streams).
 5. Route economics for every airline (pure arithmetic + stateless noise):
-   demand → shares → pax → revenue/costs per route.
+   demand → shares → pax per pair, then connecting itineraries over spare
+   seats → revenue/costs per route.
 6. Financials: service costs, overheads, maintenance, loan interest,
    quarterly cash delta applied.
 7. Aging (aircraft quarters), stats history append, solvency and objective
-   checks, turn increment.
+   checks.
+8. Slot idle decay (use-it-or-lose-it, HQ exempt), then turn increment.
 
 ## 4. Why this architecture serves the tests
 

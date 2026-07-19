@@ -1,32 +1,35 @@
 // Route economics: the heart of the game (PLAN.md §2.2). Pure arithmetic plus
 // stateless hash noise — no stream draws, so resolution order can never
-// reshuffle another subsystem's randomness.
+// reshuffle another subsystem's randomness. Resolution has two phases:
+// direct traffic on every contested pair, then connecting itineraries that
+// fill spare seats across each airline's own network.
 
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm, getCity, pairKey } from '../data/cities'
 import {
   AIRCRAFT_ADMIN_PER_QUARTER,
-  DEMAND_GROWTH_LATE_BP_PER_QUARTER,
-  DEMAND_GROWTH_TAPER_TURN,
+  CONNECT_DETOUR_MAX_BP,
+  CONNECT_FARE_DISCOUNT_BP,
+  CONNECT_WILLING_BP,
   COST_INFLATION_BP_PER_QUARTER,
-  FUEL_INFLATION_BP_PER_QUARTER,
   CREW_COST_PER_BLOCK_HOUR,
-  OWNERSHIP_BP_PER_QUARTER,
   DEMAND_DIST_BANDS,
   DEMAND_GROWTH_BP_PER_QUARTER,
+  DEMAND_GROWTH_LATE_BP_PER_QUARTER,
+  DEMAND_GROWTH_TAPER_TURN,
   DEMAND_MASS_FLOOR,
   DEMAND_NOISE_SPREAD_BP,
   FARE_BASE,
   FARE_DEMAND_BP,
   FARE_LEVEL_PRICE_BP,
-  HUB_CONN_BP_PER_ROUTE,
-  HUB_CONN_MAX_BP,
   FARE_LEVEL_WEIGHT,
   FARE_PER_100KM_FAR,
   FARE_PER_100KM_NEAR,
   FARE_TAPER_KM,
+  FUEL_INFLATION_BP_PER_QUARTER,
   LANDING_FEE_BASE,
   LANDING_FEE_PER_SEAT,
+  OWNERSHIP_BP_PER_QUARTER,
   ROUTE_HISTORY_QUARTERS,
   SERVICE_COST_PER_PAX,
   SERVICE_LEVEL_WEIGHT,
@@ -118,9 +121,21 @@ export function pairWeeklyDemand(state: GameState, a: string, b: string): number
 interface Entrant {
   airlineIdx: number
   route: Route
-  weeklyRoundTrips: number // summed over assigned aircraft
+  weeklyRoundTrips: number
   weeklyCapacity: number // seats, both directions
   weight: number // attractiveness for market-share split
+}
+
+// Per-route weekly accumulator, finalized to quarterly numbers at the end.
+interface RouteAcc {
+  airlineIdx: number
+  route: Route
+  km: number
+  weeklyPax: number
+  weeklyTransfer: number
+  weeklyCapacity: number
+  weeklyRevenue: number // $
+  weeklyCost: number // $, flight + service, inflation already applied
 }
 
 interface AirlineTotals {
@@ -129,35 +144,21 @@ interface AirlineTotals {
   pax: number // per quarter
 }
 
-// Resolves every contested city pair, writes each route's last* results,
-// emits route_result events, and returns per-airline totals. Mutates state
+// Resolves every contested city pair, then routes connecting traffic over
+// each airline's own network, writes each route's last* results, emits
+// route_result events, and returns per-airline totals. Mutates state
 // (callers clone at the entry point).
 export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTotals[] {
   const totals: AirlineTotals[] = state.airlines.map(() => ({ revenue: 0, cost: 0, pax: 0 }))
   const marketFuelBp = effFuelBp(state.world)
-  // A live hedge freezes that airline's fuel index regardless of the market.
   const fuelBpFor = (idx: number): number => {
     const hedge = state.airlines[idx]!.fuelHedge
-    return hedge !== null && hedge.quartersLeft > 0 ? hedge.bp : marketFuelBp
+    const base = hedge !== null && hedge.quartersLeft > 0 ? hedge.bp : marketFuelBp
+    return Math.floor((base * fuelInflationBp(state.turn)) / 10000)
   }
+  const inflBp = inflationBp(state.turn)
 
-  // Hub feed: routes per airline per city, for the connectivity bonus.
-  const routesAt: Map<string, number>[] = state.airlines.map((airline) => {
-    const counts = new Map<string, number>()
-    for (const r of airline.routes) {
-      counts.set(r.from, (counts.get(r.from) ?? 0) + 1)
-      counts.set(r.to, (counts.get(r.to) ?? 0) + 1)
-    }
-    return counts
-  })
-  const connBpFor = (idx: number, route: Route): number => {
-    const counts = routesAt[idx]!
-    const extra = (counts.get(route.from)! - 1) + (counts.get(route.to)! - 1)
-    return 10000 + Math.min(HUB_CONN_MAX_BP, HUB_CONN_BP_PER_ROUTE * extra)
-  }
-
-  // Collect entrants per pair in stable order (airline index, then route id).
-  // Each route flies its scheduled frequency (requested, capped by fleet).
+  // ---- Phase 1: direct traffic per contested pair ----
   const pairs = new Map<string, Entrant[]>()
   for (const airline of state.airlines) {
     for (const route of airline.routes) {
@@ -180,6 +181,9 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
     }
   }
 
+  const accs = new Map<number, RouteAcc>() // route id → accumulator (ids are per-airline but unique enough with airlineIdx check; key on composite)
+  const accKey = (airlineIdx: number, routeId: number): number => airlineIdx * 1_000_000 + routeId
+
   for (const key of [...pairs.keys()].sort()) {
     const entrants = pairs.get(key)!
     const first = entrants[0]!
@@ -187,17 +191,14 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
     const km = distanceKm(from, to)
     const demand = pairWeeklyDemand(state, from, to)
 
-    // Split demand by attractiveness, then shape each entrant's share by fare
-    // elasticity (gouging sheds pax even in a monopoly) and hub connectivity
-    // (a hub endpoint feeds connecting traffic in). Cap at capacity, then one
-    // spill pass: unmet demand flows to entrants with spare seats, pro rata.
+    // Split demand by attractiveness, shaped by fare elasticity (gouging
+    // sheds pax even in a monopoly). Cap at capacity, then one spill pass.
     let totalWeight = 0
     for (const e of entrants) totalWeight += e.weight
     const attracted = entrants.map((e) => {
       if (totalWeight === 0) return 0
       let a = Math.floor((demand * e.weight) / totalWeight)
       a = Math.floor((a * FARE_DEMAND_BP[e.route.fareLevel + 2]!) / 10000)
-      a = Math.floor((a * connBpFor(e.airlineIdx, e.route)) / 10000)
       return a
     })
     const pax = entrants.map((e, i) => Math.min(attracted[i]!, e.weeklyCapacity))
@@ -218,16 +219,11 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       const e = entrants[i]!
       const weeklyPax = pax[i]!
       const fare = fareFor(km, e.route.fareLevel)
-
-      // Weekly costs in $, converted to $k per quarter at the end. Only the
-      // trips actually flown burn fuel, fees, and crew time.
+      const airline = state.airlines[e.airlineIdx]!
+      const fuelBp = fuelBpFor(e.airlineIdx)
       let weeklyFuel = 0
       let weeklyFees = 0
       let weeklyCrewMin = 0
-      const airline = state.airlines[e.airlineIdx]!
-      // The fuel index rides its walk (or a hedge), and the nominal price per
-      // index point inflates with the era like every other cost.
-      const fuelBp = Math.floor((fuelBpFor(e.airlineIdx) * fuelInflationBp(state.turn)) / 10000)
       for (const alloc of allocateTrips(airline, e.route)) {
         const t = getAircraftType(alloc.type)
         weeklyFuel += Math.floor((alloc.trips * 2 * km * t.fuelPerKm * fuelBp) / 10000)
@@ -236,43 +232,115 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       }
       const weeklyCrew = Math.floor((weeklyCrewMin / 60) * CREW_COST_PER_BLOCK_HOUR)
       const weeklyService = weeklyPax * SERVICE_COST_PER_PAX[e.route.serviceLevel - 1]!
-      const weeklyRevenue = weeklyPax * fare
+      const inflated = Math.floor(((weeklyFees + weeklyCrew + weeklyService) * inflBp) / 10000)
+      accs.set(accKey(e.airlineIdx, e.route.id), {
+        airlineIdx: e.airlineIdx,
+        route: e.route,
+        km,
+        weeklyPax,
+        weeklyTransfer: 0,
+        weeklyCapacity: e.weeklyCapacity,
+        weeklyRevenue: weeklyPax * fare,
+        weeklyCost: weeklyFuel + inflated,
+      })
+    }
+  }
 
-      // Crew, fees, and service inflate with the era; fuel rides its own index.
-      const inflated = Math.floor(
-        ((weeklyFees + weeklyCrew + weeklyService) * inflationBp(state.turn)) / 10000,
-      )
-      const revenue = Math.floor((weeklyRevenue * WEEKS_PER_QUARTER) / 1000)
-      const cost = Math.floor(((weeklyFuel + inflated) * WEEKS_PER_QUARTER) / 1000)
-      const quarterPax = weeklyPax * WEEKS_PER_QUARTER
+  // ---- Phase 2: connecting itineraries over each airline's own network ----
+  // A share of unserved O/D demand will take a one-stop over a hub if both
+  // legs exist, the detour is tolerable, and spare seats remain. Connecting
+  // pax pay each leg's fare at a through discount and ride standby priority:
+  // strictly after direct demand.
+  for (const airline of state.airlines) {
+    // Adjacency over legs that actually flew this quarter.
+    const legsAt = new Map<string, RouteAcc[]>()
+    const legByPair = new Map<string, RouteAcc>()
+    for (const route of airline.routes) {
+      const acc = accs.get(accKey(airline.id, route.id))
+      if (!acc || acc.weeklyCapacity === 0) continue
+      for (const city of [route.from, route.to]) {
+        const list = legsAt.get(city) ?? []
+        list.push(acc)
+        legsAt.set(city, list)
+      }
+      legByPair.set(pairKey(route.from, route.to), acc)
+    }
+    const served = [...legsAt.keys()].sort()
+    for (let i = 0; i < served.length; i++) {
+      for (let j = i + 1; j < served.length; j++) {
+        const a = served[i]!
+        const c = served[j]!
+        if (legByPair.has(pairKey(a, c))) continue // direct service wins
+        const direct = distanceKm(a, c)
+        // Best hub: both legs exist, minimal total detour within tolerance.
+        let best: { leg1: RouteAcc; leg2: RouteAcc; total: number } | null = null
+        for (const leg1 of legsAt.get(a)!) {
+          const b = leg1.route.from === a ? leg1.route.to : leg1.route.from
+          if (b === c) continue
+          const leg2 = legByPair.get(pairKey(b, c))
+          if (!leg2) continue
+          const total = leg1.km + leg2.km
+          if (total * 10000 > direct * CONNECT_DETOUR_MAX_BP) continue
+          if (best === null || total < best.total) best = { leg1, leg2, total }
+        }
+        if (best === null) continue
+        const spare1 = best.leg1.weeklyCapacity - best.leg1.weeklyPax
+        const spare2 = best.leg2.weeklyCapacity - best.leg2.weeklyPax
+        if (spare1 <= 0 || spare2 <= 0) continue
+        const willing = Math.floor((pairWeeklyDemand(state, a, c) * CONNECT_WILLING_BP) / 10000)
+        const take = Math.min(willing, spare1, spare2)
+        if (take <= 0) continue
+        for (const leg of [best.leg1, best.leg2]) {
+          const legFare = Math.floor((fareFor(leg.km, leg.route.fareLevel) * CONNECT_FARE_DISCOUNT_BP) / 10000)
+          const legService = Math.floor(
+            (take * SERVICE_COST_PER_PAX[leg.route.serviceLevel - 1]! * inflBp) / 10000,
+          )
+          leg.weeklyPax += take
+          leg.weeklyTransfer += take
+          leg.weeklyRevenue += take * legFare
+          leg.weeklyCost += legService
+        }
+      }
+    }
+  }
 
-      e.route.lastPax = quarterPax
-      e.route.lastCapacity = e.weeklyCapacity * WEEKS_PER_QUARTER
-      e.route.lastLoadFactorBp =
-        e.weeklyCapacity === 0 ? 0 : Math.floor((weeklyPax * 10000) / e.weeklyCapacity)
-      e.route.lastRevenue = revenue
-      e.route.lastCost = cost
-      e.route.history.push({
+  // ---- Finalize: quarterly numbers, state, events — stable order ----
+  for (const airline of state.airlines) {
+    for (const route of airline.routes) {
+      const acc = accs.get(accKey(airline.id, route.id))
+      if (!acc) continue
+      const revenue = Math.floor((acc.weeklyRevenue * WEEKS_PER_QUARTER) / 1000)
+      const cost = Math.floor((acc.weeklyCost * WEEKS_PER_QUARTER) / 1000)
+      const quarterPax = acc.weeklyPax * WEEKS_PER_QUARTER
+      const transferPax = acc.weeklyTransfer * WEEKS_PER_QUARTER
+      route.lastPax = quarterPax
+      route.lastCapacity = acc.weeklyCapacity * WEEKS_PER_QUARTER
+      route.lastLoadFactorBp =
+        acc.weeklyCapacity === 0 ? 0 : Math.floor((acc.weeklyPax * 10000) / acc.weeklyCapacity)
+      route.lastRevenue = revenue
+      route.lastCost = cost
+      route.lastTransferPax = transferPax
+      route.history.push({
         turn: state.turn,
         pax: quarterPax,
-        capacity: e.route.lastCapacity,
-        loadFactorBp: e.route.lastLoadFactorBp,
+        transferPax,
+        capacity: route.lastCapacity,
+        loadFactorBp: route.lastLoadFactorBp,
         revenue,
         cost,
       })
-      if (e.route.history.length > ROUTE_HISTORY_QUARTERS) e.route.history.shift()
-
-      totals[e.airlineIdx]!.revenue += revenue
-      totals[e.airlineIdx]!.cost += cost
-      totals[e.airlineIdx]!.pax += quarterPax
-
+      if (route.history.length > ROUTE_HISTORY_QUARTERS) route.history.shift()
+      totals[airline.id]!.revenue += revenue
+      totals[airline.id]!.cost += cost
+      totals[airline.id]!.pax += quarterPax
       events.push({
         type: 'route_result',
-        airline: e.airlineIdx,
-        routeId: e.route.id,
+        airline: airline.id,
+        routeId: route.id,
         pax: quarterPax,
-        capacity: e.route.lastCapacity,
-        loadFactorBp: e.route.lastLoadFactorBp,
+        capacity: route.lastCapacity,
+        loadFactorBp: route.lastLoadFactorBp,
+        transferPax,
         revenue,
         cost,
       })

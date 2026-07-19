@@ -89,6 +89,50 @@ describe('quarter resolution', () => {
     expect(rejected.events[0]).toMatchObject({ type: 'command_rejected' })
   })
 
+  it('idle slots are reclaimed after four consecutive idle quarters, HQ exempt', () => {
+    let state: GameState = newGame('jet_age', 'slot-decay-seed')
+    // ORD starts with 4 slots and no routes: ≥2 free every quarter. The HQ
+    // (JFK, 8 free) is exempt no matter how idle it sits.
+    const hq = state.airlines[0]!.hq
+    const hqSlotsBefore = state.airlines[0]!.slots[hq]!
+    let lost: string[] = []
+    for (let q = 0; q < 4; q++) {
+      const r = applyCommand(state, { type: 'end_quarter' })
+      state = r.state
+      lost = lost.concat(
+        r.events.filter((e) => e.type === 'slot_lost' && e.airline === 0).map((e) => (e.type === 'slot_lost' ? e.city : '')),
+      )
+    }
+    expect(lost).toContain('ORD')
+    expect(lost).not.toContain(hq)
+    expect(state.airlines[0]!.slots['ORD']).toBe(3)
+    expect(state.airlines[0]!.slots[hq]).toBe(hqSlotsBefore)
+    // The counter resets after a loss — nothing else goes for another 3 quarters.
+    expect(state.airlines[0]!.slotIdle['ORD']).toBeUndefined()
+  })
+
+  it('using slots resets the idle counter', () => {
+    let state: GameState = newGame('jet_age', 'slot-use-seed')
+    // Two idle quarters at MIA (2 slots, none used), then a route drops the
+    // free count below the threshold — the counter clears and stays clear.
+    for (let q = 0; q < 2; q++) state = applyCommand(state, { type: 'end_quarter' }).state
+    expect(state.airlines[0]!.slotIdle['MIA']).toBe(2)
+    state = applyCommand(state, {
+      type: 'open_route',
+      from: 'JFK',
+      to: 'MIA',
+      aircraftId: 1,
+      frequency: 10,
+    }).state
+    for (let q = 0; q < 4; q++) {
+      const r = applyCommand(state, { type: 'end_quarter' })
+      state = r.state
+      expect(r.events.some((e) => e.type === 'slot_lost' && e.airline === 0 && e.city === 'MIA')).toBe(false)
+    }
+    expect(state.airlines[0]!.slotIdle['MIA']).toBeUndefined()
+    expect(state.airlines[0]!.slots['MIA']).toBe(2)
+  })
+
   it('rivals act: they open routes and expand without touching player state', () => {
     let state: GameState = newGame('jet_age', 'rival-seed')
     const playerCashBefore = state.airlines[0]!.cash

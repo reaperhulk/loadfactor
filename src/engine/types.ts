@@ -55,6 +55,7 @@ export interface FuelHedge {
 export interface RouteQuarter {
   turn: number
   pax: number
+  transferPax: number // of pax, how many were connecting over a hub
   capacity: number
   loadFactorBp: number
   revenue: number // $k
@@ -76,6 +77,7 @@ export interface Route {
   lastLoadFactorBp: number
   lastRevenue: number // $k
   lastCost: number // $k
+  lastTransferPax: number
   // Rolling recent quarters (newest last, capped at ROUTE_HISTORY_QUARTERS).
   history: RouteQuarter[]
 }
@@ -108,6 +110,8 @@ export interface Airline {
   routes: Route[]
   slots: Record<string, number> // city id → slots held (read via sorted keys only)
   negotiations: PendingNegotiation[]
+  // Consecutive quarters each city's slots sat ≥2 unused (use it or lose it).
+  slotIdle: Record<string, number>
   fuelHedge: FuelHedge | null
   insolventQuarters: number
   bankrupt: boolean
@@ -187,6 +191,7 @@ export type GameEvent =
   | { type: 'negotiation_started'; airline: number; city: string; spend: number }
   | { type: 'negotiation_failed'; airline: number; city: string }
   | { type: 'slots_granted'; airline: number; city: string; slots: number }
+  | { type: 'slot_lost'; airline: number; city: string }
   | { type: 'loan_taken'; airline: number; loanId: number; amount: number; annualRateBp: number }
   | { type: 'loan_repaid'; airline: number; loanId: number; amount: number; remaining: number }
   | { type: 'world_event_started'; eventId: string; city: string | null; region: Region | null }
@@ -199,6 +204,7 @@ export type GameEvent =
       pax: number
       capacity: number
       loadFactorBp: number
+      transferPax: number
       revenue: number // $k
       cost: number // $k
     }

@@ -18,6 +18,7 @@ function withRoute(state: GameState, airlineIdx: number, from: string, to: strin
     lastLoadFactorBp: 0,
     lastRevenue: 0,
     lastCost: 0,
+    lastTransferPax: 0,
     history: [],
   }
   airline.routes.push(route)
@@ -104,6 +105,60 @@ describe('market resolution', () => {
         expect(rival.pax).toBeGreaterThan(player.pax)
       }
     }
+  })
+
+  it('connecting pax ride spare seats over a hub on unserved pairs', () => {
+    const state = newGame('jet_age', 'connect-seed')
+    const airline = state.airlines[0]!
+    const type = airline.fleet[0]!.type
+    // JFK–ORD and ORD–LAX exist; JFK–LAX does not. Via ORD is barely a detour,
+    // so a share of JFK–LAX demand should connect. Pile on capacity so direct
+    // demand leaves spare seats on both legs.
+    const leg1 = withRoute(state, 0, 'JFK', 'ORD')
+    const leg2 = withRoute(state, 0, 'ORD', 'LAX')
+    for (let i = 0; i < 8; i++) {
+      airline.fleet.push({
+        id: airline.nextId++,
+        type,
+        ageQuarters: 0,
+        routeId: i % 2 === 0 ? leg1 : leg2,
+        leased: false,
+      })
+    }
+    const events: GameEvent[] = []
+    resolveMarket(state, events)
+    const r1 = airline.routes.find((r) => r.id === leg1)!
+    const r2 = airline.routes.find((r) => r.id === leg2)!
+    // The same connecting flow rides both legs (only one unserved pair here).
+    expect(r1.lastTransferPax).toBeGreaterThan(0)
+    expect(r2.lastTransferPax).toBe(r1.lastTransferPax)
+    expect(r1.lastPax).toBeLessThanOrEqual(r1.lastCapacity)
+    expect(r2.lastPax).toBeLessThanOrEqual(r2.lastCapacity)
+    const results = events.filter((e) => e.type === 'route_result')
+    for (const r of results) {
+      if (r.type === 'route_result') expect(r.transferPax).toBeGreaterThan(0)
+    }
+  })
+
+  it('nobody connects through an absurd detour', () => {
+    const state = newGame('jet_age', 'connect-seed')
+    const airline = state.airlines[0]!
+    const type = airline.fleet[0]!.type
+    // JFK–LAX and LAX–ORD exist; the unserved pair JFK–ORD is short, and
+    // routing it through LAX is a ~5.7× detour — beyond any tolerance.
+    const leg1 = withRoute(state, 0, 'JFK', 'LAX')
+    const leg2 = withRoute(state, 0, 'LAX', 'ORD')
+    for (let i = 0; i < 8; i++) {
+      airline.fleet.push({
+        id: airline.nextId++,
+        type,
+        ageQuarters: 0,
+        routeId: i % 2 === 0 ? leg1 : leg2,
+        leased: false,
+      })
+    }
+    resolveMarket(state, [])
+    for (const r of airline.routes) expect(r.lastTransferPax).toBe(0)
   })
 
   it('quarter resolution emits results through the public surface', () => {

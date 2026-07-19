@@ -4,7 +4,7 @@
 
 import { useMemo, useState } from 'react'
 import { CITIES, distanceKm, getCity } from '../data/cities'
-import { NEG_MIN_SPEND } from '../data/constants'
+import { NEG_MIN_SPEND, SLOT_IDLE_QUARTERS_TO_LOSE, SLOT_IDLE_THRESHOLD } from '../data/constants'
 import { getEventDef } from '../data/events'
 import type { GameState } from '../engine'
 import { baseFare, pairWeeklyDemand } from '../engine/market'
@@ -124,6 +124,13 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onClose }: Ci
       <div className="city-slots" data-testid="city-slots">
         <strong>Slots</strong> — pool {city.slotPool} · rivals hold {rivalsHeld} · you hold {held} (using {used})
       </div>
+
+      {cityId !== player.hq && held - used >= SLOT_IDLE_THRESHOLD && (
+        <div className="neg" data-testid="slot-idle-warning">
+          ⚠ {held - used} slots idle — the authority reclaims one after {SLOT_IDLE_QUARTERS_TO_LOSE} idle quarters (
+          {SLOT_IDLE_QUARTERS_TO_LOSE - (player.slotIdle[cityId] ?? 0)}q left)
+        </div>
+      )}
 
       {held > 0 && (
         <button

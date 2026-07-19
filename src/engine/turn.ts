@@ -8,6 +8,8 @@ import {
   AIRLINE_OVERHEAD_PER_QUARTER,
   INSOLVENCY_QUARTERS_TO_FAIL,
   LEASE_BP_PER_QUARTER,
+  SLOT_IDLE_QUARTERS_TO_LOSE,
+  SLOT_IDLE_THRESHOLD,
   MAINT_AGE_BP_PER_QUARTER,
   OWNERSHIP_BP_PER_QUARTER,
   ROUTE_OVERHEAD_QUAD,
@@ -17,7 +19,7 @@ import {
 import { fnv1a } from './rng'
 import { getScenario } from '../data/scenarios'
 import { inflationBp, resolveMarket } from './market'
-import { resaleValue } from './queries'
+import { resaleValue, slotCities, slotsFree } from './queries'
 import { resolveNegotiations } from './negotiation'
 import { netWorth, yearOf } from './queries'
 import { runRivalTurn } from './rivals'
@@ -175,6 +177,33 @@ export function endQuarter(prev: GameState): EngineResult {
     if (airline.insolventQuarters >= INSOLVENCY_QUARTERS_TO_FAIL) {
       events.push({ type: 'airline_bankrupt', airline: airline.id })
       if (airline.controller === 'rival') liquidate(airline)
+    }
+  }
+
+  // 8. Use it or lose it: slots that sit idle too long go back to the
+  // authority. The HQ is exempt — a home base is never confiscated.
+  for (const airline of state.airlines) {
+    if (airline.bankrupt) {
+      airline.slotIdle = {}
+      continue
+    }
+    for (const city of slotCities(airline)) {
+      if (city === airline.hq || slotsFree(airline, city) < SLOT_IDLE_THRESHOLD) {
+        delete airline.slotIdle[city]
+        continue
+      }
+      const idle = (airline.slotIdle[city] ?? 0) + 1
+      if (idle >= SLOT_IDLE_QUARTERS_TO_LOSE) {
+        airline.slots[city] = (airline.slots[city] ?? 0) - 1
+        delete airline.slotIdle[city]
+        events.push({ type: 'slot_lost', airline: airline.id, city })
+      } else {
+        airline.slotIdle[city] = idle
+      }
+    }
+    // Drop counters for cities the airline no longer holds slots at.
+    for (const city of Object.keys(airline.slotIdle).sort()) {
+      if ((airline.slots[city] ?? 0) <= 0) delete airline.slotIdle[city]
     }
   }
 

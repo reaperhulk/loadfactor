@@ -46,10 +46,14 @@ export const FARE_LEVEL_WEIGHT: readonly number[] = [150, 125, 100, 80, 65]
 // Fare level -2..+2 → demand elasticity bp: gouging sheds passengers even
 // with no competitor on the pair (monopolies are not a free +30%).
 export const FARE_DEMAND_BP: readonly number[] = [11000, 10500, 10000, 8600, 7400]
-// Hub feed: each additional route at an endpoint funnels connecting traffic
-// onto this one, up to a cap — hub-and-spoke beats scattered point-to-point.
-export const HUB_CONN_BP_PER_ROUTE = 150
-export const HUB_CONN_MAX_BP = 1500
+// Connecting traffic: for served city pairs with no direct flight, real
+// itineraries route over a one-stop hub on the airline's own network, filling
+// spare seats on both legs. Only this share of the pair's demand tolerates a
+// connection, each leg sells at a through-fare discount, and the hub must not
+// add more than this detour over the great-circle direct distance.
+export const CONNECT_WILLING_BP = 3000
+export const CONNECT_FARE_DISCOUNT_BP = 9000
+export const CONNECT_DETOUR_MAX_BP = 14000
 // Management complexity: quarterly overhead grows with the SQUARE of route
 // count ($k × routes²) — sprawl has a real carrying cost.
 export const ROUTE_OVERHEAD_QUAD = 25
@@ -116,6 +120,10 @@ export const NEG_BASE_CHANCE_BP = 2000
 export const NEG_SPEND_CHANCE_BP = 6000 // added at spend == difficulty, pro rata
 export const NEG_MAX_CHANCE_BP = 8500
 export const SLOTS_PER_GRANT = 2
+// Use it or lose it: a city with this many (or more) unused slots for this
+// many consecutive quarters hands one back to the authority. The HQ is exempt.
+export const SLOT_IDLE_THRESHOLD = 2
+export const SLOT_IDLE_QUARTERS_TO_LOSE = 4
 
 // --- World walks (PLAN.md §2.3) ---
 export const ECONOMY_MIN_BP = 7000

@@ -54,6 +54,9 @@ export function toastsFor(events: GameEvent[]): Omit<Toast, 'id'>[] {
       case 'slots_granted':
         if (e.airline === 0) out.push({ kind: 'slots', icon: '🤝', text: `Won ${e.slots} slots at ${e.city}` })
         break
+      case 'slot_lost':
+        if (e.airline === 0) out.push({ kind: 'error', icon: '🕳️', text: `Idle slot at ${e.city} was forfeited` })
+        break
       case 'world_event_started': {
         const where = e.city ? ` — ${e.city}` : e.region ? ` — ${e.region.toUpperCase()}` : ''
         out.push({

@@ -84,6 +84,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         lastLoadFactorBp: 0,
         lastRevenue: 0,
         lastCost: 0,
+        lastTransferPax: 0,
         history: [],
       }
       airline.routes.push(route)
