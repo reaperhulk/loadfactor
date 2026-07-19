@@ -376,6 +376,21 @@ export function MapView({
   )
   const isGlobe = projection === 'globe'
   const [globe, setGlobe] = useState<GlobeView>(GLOBE_HOME)
+  // 'g' flips the projection from anywhere (except form fields).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'g' && e.key !== 'G') return
+      const target = e.target as HTMLElement | null
+      if (target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return
+      setProjection((p) => {
+        const next = p === 'globe' ? 'flat' : 'globe'
+        localStorage.setItem('loadfactor:projection', next)
+        return next
+      })
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const clampGlobe = (g: GlobeView): GlobeView => ({
     cLon: ((g.cLon + 540) % 360) - 180,
     cLat: Math.min(80, Math.max(-80, g.cLat)),

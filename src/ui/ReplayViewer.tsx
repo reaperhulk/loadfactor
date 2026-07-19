@@ -12,7 +12,9 @@ const EMPTY = new Set<never>()
 
 function snapshotQuarters(replay: Replay): GameState[] {
   const snapshots: GameState[] = []
-  let state = newGame(replay.scenario, replay.seed)
+  // The player customization is part of the replay — without it a custom-HQ
+  // career would replay against the wrong world and silently diverge.
+  let state = newGame(replay.scenario, replay.seed, replay.player)
   snapshots.push(state)
   for (const command of replay.commands) {
     state = applyCommand(state, command).state
@@ -25,21 +27,25 @@ export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () =>
   const snapshots = useMemo(() => snapshotQuarters(replay), [replay])
   const [index, setIndex] = useState(0)
   const [playing, setPlaying] = useState(true)
+  const [fast, setFast] = useState(false)
   const last = snapshots.length - 1
 
   useEffect(() => {
     if (!playing) return
-    const timer = setInterval(() => {
-      setIndex((i) => {
-        if (i >= last) {
-          setPlaying(false)
-          return i
-        }
-        return i + 1
-      })
-    }, 600)
+    const timer = setInterval(
+      () => {
+        setIndex((i) => {
+          if (i >= last) {
+            setPlaying(false)
+            return i
+          }
+          return i + 1
+        })
+      },
+      fast ? 150 : 600,
+    )
     return () => clearInterval(timer)
-  }, [playing, last])
+  }, [playing, fast, last])
 
   const state = snapshots[index]!
   return (
@@ -79,6 +85,14 @@ export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () =>
           data-testid="replay-step"
         >
           ⏩
+        </button>
+        <button
+          className={fast ? 'active' : ''}
+          onClick={() => setFast((f) => !f)}
+          title="playback speed"
+          data-testid="replay-speed"
+        >
+          {fast ? '4×' : '1×'}
         </button>
         <input
           type="range"
