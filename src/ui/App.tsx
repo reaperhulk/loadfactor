@@ -611,6 +611,11 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             cityId={selectedCity}
             routeFrom={routeFrom}
             onPlanRoute={(from) => setRouteFrom(routeFrom === from ? null : from)}
+            onPlanPair={(from, to) => {
+              setSelectedCity(null)
+              setRouteFrom(null)
+              setPendingRoute({ from, to })
+            }}
             onClose={() => {
               setSelectedCity(null)
               setRouteFrom(null)

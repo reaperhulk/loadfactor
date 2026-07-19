@@ -41,10 +41,12 @@ interface CityPanelProps {
   cityId: string
   routeFrom: string | null
   onPlanRoute: (from: string) => void
+  // Straight to the launch dialog for a specific pair (the market rows).
+  onPlanPair?: (from: string, to: string) => void
   onClose: () => void
 }
 
-export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onClose }: CityPanelProps) {
+export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, onClose }: CityPanelProps) {
   const city = getCity(cityId)
   const player = state.airlines[0]!
   const [spend, setSpend] = useState(1000)
@@ -239,6 +241,13 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onClose }: Ci
                     : p.openable
                       ? 'open now'
                       : 'need slots'}
+              </td>
+              <td>
+                {onPlanPair && p.openable && !p.mine && (
+                  <button data-testid={`city-plan-${p.to}`} onClick={() => onPlanPair(cityId, p.to)}>
+                    plan ✈
+                  </button>
+                )}
               </td>
             </tr>
           ))}
