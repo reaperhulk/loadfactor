@@ -10,6 +10,7 @@ import { baseFare, estimateAircraftQuarterCost, estimateWeeklySeats, fareFor, pa
 import {
   CABIN_REFIT_COST_BP,
   MAINT_AGE_BP_PER_QUARTER,
+  ORDER_CANCEL_REFUND_BP,
   SLOT_IDLE_QUARTERS_TO_LOSE,
   SLOT_IDLE_THRESHOLD,
   HEDGE_MAX_QUARTERS,
@@ -449,12 +450,26 @@ export function FleetPanel({ state }: { state: GameState }) {
               </tr>
             )
           })}
-          {player.orders.map((o) => (
-            <tr key={`order-${o.id}`} className="dim">
-              <td>{getAircraftType(o.type).name}</td>
-              <td colSpan={6}>on order — delivers in {o.quartersLeft} quarter(s)</td>
-            </tr>
-          ))}
+          {player.orders.map((o) => {
+            const refund = o.leased
+              ? 0
+              : Math.floor((getAircraftType(o.type).price * ORDER_CANCEL_REFUND_BP) / 10000)
+            return (
+              <tr key={`order-${o.id}`} className="dim">
+                <td>{getAircraftType(o.type).name}</td>
+                <td colSpan={5}>
+                  on order — delivers in {o.quartersLeft} quarter(s)
+                </td>
+                <td>
+                  <ConfirmButton
+                    label={o.leased ? 'cancel lease' : `cancel (${money(refund)} back)`}
+                    confirmLabel="sure?"
+                    onConfirm={() => dispatch({ type: 'cancel_order', orderId: o.id })}
+                  />
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table></div>
       <CabinLegend />

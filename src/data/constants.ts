@@ -97,6 +97,9 @@ export const AIRLINE_OVERHEAD_PER_QUARTER = 400 // $k
 export const AIRCRAFT_ADMIN_PER_QUARTER = 40 // $k per airframe
 
 // --- Leasing, used market, hedging (M2 fleet depth) ---
+// Cancelling a purchase order refunds this bp of the price paid — the
+// manufacturer keeps a deposit. Leased orders cancel free (nothing was paid).
+export const ORDER_CANCEL_REFUND_BP = 8000
 // Quarterly lease payment as bp of list price (no capex, no resale). Sits
 // above the ownership rate — flexibility costs a premium.
 export const LEASE_BP_PER_QUARTER = 600

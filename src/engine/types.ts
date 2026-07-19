@@ -182,6 +182,7 @@ export type Command =
   | { type: 'set_frequency'; routeId: number; frequency: number }
   | { type: 'assign_aircraft'; aircraftId: number; routeId: number | null }
   | { type: 'order_aircraft'; aircraftType: string }
+  | { type: 'cancel_order'; orderId: number }
   | { type: 'lease_aircraft'; aircraftType: string }
   | { type: 'buy_used'; offerId: number }
   | { type: 'hedge_fuel'; quarters: number }
@@ -203,6 +204,7 @@ export type GameEvent =
   | { type: 'frequency_set'; airline: number; routeId: number; frequency: number }
   | { type: 'aircraft_assigned'; airline: number; aircraftId: number; routeId: number | null }
   | { type: 'aircraft_ordered'; airline: number; orderId: number; aircraftType: string; price: number }
+  | { type: 'order_cancelled'; airline: number; orderId: number; refund: number }
   | { type: 'aircraft_leased'; airline: number; orderId: number; aircraftType: string; paymentPerQuarter: number }
   | { type: 'used_bought'; airline: number; aircraftId: number; aircraftType: string; price: number; ageQuarters: number }
   | { type: 'fuel_hedged'; airline: number; bp: number; quarters: number; premium: number }

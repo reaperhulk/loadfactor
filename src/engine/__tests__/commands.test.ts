@@ -181,6 +181,22 @@ describe('command validation', () => {
     expect(r2.events[0]).toMatchObject({ type: 'route_opened', from: 'MIA', to: 'YYZ' })
   })
 
+  it('cancelling an order refunds most of the price; leases cancel free', () => {
+    let r = applyCommand(fresh(), { type: 'order_aircraft', aircraftType: 'caravelle' })
+    const orderId = r.state.airlines[0]!.orders[0]!.id
+    expectRejected(applyCommand(r.state, { type: 'cancel_order', orderId: 999 }).events, 'no such order')
+    r = applyCommand(r.state, { type: 'cancel_order', orderId })
+    expect(r.events[0]).toMatchObject({ type: 'order_cancelled', refund: 5440 }) // 80% of 6800
+    expect(r.state.airlines[0]!.orders).toHaveLength(0)
+    expect(r.state.airlines[0]!.cash).toBe(18000 - 6800 + 5440)
+    // A leased order paid nothing up front and refunds nothing.
+    let l = applyCommand(fresh(), { type: 'lease_aircraft', aircraftType: 'caravelle' })
+    const leaseId = l.state.airlines[0]!.orders[0]!.id
+    l = applyCommand(l.state, { type: 'cancel_order', orderId: leaseId })
+    expect(l.events[0]).toMatchObject({ type: 'order_cancelled', refund: 0 })
+    expect(l.state.airlines[0]!.cash).toBe(18000)
+  })
+
   it('refitting a cabin validates, charges cash, and sticks', () => {
     const state = fresh()
     expectRejected(applyCommand(state, { type: 'refit_cabin', aircraftId: 1, cabin: 7 }).events, 'cabin must be')

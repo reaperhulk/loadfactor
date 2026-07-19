@@ -8,6 +8,7 @@ import { distanceKm, getCity, isCity } from '../data/cities'
 import {
   BASE_LOAN_RATE_BP,
   CABIN_REFIT_COST_BP,
+  ORDER_CANCEL_REFUND_BP,
   HEDGE_MAX_QUARTERS,
   HEDGE_MIN_QUARTERS,
   HEDGE_PREMIUM_PER_AIRCRAFT,
@@ -176,6 +177,21 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         events: [
           { type: 'aircraft_ordered', airline: airlineIdx, orderId: order.id, aircraftType: type.id, price: type.price },
         ],
+      }
+    }
+
+    case 'cancel_order': {
+      const order = airline.orders.find((o) => o.id === command.orderId)
+      if (!order) return reject(airlineIdx, command, 'no such order')
+      // Purchases refund most of the price (the maker keeps a deposit);
+      // leases cancel free — nothing was paid up front.
+      const refund = order.leased
+        ? 0
+        : Math.floor((getAircraftType(order.type).price * ORDER_CANCEL_REFUND_BP) / 10000)
+      airline.orders = airline.orders.filter((o) => o.id !== order.id)
+      airline.cash += refund
+      return {
+        events: [{ type: 'order_cancelled', airline: airlineIdx, orderId: order.id, refund }],
       }
     }
 
