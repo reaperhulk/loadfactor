@@ -255,6 +255,13 @@ button:disabled {
   margin: 6px 0;
 }
 
+.scenario-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 4px 0;
+}
+
 /* Route-planning reach: how far the best idle airframe can fly. */
 .range-ring {
   fill: #4fa3ff0d;

@@ -183,6 +183,13 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
             {money(s.targetNetWorth)} · vs{' '}
             {s.rivals.map((r) => `${r.name} (${r.personality ?? 'balanced'})`).join(', ')}
           </p>
+          <p className="scenario-chips">
+            <span className="event-chip">✈ {s.player.name} — {s.player.hq}</span>
+            <span className="event-chip">⚔ {s.rivals.length} rival{s.rivals.length > 1 ? 's' : ''}</span>
+            {(s.eventWeightMult?.['oil_shock'] ?? 1) > 1 && <span className="event-chip">🛢️ volatile fuel</span>}
+            {(s.eventWeightMult?.['boom'] ?? 1) > 1 && <span className="event-chip">📈 boom era</span>}
+            {(s.eventWeightMult?.['conflict'] ?? 1) > 1 && <span className="event-chip">⚠️ unstable regions</span>}
+          </p>
           {overwrites !== null ? (
             <ConfirmButton
               data-testid={`start-${s.id}`}

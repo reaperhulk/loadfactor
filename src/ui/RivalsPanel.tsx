@@ -6,6 +6,7 @@ import { getAircraftType } from '../data/aircraft'
 import { pairKey } from '../data/cities'
 import type { Airline, GameState } from '../engine'
 import { netWorth, routeWeeklyCapacity, slotCities } from '../engine/queries'
+import { getScenario } from '../data/scenarios'
 import { RIVAL_COLORS } from './MapView'
 import { RaceChart, Sparkline } from './Sparkline'
 import { money } from './format'
@@ -156,6 +157,31 @@ export function RivalsPanel({ state }: { state: GameState }) {
         by quarter
       </h3>
       <RaceChart series={series} format={metric === 'pax' ? (v) => v.toLocaleString('en-US') : undefined} />
+      {(() => {
+        // Pace: extrapolate the last two years' net-worth trend to the
+        // deadline. A projection, not a promise — but it turns "am I
+        // winning?" into a number you can steer by.
+        const scenario = getScenario(state.scenario)
+        const me = state.airlines[0]!
+        const h = me.history
+        const remaining = scenario.quarters - state.turn
+        if (h.length < 8 || remaining <= 0) return null
+        const now = h[h.length - 1]!.netWorth
+        const then = h[h.length - 8]!.netWorth
+        const slope = Math.floor((now - then) / 7)
+        const projected = now + slope * remaining
+        const leader = Math.max(
+          ...state.airlines.filter((a) => !a.bankrupt).map((a) => a.history[a.history.length - 1]?.netWorth ?? 0),
+        )
+        return (
+          <p className="dim" data-testid="race-pace">
+            Pace: at the current trend you finish ~
+            <strong className={projected >= scenario.targetNetWorth ? 'pos' : 'neg'}>{money(projected)}</strong>{' '}
+            in {Math.floor(remaining / 4)}y {remaining % 4}q — target {money(scenario.targetNetWorth)} plus #1
+            {now < leader && <span className="neg"> (currently behind the leader)</span>}
+          </p>
+        )
+      })()}
       <StandingsTable state={state} />
       <div className="race-legend">
         {state.airlines.map((a, i) => (
