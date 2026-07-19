@@ -434,7 +434,37 @@ export function FleetPanel({ state }: { state: GameState }) {
         <p className="dim" data-testid="renewal-forecast">
           Fleet upkeep {money(maintAt(0))}/q now → {money(maintAt(8))}/q in 2 years on the same metal
           {geriatricNow > 0 && <span className="neg"> · {geriatricNow} geriatric</span>}
-          {geriatricSoon > 0 && <span> · {geriatricSoon} more turn geriatric within 2y</span>}
+          {geriatricSoon > 0 && <span> · {geriatricSoon} more turn geriatric within 2y</span>}{' '}
+          <button
+            className="link-btn"
+            data-testid="copy-fleet"
+            title="copy the fleet as TSV — paste into any spreadsheet (raw numbers, $k)"
+            onClick={() =>
+              copyTsv(
+                ['aircraft', 'seats', 'ageQuarters', 'leased', 'cabin', 'maintK', 'valueK', 'route'],
+                player.fleet.map((a) => {
+                  const t = getAircraftType(a.type)
+                  const r = player.routes.find((x) => x.id === a.routeId)
+                  return [
+                    t.name,
+                    cabinSeats(a.type, a.cabin),
+                    a.ageQuarters,
+                    a.leased ? 1 : 0,
+                    a.cabin,
+                    Math.floor(
+                      (Math.floor((t.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * a.ageQuarters)) / 10000) *
+                        inflationBp(state.turn)) /
+                        10000,
+                    ),
+                    a.leased ? 0 : resaleValue(a.type, a.ageQuarters),
+                    r ? `${r.from}-${r.to}` : 'idle',
+                  ]
+                }),
+              )
+            }
+          >
+            ⎘ copy as spreadsheet
+          </button>
         </p>
       )}
       {(() => {

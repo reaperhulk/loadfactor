@@ -295,6 +295,12 @@ test('the route dossier and rivals intel expose the numbers', async ({ page }) =
   // Rivals intel tab.
   await page.getByTestId('tab-rivals').click()
   await expect(page.getByTestId('rivals-panel')).toContainText('Albion Airways')
+  // Copy-as-spreadsheet writes formula-ready TSV to the clipboard.
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page.getByTestId('copy-standings').click()
+  const tsv = await page.evaluate(() => navigator.clipboard.readText())
+  expect(tsv).toContain('airline\tnetWorthK')
+  expect(tsv).toContain('Meridian Air (you)')
   await expect(page.getByTestId('rivals-panel')).toContainText('The race')
   // The race chart switches metrics and the standings sheet lines everyone up.
   await page.getByTestId('race-metric-pax').click()
