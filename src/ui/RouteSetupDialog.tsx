@@ -6,8 +6,9 @@ import { useState } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm } from '../data/cities'
 import type { GameState } from '../engine'
+import { FARE_DEMAND_BP } from '../data/constants'
 import { estimateAircraftQuarterCost, fareFor, pairWeeklyDemand } from '../engine/market'
-import { roundTripsPerWeek } from '../engine/queries'
+import { airlinesOnPair, roundTripsPerWeek } from '../engine/queries'
 import { dispatch } from './session'
 import { money } from './format'
 
@@ -110,7 +111,24 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
                 </select>
               </label>
             </div>
-            <p className="dim">Est. aircraft cost here: {money(estCost)}/quarter (at full utilization)</p>
+            {(() => {
+              // Honest preview: demand shaped by the chosen fare's elasticity,
+              // capped by the seats actually flown, priced at the chosen fare.
+              const shaped = Math.floor((demand * FARE_DEMAND_BP[fareLevel + 2]!) / 10000)
+              const estPax = Math.min(shaped, seats)
+              const estRev = Math.floor((estPax * fareFor(km, fareLevel) * 13) / 1000)
+              const rivalsHere = airlinesOnPair(state, from, to, 0)
+              return (
+                <p data-testid="route-setup-estimate">
+                  Est. revenue{' '}
+                  <strong className={estRev >= estCost ? 'pos' : 'neg'}>{money(estRev)}/q</strong> vs aircraft
+                  cost {money(estCost)}/q at full schedule
+                  {rivalsHere > 0 && (
+                    <span className="neg"> — before splitting the pair with {rivalsHere} rival{rivalsHere > 1 ? 's' : ''}</span>
+                  )}
+                </p>
+              )
+            })()}
             <button
               data-testid="route-setup-confirm"
               onClick={() => {

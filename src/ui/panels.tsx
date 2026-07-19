@@ -421,11 +421,17 @@ function Shop({ state }: { state: GameState }) {
               <tbody>
                 {state.world.usedMarket.map((o) => {
                   const t = getAircraftType(o.type)
+                  const discountBp = 10000 - Math.floor((o.price * 10000) / t.price)
                   return (
                     <tr key={o.id}>
                       <td>{t.name}</td>
                       <td>{(o.ageQuarters / 4).toFixed(1)}y old</td>
-                      <td>{money(o.price)}</td>
+                      <td>
+                        {money(o.price)}{' '}
+                        <span className="pos" title={`vs ${money(t.price)} new`}>
+                          −{(discountBp / 100).toFixed(0)}%
+                        </span>
+                      </td>
                       <td>
                         <button
                           disabled={player.cash < o.price}
@@ -704,11 +710,55 @@ function describeEvent(state: GameState, e: GameEvent): string | null {
 export function ReportPanel({ state, events }: { state: GameState; events: GameEvent[] }) {
   const lines = events.map((e) => describeEvent(state, e)).filter((l): l is string => l !== null)
   if (lines.length === 0) return <p className="hint">End the quarter to see your first report.</p>
+  // Structured results first: every route's quarter in one comparable table,
+  // sorted by profit; the narrative log below for everything else.
+  const results = events
+    .filter(
+      (e): e is Extract<GameEvent, { type: 'route_result' }> => e.type === 'route_result' && e.airline === 0,
+    )
+    .sort((a, b) => b.revenue - b.cost - (a.revenue - a.cost))
+  const player = state.airlines[0]!
+  const routeName = (routeId: number): string => {
+    const r = player.routes.find((x) => x.id === routeId)
+    return r ? `${r.from}–${r.to}` : '(closed)'
+  }
   return (
-    <ul className="report" data-testid="report">
-      {lines.map((line, i) => (
-        <li key={i}>{line}</li>
-      ))}
-    </ul>
+    <div>
+      {results.length > 0 && (
+        <div className="table-scroll">
+          <table data-testid="report-results">
+            <thead>
+              <tr className="dim">
+                <th>route</th>
+                <th>pax</th>
+                <th>conn</th>
+                <th>load</th>
+                <th>rev</th>
+                <th>cost</th>
+                <th>P&L</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((r) => (
+                <tr key={r.routeId}>
+                  <td>{routeName(r.routeId)}</td>
+                  <td>{r.pax.toLocaleString('en-US')}</td>
+                  <td className="dim">{r.transferPax}</td>
+                  <td>{(r.loadFactorBp / 100).toFixed(0)}%</td>
+                  <td>{money(r.revenue)}</td>
+                  <td>{money(r.cost)}</td>
+                  <td className={r.revenue - r.cost >= 0 ? 'pos' : 'neg'}>{money(r.revenue - r.cost)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <ul className="report" data-testid="report">
+        {lines.map((line, i) => (
+          <li key={i}>{line}</li>
+        ))}
+      </ul>
+    </div>
   )
 }
