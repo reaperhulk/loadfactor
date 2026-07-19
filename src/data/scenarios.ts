@@ -159,6 +159,55 @@ export const SCENARIOS: readonly Scenario[] = [
     targetNetWorth: 400_000,
     eventWeightMult: { boom: 2, tourism_wave: 2 },
   },
+  {
+    id: 'open_skies',
+    name: 'Open Skies',
+    description:
+      'Singapore, 1995. Borders open, the big twins fly anywhere, and every ' +
+      'megahub wants your passengers. Finish 2010 as the #1 airline by net ' +
+      'worth — and be worth at least $500M.',
+    startYear: 1995,
+    quarters: 60,
+    player: {
+      name: 'Meridian Pacific',
+      hq: 'SIN',
+      cash: 35000,
+      hqSlots: 8,
+      extraSlots: { HKG: 2, BKK: 2, KUL: 2 },
+      starterFleet: ['a320', 'a320'],
+    },
+    rivals: [
+      {
+        name: 'Gulf Crown',
+        hq: 'DXB',
+        cash: 35000,
+        hqSlots: 8,
+        extraSlots: { BOM: 2, CAI: 2, IST: 2 },
+        starterFleet: ['a320', 'a320'],
+        personality: 'premium',
+      },
+      {
+        name: 'Liberty Global',
+        hq: 'JFK',
+        cash: 35000,
+        hqSlots: 8,
+        extraSlots: { ORD: 2, LAX: 2, MIA: 2 },
+        starterFleet: ['b767', 'b767'],
+        personality: 'balanced',
+      },
+      {
+        name: 'EuroConnect',
+        hq: 'FRA',
+        cash: 35000,
+        hqSlots: 8,
+        extraSlots: { MAD: 2, FCO: 2, ARN: 2 },
+        starterFleet: ['a320', 'a320'],
+        personality: 'price_war',
+      },
+    ],
+    targetNetWorth: 500_000,
+    eventWeightMult: { boom: 2, tourism_wave: 2, conflict: 1.5 },
+  },
 ]
 
 const byId = new Map(SCENARIOS.map((s) => [s.id, s]))

@@ -22,6 +22,7 @@ const CAREERS: readonly { name: string; scenario: string; seed: string; bot: Bot
   { name: 'naive-alpha', scenario: 'jet_age', seed: 'alpha', bot: 'naive', quarters: 40 },
   { name: 'oil-crisis-greedy', scenario: 'oil_crisis', seed: 'alpha', bot: 'greedy', quarters: 40 },
   { name: 'deregulation-greedy', scenario: 'deregulation', seed: 'alpha', bot: 'greedy', quarters: 40 },
+  { name: 'open-skies-greedy', scenario: 'open_skies', seed: 'alpha', bot: 'greedy', quarters: 40 },
 ]
 
 describe('golden careers', () => {

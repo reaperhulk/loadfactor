@@ -83,5 +83,22 @@
       "fleet": 10,
       "quarterlyProfit": 63338
     }
+  },
+  "open-skies-greedy": {
+    "checkpointHashes": {
+      "10": "c16aadb6",
+      "20": "6cd6315a",
+      "30": "9a15f824",
+      "40": "f9ce32a5"
+    },
+    "summary": {
+      "turn": 40,
+      "phase": "planning",
+      "cash": 590060,
+      "netWorth": 797340,
+      "routes": 5,
+      "fleet": 9,
+      "quarterlyProfit": -12308
+    }
   }
 }
