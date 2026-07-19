@@ -123,7 +123,11 @@ interface GlobePoint {
   vis: boolean
 }
 
-function globeProject(g: GlobeView, lonDeg: number, latDeg: number): GlobePoint {
+function globeProjectFull(
+  g: GlobeView,
+  lonDeg: number,
+  latDeg: number,
+): { X: number; Y: number; cosc: number } {
   const R = GLOBE_R * g.s
   const lam = ((lonDeg - g.cLon) * Math.PI) / 180
   const phi = (latDeg * Math.PI) / 180
@@ -132,12 +136,21 @@ function globeProject(g: GlobeView, lonDeg: number, latDeg: number): GlobePoint 
   return {
     X: W / 2 + R * Math.cos(phi) * Math.sin(lam),
     Y: H / 2 - R * (Math.cos(phi0) * Math.sin(phi) - Math.sin(phi0) * Math.cos(phi) * Math.cos(lam)),
-    vis: cosc > 0.001,
+    cosc,
   }
 }
 
-// Landmass on the sphere: hidden points clamp to the limb along their
-// azimuth, so coastlines hug the horizon instead of folding through it.
+function globeProject(g: GlobeView, lonDeg: number, latDeg: number): GlobePoint {
+  const p = globeProjectFull(g, lonDeg, latDeg)
+  return { X: p.X, Y: p.Y, vis: p.cosc > 0.001 }
+}
+
+// Landmass on the sphere. Hidden points clamp to the limb along their
+// azimuth so coastlines hug the horizon — with two guards that keep the
+// silhouette honest: points near the ANTIPODE are dropped (their projected
+// azimuth is numerically meaningless and used to fling chords across the
+// disc), and consecutive limb points bridge along the limb ARC in short
+// steps instead of a straight chord.
 function globeLandPath(g: GlobeView): string {
   const R = GLOBE_R * g.s
   const cx = W / 2
@@ -146,20 +159,33 @@ function globeLandPath(g: GlobeView): string {
   for (const ring of WORLD_RINGS) {
     let d = ''
     let anyVisible = false
-    for (const [lon, lat] of ring) {
-      const p = globeProject(g, lon, lat)
-      let px = p.X
-      let py = p.Y
-      if (p.vis) {
-        anyVisible = true
-      } else {
-        const dx = px - cx
-        const dy = py - cy
-        const len = Math.hypot(dx, dy) || 1
-        px = cx + (R * dx) / len
-        py = cy + (R * dy) / len
-      }
+    let prevLimbAz: number | null = null
+    const emit = (px: number, py: number): void => {
       d += `${d === '' ? 'M' : 'L'}${px.toFixed(1)} ${py.toFixed(1)}`
+    }
+    for (const [lon, lat] of ring) {
+      const p = globeProjectFull(g, lon, lat)
+      if (p.cosc > 0.001) {
+        anyVisible = true
+        emit(p.X, p.Y)
+        prevLimbAz = null
+        continue
+      }
+      if (p.cosc < -0.55) continue // antipode zone: azimuth is noise
+      const az = Math.atan2(p.Y - cy, p.X - cx)
+      if (prevLimbAz !== null) {
+        // Bridge along the limb, shorter way round, in ≤12° steps.
+        let delta = az - prevLimbAz
+        while (delta > Math.PI) delta -= 2 * Math.PI
+        while (delta < -Math.PI) delta += 2 * Math.PI
+        const steps = Math.floor(Math.abs(delta) / 0.2)
+        for (let s = 1; s <= steps; s++) {
+          const a = prevLimbAz + (delta * s) / (steps + 1)
+          emit(cx + R * Math.cos(a), cy + R * Math.sin(a))
+        }
+      }
+      emit(cx + R * Math.cos(az), cy + R * Math.sin(az))
+      prevLimbAz = az
     }
     if (anyVisible && d !== '') parts.push(d + 'Z')
   }
@@ -332,6 +358,11 @@ export function MapView({
 
   const player = state.airlines[0]!
   const scale = isGlobe ? globe.s : W / view.w
+  // Screen-size compensation. On the flat map the viewBox shrinks as you
+  // zoom, so sizes divide by scale to stay constant on screen. The globe
+  // keeps a FIXED viewBox and grows R instead — dividing there would shrink
+  // labels and dots as you zoom in.
+  const uiScale = isGlobe ? 1 : scale
   // One projection call for every feature on the map.
   const pt = (lon: number, lat: number): GlobePoint =>
     isGlobe ? globeProject(globe, lon, lat) : { X: x(lon), Y: y(lat), vis: true }
@@ -583,7 +614,7 @@ export function MapView({
                 key={`hub-${cityId}`}
                 cx={p.X}
                 cy={p.Y}
-                r={(5 + Math.min(14, Math.sqrt(v) / 6)) / scale}
+                r={(5 + Math.min(14, Math.sqrt(v) / 6)) / uiScale}
                 className="hub-glow"
                 data-testid={`hub-glow-${cityId}`}
               >
@@ -632,7 +663,7 @@ export function MapView({
                 [r.from, r.to].map((cityId) => {
                   const p = cityPt(cityId)
                   if (!p.vis) return null
-                  return <circle key={cityId} cx={p.X} cy={p.Y} r={10 / scale} className="endpoint-pulse" />
+                  return <circle key={cityId} cx={p.X} cy={p.Y} r={10 / uiScale} className="endpoint-pulse" />
                 })}
             </g>
           )
@@ -653,7 +684,7 @@ export function MapView({
                   keeps it flying nose-first on BOTH legs of the shuttle — the
                   ✈ text glyph points 45° off-axis and read as flying
                   backwards on the return leg. */}
-              <path d={PLANE_GLYPH} transform={`scale(${0.8 / scale})`} />
+              <path d={PLANE_GLYPH} transform={`scale(${0.8 / uiScale})`} />
               {/* The path itself runs out AND back, traversed forward only —
                   brief dwells at each end, correct nose-first orientation on
                   both legs in every engine (keyPoints reversal breaks
@@ -681,7 +712,7 @@ export function MapView({
               key={`slots-${cityId}`}
               cx={p.X}
               cy={p.Y}
-              r={11 / scale}
+              r={11 / uiScale}
               className="slots-ping"
               data-testid={`slots-ping-${cityId}`}
             />
@@ -702,7 +733,7 @@ export function MapView({
                 key={`${e.id}-${c.id}`}
                 cx={p.X}
                 cy={p.Y}
-                r={12 / scale}
+                r={12 / uiScale}
                 className={good ? 'event-halo halo-boom' : 'event-halo halo-bust'}
                 data-testid={`event-halo-${c.id}`}
               />
@@ -725,10 +756,10 @@ export function MapView({
             )
           const p = pt(c.lon, c.lat)
           if (!p.vis) return null
-          const r = (2 + cityMass(c) / 18) / Math.sqrt(scale)
+          const r = (2 + cityMass(c) / 18) / Math.sqrt(uiScale)
           return (
             <g key={c.id} onClick={() => handleCityClick(c.id)} className="city">
-              {inNetwork && <circle cx={p.X} cy={p.Y} r={r + 2.5 / scale} className="city-network-ring" />}
+              {inNetwork && <circle cx={p.X} cy={p.Y} r={r + 2.5 / uiScale} className="city-network-ring" />}
               <circle
                 data-testid={`city-${c.id}`}
                 cx={p.X}
@@ -754,13 +785,13 @@ export function MapView({
           .map((c) => {
             const p = pt(c.lon, c.lat)
             if (!p.vis) return null
-            const r = (2 + cityMass(c) / 18) / Math.sqrt(scale)
+            const r = (2 + cityMass(c) / 18) / Math.sqrt(uiScale)
             return (
               <text
                 key={`label-${c.id}`}
-                x={p.X + r + 3 / scale}
-                y={p.Y + 3 / scale}
-                fontSize={9 / scale}
+                x={p.X + r + 3 / uiScale}
+                y={p.Y + 3 / uiScale}
+                fontSize={9 / uiScale}
                 className="city-label"
               >
                 {c.id}
