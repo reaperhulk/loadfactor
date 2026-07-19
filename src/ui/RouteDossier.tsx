@@ -4,7 +4,7 @@
 
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm, pairKey } from '../data/cities'
-import { FARE_DEMAND_BP } from '../data/constants'
+import { FARE_DEMAND_BP, ROUTE_MEMORY_QUARTERS } from '../data/constants'
 import type { GameState } from '../engine'
 import { fareFor, fuelInflationBp, pairWeeklyDemand, routeShareWeight, routeSpoolBp, seasonalBp } from '../engine/market'
 import { effFuelBp } from '../engine/worldEvents'
@@ -310,6 +310,11 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
         <ConfirmButton
           label="close route"
           confirmLabel="really close it?"
+          title={
+            route.history.length > 0
+              ? `the market remembers this pair for ${ROUTE_MEMORY_QUARTERS} quarters — reopening within that window skips the spool-up`
+              : undefined
+          }
           onConfirm={() => dispatch({ type: 'close_route', routeId: route.id })}
         />
       </div>

@@ -273,6 +273,15 @@ button:disabled {
   margin: 4px 0;
 }
 
+/* Your HQ wears a star. */
+.hq-marker {
+  fill: var(--accent);
+  paint-order: stroke;
+  stroke: #0e1522;
+  stroke-width: 2px;
+  pointer-events: none;
+}
+
 /* Route-planning reach: how far the best idle airframe can fly. */
 .range-ring {
   fill: #4fa3ff0d;

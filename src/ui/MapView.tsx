@@ -955,6 +955,18 @@ export function MapView({
                 />
               )}
               {inNetwork && <circle cx={p.X} cy={p.Y} r={r + 2.5 / uiScale} className="city-network-ring" />}
+              {c.id === player.hq && (
+                <text
+                  x={p.X}
+                  y={p.Y - r - 4 / uiScale}
+                  className="hq-marker"
+                  fontSize={9 / uiScale}
+                  textAnchor="middle"
+                  data-testid="hq-marker"
+                >
+                  ★
+                </text>
+              )}
               <circle
                 data-testid={`city-${c.id}`}
                 cx={p.X}
