@@ -233,6 +233,22 @@ function GameOverOverlay({ state, onWatchReplay }: { state: GameState; onWatchRe
   const peakWorth = me.history.reduce((s, h) => Math.max(s, h.netWorth), 0)
   return (
     <div className="gameover-overlay" data-testid="gameover-overlay">
+      {state.phase === 'won' && (
+        <div className="confetti" aria-hidden="true" data-testid="confetti">
+          {/* Deterministic scatter — index drives position, drift, and delay. */}
+          {Array.from({ length: 28 }, (_, i) => (
+            <span
+              key={i}
+              style={{
+                left: `${(i * 37) % 100}%`,
+                background: ['#ffd166', '#4fae62', '#4fa3ff', '#d0636e', '#9d7bd8'][i % 5],
+                animationDelay: `${(i % 7) * 0.35}s`,
+                animationDuration: `${2.6 + (i % 5) * 0.5}s`,
+              }}
+            />
+          ))}
+        </div>
+      )}
       <div className="gameover-card">
         <h2 className={state.phase === 'won' ? 'pos' : 'neg'}>
           {state.phase === 'won' ? '🏆 VICTORY' : 'DEFEAT'}

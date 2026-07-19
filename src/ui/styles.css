@@ -126,15 +126,45 @@ button:disabled {
   cursor: grabbing;
 }
 
+/* The world's palette drifts with the decade — sepia-warm sixties through a
+   cool, neon-tinged nineties. Subtle: routes and cities stay readable. */
 .map-sea {
-  fill: #0e1522;
+  fill: var(--sea, #0e1522);
+  transition: fill 1200ms ease;
 }
 
 .map-land {
-  fill: #1c2739;
-  stroke: #2c3a54;
+  fill: var(--land, #1c2739);
+  stroke: var(--coast, #2c3a54);
   stroke-width: 0.6;
   vector-effect: non-scaling-stroke;
+  transition: fill 1200ms ease, stroke 1200ms ease;
+}
+
+.map.era-1960 {
+  --sea: #131320;
+  --land: #262436;
+  --coast: #3a3650;
+}
+.map.era-1970 {
+  --sea: #12141e;
+  --land: #232634;
+  --coast: #35394e;
+}
+.map.era-1980 {
+  --sea: #0e1522;
+  --land: #1c2739;
+  --coast: #2c3a54;
+}
+.map.era-1990 {
+  --sea: #0b1424;
+  --land: #17263e;
+  --coast: #27395c;
+}
+.map.era-2000 {
+  --sea: #091323;
+  --land: #132441;
+  --coast: #223a63;
 }
 
 .map-controls {
@@ -174,6 +204,40 @@ button:disabled {
 
 .city-dot.slotted {
   fill: var(--accent);
+}
+
+/* Victory confetti: paper falls behind the game-over card. */
+.confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.confetti span {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  opacity: 0.9;
+  animation: confetti-fall 3s linear infinite;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-5vh) rotate(0deg);
+  }
+  100% {
+    transform: translateY(105vh) rotate(540deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti span {
+    animation: none;
+    display: none;
+  }
 }
 
 /* Save slots on the menu. */

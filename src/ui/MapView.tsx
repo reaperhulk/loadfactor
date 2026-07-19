@@ -10,7 +10,7 @@ import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { WORLD_PATH, WORLD_RINGS } from '../data/worldmap.gen'
 import type { GameState, Route } from '../engine'
-import { effectiveFrequency, networkCities, routeWeeklyCapacity, slotsHeld } from '../engine/queries'
+import { effectiveFrequency, networkCities, routeWeeklyCapacity, slotsHeld, yearOf } from '../engine/queries'
 import type { Airline } from '../engine'
 
 // Arc weight tells capacity: seats/wk drive stroke width, so the map itself
@@ -682,7 +682,7 @@ export function MapView({
       <svg
         ref={svgRef}
         viewBox={isGlobe ? `0 0 ${W} ${H}` : `${view.x} ${view.y} ${view.w} ${view.h}`}
-        className="map"
+        className={`map era-${Math.min(2000, Math.max(1960, Math.floor(yearOf(state) / 10) * 10))}`}
         role="img"
         aria-label="World route map"
         data-testid="map"
