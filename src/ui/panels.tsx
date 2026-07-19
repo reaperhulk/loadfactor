@@ -48,7 +48,7 @@ import { assignAndSchedule } from './assign'
 import { ConfirmButton } from './ConfirmButton'
 import { dispatch, getSession } from './session'
 import { Sparkline } from './Sparkline'
-import { COST_LABELS, money } from './format'
+import { COST_LABELS, copyTsv, money } from './format'
 import { CabinLegend, ServiceLegend } from './legends'
 
 // Sort keys for the routes comparison table. Each computes from the same row
@@ -134,7 +134,31 @@ export function RoutesPanel({
     <div>
     <p className="dim" data-testid="network-overhead">
       Network management: {money(networkOverhead)}/quarter for {player.routes.length} routes (grows with the
-      square of the network — quality beats sprawl)
+      square of the network — quality beats sprawl){' '}
+      <button
+        className="link-btn"
+        data-testid="copy-routes"
+        title="copy this table as TSV — paste into any spreadsheet (raw numbers, $k)"
+        onClick={() =>
+          copyTsv(
+            ['route', 'km', 'fareUsd', 'service', 'planes', 'rivals', 'loadBp', 'revenueK', 'marginBp', 'profitK'],
+            rows.map((x) => [
+              `${x.route.from}-${x.route.to}`,
+              x.km,
+              fareFor(x.km, x.route.fareLevel),
+              x.route.serviceLevel,
+              x.planes,
+              x.rivals,
+              x.route.lastLoadFactorBp,
+              x.route.lastRevenue,
+              x.marginBp,
+              x.profit,
+            ]),
+          )
+        }
+      >
+        ⎘ copy as spreadsheet
+      </button>
     </p>
     <div className="table-scroll"><table>
       <thead>

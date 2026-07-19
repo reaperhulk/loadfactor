@@ -9,7 +9,7 @@ import { netWorth, routeWeeklyCapacity, slotCities } from '../engine/queries'
 import { getScenario } from '../data/scenarios'
 import { RIVAL_COLORS } from './MapView'
 import { RaceChart, Sparkline } from './Sparkline'
-import { money } from './format'
+import { copyTsv, money } from './format'
 
 const PERSONALITY_BLURBS: Record<string, string> = {
   player: '',
@@ -74,6 +74,34 @@ function StandingsTable({ state }: { state: GameState }) {
   )
   return (
     <div className="table-scroll">
+      <p className="dim">
+        <button
+          className="link-btn"
+          data-testid="copy-standings"
+          title="copy this table as TSV — paste into any spreadsheet (raw numbers, $k)"
+          onClick={() =>
+            copyTsv(
+              ['airline', 'netWorthK', 'cashK', 'revenueK', 'profitK', 'marginBp', 'pax', 'shareBp', 'seatsWk', 'routes', 'cities', 'fleet'],
+              rows.map((r) => [
+                r.name,
+                r.netWorth,
+                r.cash,
+                r.revenue,
+                r.profit,
+                r.marginBp,
+                r.pax,
+                r.shareBp,
+                r.seats,
+                r.routes,
+                r.cities,
+                r.fleet,
+              ]),
+            )
+          }
+        >
+          ⎘ copy as spreadsheet
+        </button>
+      </p>
       <table data-testid="standings">
         <thead>
           <tr className="dim">
