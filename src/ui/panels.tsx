@@ -215,8 +215,31 @@ export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect:
 export function FleetPanel({ state }: { state: GameState }) {
   const player = state.airlines[0]!
   const year = yearOf(state)
+  // Renewal forecast: what the fleet costs to keep today, what the same
+  // metal will cost in two years of aging and inflation, and how many
+  // airframes cross into geriatric territory on the way.
+  const maintAt = (turnsAhead: number): number => {
+    let total = 0
+    for (const a of player.fleet) {
+      const t = getAircraftType(a.type)
+      const aged = Math.floor(
+        (t.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * (a.ageQuarters + turnsAhead))) / 10000,
+      )
+      total += Math.floor((aged * inflationBp(state.turn + turnsAhead)) / 10000)
+    }
+    return total
+  }
+  const geriatricNow = player.fleet.filter((a) => a.ageQuarters >= 48).length
+  const geriatricSoon = player.fleet.filter((a) => a.ageQuarters >= 40 && a.ageQuarters < 48).length
   return (
     <div>
+      {player.fleet.length > 0 && (
+        <p className="dim" data-testid="renewal-forecast">
+          Fleet upkeep {money(maintAt(0))}/q now → {money(maintAt(8))}/q in 2 years on the same metal
+          {geriatricNow > 0 && <span className="neg"> · {geriatricNow} geriatric</span>}
+          {geriatricSoon > 0 && <span> · {geriatricSoon} more turn geriatric within 2y</span>}
+        </p>
+      )}
       <div className="table-scroll"><table>
         <thead>
           <tr>

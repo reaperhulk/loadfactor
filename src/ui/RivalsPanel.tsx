@@ -179,6 +179,22 @@ export function RivalsPanel({ state }: { state: GameState }) {
                         ({Math.round((fieldedSeats(rival) * 100) / mySeats)}% of your capacity)
                       </span>
                     )}
+                    {(() => {
+                      // Momentum: passengers now vs a year ago.
+                      const h = rival.history
+                      if (h.length < 5) return null
+                      const now = h[h.length - 1]!.pax
+                      const then = h[h.length - 5]!.pax
+                      if (then <= 0) return null
+                      const pct = Math.round(((now - then) * 100) / then)
+                      return (
+                        <span className={pct >= 0 ? 'pos' : 'neg'} title="passenger volume vs 4 quarters ago">
+                          {' '}
+                          · pax {pct >= 0 ? '▲' : '▼'}
+                          {Math.abs(pct)}%/y
+                        </span>
+                      )
+                    })()}
                   </p>
                   <p className="dim">{fleetSummary(rival)}</p>
                   <div className="trend-row">

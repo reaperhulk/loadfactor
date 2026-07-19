@@ -120,6 +120,11 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
         <div key={s.id} className="scenario-card">
           <h2>{s.name}</h2>
           <p>{s.description}</p>
+          <p className="dim scenario-facts">
+            {s.startYear}–{s.startYear + Math.floor(s.quarters / 4)} · {s.quarters} quarters · target{' '}
+            {money(s.targetNetWorth)} · vs{' '}
+            {s.rivals.map((r) => `${r.name} (${r.personality ?? 'balanced'})`).join(', ')}
+          </p>
           <button
             data-testid={`start-${s.id}`}
             onClick={() => startGame(s.id, seed || new Date().toISOString().slice(0, 10), custom())}
