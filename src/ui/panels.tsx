@@ -720,6 +720,8 @@ export function AirportsPanel({ state }: { state: GameState }) {
             <th>City</th>
             <th>Slots held / used</th>
             <th title="slots allocated across all airlines vs the city's pool">Pool</th>
+            <th title="last quarter's passengers on your routes touching this city">Pax/q</th>
+            <th title="last quarter's route P&L attributed here (half to each endpoint)">P&L/q</th>
             <th>Difficulty</th>
             <th />
           </tr>
@@ -730,6 +732,16 @@ export function AirportsPanel({ state }: { state: GameState }) {
             const used = slotsUsed(player, c.id)
             const allocated = slotsAllocated(state, c.id)
             const negotiating = player.negotiations.some((n) => n.city === c.id)
+            // The city as a business: traffic and P&L across every route
+            // touching it (each route splits evenly between its endpoints).
+            let cityPax = 0
+            let cityProfitHalves = 0
+            for (const r of player.routes) {
+              if (r.from !== c.id && r.to !== c.id) continue
+              cityPax += r.lastPax
+              cityProfitHalves += r.lastRevenue - r.lastCost
+            }
+            const cityProfit = Math.floor(cityProfitHalves / 2)
             // Use it or lose it: idle slots (HQ exempt) are on a countdown.
             const atRisk = c.id !== player.hq && held - used >= SLOT_IDLE_THRESHOLD
             return (
@@ -748,6 +760,10 @@ export function AirportsPanel({ state }: { state: GameState }) {
                 </td>
                 <td className={allocated >= c.slotPool ? 'neg' : 'dim'}>
                   {allocated}/{c.slotPool}
+                </td>
+                <td className="dim">{cityPax > 0 ? cityPax.toLocaleString('en-US') : '—'}</td>
+                <td className={cityPax === 0 ? 'dim' : cityProfit >= 0 ? 'pos' : 'neg'}>
+                  {cityPax > 0 ? money(cityProfit) : '—'}
                 </td>
                 <td>{money(negotiationDifficulty(c.id))}</td>
                 <td>

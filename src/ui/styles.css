@@ -206,6 +206,12 @@ button:disabled {
   fill: var(--accent);
 }
 
+/* The race chart pinned under the replay scrubber. */
+.replay-chart {
+  padding: 2px 10px;
+  max-width: 560px;
+}
+
 /* Victory confetti: paper falls behind the game-over card. */
 .confetti {
   position: absolute;

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { applyCommand, newGame, type GameState, type Replay } from '../engine'
 import { netWorth, quarterOf, yearOf } from '../engine/queries'
 import { MapView } from './MapView'
+import { RaceChart } from './Sparkline'
 import { money } from './format'
 
 const EMPTY = new Set<never>()
@@ -111,6 +112,18 @@ export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () =>
           {index}/{last}
         </span>
       </div>
+      {/* The race so far, up to the scrub position — the story under the map. */}
+      {index >= 2 && (
+        <div className="replay-chart" data-testid="replay-chart">
+          <RaceChart
+            series={state.airlines.map((a, i) => ({
+              label: a.name,
+              points: a.history.map((h) => h.netWorth),
+              className: i === 0 ? 'race-me' : `race-rival-${i}`,
+            }))}
+          />
+        </div>
+      )}
       <footer className="standings">
         {state.airlines.map((a) => (
           <span key={a.id} className={a.id === 0 ? 'me' : ''}>
