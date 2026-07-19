@@ -15,7 +15,17 @@ import { ReportCard } from './ReportCard'
 import { RivalsPanel } from './RivalsPanel'
 import { RouteDossier } from './RouteDossier'
 import { RouteSetupDialog } from './RouteSetupDialog'
-import { dispatch, getPlayerColor, getReplay, getSession, loadSave, resumeSave, startGame, reset } from './session'
+import {
+  dispatch,
+  getPlayerColor,
+  getReplay,
+  getSession,
+  loadFame,
+  loadSave,
+  resumeSave,
+  startGame,
+  reset,
+} from './session'
 import { subscribe } from './session'
 import { EVENT_ICONS, EVENT_NAMES, ToastStack } from './toasts'
 import type { GameState, Replay } from '../engine'
@@ -126,6 +136,23 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           </button>
         )}
       </div>
+      {(() => {
+        const fame = loadFame()
+        if (fame.length === 0) return null
+        return (
+          <div className="scenario-card" data-testid="hall-of-fame">
+            <h2>Past careers</h2>
+            <ul className="fame-list">
+              {fame.slice(0, 5).map((f, i) => (
+                <li key={i}>
+                  {f.won ? '🏆' : '🕯'} {f.name} — {money(f.netWorth)} · {f.scenario} · “{f.seed}” ·{' '}
+                  {f.years}y
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      })()}
       {SCENARIOS.map((s) => (
         <div key={s.id} className="scenario-card">
           <h2>{s.name}</h2>

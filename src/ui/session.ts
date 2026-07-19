@@ -144,9 +144,50 @@ export function startGame(
   notify()
 }
 
+// Finished careers, newest first, capped — the menu's hall of fame.
+const FAME_KEY = 'loadfactor:fame:v1'
+
+export interface FameEntry {
+  name: string
+  scenario: string
+  seed: string
+  won: boolean
+  netWorth: number
+  years: number
+}
+
+export function loadFame(): FameEntry[] {
+  try {
+    const raw = localStorage.getItem(FAME_KEY)
+    const list = raw ? (JSON.parse(raw) as FameEntry[]) : []
+    return Array.isArray(list) ? list : []
+  } catch {
+    return []
+  }
+}
+
+function recordFame(state: GameState): void {
+  const me = state.airlines[0]!
+  const entry: FameEntry = {
+    name: me.name,
+    scenario: state.scenario,
+    seed: state.seed,
+    won: state.phase === 'won',
+    netWorth: me.history[me.history.length - 1]?.netWorth ?? 0,
+    years: Math.floor(state.turn / 4),
+  }
+  try {
+    localStorage.setItem(FAME_KEY, JSON.stringify([entry, ...loadFame()].slice(0, 10)))
+  } catch {
+    // no storage, no fame
+  }
+}
+
 export function dispatch(command: Command): GameEvent[] {
   if (!session) throw new Error('no active session')
+  const wasPlanning = session.state.phase === 'planning'
   const { state, events } = applyCommand(session.state, command)
+  if (wasPlanning && state.phase !== 'planning') recordFame(state)
   session = {
     state,
     lastEvents: events,

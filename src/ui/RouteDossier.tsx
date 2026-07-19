@@ -6,8 +6,10 @@ import { getAircraftType } from '../data/aircraft'
 import { distanceKm, pairKey } from '../data/cities'
 import { FARE_DEMAND_BP } from '../data/constants'
 import type { GameState } from '../engine'
-import { fareFor, pairWeeklyDemand, routeShareWeight } from '../engine/market'
+import { fareFor, fuelInflationBp, pairWeeklyDemand, routeShareWeight } from '../engine/market'
+import { effFuelBp } from '../engine/worldEvents'
 import {
+  allocateTrips,
   cabinSeats,
   effectiveFrequency,
   maxRouteFrequency,
@@ -126,6 +128,27 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
       <div className="dim" data-testid="route-economics-notes">
         Connecting pax last quarter: {route.lastTransferPax} · fare posture{' '}
         {elasticityBp >= 10000 ? 'attracts' : 'sheds'} {Math.abs((elasticityBp - 10000) / 100).toFixed(0)}% of demand
+        {(() => {
+          // Fuel exposure: this route's estimated fuel bill at today's index
+          // (honoring a hedge), and what a 20% spike would add.
+          const base = player.fuelHedge !== null ? player.fuelHedge.bp : effFuelBp(state.world)
+          const fuelBp = Math.floor((base * fuelInflationBp(state.turn)) / 10000)
+          let weeklyFuel = 0
+          for (const alloc of allocateTrips(player, route)) {
+            weeklyFuel += Math.floor(
+              (alloc.trips * 2 * km * getAircraftType(alloc.type).fuelPerKm * fuelBp) / 10000,
+            )
+          }
+          const quarterFuelK = Math.floor((weeklyFuel * 13) / 1000)
+          if (quarterFuelK <= 0) return null
+          return (
+            <span data-testid="fuel-exposure">
+              {' '}
+              · fuel ~{money(quarterFuelK)}/q{player.fuelHedge !== null ? ' (hedged)' : ''} — a 20% index
+              spike adds {money(Math.floor(quarterFuelK / 5))}
+            </span>
+          )
+        })()}
       </div>
 
       {route.history.length >= 2 && (
