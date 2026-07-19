@@ -103,9 +103,14 @@ test('the quarterly report reflects the resolved quarter', async ({ page }) => {
   await expect(page.getByTestId('report-card')).toContainText('Best route')
   await page.getByTestId('report-card-close').click()
   await expect(page.getByTestId('report-card')).toHaveCount(0)
-  // …and the report tab keeps the full log.
+  // …and the report tab leads with the structured results table plus the log.
   await page.getByTestId('tab-report').click()
+  await expect(page.getByTestId('report-results')).toContainText('JFK–ORD')
   await expect(page.getByTestId('report')).toContainText('Quarter closed')
+  // The finance tab attributes every cost dollar, and the HUD shows the race.
+  await page.getByTestId('tab-finance').click()
+  await expect(page.getByTestId('cost-structure')).toContainText('Fuel')
+  await expect(page.getByTestId('rank')).toContainText('/3')
   const loadFactor = await page.evaluate(
     () => window.__harness.getState()!.airlines[0]!.routes[0]!.lastLoadFactorBp,
   )

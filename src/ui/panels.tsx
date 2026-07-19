@@ -28,6 +28,7 @@ import {
   maxRouteFrequency,
   resaleValue,
   roundTripsPerWeek,
+  slotsAllocated,
   slotsHeld,
   slotsUsed,
   totalDebt,
@@ -456,6 +457,19 @@ function Shop({ state }: { state: GameState }) {
 export function AirportsPanel({ state }: { state: GameState }) {
   const player = state.airlines[0]!
   const [spend, setSpend] = useState(1000)
+  const [onlyMine, setOnlyMine] = useState(true)
+  // Your airports first (held slots, then usage), the rest of the world by
+  // city mass — one list, comparable, filterable.
+  const cities = [...CITIES]
+    .filter((c) => !onlyMine || slotsHeld(player, c.id) > 0 || player.negotiations.some((n) => n.city === c.id))
+    .sort((a, b) => {
+      const ha = slotsHeld(player, a.id)
+      const hb = slotsHeld(player, b.id)
+      if (ha !== hb) return hb - ha
+      const ma = a.pop * 4 + a.biz * 3 + a.tour * 2
+      const mb = b.pop * 4 + b.biz * 3 + b.tour * 2
+      return mb - ma
+    })
   return (
     <div>
       <label>
@@ -468,20 +482,31 @@ export function AirportsPanel({ state }: { state: GameState }) {
           onChange={(e) => setSpend(Number(e.target.value))}
         />{' '}
         $k
+      </label>{' '}
+      <label className="dim">
+        <input
+          type="checkbox"
+          data-testid="airports-only-mine"
+          checked={onlyMine}
+          onChange={(e) => setOnlyMine(e.target.checked)}
+        />{' '}
+        only my airports
       </label>
       <div className="table-scroll"><table>
         <thead>
           <tr>
             <th>City</th>
             <th>Slots held / used</th>
+            <th title="slots allocated across all airlines vs the city's pool">Pool</th>
             <th>Difficulty</th>
             <th />
           </tr>
         </thead>
         <tbody>
-          {CITIES.map((c) => {
+          {cities.map((c) => {
             const held = slotsHeld(player, c.id)
             const used = slotsUsed(player, c.id)
+            const allocated = slotsAllocated(state, c.id)
             const negotiating = player.negotiations.some((n) => n.city === c.id)
             // Use it or lose it: idle slots (HQ exempt) are on a countdown.
             const atRisk = c.id !== player.hq && held - used >= SLOT_IDLE_THRESHOLD
@@ -498,6 +523,9 @@ export function AirportsPanel({ state }: { state: GameState }) {
                       ⚠ {SLOT_IDLE_QUARTERS_TO_LOSE - (player.slotIdle[c.id] ?? 0)}q
                     </span>
                   )}
+                </td>
+                <td className={allocated >= c.slotPool ? 'neg' : 'dim'}>
+                  {allocated}/{c.slotPool}
                 </td>
                 <td>{money(negotiationDifficulty(c.id))}</td>
                 <td>

@@ -218,6 +218,28 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         <span data-testid="networth">
           Net worth {money(shownWorth)} / {money(scenario.targetNetWorth)}
         </span>
+        {(() => {
+          // The race, always on screen: current rank among the living, and
+          // the gap to whoever must be caught (or is catching up).
+          const worths = state.airlines.filter((a) => !a.bankrupt).map((a) => ({ id: a.id, w: netWorth(a) }))
+          worths.sort((a, b) => b.w - a.w)
+          const rank = worths.findIndex((x) => x.id === 0) + 1
+          if (rank === 0) return null
+          const me = netWorth(player)
+          const gapTo = rank === 1 ? worths[1] : worths[rank - 2]
+          return (
+            <span data-testid="rank" className={rank === 1 ? 'pos' : 'neg'}>
+              #{rank}/{worths.length}
+              {gapTo && (
+                <span className="dim">
+                  {' '}
+                  ({rank === 1 ? '+' : '−'}
+                  {money(Math.abs(me - gapTo.w))})
+                </span>
+              )}
+            </span>
+          )
+        })()}
         <MuteToggle />
         {state.phase === 'planning' && (
           <button className="end-quarter" data-testid="end-quarter" onClick={endQuarter}>
