@@ -123,6 +123,7 @@ describe('market resolution', () => {
         ageQuarters: 0,
         routeId: i % 2 === 0 ? leg1 : leg2,
         leased: false,
+        cabin: 2,
       })
     }
     const events: GameEvent[] = []
@@ -155,10 +156,32 @@ describe('market resolution', () => {
         ageQuarters: 0,
         routeId: i % 2 === 0 ? leg1 : leg2,
         leased: false,
+        cabin: 2,
       })
     }
     resolveMarket(state, [])
     for (const r of airline.routes) expect(r.lastTransferPax).toBe(0)
+  })
+
+  it('cabin fits trade seats for yield', () => {
+    const flyWithCabin = (cabin: number) => {
+      const state = newGame('jet_age', 'cabin-seed')
+      const routeId = withRoute(state, 0, 'JFK', 'ORD')
+      state.airlines[0]!.fleet[0]!.routeId = routeId
+      state.airlines[0]!.fleet[0]!.cabin = cabin
+      resolveMarket(state, [])
+      return state.airlines[0]!.routes[0]!
+    }
+    const dense = flyWithCabin(1)
+    const standard = flyWithCabin(2)
+    const premium = flyWithCabin(3)
+    // High density fields more seats; premium fields fewer but earns more per
+    // passenger flown (fare × yield), whatever the pax split.
+    expect(dense.lastCapacity).toBeGreaterThan(standard.lastCapacity)
+    expect(premium.lastCapacity).toBeLessThan(standard.lastCapacity)
+    const perPax = (r: typeof standard) => r.lastRevenue / Math.max(1, r.lastPax)
+    expect(perPax(premium)).toBeGreaterThan(perPax(standard))
+    expect(perPax(dense)).toBeLessThan(perPax(standard))
   })
 
   it('quarter resolution emits results through the public surface', () => {

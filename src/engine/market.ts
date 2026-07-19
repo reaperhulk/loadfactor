@@ -8,6 +8,8 @@ import { getAircraftType } from '../data/aircraft'
 import { distanceKm, getCity, pairKey } from '../data/cities'
 import {
   AIRCRAFT_ADMIN_PER_QUARTER,
+  CABIN_WEIGHT,
+  CABIN_YIELD_BP,
   CONNECT_DETOUR_MAX_BP,
   CONNECT_FARE_DISCOUNT_BP,
   CONNECT_WILLING_BP,
@@ -122,7 +124,8 @@ interface Entrant {
   airlineIdx: number
   route: Route
   weeklyRoundTrips: number
-  weeklyCapacity: number // seats, both directions
+  weeklyCapacity: number // sellable seats, both directions, after cabin fits
+  yieldBp: number // capacity-weighted cabin yield on revenue per pax
   weight: number // attractiveness for market-share split
 }
 
@@ -134,6 +137,7 @@ interface RouteAcc {
   weeklyPax: number
   weeklyTransfer: number
   weeklyCapacity: number
+  yieldBp: number // capacity-weighted cabin yield on revenue per pax
   weeklyRevenue: number // $
   weeklyCost: number // $, flight + service, inflation already applied
 }
@@ -164,19 +168,27 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
     for (const route of airline.routes) {
       let weeklyRoundTrips = 0
       let weeklyCapacity = 0
+      let cabinTripWeight = 0 // Σ trips × cabin weight — trip-weighted appeal
+      let yieldNum = 0 // Σ seats × cabin yield — capacity-weighted revenue/pax
       for (const alloc of allocateTrips(airline, route)) {
         weeklyRoundTrips += alloc.trips
-        weeklyCapacity += getAircraftType(alloc.type).seats * alloc.trips * 2
+        weeklyCapacity += alloc.seats * alloc.trips * 2
+        cabinTripWeight += alloc.trips * CABIN_WEIGHT[alloc.cabin - 1]!
+        yieldNum += alloc.seats * alloc.trips * 2 * CABIN_YIELD_BP[alloc.cabin - 1]!
       }
       const weight =
         weeklyCapacity === 0
           ? 0
-          : weeklyRoundTrips *
-            FARE_LEVEL_WEIGHT[route.fareLevel + 2]! *
-            SERVICE_LEVEL_WEIGHT[route.serviceLevel - 1]!
+          : Math.floor(
+              (cabinTripWeight *
+                FARE_LEVEL_WEIGHT[route.fareLevel + 2]! *
+                SERVICE_LEVEL_WEIGHT[route.serviceLevel - 1]!) /
+                100,
+            )
+      const yieldBp = weeklyCapacity === 0 ? 10000 : Math.floor(yieldNum / weeklyCapacity)
       const key = pairKey(route.from, route.to)
       const list = pairs.get(key) ?? []
-      list.push({ airlineIdx: airline.id, route, weeklyRoundTrips, weeklyCapacity, weight })
+      list.push({ airlineIdx: airline.id, route, weeklyRoundTrips, weeklyCapacity, yieldBp, weight })
       pairs.set(key, list)
     }
   }
@@ -227,6 +239,7 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       for (const alloc of allocateTrips(airline, e.route)) {
         const t = getAircraftType(alloc.type)
         weeklyFuel += Math.floor((alloc.trips * 2 * km * t.fuelPerKm * fuelBp) / 10000)
+        // Fees bill the physical airframe, not the cabin fit.
         weeklyFees += alloc.trips * 2 * (LANDING_FEE_BASE + t.seats * LANDING_FEE_PER_SEAT)
         weeklyCrewMin += alloc.trips * 2 * Math.floor((km * 60) / t.speedKmh)
       }
@@ -240,7 +253,8 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
         weeklyPax,
         weeklyTransfer: 0,
         weeklyCapacity: e.weeklyCapacity,
-        weeklyRevenue: weeklyPax * fare,
+        yieldBp: e.yieldBp,
+        weeklyRevenue: Math.floor((weeklyPax * fare * e.yieldBp) / 10000),
         weeklyCost: weeklyFuel + inflated,
       })
     }
@@ -297,7 +311,7 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
           )
           leg.weeklyPax += take
           leg.weeklyTransfer += take
-          leg.weeklyRevenue += take * legFare
+          leg.weeklyRevenue += Math.floor((take * legFare * leg.yieldBp) / 10000)
           leg.weeklyCost += legService
         }
       }

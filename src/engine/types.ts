@@ -29,6 +29,9 @@ export interface OwnedAircraft {
   // Leased airframes cost a quarterly payment instead of capital: no resale
   // value, no ownership cost, returned (not sold) when disposed.
   leased: boolean
+  // Cabin fit: 1 = high-density (more seats, less appeal), 2 = standard,
+  // 3 = premium (fewer seats, more appeal and yield). Refits cost cash.
+  cabin: number
 }
 
 export interface AircraftOrder {
@@ -166,6 +169,7 @@ export type Command =
   | { type: 'lease_aircraft'; aircraftType: string }
   | { type: 'buy_used'; offerId: number }
   | { type: 'hedge_fuel'; quarters: number }
+  | { type: 'refit_cabin'; aircraftId: number; cabin: number }
   | { type: 'sell_aircraft'; aircraftId: number }
   | { type: 'negotiate_slots'; city: string; spend: number }
   | { type: 'take_loan'; amount: number }
@@ -186,6 +190,7 @@ export type GameEvent =
   | { type: 'aircraft_leased'; airline: number; orderId: number; aircraftType: string; paymentPerQuarter: number }
   | { type: 'used_bought'; airline: number; aircraftId: number; aircraftType: string; price: number; ageQuarters: number }
   | { type: 'fuel_hedged'; airline: number; bp: number; quarters: number; premium: number }
+  | { type: 'cabin_refit'; airline: number; aircraftId: number; cabin: number; cost: number }
   | { type: 'aircraft_delivered'; airline: number; aircraftId: number; aircraftType: string }
   | { type: 'aircraft_sold'; airline: number; aircraftId: number; proceeds: number }
   | { type: 'negotiation_started'; airline: number; city: string; spend: number }

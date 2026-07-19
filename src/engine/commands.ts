@@ -7,6 +7,7 @@ import { getAircraftType, isAircraftType } from '../data/aircraft'
 import { distanceKm, getCity, isCity } from '../data/cities'
 import {
   BASE_LOAN_RATE_BP,
+  CABIN_REFIT_COST_BP,
   HEDGE_MAX_QUARTERS,
   HEDGE_MIN_QUARTERS,
   HEDGE_PREMIUM_PER_AIRCRAFT,
@@ -208,6 +209,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         ageQuarters: offer.ageQuarters,
         routeId: null,
         leased: false,
+        cabin: 2,
       }
       airline.fleet.push(aircraft)
       return {
@@ -240,6 +242,23 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       airline.fuelHedge = { bp, quartersLeft: command.quarters }
       return {
         events: [{ type: 'fuel_hedged', airline: airlineIdx, bp, quarters: command.quarters, premium }],
+      }
+    }
+
+    case 'refit_cabin': {
+      const aircraft = airline.fleet.find((a) => a.id === command.aircraftId)
+      if (!aircraft) return reject(airlineIdx, command, 'no such aircraft')
+      if (!Number.isInteger(command.cabin) || command.cabin < 1 || command.cabin > 3)
+        return reject(airlineIdx, command, 'cabin must be 1..3')
+      if (aircraft.cabin === command.cabin) return reject(airlineIdx, command, 'already in that cabin fit')
+      const cost = Math.floor((getAircraftType(aircraft.type).price * CABIN_REFIT_COST_BP) / 10000)
+      if (airline.cash < cost) return reject(airlineIdx, command, 'insufficient cash')
+      airline.cash -= cost
+      aircraft.cabin = command.cabin
+      return {
+        events: [
+          { type: 'cabin_refit', airline: airlineIdx, aircraftId: aircraft.id, cabin: aircraft.cabin, cost },
+        ],
       }
     }
 

@@ -3,6 +3,7 @@
 
 import { getAircraftType } from '../data/aircraft'
 import {
+  CABIN_SEATS_BP,
   DEBT_BASE_ALLOWANCE,
   DEBT_LTV_BP,
   RESALE_DECAY_BP_PER_QUARTER,
@@ -100,9 +101,16 @@ export function effectiveFrequency(airline: Airline, route: Route): number {
   return Math.min(route.frequency, maxRouteFrequency(airline, route))
 }
 
+// Sellable seats on one airframe after its cabin fit.
+export function cabinSeats(type: string, cabin: number): number {
+  return Math.floor((getAircraftType(type).seats * CABIN_SEATS_BP[cabin - 1]!) / 10000)
+}
+
 export interface TripAllocation {
   aircraftId: number
   type: string
+  cabin: number
+  seats: number // sellable seats per leg, after the cabin fit
   trips: number // round trips this airframe flies this week
 }
 
@@ -116,7 +124,7 @@ export function allocateTrips(airline: Airline, route: Route): TripAllocation[] 
     if (a.routeId !== route.id) continue
     const trips = Math.min(roundTripsPerWeek(a.type, km), remaining)
     remaining -= trips
-    out.push({ aircraftId: a.id, type: a.type, trips })
+    out.push({ aircraftId: a.id, type: a.type, cabin: a.cabin, seats: cabinSeats(a.type, a.cabin), trips })
   }
   return out
 }
@@ -125,7 +133,7 @@ export function allocateTrips(airline: Airline, route: Route): TripAllocation[] 
 export function routeWeeklyCapacity(airline: Airline, route: Route): number {
   let seats = 0
   for (const alloc of allocateTrips(airline, route)) {
-    seats += getAircraftType(alloc.type).seats * alloc.trips * 2
+    seats += alloc.seats * alloc.trips * 2
   }
   return seats
 }

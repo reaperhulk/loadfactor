@@ -78,6 +78,7 @@ export function endQuarter(prev: GameState): EngineResult {
           ageQuarters: 0,
           routeId: null,
           leased: order.leased,
+          cabin: 2,
         }
         airline.fleet.push(aircraft)
         events.push({

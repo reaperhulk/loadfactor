@@ -39,6 +39,7 @@ interface Personality {
   expandMinDemand: number // weekly-demand floor for opening a route
   negotiateBudgetBp: number // spend as bp of city difficulty
   homeRegionUntil: number // cities held before negotiating outside the HQ region
+  cabin: number // preferred cabin fit for the fleet (1 dense / 2 std / 3 prem)
 }
 
 const PERSONALITIES: Record<string, Personality> = {
@@ -50,6 +51,7 @@ const PERSONALITIES: Record<string, Personality> = {
     expandMinDemand: 300,
     negotiateBudgetBp: 10000,
     homeRegionUntil: 0,
+    cabin: 2,
   },
   price_war: {
     orderChanceBp: 8000,
@@ -59,6 +61,7 @@ const PERSONALITIES: Record<string, Personality> = {
     expandMinDemand: 200,
     negotiateBudgetBp: 9000,
     homeRegionUntil: 0,
+    cabin: 1,
   },
   premium: {
     orderChanceBp: 6000,
@@ -68,6 +71,7 @@ const PERSONALITIES: Record<string, Personality> = {
     expandMinDemand: 300,
     negotiateBudgetBp: 11000,
     homeRegionUntil: 0,
+    cabin: 3,
   },
   fortress: {
     orderChanceBp: 7000,
@@ -77,6 +81,7 @@ const PERSONALITIES: Record<string, Personality> = {
     expandMinDemand: 250,
     negotiateBudgetBp: 12000,
     homeRegionUntil: 6,
+    cabin: 2,
   },
 }
 
@@ -135,6 +140,18 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
       if (ac.ageQuarters >= 60 && (oldest === null || ac.ageQuarters > oldest.ageQuarters)) oldest = ac
     }
     if (oldest) apply(state, idx, { type: 'sell_aircraft', aircraftId: oldest.id }, events)
+  }
+
+  // Bring the fleet toward the personality's cabin fit, a couple of refits a
+  // quarter when cash allows — price_war packs seats, premium sells space.
+  if (airline.cash >= 6000) {
+    let refits = 0
+    for (const ac of airline.fleet) {
+      if (refits >= 2) break
+      if (ac.cabin === personality.cabin) continue
+      apply(state, idx, { type: 'refit_cabin', aircraftId: ac.id, cabin: personality.cabin }, events)
+      refits++
+    }
   }
 
   // Assign idle aircraft to the route that is most starved for seats, and

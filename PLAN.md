@@ -75,6 +75,10 @@ points where precision matters).
   `floor(weeklyBlockMinutes / roundTripMinutes)` round trips per week;
   round-trip time comes from distance/speed plus turnaround. Weekly seat
   capacity = Σ seats × round trips × 2 legs.
+- **Cabin fits.** Each airframe carries a cabin configuration — high-density
+  (more seats, less appeal), standard, or premium (fewer seats, more appeal
+  and higher revenue per pax). Refits cost a slice of list price. The
+  hardware axis under the soft-product service level.
 - **Market share.** Airlines serving the same pair split demand by
   attractiveness weight = f(frequency, service level, fare level). Cheap
   fares and better service win share but cost margin.

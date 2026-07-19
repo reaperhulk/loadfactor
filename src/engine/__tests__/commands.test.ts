@@ -170,6 +170,20 @@ describe('command validation', () => {
     expect(after.airlines[0]!.cash).toBe(18000 + 5984)
   })
 
+  it('refitting a cabin validates, charges cash, and sticks', () => {
+    const state = fresh()
+    expectRejected(applyCommand(state, { type: 'refit_cabin', aircraftId: 1, cabin: 7 }).events, 'cabin must be')
+    expectRejected(applyCommand(state, { type: 'refit_cabin', aircraftId: 1, cabin: 2 }).events, 'already in')
+    expectRejected(applyCommand(state, { type: 'refit_cabin', aircraftId: 999, cabin: 3 }).events, 'no such aircraft')
+    const { state: after, events } = applyCommand(state, { type: 'refit_cabin', aircraftId: 1, cabin: 3 })
+    expect(events[0]).toMatchObject({ type: 'cabin_refit', aircraftId: 1, cabin: 3 })
+    expect(after.airlines[0]!.fleet[0]!.cabin).toBe(3)
+    if (events[0]?.type === 'cabin_refit') {
+      expect(events[0].cost).toBeGreaterThan(0)
+      expect(after.airlines[0]!.cash).toBe(18000 - events[0].cost)
+    }
+  })
+
   it('never mutates the input state', () => {
     const state = fresh()
     const snapshot = JSON.stringify(state)

@@ -60,6 +60,14 @@ export const ROUTE_OVERHEAD_QUAD = 25
 // Service level 1..3 → attractiveness weight and cost per pax ($).
 export const SERVICE_LEVEL_WEIGHT: readonly number[] = [100, 118, 140]
 export const SERVICE_COST_PER_PAX: readonly number[] = [10, 18, 28]
+// Cabin fit 1..3 (high-density / standard / premium): seats multiplier bp,
+// attractiveness weight, and revenue-per-pax yield bp. Hardware trade-off —
+// pack the tube or sell the space; service level is the soft product on top.
+export const CABIN_SEATS_BP: readonly number[] = [11500, 10000, 8200]
+export const CABIN_WEIGHT: readonly number[] = [90, 100, 118]
+export const CABIN_YIELD_BP: readonly number[] = [9600, 10000, 11200]
+// One refit costs this bp of the airframe's list price.
+export const CABIN_REFIT_COST_BP = 250
 
 // --- Operations ---
 export const WEEKS_PER_QUARTER = 13

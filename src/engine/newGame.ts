@@ -28,7 +28,7 @@ function makeAirline(id: number, setup: AirlineSetup, controller: 'player' | 'ri
   }
   for (const type of setup.starterFleet) {
     getAircraftType(type) // validate data
-    airline.fleet.push({ id: airline.nextId++, type, ageQuarters: 0, routeId: null, leased: false })
+    airline.fleet.push({ id: airline.nextId++, type, ageQuarters: 0, routeId: null, leased: false, cabin: 2 })
   }
   return airline
 }

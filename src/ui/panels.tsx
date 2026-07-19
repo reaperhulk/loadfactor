@@ -8,6 +8,7 @@ import { NEG_MIN_SPEND } from '../data/constants'
 import type { GameEvent, GameState } from '../engine'
 import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor } from '../engine/market'
 import {
+  CABIN_REFIT_COST_BP,
   HEDGE_MAX_QUARTERS,
   HEDGE_MIN_QUARTERS,
   HEDGE_PREMIUM_PER_AIRCRAFT,
@@ -18,6 +19,7 @@ import { inflationBp } from '../engine/market'
 import { negotiationDifficulty } from '../engine/negotiation'
 import {
   airlinesOnPair,
+  cabinSeats,
   debtCeiling,
   effectiveFrequency,
   maxRouteFrequency,
@@ -139,6 +141,7 @@ export function FleetPanel({ state }: { state: GameState }) {
           <tr>
             <th>Aircraft</th>
             <th>Age</th>
+            <th>Cabin</th>
             <th>Assignment</th>
           </tr>
         </thead>
@@ -149,9 +152,21 @@ export function FleetPanel({ state }: { state: GameState }) {
               <tr key={a.id}>
                 <td>
                   {type.name} {a.leased && <span className="dim">(leased)</span>}{' '}
-                  <span className="dim">({type.seats} seats, {type.rangeKm}km)</span>
+                  <span className="dim">({cabinSeats(a.type, a.cabin)} seats, {type.rangeKm}km)</span>
                 </td>
                 <td>{(a.ageQuarters / 4).toFixed(1)}y</td>
+                <td>
+                  <select
+                    value={a.cabin}
+                    aria-label="cabin fit"
+                    title={`refit costs ${money(Math.floor((type.price * CABIN_REFIT_COST_BP) / 10000))}`}
+                    onChange={(e) => dispatch({ type: 'refit_cabin', aircraftId: a.id, cabin: Number(e.target.value) })}
+                  >
+                    <option value={1}>dense</option>
+                    <option value={2}>standard</option>
+                    <option value={3}>premium</option>
+                  </select>
+                </td>
                 <td>
                   <select
                     value={a.routeId ?? ''}
@@ -178,7 +193,7 @@ export function FleetPanel({ state }: { state: GameState }) {
           {player.orders.map((o) => (
             <tr key={`order-${o.id}`} className="dim">
               <td>{getAircraftType(o.type).name}</td>
-              <td colSpan={2}>on order — delivers in {o.quartersLeft} quarter(s)</td>
+              <td colSpan={3}>on order — delivers in {o.quartersLeft} quarter(s)</td>
             </tr>
           ))}
         </tbody>
