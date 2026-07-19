@@ -53,6 +53,8 @@ test('routes open via the city panel plan-route flow with a launch schedule', as
   await page.getByTestId('city-MIA').click()
   await expect(page.getByTestId('city-panel')).toBeVisible()
   await page.getByTestId('plan-route').click()
+  // Planning mode draws the idle-fleet reach ring around the origin.
+  await expect(page.getByTestId('range-ring')).toBeVisible()
   await page.getByTestId('city-ORD').click()
   // The launch dialog: aircraft + frequency (bounded by distance) + fare.
   await expect(page.getByTestId('route-setup')).toBeVisible()

@@ -69,19 +69,19 @@
   },
   "deregulation-greedy": {
     "checkpointHashes": {
-      "10": "587a5809",
-      "20": "46071e95",
-      "30": "d985a78c",
-      "40": "e486b9be"
+      "10": "5562e1ee",
+      "20": "40ded9ad",
+      "30": "3bdd38bc",
+      "40": "b0a68f52"
     },
     "summary": {
       "turn": 40,
       "phase": "planning",
-      "cash": 1111523,
-      "netWorth": 1390233,
-      "routes": 11,
-      "fleet": 11,
-      "quarterlyProfit": 57256
+      "cash": 1383359,
+      "netWorth": 1612863,
+      "routes": 10,
+      "fleet": 10,
+      "quarterlyProfit": 63338
     }
   }
 }
