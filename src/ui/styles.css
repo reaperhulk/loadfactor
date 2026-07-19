@@ -176,6 +176,16 @@ button:disabled {
   fill: var(--accent);
 }
 
+.fame-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.88rem;
+}
+.fame-list li {
+  padding: 2px 0;
+}
+
 /* Active world events, always on screen while they run. */
 .events-strip {
   display: flex;

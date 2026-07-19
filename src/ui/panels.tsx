@@ -647,10 +647,19 @@ export function AirportsPanel({ state }: { state: GameState }) {
   const player = state.airlines[0]!
   const [spend, setSpend] = useState(1000)
   const [onlyMine, setOnlyMine] = useState(true)
+  const [query, setQuery] = useState('')
   // Your airports first (held slots, then usage), the rest of the world by
-  // city mass — one list, comparable, filterable.
+  // city mass — one list, comparable, filterable, searchable.
+  const q = query.trim().toLowerCase()
   const cities = [...CITIES]
-    .filter((c) => !onlyMine || slotsHeld(player, c.id) > 0 || player.negotiations.some((n) => n.city === c.id))
+    .filter((c) => q === '' || c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q))
+    .filter(
+      (c) =>
+        q !== '' || // a search overrides the only-mine filter — you searched for a reason
+        !onlyMine ||
+        slotsHeld(player, c.id) > 0 ||
+        player.negotiations.some((n) => n.city === c.id),
+    )
     .sort((a, b) => {
       const ha = slotsHeld(player, a.id)
       const hb = slotsHeld(player, b.id)
@@ -680,7 +689,13 @@ export function AirportsPanel({ state }: { state: GameState }) {
           onChange={(e) => setOnlyMine(e.target.checked)}
         />{' '}
         only my airports
-      </label>
+      </label>{' '}
+      <input
+        placeholder="find a city…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        data-testid="airports-search"
+      />
       <div className="table-scroll"><table>
         <thead>
           <tr>
