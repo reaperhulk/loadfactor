@@ -4,6 +4,7 @@
 
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm, pairKey } from '../data/cities'
+import { FARE_DEMAND_BP, HUB_CONN_BP_PER_ROUTE, HUB_CONN_MAX_BP } from '../data/constants'
 import type { GameState } from '../engine'
 import { fareFor, pairWeeklyDemand } from '../engine/market'
 import { effectiveFrequency, maxRouteFrequency, roundTripsPerWeek, routeWeeklyCapacity } from '../engine/queries'
@@ -44,6 +45,13 @@ export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
     .filter((c): c is NonNullable<typeof c> => c !== null)
 
   const assigned = player.fleet.filter((a) => a.routeId === route.id)
+  // Surface the market model: hub feed at the endpoints, elasticity of the
+  // current fare posture.
+  const routesTouching = (city: string): number =>
+    player.routes.filter((r) => r.from === city || r.to === city).length
+  const hubExtra = routesTouching(route.from) - 1 + (routesTouching(route.to) - 1)
+  const hubBp = Math.min(HUB_CONN_MAX_BP, HUB_CONN_BP_PER_ROUTE * hubExtra)
+  const elasticityBp = FARE_DEMAND_BP[route.fareLevel + 2]!
   const profitTrend = route.history.map((h) => h.revenue - h.cost)
   const lfTrend = route.history.map((h) => h.loadFactorBp)
 
@@ -75,6 +83,12 @@ export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
         <span className={route.lastRevenue - route.lastCost >= 0 ? 'pos' : 'neg'}>
           {money(route.lastRevenue - route.lastCost)}/q
         </span>
+      </div>
+
+      <div className="dim" data-testid="route-economics-notes">
+        Hub feed: +{(hubBp / 100).toFixed(1)}% ({hubExtra} connecting route{hubExtra === 1 ? '' : 's'}) · fare
+        posture {elasticityBp >= 10000 ? 'attracts' : 'sheds'} {Math.abs((elasticityBp - 10000) / 100).toFixed(0)}%
+        of demand
       </div>
 
       <h3>Controls</h3>

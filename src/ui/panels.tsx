@@ -7,7 +7,14 @@ import { CITIES, distanceKm } from '../data/cities'
 import { NEG_MIN_SPEND } from '../data/constants'
 import type { GameEvent, GameState } from '../engine'
 import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor } from '../engine/market'
-import { HEDGE_MAX_QUARTERS, HEDGE_MIN_QUARTERS, HEDGE_PREMIUM_PER_AIRCRAFT, LEASE_BP_PER_QUARTER } from '../data/constants'
+import {
+  HEDGE_MAX_QUARTERS,
+  HEDGE_MIN_QUARTERS,
+  HEDGE_PREMIUM_PER_AIRCRAFT,
+  LEASE_BP_PER_QUARTER,
+  ROUTE_OVERHEAD_QUAD,
+} from '../data/constants'
+import { inflationBp } from '../engine/market'
 import { negotiationDifficulty } from '../engine/negotiation'
 import {
   airlinesOnPair,
@@ -31,7 +38,15 @@ export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect:
   if (player.routes.length === 0) {
     return <p className="hint">No routes yet. Click a city on the map, then “Open route from here”.</p>
   }
+  const networkOverhead = Math.floor(
+    (ROUTE_OVERHEAD_QUAD * player.routes.length * player.routes.length * inflationBp(state.turn)) / 10000,
+  )
   return (
+    <div>
+    <p className="dim" data-testid="network-overhead">
+      Network management: {money(networkOverhead)}/quarter for {player.routes.length} routes (grows with the
+      square of the network — quality beats sprawl)
+    </p>
     <div className="table-scroll"><table>
       <thead>
         <tr>
@@ -110,6 +125,7 @@ export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect:
         })}
       </tbody>
     </table></div>
+    </div>
   )
 }
 
