@@ -13,8 +13,12 @@ import { runCareer } from '../simulate'
 const SEEDS = ['alpha', 'beta', 'gamma', 'delta', 'epsilon']
 const RUNAWAY_CAP = 12_000_000 // $12B — tightened after the M2 growth taper
 
+// Five 80-quarter careers per test run ~3s locally but CI runners are slower;
+// the default 5s timeout is flaky there.
+const TIMEOUT = 60_000
+
 describe('balance envelope', () => {
-  it('the greedy bot survives the window and wins the race on every pinned seed', () => {
+  it('the greedy bot survives the window and wins the race on every pinned seed', { timeout: TIMEOUT }, () => {
     for (const seed of SEEDS) {
       const result = runCareer('jet_age', seed, 'greedy', 80)
       expect(result.summary.turn, `${seed}: reached the 1980 deadline`).toBe(80)
@@ -24,7 +28,7 @@ describe('balance envelope', () => {
     }
   })
 
-  it('the naive bot never wins and always underperforms the greedy bot', () => {
+  it('the naive bot never wins and always underperforms the greedy bot', { timeout: TIMEOUT }, () => {
     for (const seed of SEEDS) {
       const naive = runCareer('jet_age', seed, 'naive', 80)
       expect(naive.summary.phase, `${seed}: naive loses the scenario`).toBe('lost')
@@ -33,7 +37,7 @@ describe('balance envelope', () => {
     }
   })
 
-  it('the naive bot is not instantly dead (the floor is survivable)', () => {
+  it('the naive bot is not instantly dead (the floor is survivable)', { timeout: TIMEOUT }, () => {
     for (const seed of SEEDS) {
       const result = runCareer('jet_age', seed, 'naive', 80)
       expect(result.summary.turn, `${seed}: naive survives the opening`).toBeGreaterThanOrEqual(12)
