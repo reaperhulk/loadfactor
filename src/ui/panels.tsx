@@ -1007,6 +1007,41 @@ export function FinancePanel({ state }: { state: GameState }) {
           </div>
         </div>
       )}
+      {state.world.indexHistory.length >= 2 && (
+        <div data-testid="world-indices">
+          <h3>The world</h3>
+          <div className="trend-row">
+            <span className="dim">economy</span>
+            <Sparkline
+              points={state.world.indexHistory.map((h) => h.economyBp)}
+              width={180}
+              className="sparkline spark-profit"
+            />
+            <span className={state.world.economyBp >= 10000 ? 'pos' : 'neg'}>
+              {(state.world.economyBp / 100).toFixed(0)}%
+            </span>
+          </div>
+          <div className="trend-row">
+            <span className="dim" title="effective fuel index, event shocks included">
+              fuel
+            </span>
+            <Sparkline
+              points={state.world.indexHistory.map((h) => h.fuelBp)}
+              width={180}
+              className="sparkline spark-lf"
+            />
+            <span
+              className={
+                (state.world.indexHistory[state.world.indexHistory.length - 1]?.fuelBp ?? 10000) > 11000
+                  ? 'neg'
+                  : 'dim'
+              }
+            >
+              {((state.world.indexHistory[state.world.indexHistory.length - 1]?.fuelBp ?? 10000) / 100).toFixed(0)}%
+            </span>
+          </div>
+        </div>
+      )}
       <CostStructure state={state} />
       <CostMixHistory state={state} />
       <p>

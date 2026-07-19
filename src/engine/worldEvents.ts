@@ -137,6 +137,10 @@ export function updateWorld(state: GameState): GameEvent[] {
   }
   state.rng.events = evRng
 
+  // Record the macro story: the settled indices for this quarter, capped to
+  // a rolling window (charts don't need the whole century).
+  world.indexHistory.push({ turn: state.turn, economyBp: world.economyBp, fuelBp: effFuelBp(world) })
+  if (world.indexHistory.length > 60) world.indexHistory.shift()
   events.push({ type: 'economy_updated', economyBp: world.economyBp, fuelBp: world.fuelBp })
   return events
 }

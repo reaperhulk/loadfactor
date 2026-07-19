@@ -88,7 +88,7 @@ export function newGame(scenarioId: string, seed: string, player?: PlayerSetup):
       negotiations: deriveStream(seed, 'negotiations'),
       rivals: deriveStream(seed, 'rivals'),
     },
-    world: { economyBp: 10000, fuelBp: 10000, events: [], usedMarket: [] },
+    world: { economyBp: 10000, fuelBp: 10000, events: [], usedMarket: [], indexHistory: [] },
     airlines,
   }
 }

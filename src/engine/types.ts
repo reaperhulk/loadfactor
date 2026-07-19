@@ -155,6 +155,9 @@ export interface WorldState {
   fuelBp: number // random-walk fuel price index, 10000 = baseline
   events: ActiveEvent[]
   usedMarket: UsedOffer[] // rotates deterministically each quarter
+  // The macro story per resolved quarter (fuel is the EFFECTIVE index,
+  // event shocks included), rolling window for the finance charts.
+  indexHistory: { turn: number; economyBp: number; fuelBp: number }[]
 }
 
 export interface GameState {
