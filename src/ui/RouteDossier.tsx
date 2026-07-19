@@ -6,7 +6,7 @@ import { getAircraftType } from '../data/aircraft'
 import { distanceKm, pairKey } from '../data/cities'
 import { FARE_DEMAND_BP } from '../data/constants'
 import type { GameState } from '../engine'
-import { fareFor, fuelInflationBp, pairWeeklyDemand, routeShareWeight, routeSpoolBp } from '../engine/market'
+import { fareFor, fuelInflationBp, pairWeeklyDemand, routeShareWeight, routeSpoolBp, seasonalBp } from '../engine/market'
 import { effFuelBp } from '../engine/worldEvents'
 import {
   allocateTrips,
@@ -82,6 +82,27 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
                 · ramping — attaches {routeSpoolBp(player, route, state.turn) / 100}% of its share this quarter
               </span>
             )}
+            {(() => {
+              // Seasonal pairs: say which way the calendar is leaning.
+              const bp = Math.floor(
+                (seasonalBp(route.from, state.turn) * seasonalBp(route.to, state.turn)) / 10000,
+              )
+              if (bp > 10100)
+                return (
+                  <span className="pos" data-testid="route-season">
+                    {' '}
+                    · 🌞 high season (+{((bp - 10000) / 100).toFixed(1)}%)
+                  </span>
+                )
+              if (bp < 9900)
+                return (
+                  <span className="neg" data-testid="route-season">
+                    {' '}
+                    · ❄ off season ({((bp - 10000) / 100).toFixed(1)}%)
+                  </span>
+                )
+              return null
+            })()}
           </span>
         </div>
         <span>

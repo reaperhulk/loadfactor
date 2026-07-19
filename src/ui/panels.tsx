@@ -34,6 +34,7 @@ import {
   maxRouteFrequency,
   resaleValue,
   roundTripsPerWeek,
+  routeWeeklyCapacity,
   slotCities,
   slotsAllocated,
   slotsFree,
@@ -413,9 +414,37 @@ export function FleetPanel({ state }: { state: GameState }) {
                       {Math.round(utilBp / 100)}%
                     </>
                   ) : (
-                    <span className="neg" title="idle metal still draws salaries and ownership">
-                      parked
-                    </span>
+                    <>
+                      <span className="neg" title="idle metal still draws salaries and ownership">
+                        parked
+                      </span>
+                      {(() => {
+                        // Best use for this airframe: the in-range route most
+                        // starved for seats — one click assigns and schedules.
+                        let bestRoute: (typeof player.routes)[number] | null = null
+                        let bestGap = 0
+                        for (const r of player.routes) {
+                          const rkm = distanceKm(r.from, r.to)
+                          if (rkm > type.rangeKm) continue
+                          const gap = pairWeeklyDemand(state, r.from, r.to) - routeWeeklyCapacity(player, r)
+                          if (gap > bestGap) {
+                            bestGap = gap
+                            bestRoute = r
+                          }
+                        }
+                        if (!bestRoute) return null
+                        return (
+                          <button
+                            className="link-btn"
+                            data-testid={`suggest-${a.id}`}
+                            title={`${bestGap.toLocaleString('en-US')} unmet weekly seats there`}
+                            onClick={() => assignAndSchedule(state, a.id, bestRoute.id)}
+                          >
+                            → {bestRoute.from}–{bestRoute.to}?
+                          </button>
+                        )
+                      })()}
+                    </>
                   )}
                 </td>
                 <td className={geriatric ? 'neg' : 'dim'}>

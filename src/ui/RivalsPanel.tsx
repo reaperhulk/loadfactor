@@ -47,11 +47,13 @@ function StandingsTable({ state }: { state: GameState }) {
   )
   const rows = state.airlines.map((a) => {
     const last = a.history[a.history.length - 1]
+    const prev = a.history[a.history.length - 2]
     return {
       id: a.id,
       name: a.id === 0 ? `${a.name} (you)` : a.name,
       bankrupt: a.bankrupt,
       netWorth: netWorth(a),
+      worthTrend: last && prev ? last.netWorth - prev.netWorth : 0,
       cash: a.cash,
       revenue: last?.revenue ?? 0,
       profit: last?.profit ?? 0,
@@ -92,7 +94,18 @@ function StandingsTable({ state }: { state: GameState }) {
           {rows.map((r) => (
             <tr key={r.id} className={r.id === 0 ? 'me' : r.bankrupt ? 'dim' : ''}>
               <td>{r.bankrupt ? `${r.name} ✝` : r.name}</td>
-              {cell(r, 'netWorth', money(r.netWorth))}
+              <td className={!r.bankrupt && r.netWorth === best('netWorth') ? 'pos' : ''}>
+                {money(r.netWorth)}
+                {!r.bankrupt && r.worthTrend !== 0 && (
+                  <span
+                    className={r.worthTrend > 0 ? 'pos' : 'neg'}
+                    title={`${r.worthTrend > 0 ? '+' : ''}${money(r.worthTrend)} vs last quarter`}
+                  >
+                    {' '}
+                    {r.worthTrend > 0 ? '▲' : '▼'}
+                  </span>
+                )}
+              </td>
               {cell(r, 'cash', money(r.cash))}
               {cell(r, 'revenue', money(r.revenue))}
               {cell(r, 'profit', money(r.profit))}
