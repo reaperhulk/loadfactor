@@ -154,6 +154,11 @@ function MuteToggle() {
 // Final standings, ranked — the scenario is a race, show the podium.
 function GameOverOverlay({ state, onWatchReplay }: { state: GameState; onWatchReplay: (r: Replay) => void }) {
   const ranked = [...state.airlines].sort((a, b) => netWorth(b) - netWorth(a))
+  // The career in numbers — what those decades added up to.
+  const me = state.airlines[0]!
+  const totalPax = me.history.reduce((s, h) => s + h.pax, 0)
+  const totalProfit = me.history.reduce((s, h) => s + h.profit, 0)
+  const peakWorth = me.history.reduce((s, h) => Math.max(s, h.netWorth), 0)
   return (
     <div className="gameover-overlay" data-testid="gameover-overlay">
       <div className="gameover-card">
@@ -167,6 +172,10 @@ function GameOverOverlay({ state, onWatchReplay }: { state: GameState; onWatchRe
             </li>
           ))}
         </ol>
+        <p className="dim" data-testid="career-summary">
+          {Math.floor(state.turn / 4)} years · {totalPax.toLocaleString('en-US')} passengers flown · lifetime
+          P&L {money(totalProfit)} · peak worth {money(peakWorth)}
+        </p>
         <button
           data-testid="watch-replay"
           onClick={() => {

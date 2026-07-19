@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent } from 'react'
+import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { WORLD_PATH, WORLD_RINGS } from '../data/worldmap.gen'
@@ -401,6 +402,12 @@ export function MapView({
     isGlobe ? globeTripPath(globe, fromId, toId) : roundTripPath(fromId, toId)
   const flownRoutes = player.routes.filter((r) => player.fleet.some((a) => a.routeId === r.id))
   const network = networkCities(player)
+  // Launching needs an idle airframe with the legs — targets beyond every
+  // idle aircraft's range shouldn't light up at all.
+  let idleReachKm = 0
+  for (const a of player.fleet) {
+    if (a.routeId === null) idleReachKm = Math.max(idleReachKm, getAircraftType(a.type).rangeKm)
+  }
   const [showRivals, setShowRivals] = useState(true)
   // Hub glow: each route's connecting pax land on both endpoints, so the
   // transfer hub — riding two legs — naturally counts double and glows
@@ -784,6 +791,7 @@ export function MapView({
             routeFrom !== c.id &&
             (network.has(routeFrom) || inNetwork) &&
             held > slotsUsedAt(player.routes, c.id) &&
+            distanceKm(routeFrom, c.id) <= idleReachKm &&
             !player.routes.some(
               (r) =>
                 (r.from === c.id && r.to === routeFrom) || (r.from === routeFrom && r.to === c.id),
