@@ -74,6 +74,30 @@ test('two careers live in separate slots; delete frees one', async ({ page }) =>
   await expect(page.getByTestId('save-slot-0')).toBeVisible()
 })
 
+test('a career exports as JSON and imports back into a slot', async ({ page }) => {
+  await startGame(page, 'export-seed')
+  await page.evaluate(() => window.__harness.endQuarter())
+  await page.reload()
+  await expect(page.getByTestId('save-slot-0')).toContainText('export-seed')
+  // Lift the save JSON (what the export button copies), delete the career,
+  // then import the JSON back — it must replay cleanly and reclaim a slot.
+  const json = await page.evaluate(() => localStorage.getItem('loadfactor:save:v1'))
+  expect(json).not.toBeNull()
+  await page.getByTestId('delete-save-0').click()
+  await page.getByTestId('delete-save-0').click()
+  await expect(page.getByTestId('save-slot-0')).toHaveCount(0)
+  // The saved-games card only renders when a save exists — recreate one so
+  // the import box is on screen, then import into the next free slot.
+  await page.getByTestId('seed-input').fill('other-seed')
+  await page.getByTestId('start-jet_age').click()
+  await page.evaluate(() => window.__harness.endQuarter())
+  await page.reload()
+  await page.locator('summary', { hasText: 'Import a career' }).click()
+  await page.getByTestId('import-save-text').fill(json!)
+  await page.getByTestId('import-save').click()
+  await expect(page.getByTestId('save-slot-1')).toContainText('export-seed')
+})
+
 test('the replay viewer scrubs a saved career quarter by quarter', async ({ page }) => {
   await startGame(page, 'replay-seed')
   await page.evaluate(() => {
