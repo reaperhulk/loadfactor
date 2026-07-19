@@ -6,6 +6,7 @@ import { AIRCRAFT, getAircraftType } from '../data/aircraft'
 import {
   AIRCRAFT_ADMIN_PER_QUARTER,
   AIRLINE_OVERHEAD_PER_QUARTER,
+  CREW_SALARY_BP_PER_QUARTER,
   INSOLVENCY_QUARTERS_TO_FAIL,
   LEASE_BP_PER_QUARTER,
   SLOT_IDLE_QUARTERS_TO_LOSE,
@@ -128,6 +129,9 @@ export function endQuarter(prev: GameState): EngineResult {
       const type = getAircraftType(ac.type)
       inflatable += Math.floor((type.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * ac.ageQuarters)) / 10000)
       inflatable += AIRCRAFT_ADMIN_PER_QUARTER
+      // Crews are salaried per airframe whether it flies or not — parking
+      // the schedule saves fuel and fees, never the payroll.
+      inflatable += Math.floor((type.price * CREW_SALARY_BP_PER_QUARTER) / 10000)
       // Owned airframes carry ownership (depreciation+insurance); leased ones
       // pay the lessor instead.
       fixedCosts += ac.leased

@@ -21,7 +21,7 @@ export const DEMAND_DIST_BANDS: readonly (readonly [number, number])[] = [
 // the late-game money curve (M2 anti-compounding rule #2).
 export const DEMAND_GROWTH_BP_PER_QUARTER = 125
 export const DEMAND_GROWTH_TAPER_TURN = 40
-export const DEMAND_GROWTH_LATE_BP_PER_QUARTER = 25
+export const DEMAND_GROWTH_LATE_BP_PER_QUARTER = 40
 // Operating-cost inflation trails demand growth slightly: a saturated route's
 // margin decays over the years, so growth must come from expansion and fleet
 // renewal, never from sitting on a full plane (M1 anti-compounding rule).
@@ -35,8 +35,8 @@ export const DEMAND_NOISE_SPREAD_BP = 800
 // --- Fares & service ---
 // One-way base fare in $, concave with distance (long-haul $/km taper):
 // FARE_BASE + min(km, TAPER)*NEAR/100 + max(0, km-TAPER)*FAR/100.
-export const FARE_BASE = 25
-export const FARE_PER_100KM_NEAR = 12
+export const FARE_BASE = 22
+export const FARE_PER_100KM_NEAR = 11
 export const FARE_TAPER_KM = 3000
 export const FARE_PER_100KM_FAR = 6
 // Fare level -2..+2 → price multiplier bp.
@@ -45,13 +45,13 @@ export const FARE_LEVEL_PRICE_BP: readonly number[] = [8000, 9000, 10000, 11500,
 export const FARE_LEVEL_WEIGHT: readonly number[] = [150, 125, 100, 80, 65]
 // Fare level -2..+2 → demand elasticity bp: gouging sheds passengers even
 // with no competitor on the pair (monopolies are not a free +30%).
-export const FARE_DEMAND_BP: readonly number[] = [11000, 10500, 10000, 8600, 7400]
+export const FARE_DEMAND_BP: readonly number[] = [11000, 10500, 10000, 8900, 7400]
 // Connecting traffic: for served city pairs with no direct flight, real
 // itineraries route over a one-stop hub on the airline's own network, filling
 // spare seats on both legs. Only this share of the pair's demand tolerates a
 // connection, each leg sells at a through-fare discount, and the hub must not
 // add more than this detour over the great-circle direct distance.
-export const CONNECT_WILLING_BP = 3000
+export const CONNECT_WILLING_BP = 5000
 export const CONNECT_FARE_DISCOUNT_BP = 9000
 export const CONNECT_DETOUR_MAX_BP = 14000
 // Management complexity: quarterly overhead grows with the SQUARE of route
@@ -59,13 +59,13 @@ export const CONNECT_DETOUR_MAX_BP = 14000
 export const ROUTE_OVERHEAD_QUAD = 25
 // Service level 1..3 → attractiveness weight and cost per pax ($).
 export const SERVICE_LEVEL_WEIGHT: readonly number[] = [100, 118, 140]
-export const SERVICE_COST_PER_PAX: readonly number[] = [10, 18, 28]
+export const SERVICE_COST_PER_PAX: readonly number[] = [10, 17, 25]
 // Cabin fit 1..3 (high-density / standard / premium): seats multiplier bp,
 // attractiveness weight, and revenue-per-pax yield bp. Hardware trade-off —
 // pack the tube or sell the space; service level is the soft product on top.
 export const CABIN_SEATS_BP: readonly number[] = [11500, 10000, 8200]
 export const CABIN_WEIGHT: readonly number[] = [90, 100, 118]
-export const CABIN_YIELD_BP: readonly number[] = [9600, 10000, 11200]
+export const CABIN_YIELD_BP: readonly number[] = [9600, 10000, 12000]
 // One refit costs this bp of the airframe's list price.
 export const CABIN_REFIT_COST_BP = 250
 
@@ -80,19 +80,26 @@ export const MIN_ROUTE_KM = 300
 // demand band makes them traps (players may still open them).
 export const AI_MIN_ROUTE_KM = 800
 // Landing + handling fee per leg = FEE_BASE + seats * FEE_PER_SEAT ($).
-export const LANDING_FEE_BASE = 300
-export const LANDING_FEE_PER_SEAT = 3
-export const CREW_COST_PER_BLOCK_HOUR = 500 // $
+export const LANDING_FEE_BASE = 200
+export const LANDING_FEE_PER_SEAT = 2
+// Flight pay on top of salaries — the marginal crew cost of one more hour.
+export const CREW_COST_PER_BLOCK_HOUR = 150 // $
+// Crews are salaried per airframe, flying or not, as bp of list price per
+// quarter. The airplane-and-its-people are the expensive part of an airline;
+// the marginal flight is comparatively cheap. Parking the schedule saves
+// fuel and fees, not the payroll.
+export const CREW_SALARY_BP_PER_QUARTER = 300
 // Maintenance escalates with age: base * (10000 + AGE_BP*ageQuarters)/10000.
 export const MAINT_AGE_BP_PER_QUARTER = 300
 // Quarterly ownership cost (depreciation+insurance) as bp of list price.
-export const OWNERSHIP_BP_PER_QUARTER = 250
+export const OWNERSHIP_BP_PER_QUARTER = 400
 export const AIRLINE_OVERHEAD_PER_QUARTER = 400 // $k
 export const AIRCRAFT_ADMIN_PER_QUARTER = 40 // $k per airframe
 
 // --- Leasing, used market, hedging (M2 fleet depth) ---
-// Quarterly lease payment as bp of list price (no capex, no resale).
-export const LEASE_BP_PER_QUARTER = 350
+// Quarterly lease payment as bp of list price (no capex, no resale). Sits
+// above the ownership rate — flexibility costs a premium.
+export const LEASE_BP_PER_QUARTER = 600
 export const USED_OFFERS_PER_QUARTER = 3
 // Used price: resale value plus a dealer margin.
 export const USED_MARGIN_BP = 800

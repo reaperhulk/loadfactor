@@ -9,6 +9,7 @@ import { distanceKm, getCity, pairKey } from '../data/cities'
 import {
   AIRCRAFT_ADMIN_PER_QUARTER,
   CABIN_WEIGHT,
+  CREW_SALARY_BP_PER_QUARTER,
   CABIN_YIELD_BP,
   CONNECT_DETOUR_MAX_BP,
   CONNECT_FARE_DISCOUNT_BP,
@@ -80,6 +81,7 @@ export function estimateAircraftQuarterCost(state: GameState, typeId: string, km
   const fixed =
     Math.floor((t.maintBase * inflationBp(state.turn)) / 10000) +
     Math.floor((t.price * OWNERSHIP_BP_PER_QUARTER) / 10000) +
+    Math.floor((Math.floor((t.price * CREW_SALARY_BP_PER_QUARTER) / 10000) * inflationBp(state.turn)) / 10000) +
     Math.floor((AIRCRAFT_ADMIN_PER_QUARTER * inflationBp(state.turn)) / 10000)
   return routeCost + fixed
 }

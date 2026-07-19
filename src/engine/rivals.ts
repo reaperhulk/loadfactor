@@ -24,6 +24,7 @@ import {
   yearOf,
 } from './queries'
 import { chanceBp } from './rng'
+import { effFuelBp } from './worldEvents'
 import type { Airline, Command, GameEvent, GameState } from './types'
 
 function apply(state: GameState, idx: number, cmd: Command, events: GameEvent[]): void {
@@ -118,18 +119,33 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   if (!airline || airline.bankrupt) return
   const personality = PERSONALITIES[airline.personality] ?? PERSONALITIES['balanced']!
 
-  // Borrow when the cash buffer is thin and there is real debt room.
-  if (airline.cash < 3000) {
+  // Treasury: keep a cash buffer proportional to the cost base — a airline
+  // grossing $100M a quarter dies of illiquidity long before insolvency if it
+  // only tops up at $3M. Borrow against the fleet when the buffer thins.
+  const lastCosts = airline.history[airline.history.length - 1]?.costs ?? 0
+  const cashBuffer = Math.max(3000, Math.floor(lastCosts / 2))
+  if (airline.cash < cashBuffer) {
     const room = debtCeiling(airline) - totalDebt(airline)
-    if (room >= 5000) apply(state, idx, { type: 'take_loan', amount: Math.min(room, 8000) }, events)
+    const want = Math.min(room, cashBuffer)
+    if (want >= 2000) apply(state, idx, { type: 'take_loan', amount: want }, events)
   }
 
   // Defensive play, same as the competent player bot: prune structurally
-  // losing routes and retire one geriatric maintenance hog per quarter.
-  for (const route of [...airline.routes]) {
-    if (route.lastCapacity > 0 && route.lastRevenue * 100 < route.lastCost * 85) {
-      apply(state, idx, { type: 'close_route', routeId: route.id }, events)
-    }
+  // losing routes — but at most two per quarter. A fuel spike can flip half
+  // the network to paper-losers at once; closing everything in one quarter
+  // collapses revenue while the freed planes keep drawing salaries.
+  const losers = airline.routes
+    .filter((r) => r.lastCapacity > 0 && r.lastRevenue * 100 < r.lastCost * 85)
+    .sort((a, b) => a.lastRevenue * b.lastCost - b.lastRevenue * a.lastCost)
+    .slice(0, 2)
+  for (const route of losers) {
+    apply(state, idx, { type: 'close_route', routeId: route.id }, events)
+  }
+
+  // Lock in cheap fuel when it is cheap — a hedge smooths the oil shocks
+  // that otherwise flip whole networks into paper-losers overnight.
+  if (airline.fuelHedge === null && airline.fleet.length > 0 && effFuelBp(state.world) <= 10500) {
+    apply(state, idx, { type: 'hedge_fuel', quarters: 4 }, events)
   }
   // Yield management, same instincts as the competent player bot: packed
   // planes raise fares, slack ones cut toward the personality floor.
@@ -161,9 +177,26 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   if (airline.fleet.length > 2) {
     let oldest: (typeof airline.fleet)[number] | null = null
     for (const ac of airline.fleet) {
-      if (ac.ageQuarters >= 60 && (oldest === null || ac.ageQuarters > oldest.ageQuarters)) oldest = ac
+      if (ac.ageQuarters >= 48 && (oldest === null || ac.ageQuarters > oldest.ageQuarters)) oldest = ac
     }
     if (oldest) apply(state, idx, { type: 'sell_aircraft', aircraftId: oldest.id }, events)
+  }
+
+  // Capacity discipline: slack MONOPOLY routes trim the schedule (empty seats
+  // burn fuel and nobody takes the share). On contested pairs frequency is
+  // competitiveness — trimming there concedes the market and spirals, so
+  // slack contested routes are fought with fares (retaliation) instead.
+  // Packed routes restore the schedule toward the fleet's maximum.
+  for (const route of airline.routes) {
+    if (route.lastCapacity === 0) continue
+    const max = maxRouteFrequency(airline, route)
+    const eff = Math.min(route.frequency, max)
+    const contested = airlinesOnPair(state, route.from, route.to, idx) > 0
+    if (!contested && route.lastLoadFactorBp < 5500 && eff > 2) {
+      apply(state, idx, { type: 'set_frequency', routeId: route.id, frequency: Math.max(2, Math.floor((eff * 3) / 4)) }, events)
+    } else if (route.lastLoadFactorBp >= 9000 && route.frequency < max) {
+      apply(state, idx, { type: 'set_frequency', routeId: route.id, frequency: max }, events)
+    }
   }
 
   // Bring the fleet toward the personality's cabin fit, a couple of refits a
@@ -253,6 +286,27 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
           events,
         )
       }
+    }
+  }
+
+  // Cash-strapped with metal on the ground: surplus idle airframes draw
+  // salaries and ownership for nothing — liquidate one a quarter.
+  if (airline.cash < cashBuffer && airline.fleet.length > 3) {
+    let surplus: (typeof airline.fleet)[number] | null = null
+    for (const ac of airline.fleet) {
+      if (ac.routeId !== null) continue
+      if (surplus === null || ac.ageQuarters > surplus.ageQuarters) surplus = ac
+    }
+    if (surplus) apply(state, idx, { type: 'sell_aircraft', aircraftId: surplus.id }, events)
+  }
+
+  // Distress: negative cash means one more bad quarter is the end. Sell the
+  // oldest airframes — assigned or not — to stay alive (the sale-and-shrink
+  // every real carrier reaches for before the receivers do).
+  if (airline.cash < 0 && airline.fleet.length > 2) {
+    const byAge = [...airline.fleet].sort((a, b) => b.ageQuarters - a.ageQuarters || a.id - b.id)
+    for (const ac of byAge.slice(0, 2)) {
+      apply(state, idx, { type: 'sell_aircraft', aircraftId: ac.id }, events)
     }
   }
 

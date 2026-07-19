@@ -91,10 +91,14 @@ points where precision matters).
   detour capped, riding only spare seats on both legs, each leg sold at a
   through-fare discount. Hub-and-spoke emerges from real itineraries, not a
   bonus multiplier.
-- **Costs.** Per flight: fuel (burn/km × distance × fuel index), landing
-  fees, crew by block time. Per aircraft: maintenance rising with age,
-  ownership overhead. Per airline: fixed overhead. Per pax: service cost by
-  service level.
+- **Costs.** The airplane and its people are the expensive part; the
+  marginal flight is comparatively cheap. Per flight: fuel (burn/km ×
+  distance × fuel index), landing fees, flight pay by block time. Per
+  aircraft: crew salaries (paid whether it flies or not), ownership or lease,
+  maintenance rising with age, admin. Per airline: fixed overhead plus
+  quadratic route-count overhead. Per pax: service cost by service level.
+  Trimming a schedule saves fuel and fees, never the payroll — capacity
+  discipline is a real decision, not a free cost dial.
 - **Finance.** Loans have principal and quarterly interest tied to the
   economy; a debt ceiling scales with fleet value. Bankruptcy (cash below
   the failure floor at quarter end for two consecutive quarters) = defeat.
