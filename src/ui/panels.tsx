@@ -349,9 +349,13 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
   )
 }
 
+type FleetSortKey = 'type' | 'age' | 'util' | 'maint' | 'value'
+
 export function FleetPanel({ state }: { state: GameState }) {
   const player = state.airlines[0]!
   const year = yearOf(state)
+  const [fleetSort, setFleetSort] = useState<FleetSortKey>('type')
+  const [fleetAsc, setFleetAsc] = useState(true)
   // Renewal forecast: what the fleet costs to keep today, what the same
   // metal will cost in two years of aging and inflation, and how many
   // airframes cross into geriatric territory on the way.
@@ -377,25 +381,70 @@ export function FleetPanel({ state }: { state: GameState }) {
           {geriatricSoon > 0 && <span> · {geriatricSoon} more turn geriatric within 2y</span>}
         </p>
       )}
+      {(() => {
+        // Row models first so sorting works on exactly what the cells show.
+        const fleetRows = player.fleet.map((a) => {
+          const type = getAircraftType(a.type)
+          const route = player.routes.find((r) => r.id === a.routeId)
+          const alloc = route ? allocateTrips(player, route).find((x) => x.aircraftId === a.id) : undefined
+          const maxTrips = route ? roundTripsPerWeek(a.type, distanceKm(route.from, route.to)) : 0
+          const utilBp = alloc && maxTrips > 0 ? Math.floor((alloc.trips * 10000) / maxTrips) : 0
+          const maint = Math.floor(
+            (Math.floor((type.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * a.ageQuarters)) / 10000) *
+              inflationBp(state.turn)) /
+              10000,
+          )
+          const value = a.leased ? 0 : resaleValue(a.type, a.ageQuarters)
+          return { a, type, route, utilBp, maint, value }
+        })
+        const fdir = fleetAsc ? 1 : -1
+        fleetRows.sort((x, y) => {
+          switch (fleetSort) {
+            case 'age':
+              return fdir * (x.a.ageQuarters - y.a.ageQuarters)
+            case 'util':
+              return fdir * (x.utilBp - y.utilBp)
+            case 'maint':
+              return fdir * (x.maint - y.maint)
+            case 'value':
+              return fdir * (x.value - y.value)
+            default:
+              return fdir * (x.type.name.localeCompare(y.type.name) || x.a.id - y.a.id)
+          }
+        })
+        const fheader = (key: FleetSortKey, label: string, title?: string) => (
+          <th title={title}>
+            <button
+              className={`link-btn sort-btn${fleetSort === key ? ' active' : ''}`}
+              data-testid={`fleet-sort-${key}`}
+              onClick={() => {
+                if (fleetSort === key) setFleetAsc(!fleetAsc)
+                else {
+                  setFleetSort(key)
+                  setFleetAsc(key === 'type')
+                }
+              }}
+            >
+              {label}
+              {fleetSort === key ? (fleetAsc ? ' ▲' : ' ▼') : ''}
+            </button>
+          </th>
+        )
+        return (
       <div className="table-scroll"><table>
         <thead>
           <tr>
-            <th>Aircraft</th>
-            <th>Age</th>
-            <th title="round trips flown vs what this airframe could fly on its route">Utilization</th>
-            <th title="this quarter's maintenance — escalates with age and inflation">Maint/q</th>
-            <th>Value</th>
+            {fheader('type', 'Aircraft')}
+            {fheader('age', 'Age')}
+            {fheader('util', 'Utilization', 'round trips flown vs what this airframe could fly on its route')}
+            {fheader('maint', 'Maint/q', 'this quarter’s maintenance — escalates with age and inflation')}
+            {fheader('value', 'Value')}
             <th>Cabin</th>
             <th>Assignment</th>
           </tr>
         </thead>
         <tbody>
-          {player.fleet.map((a) => {
-            const type = getAircraftType(a.type)
-            const route = player.routes.find((r) => r.id === a.routeId)
-            const alloc = route ? allocateTrips(player, route).find((x) => x.aircraftId === a.id) : undefined
-            const maxTrips = route ? roundTripsPerWeek(a.type, distanceKm(route.from, route.to)) : 0
-            const utilBp = alloc && maxTrips > 0 ? Math.floor((alloc.trips * 10000) / maxTrips) : 0
+          {fleetRows.map(({ a, type, route, utilBp, maint, value }) => {
             const geriatric = a.ageQuarters >= 48
             return (
               <tr key={a.id}>
@@ -448,16 +497,8 @@ export function FleetPanel({ state }: { state: GameState }) {
                     </>
                   )}
                 </td>
-                <td className={geriatric ? 'neg' : 'dim'}>
-                  {money(
-                    Math.floor(
-                      (Math.floor((type.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * a.ageQuarters)) / 10000) *
-                        inflationBp(state.turn)) /
-                        10000,
-                    ),
-                  )}
-                </td>
-                <td className="dim">{a.leased ? '—' : money(resaleValue(a.type, a.ageQuarters))}</td>
+                <td className={geriatric ? 'neg' : 'dim'}>{money(maint)}</td>
+                <td className="dim">{a.leased ? '—' : money(value)}</td>
                 <td>
                   <select
                     value={a.cabin}
@@ -518,6 +559,8 @@ export function FleetPanel({ state }: { state: GameState }) {
           })}
         </tbody>
       </table></div>
+        )
+      })()}
       <CabinLegend />
       <h3>Order new aircraft ({year})</h3>
       <Shop state={state} />

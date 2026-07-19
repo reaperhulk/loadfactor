@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyCommand, newGame, type GameEvent, type GameState } from '../index'
+import { currentLoanRateBp } from '../queries'
 
 function expectRejected(events: GameEvent[], reasonPart: string): void {
   const rejection = events.find((e) => e.type === 'command_rejected')
@@ -195,6 +196,20 @@ describe('command validation', () => {
     l = applyCommand(l.state, { type: 'cancel_order', orderId: leaseId })
     expect(l.events[0]).toMatchObject({ type: 'order_cancelled', refund: 0 })
     expect(l.state.airlines[0]!.cash).toBe(18000)
+  })
+
+  it('loan rates follow the economy: booms borrow cheaper than busts', () => {
+    const state = fresh()
+    const boom = structuredClone(state)
+    boom.world.economyBp = 11000
+    const bust = structuredClone(state)
+    bust.world.economyBp = 9000
+    expect(currentLoanRateBp(boom)).toBeLessThan(currentLoanRateBp(bust))
+    // The quoted rate is exactly what take_loan books.
+    const { state: after, events } = applyCommand(bust, { type: 'take_loan', amount: 2000 })
+    const quoted = currentLoanRateBp(bust)
+    expect(events[0]).toMatchObject({ type: 'loan_taken', annualRateBp: quoted })
+    expect(after.airlines[0]!.loans[0]!.annualRateBp).toBe(quoted)
   })
 
   it('marketing level validates 0..3 and sticks on the airline', () => {
