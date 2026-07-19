@@ -66,20 +66,32 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onClose }: Ci
     return e.city === cityId || (e.region !== null && e.region === city.region)
   })
 
-  // The five richest pairs from this city right now (80 demand evaluations —
-  // memoized so panel re-renders don't rescan the world).
+  // The richest pairs from this city right now (165 demand evaluations —
+  // memoized so panel re-renders don't rescan the world). Market $ = weekly
+  // demand × base fare: compare markets by money, not just bodies.
+  const network = networkCities(player)
   const pairs = useMemo(
     () =>
       CITIES.filter((c) => c.id !== cityId)
-        .map((c) => ({
-          to: c.id,
-          km: distanceKm(cityId, c.id),
-          demand: pairWeeklyDemand(state, cityId, c.id),
-          competitors: airlinesOnPair(state, cityId, c.id, 0),
-          mine: airlinesOnPair(state, cityId, c.id) - airlinesOnPair(state, cityId, c.id, 0) > 0,
-        }))
-        .sort((a, b) => b.demand - a.demand)
-        .slice(0, 5),
+        .map((c) => {
+          const km = distanceKm(cityId, c.id)
+          const demand = pairWeeklyDemand(state, cityId, c.id)
+          return {
+            to: c.id,
+            km,
+            demand,
+            marketK: Math.floor((demand * baseFare(km)) / 1000), // $k/wk
+            competitors: airlinesOnPair(state, cityId, c.id, 0),
+            mine: airlinesOnPair(state, cityId, c.id) - airlinesOnPair(state, cityId, c.id, 0) > 0,
+            openable:
+              (network.has(cityId) || network.has(c.id)) &&
+              slotsFree(player, cityId) > 0 &&
+              slotsFree(player, c.id) > 0,
+          }
+        })
+        .sort((a, b) => b.marketK - a.marketK)
+        .slice(0, 8),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, cityId],
   )
 
@@ -177,8 +189,17 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onClose }: Ci
         )}
       </div>
 
-      <h3>Top demand from here</h3>
+      <h3>Top markets from here</h3>
       <table className="city-pairs">
+        <thead>
+          <tr className="dim">
+            <th>pair</th>
+            <th>km</th>
+            <th>pax/wk</th>
+            <th title="weekly demand × base fare">market</th>
+            <th>status</th>
+          </tr>
+        </thead>
         <tbody>
           {pairs.map((p) => (
             <tr key={p.to}>
@@ -186,10 +207,16 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onClose }: Ci
                 {cityId}–{p.to}
               </td>
               <td>{p.km}km</td>
-              <td>{p.demand}/wk</td>
-              <td>~${baseFare(p.km)}</td>
+              <td>{p.demand}</td>
+              <td>${p.marketK}k</td>
               <td className="dim">
-                {p.mine ? 'yours' : p.competitors > 0 ? `${p.competitors} rival${p.competitors > 1 ? 's' : ''}` : 'open'}
+                {p.mine
+                  ? '✓ yours'
+                  : p.competitors > 0
+                    ? `⚔ ${p.competitors} rival${p.competitors > 1 ? 's' : ''}`
+                    : p.openable
+                      ? 'open now'
+                      : 'need slots'}
               </td>
             </tr>
           ))}

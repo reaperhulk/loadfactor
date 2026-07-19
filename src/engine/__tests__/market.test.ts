@@ -82,7 +82,7 @@ describe('market resolution', () => {
     withRoute(state, 0, 'JFK', 'ORD')
     const events: GameEvent[] = []
     const totals = resolveMarket(state, events)
-    expect(totals[0]).toEqual({ revenue: 0, cost: 0, pax: 0 })
+    expect(totals[0]).toMatchObject({ revenue: 0, cost: 0, pax: 0 })
   })
 
   it('competition splits a pair and cheaper fares win share', () => {

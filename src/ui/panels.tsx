@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { getAircraftType, typesOnSale } from '../data/aircraft'
 import { CITIES, distanceKm } from '../data/cities'
 import { NEG_MIN_SPEND } from '../data/constants'
-import type { GameEvent, GameState } from '../engine'
+import type { CostBreakdown, GameEvent, GameState } from '../engine'
 import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor } from '../engine/market'
 import {
   CABIN_REFIT_COST_BP,
@@ -21,10 +21,13 @@ import { inflationBp } from '../engine/market'
 import { negotiationDifficulty } from '../engine/negotiation'
 import {
   airlinesOnPair,
+  allocateTrips,
   cabinSeats,
   debtCeiling,
   effectiveFrequency,
   maxRouteFrequency,
+  resaleValue,
+  roundTripsPerWeek,
   slotsHeld,
   slotsUsed,
   totalDebt,
@@ -38,13 +41,69 @@ function money(k: number): string {
   return k >= 1000 || k <= -1000 ? `$${(k / 1000).toFixed(1)}M` : `$${k}k`
 }
 
+// Sort keys for the routes comparison table. Each computes from the same row
+// model the cells render, so what you sort is exactly what you see.
+type RouteSortKey = 'name' | 'km' | 'load' | 'revenue' | 'profit' | 'margin' | 'rivals'
+
 export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect: (routeId: number) => void }) {
   const player = state.airlines[0]!
+  const [sortKey, setSortKey] = useState<RouteSortKey>('profit')
+  const [sortAsc, setSortAsc] = useState(false)
   if (player.routes.length === 0) {
     return <p className="hint">No routes yet. Click a city on the map, then “Open route from here”.</p>
   }
   const networkOverhead = Math.floor(
     (ROUTE_OVERHEAD_QUAD * player.routes.length * player.routes.length * inflationBp(state.turn)) / 10000,
+  )
+  const rows = player.routes.map((r) => {
+    const prev = r.history.length >= 2 ? r.history[r.history.length - 2] : undefined
+    const profit = r.lastRevenue - r.lastCost
+    return {
+      route: r,
+      km: distanceKm(r.from, r.to),
+      planes: player.fleet.filter((a) => a.routeId === r.id).length,
+      rivals: airlinesOnPair(state, r.from, r.to, 0),
+      profit,
+      marginBp: r.lastRevenue > 0 ? Math.floor((profit * 10000) / r.lastRevenue) : 0,
+      profitTrend: prev === undefined ? 0 : profit - (prev.revenue - prev.cost),
+    }
+  })
+  const dir = sortAsc ? 1 : -1
+  rows.sort((a, b) => {
+    switch (sortKey) {
+      case 'name':
+        return dir * `${a.route.from}${a.route.to}`.localeCompare(`${b.route.from}${b.route.to}`)
+      case 'km':
+        return dir * (a.km - b.km)
+      case 'load':
+        return dir * (a.route.lastLoadFactorBp - b.route.lastLoadFactorBp)
+      case 'revenue':
+        return dir * (a.route.lastRevenue - b.route.lastRevenue)
+      case 'margin':
+        return dir * (a.marginBp - b.marginBp)
+      case 'rivals':
+        return dir * (a.rivals - b.rivals)
+      default:
+        return dir * (a.profit - b.profit)
+    }
+  })
+  const header = (key: RouteSortKey, label: string) => (
+    <th>
+      <button
+        className={`link-btn sort-btn${sortKey === key ? ' active' : ''}`}
+        data-testid={`sort-${key}`}
+        onClick={() => {
+          if (sortKey === key) setSortAsc(!sortAsc)
+          else {
+            setSortKey(key)
+            setSortAsc(key === 'name' || key === 'km')
+          }
+        }}
+      >
+        {label}
+        {sortKey === key ? (sortAsc ? ' ▲' : ' ▼') : ''}
+      </button>
+    </th>
   )
   return (
     <div>
@@ -55,25 +114,23 @@ export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect:
     <div className="table-scroll"><table>
       <thead>
         <tr>
-          <th>Route</th>
-          <th>km</th>
+          {header('name', 'Route')}
+          {header('km', 'km')}
           <th>Fare</th>
           <th>Service</th>
           <th>Planes</th>
           <th>Freq/wk</th>
-          <th>Rivals</th>
-          <th>Load</th>
-          <th>Rev</th>
-          <th>P&L</th>
+          {header('rivals', 'Rivals')}
+          {header('load', 'Load')}
+          {header('revenue', 'Rev')}
+          {header('margin', 'Margin')}
+          {header('profit', 'P&L')}
           <th />
         </tr>
       </thead>
       <tbody>
-        {player.routes.map((r) => {
-          const km = distanceKm(r.from, r.to)
-          const planes = player.fleet.filter((a) => a.routeId === r.id).length
+        {rows.map(({ route: r, km, planes, rivals: rivalsHere, profit, marginBp, profitTrend }) => {
           const freq = `${effectiveFrequency(player, r)}/${maxRouteFrequency(player, r)}`
-          const rivalsHere = airlinesOnPair(state, r.from, r.to, 0)
           return (
             <tr key={r.id} data-testid={`route-${r.from}-${r.to}`}>
               <td>
@@ -111,7 +168,7 @@ export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect:
               </td>
               <td>{planes}</td>
               <td>{freq}</td>
-              <td>{rivalsHere > 0 ? rivalsHere : '—'}</td>
+              <td className={rivalsHere > 0 ? 'neg' : 'dim'}>{rivalsHere > 0 ? `⚔ ${rivalsHere}` : '—'}</td>
               <td>
                 <span className="lf-bar">
                   <span className="lf-fill" style={{ width: `${r.lastLoadFactorBp / 100}%` }} />
@@ -119,8 +176,15 @@ export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect:
                 {(r.lastLoadFactorBp / 100).toFixed(0)}%
               </td>
               <td>{money(r.lastRevenue)}</td>
-              <td className={r.lastRevenue - r.lastCost >= 0 ? 'pos' : 'neg'}>
-                {money(r.lastRevenue - r.lastCost)}
+              <td className={marginBp >= 0 ? 'pos' : 'neg'}>{(marginBp / 100).toFixed(0)}%</td>
+              <td className={profit >= 0 ? 'pos' : 'neg'}>
+                {money(profit)}
+                {profitTrend !== 0 && (
+                  <span className={profitTrend > 0 ? 'pos' : 'neg'} title="vs previous quarter">
+                    {' '}
+                    {profitTrend > 0 ? '▲' : '▼'}
+                  </span>
+                )}
               </td>
               <td>
                 <button onClick={() => dispatch({ type: 'close_route', routeId: r.id })}>close</button>
@@ -144,6 +208,8 @@ export function FleetPanel({ state }: { state: GameState }) {
           <tr>
             <th>Aircraft</th>
             <th>Age</th>
+            <th title="round trips flown vs what this airframe could fly on its route">Utilization</th>
+            <th>Value</th>
             <th>Cabin</th>
             <th>Assignment</th>
           </tr>
@@ -151,13 +217,35 @@ export function FleetPanel({ state }: { state: GameState }) {
         <tbody>
           {player.fleet.map((a) => {
             const type = getAircraftType(a.type)
+            const route = player.routes.find((r) => r.id === a.routeId)
+            const alloc = route ? allocateTrips(player, route).find((x) => x.aircraftId === a.id) : undefined
+            const maxTrips = route ? roundTripsPerWeek(a.type, distanceKm(route.from, route.to)) : 0
+            const utilBp = alloc && maxTrips > 0 ? Math.floor((alloc.trips * 10000) / maxTrips) : 0
+            const geriatric = a.ageQuarters >= 48
             return (
               <tr key={a.id}>
                 <td>
                   {type.name} {a.leased && <span className="dim">(leased)</span>}{' '}
                   <span className="dim">({cabinSeats(a.type, a.cabin)} seats, {type.rangeKm}km)</span>
                 </td>
-                <td>{(a.ageQuarters / 4).toFixed(1)}y</td>
+                <td className={geriatric ? 'neg' : ''} title={geriatric ? 'maintenance hog — consider retiring' : undefined}>
+                  {(a.ageQuarters / 4).toFixed(1)}y
+                </td>
+                <td>
+                  {route ? (
+                    <>
+                      <span className="lf-bar">
+                        <span className="lf-fill" style={{ width: `${utilBp / 100}%` }} />
+                      </span>
+                      {Math.round(utilBp / 100)}%
+                    </>
+                  ) : (
+                    <span className="neg" title="idle metal still draws salaries and ownership">
+                      parked
+                    </span>
+                  )}
+                </td>
+                <td className="dim">{a.leased ? '—' : money(resaleValue(a.type, a.ageQuarters))}</td>
                 <td>
                   <select
                     value={a.cabin}
@@ -194,7 +282,7 @@ export function FleetPanel({ state }: { state: GameState }) {
           {player.orders.map((o) => (
             <tr key={`order-${o.id}`} className="dim">
               <td>{getAircraftType(o.type).name}</td>
-              <td colSpan={3}>on order — delivers in {o.quartersLeft} quarter(s)</td>
+              <td colSpan={5}>on order — delivers in {o.quartersLeft} quarter(s)</td>
             </tr>
           ))}
         </tbody>
@@ -244,15 +332,36 @@ function Shop({ state }: { state: GameState }) {
               <th>Price</th>
               {km !== null && <th>Est. cost/q here</th>}
               {km !== null && <th>Seats/wk here</th>}
+              {km !== null && <th title="quarterly cost divided by quarterly seats — lower is better">$/seat here</th>}
+              {km !== null && <th title="load factor where this airframe breaks even at your route's fare">B/E load</th>}
               <th />
             </tr>
           </thead>
           <tbody>
-            {typesOnSale(year).map((t) => {
-              const cost = km !== null ? estimateAircraftQuarterCost(state, t.id, km) : null
-              const seats = km !== null ? estimateWeeklySeats(t.id, km) : null
-              const outOfRange = km !== null && cost === -1
-              return (
+            {(() => {
+              // Compute the comparison rows once so the best value per
+              // column can be highlighted — comparison at a glance.
+              const rows = typesOnSale(year).map((t) => {
+                const cost = km !== null ? estimateAircraftQuarterCost(state, t.id, km) : null
+                const seats = km !== null ? estimateWeeklySeats(t.id, km) : null
+                const outOfRange = km !== null && cost === -1
+                // $ per seat per quarter and the breakeven load factor at
+                // this route's current fare (both honest engine estimates).
+                const seatsPerQuarter = seats !== null && seats > 0 ? seats * 13 : 0
+                const perSeat =
+                  !outOfRange && cost !== null && seatsPerQuarter > 0
+                    ? Math.round((cost * 1000) / seatsPerQuarter)
+                    : null
+                const fare = route && km !== null ? fareFor(km, route.fareLevel) : null
+                const breakevenBp =
+                  !outOfRange && cost !== null && fare !== null && seatsPerQuarter > 0
+                    ? Math.floor((cost * 1000 * 10000) / (seatsPerQuarter * fare))
+                    : null
+                return { t, cost, seats, outOfRange, perSeat, breakevenBp }
+              })
+              const bestPerSeat = Math.min(...rows.map((r) => r.perSeat ?? Infinity))
+              const bestBreakeven = Math.min(...rows.map((r) => r.breakevenBp ?? Infinity))
+              return rows.map(({ t, cost, seats, outOfRange, perSeat, breakevenBp }) => (
                 <tr key={t.id} className={outOfRange ? 'dim' : ''}>
                   <td>{t.name}</td>
                   <td>{t.seats}</td>
@@ -264,6 +373,27 @@ function Shop({ state }: { state: GameState }) {
                   <td>{money(t.price)}</td>
                   {km !== null && <td>{outOfRange ? 'out of range' : money(cost!)}</td>}
                   {km !== null && <td>{outOfRange ? '—' : seats}</td>}
+                  {km !== null && (
+                    <td className={perSeat !== null && perSeat === bestPerSeat ? 'pos' : ''}>
+                      {perSeat === null ? '—' : `$${perSeat}`}
+                    </td>
+                  )}
+                  {km !== null && (
+                    <td
+                      className={
+                        breakevenBp === null
+                          ? ''
+                          : breakevenBp === bestBreakeven
+                            ? 'pos'
+                            : breakevenBp > 10000
+                              ? 'neg'
+                              : ''
+                      }
+                      title={breakevenBp !== null && breakevenBp > 10000 ? 'cannot break even at this fare' : undefined}
+                    >
+                      {breakevenBp === null ? '—' : `${Math.round(breakevenBp / 100)}%`}
+                    </td>
+                  )}
                   <td>
                     <button
                       disabled={player.cash < t.price}
@@ -281,8 +411,8 @@ function Shop({ state }: { state: GameState }) {
                     </button>
                   </td>
                 </tr>
-              )
-            })}
+              ))
+            })()}
           </tbody>
         </table>
       </div>
@@ -388,6 +518,63 @@ export function AirportsPanel({ state }: { state: GameState }) {
   )
 }
 
+// Human labels for the cost buckets, in a stable presentation order.
+const COST_BUCKETS: readonly { key: keyof CostBreakdown; label: string }[] = [
+  { key: 'fuel', label: 'Fuel' },
+  { key: 'salaries', label: 'Crew salaries' },
+  { key: 'ownership', label: 'Ownership & leases' },
+  { key: 'maintenance', label: 'Maintenance' },
+  { key: 'fees', label: 'Landing fees' },
+  { key: 'service', label: 'Cabin service' },
+  { key: 'flightPay', label: 'Flight pay' },
+  { key: 'overhead', label: 'Overhead' },
+  { key: 'admin', label: 'Fleet admin' },
+  { key: 'interest', label: 'Interest' },
+]
+
+// Where the money went last quarter: exact engine attribution (the buckets
+// sum to reported costs), largest first, with proportional bars and the
+// quarter-over-quarter move per bucket.
+function CostStructure({ state }: { state: GameState }) {
+  const player = state.airlines[0]!
+  const now = player.history[player.history.length - 1]
+  const prev = player.history[player.history.length - 2]
+  if (!now || now.costs <= 0) return null
+  const rows = COST_BUCKETS.map((b) => ({
+    ...b,
+    value: now.breakdown[b.key],
+    prevValue: prev?.breakdown[b.key],
+  }))
+    .filter((r) => r.value > 0 || (r.prevValue ?? 0) > 0)
+    .sort((a, b) => b.value - a.value)
+  const max = Math.max(...rows.map((r) => r.value), 1)
+  return (
+    <div className="cost-structure" data-testid="cost-structure">
+      <h3>Cost structure — {money(now.costs)} last quarter</h3>
+      <table>
+        <tbody>
+          {rows.map((r) => {
+            const delta = r.prevValue === undefined ? null : r.value - r.prevValue
+            return (
+              <tr key={r.key}>
+                <td>{r.label}</td>
+                <td className="cost-bar-cell">
+                  <span className="cost-bar" style={{ width: `${Math.round((r.value * 100) / max)}%` }} />
+                </td>
+                <td>{money(r.value)}</td>
+                <td className="dim">{Math.round((r.value * 100) / now.costs)}%</td>
+                <td className={delta === null || delta === 0 ? 'dim' : delta > 0 ? 'neg' : 'pos'}>
+                  {delta === null || delta === 0 ? '±0' : delta > 0 ? `▲ ${money(delta)}` : `▼ ${money(-delta)}`}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export function FinancePanel({ state }: { state: GameState }) {
   const player = state.airlines[0]!
   const [amount, setAmount] = useState(5000)
@@ -413,6 +600,7 @@ export function FinancePanel({ state }: { state: GameState }) {
           </div>
         </div>
       )}
+      <CostStructure state={state} />
       <p>
         Debt {money(debt)} of {money(ceiling)} ceiling
       </p>

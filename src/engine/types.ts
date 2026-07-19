@@ -90,6 +90,21 @@ export interface PendingNegotiation {
   spend: number // $k, already paid at command time
 }
 
+// Where the quarter's money went, $k. Sums exactly to QuarterStats.costs —
+// every screen that explains costs draws from this, never from re-derivation.
+export interface CostBreakdown {
+  fuel: number
+  fees: number // landing + handling
+  flightPay: number // crew flight pay by block hour
+  service: number // per-pax cabin service
+  salaries: number // crew salaries per airframe, flying or not
+  ownership: number // depreciation+insurance on owned, lease payments on leased
+  maintenance: number
+  admin: number // per-airframe administration
+  overhead: number // airline overhead + quadratic route-count complexity
+  interest: number
+}
+
 export interface QuarterStats {
   turn: number
   cash: number
@@ -98,6 +113,7 @@ export interface QuarterStats {
   profit: number
   pax: number
   netWorth: number
+  breakdown: CostBreakdown
 }
 
 export interface Airline {
@@ -223,6 +239,7 @@ export type GameEvent =
       cash: number
       netWorth: number
       pax: number
+      breakdown: CostBreakdown
     }
   | { type: 'airline_bankrupt'; airline: number }
   | { type: 'game_over'; result: 'won' | 'lost'; reason: string }

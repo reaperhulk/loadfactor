@@ -150,6 +150,8 @@ export function routeShareWeight(airline: Airline, route: Route): number {
 }
 
 // Per-route weekly accumulator, finalized to quarterly numbers at the end.
+// Cost components are tracked separately (inflation already applied) so the
+// quarterly report can attribute every dollar; weeklyCost is their sum.
 interface RouteAcc {
   airlineIdx: number
   route: Route
@@ -159,13 +161,20 @@ interface RouteAcc {
   weeklyCapacity: number
   yieldBp: number // capacity-weighted cabin yield on revenue per pax
   weeklyRevenue: number // $
-  weeklyCost: number // $, flight + service, inflation already applied
+  weeklyFuel: number // $
+  weeklyFees: number // $
+  weeklyFlightPay: number // $
+  weeklyService: number // $
 }
 
 interface AirlineTotals {
   revenue: number // $k per quarter
   cost: number // $k per quarter (route-level costs only)
   pax: number // per quarter
+  fuel: number // $k — route-cost components, summing to cost
+  fees: number
+  flightPay: number
+  service: number
 }
 
 // Resolves every contested city pair, then routes connecting traffic over
@@ -173,7 +182,15 @@ interface AirlineTotals {
 // route_result events, and returns per-airline totals. Mutates state
 // (callers clone at the entry point).
 export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTotals[] {
-  const totals: AirlineTotals[] = state.airlines.map(() => ({ revenue: 0, cost: 0, pax: 0 }))
+  const totals: AirlineTotals[] = state.airlines.map(() => ({
+    revenue: 0,
+    cost: 0,
+    pax: 0,
+    fuel: 0,
+    fees: 0,
+    flightPay: 0,
+    service: 0,
+  }))
   const marketFuelBp = effFuelBp(state.world)
   const fuelBpFor = (idx: number): number => {
     const hedge = state.airlines[idx]!.fuelHedge
@@ -255,7 +272,8 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       }
       const weeklyCrew = Math.floor((weeklyCrewMin / 60) * CREW_COST_PER_BLOCK_HOUR)
       const weeklyService = weeklyPax * SERVICE_COST_PER_PAX[e.route.serviceLevel - 1]!
-      const inflated = Math.floor(((weeklyFees + weeklyCrew + weeklyService) * inflBp) / 10000)
+      // Each component inflates and floors separately so attribution sums
+      // exactly — the breakdown IS the cost, not an approximation of it.
       accs.set(accKey(e.airlineIdx, e.route.id), {
         airlineIdx: e.airlineIdx,
         route: e.route,
@@ -265,7 +283,10 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
         weeklyCapacity: e.weeklyCapacity,
         yieldBp: e.yieldBp,
         weeklyRevenue: Math.floor((weeklyPax * fare * e.yieldBp) / 10000),
-        weeklyCost: weeklyFuel + inflated,
+        weeklyFuel,
+        weeklyFees: Math.floor((weeklyFees * inflBp) / 10000),
+        weeklyFlightPay: Math.floor((weeklyCrew * inflBp) / 10000),
+        weeklyService: Math.floor((weeklyService * inflBp) / 10000),
       })
     }
   }
@@ -322,7 +343,7 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
           leg.weeklyPax += take
           leg.weeklyTransfer += take
           leg.weeklyRevenue += Math.floor((take * legFare * leg.yieldBp) / 10000)
-          leg.weeklyCost += legService
+          leg.weeklyService += legService
         }
       }
     }
@@ -334,7 +355,12 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       const acc = accs.get(accKey(airline.id, route.id))
       if (!acc) continue
       const revenue = Math.floor((acc.weeklyRevenue * WEEKS_PER_QUARTER) / 1000)
-      const cost = Math.floor((acc.weeklyCost * WEEKS_PER_QUARTER) / 1000)
+      const q = (weekly: number) => Math.floor((weekly * WEEKS_PER_QUARTER) / 1000)
+      const fuel = q(acc.weeklyFuel)
+      const fees = q(acc.weeklyFees)
+      const flightPay = q(acc.weeklyFlightPay)
+      const service = q(acc.weeklyService)
+      const cost = fuel + fees + flightPay + service
       const quarterPax = acc.weeklyPax * WEEKS_PER_QUARTER
       const transferPax = acc.weeklyTransfer * WEEKS_PER_QUARTER
       route.lastPax = quarterPax
@@ -357,6 +383,10 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       totals[airline.id]!.revenue += revenue
       totals[airline.id]!.cost += cost
       totals[airline.id]!.pax += quarterPax
+      totals[airline.id]!.fuel += fuel
+      totals[airline.id]!.fees += fees
+      totals[airline.id]!.flightPay += flightPay
+      totals[airline.id]!.service += service
       events.push({
         type: 'route_result',
         airline: airline.id,

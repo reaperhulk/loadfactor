@@ -1,87 +1,87 @@
 {
   "greedy-alpha": {
     "checkpointHashes": {
-      "10": "af0bf2de",
-      "20": "f93a1116",
-      "30": "eebafa30",
-      "40": "900922d6"
+      "10": "fa6e7749",
+      "20": "dc8efc91",
+      "30": "78f1953f",
+      "40": "44be50d8"
     },
     "summary": {
       "turn": 40,
       "phase": "planning",
-      "cash": 1099319,
-      "netWorth": 1223799,
+      "cash": 1100515,
+      "netWorth": 1224995,
       "routes": 12,
       "fleet": 20,
-      "quarterlyProfit": -9165
+      "quarterlyProfit": -9109
     }
   },
   "greedy-beta": {
     "checkpointHashes": {
-      "10": "03fe8de3",
-      "20": "82cbf758",
-      "30": "279bf1fb",
-      "40": "d8355b0b"
+      "10": "f61c545e",
+      "20": "cf26471c",
+      "30": "8e9cc7b1",
+      "40": "1d1f8b33"
     },
     "summary": {
       "turn": 40,
       "phase": "planning",
-      "cash": 1385007,
-      "netWorth": 1509487,
+      "cash": 1386202,
+      "netWorth": 1510682,
       "routes": 14,
       "fleet": 20,
-      "quarterlyProfit": 84837
+      "quarterlyProfit": 84894
     }
   },
   "naive-alpha": {
     "checkpointHashes": {
-      "10": "9207d492",
-      "20": "7fde6862",
-      "30": "b5b96cf7",
-      "40": "32da74dc"
+      "10": "c092e742",
+      "20": "bd1d2d9e",
+      "30": "0a90deef",
+      "40": "d66d1e25"
     },
     "summary": {
       "turn": 40,
       "phase": "planning",
-      "cash": 154871,
-      "netWorth": 158951,
+      "cash": 155068,
+      "netWorth": 159148,
       "routes": 2,
       "fleet": 2,
-      "quarterlyProfit": -3602
+      "quarterlyProfit": -3597
     }
   },
   "oil-crisis-greedy": {
     "checkpointHashes": {
-      "10": "9c09f485",
-      "20": "6083344f",
-      "30": "69c70bfb",
-      "40": "86339948"
+      "10": "d6c4dbe8",
+      "20": "35adf5e6",
+      "30": "239301c0",
+      "40": "9a50e508"
     },
     "summary": {
       "turn": 40,
       "phase": "planning",
-      "cash": 790151,
-      "netWorth": 1020573,
+      "cash": 790824,
+      "netWorth": 1021250,
       "routes": 9,
       "fleet": 11,
-      "quarterlyProfit": 8661
+      "quarterlyProfit": 8691
     }
   },
   "deregulation-greedy": {
     "checkpointHashes": {
-      "10": "edb5a66e",
-      "20": "0bf6151b",
-      "30": "c69d6a07",
-      "40": "a880798c"
+      "10": "9e3a61f6",
+      "20": "6be74b8f",
+      "30": "9b306101",
+      "40": "6b833294"
     },
     "summary": {
       "turn": 40,
       "phase": "planning",
-      "cash": 648525,
-      "netWorth": 748735,
+      "cash": 649167,
+      "netWorth": 749377,
       "routes": 7,
       "fleet": 7,
-      "quarterlyProfit": 26672
+      "quarterlyProfit": 26696
     }
   }
 }

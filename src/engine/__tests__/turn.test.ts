@@ -36,6 +36,9 @@ describe('quarter resolution', () => {
       expect(report.profit).toBe(report.revenue - report.costs)
       expect(after.airlines[0]!.cash - before).toBe(report.profit)
       expect(report.cash).toBe(after.airlines[0]!.cash)
+      // The breakdown IS the cost: buckets sum exactly to the total.
+      const bucketSum = Object.values(report.breakdown).reduce((a, b) => a + b, 0)
+      expect(bucketSum).toBe(report.costs)
       state = after
     }
   })

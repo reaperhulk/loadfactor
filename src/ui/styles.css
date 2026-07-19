@@ -150,6 +150,16 @@ button:disabled {
   background: #1d2740e6;
 }
 
+/* Narrow screens: the control column would outgrow the short map and blanket
+   the tab bar below — lay it along the map's bottom edge instead. */
+@media (max-width: 640px) {
+  .map-controls {
+    flex-direction: row;
+    top: auto;
+    bottom: 10px;
+  }
+}
+
 .city {
   cursor: pointer;
 }
@@ -263,6 +273,44 @@ button:disabled {
 /* A pair a rival also serves: your arc runs hot. */
 .route-player.route-contested {
   stroke: #e08a4a;
+}
+
+/* Data lenses recolor your arcs by metric; when a lens is on it wins over
+   the contested tint (declared later on purpose). */
+.route-player.lens-good {
+  stroke: #4fae62;
+}
+.route-player.lens-mid {
+  stroke: #d0a94f;
+}
+.route-player.lens-bad {
+  stroke: #d0636e;
+}
+
+.sort-btn {
+  font: inherit;
+  color: inherit;
+}
+.sort-btn.active {
+  color: var(--accent);
+}
+
+/* Cost structure: proportional bars, largest bucket = full width. */
+.cost-structure td {
+  padding: 2px 8px 2px 0;
+  white-space: nowrap;
+}
+.cost-bar-cell {
+  width: 30%;
+  min-width: 80px;
+}
+.cost-bar {
+  display: inline-block;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.75;
+  min-width: 2px;
 }
 
 .rival-chip {

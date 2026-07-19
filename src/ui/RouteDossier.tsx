@@ -101,6 +101,36 @@ export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
         {elasticityBp >= 10000 ? 'attracts' : 'sheds'} {Math.abs((elasticityBp - 10000) / 100).toFixed(0)}% of demand
       </div>
 
+      {route.history.length >= 2 && (
+        <details className="dossier-history">
+          <summary className="dim">Quarter by quarter ({Math.min(8, route.history.length)}q)</summary>
+          <table>
+            <thead>
+              <tr className="dim">
+                <th>q</th>
+                <th>pax</th>
+                <th>conn</th>
+                <th>load</th>
+                <th>rev</th>
+                <th>P&L</th>
+              </tr>
+            </thead>
+            <tbody>
+              {route.history.slice(-8).map((h) => (
+                <tr key={h.turn}>
+                  <td className="dim">t{h.turn}</td>
+                  <td>{h.pax.toLocaleString('en-US')}</td>
+                  <td className="dim">{h.transferPax}</td>
+                  <td>{(h.loadFactorBp / 100).toFixed(0)}%</td>
+                  <td>{money(h.revenue)}</td>
+                  <td className={h.revenue - h.cost >= 0 ? 'pos' : 'neg'}>{money(h.revenue - h.cost)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
+
       <h3>Controls</h3>
       <div className="dossier-controls">
         <span data-testid="dossier-frequency">

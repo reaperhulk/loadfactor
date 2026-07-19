@@ -68,7 +68,7 @@ test('the city panel shows stats and negotiates in context', async ({ page }) =>
   await expect(panel).toBeVisible()
   await expect(panel).toContainText('Los Angeles')
   await expect(page.getByTestId('city-slots')).toContainText('pool 30')
-  await expect(panel).toContainText('Top demand from here')
+  await expect(panel).toContainText('Top markets from here')
   // Negotiate for slots straight from the dossier.
   await page.getByTestId('negotiate-spend').fill('1500')
   await page.getByTestId('panel-negotiate').click()

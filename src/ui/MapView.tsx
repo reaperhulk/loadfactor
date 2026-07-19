@@ -168,6 +168,17 @@ export function MapView({
   const flownRoutes = player.routes.filter((r) => player.fleet.some((a) => a.routeId === r.id))
   const network = networkCities(player)
   const [showRivals, setShowRivals] = useState(true)
+  // Data lens: recolor your arcs by an operational metric so the network's
+  // health reads at a glance.
+  const [lens, setLens] = useState<'none' | 'load' | 'profit'>('none')
+  const lensClass = (r: Route): string => {
+    if (lens === 'none' || r.lastCapacity === 0) return ''
+    if (lens === 'load') {
+      return r.lastLoadFactorBp >= 8000 ? ' lens-good' : r.lastLoadFactorBp >= 5500 ? ' lens-mid' : ' lens-bad'
+    }
+    const marginBp = r.lastRevenue > 0 ? Math.floor(((r.lastRevenue - r.lastCost) * 10000) / r.lastRevenue) : -1
+    return marginBp >= 1500 ? ' lens-good' : marginBp >= 0 ? ' lens-mid' : ' lens-bad'
+  }
   // Every pair any rival serves — player arcs on these run contested-hot.
   const rivalPairs = new Set(
     state.airlines.slice(1).flatMap((a) => a.routes.map((r) => pairKey(r.from, r.to))),
@@ -349,7 +360,7 @@ export function MapView({
               <path
                 d={arcPath(r.from, r.to)}
                 pathLength={1}
-                className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}${contested ? ' route-contested' : ''}`}
+                className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
                 data-testid={isNew ? 'route-line-new' : undefined}
                 onClick={() => {
                   if (suppressClick.current) {
@@ -489,6 +500,15 @@ export function MapView({
           onClick={() => setShowRivals((v) => !v)}
         >
           ⚔
+        </button>
+        <button
+          data-testid="map-lens"
+          aria-label={`data lens: ${lens === 'none' ? 'off' : lens === 'load' ? 'load factor' : 'profit'} — click to cycle`}
+          title={`lens: ${lens === 'none' ? 'off' : lens === 'load' ? 'load factor' : 'P&L'}`}
+          className={lens !== 'none' ? 'active' : ''}
+          onClick={() => setLens(lens === 'none' ? 'load' : lens === 'load' ? 'profit' : 'none')}
+        >
+          {lens === 'profit' ? '$' : '◐'}
         </button>
       </div>
     </div>

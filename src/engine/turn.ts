@@ -104,7 +104,20 @@ export function endQuarter(prev: GameState): EngineResult {
   // 5. Route economics.
   const totals = resolveMarket(state, events)
 
-  // 6. Financials.
+  // 6. Financials. Every cost lands in a named breakdown bucket; the total
+  // is the sum of the buckets, never a separate number.
+  const ZERO_BREAKDOWN = {
+    fuel: 0,
+    fees: 0,
+    flightPay: 0,
+    service: 0,
+    salaries: 0,
+    ownership: 0,
+    maintenance: 0,
+    admin: 0,
+    overhead: 0,
+    interest: 0,
+  }
   for (const airline of state.airlines) {
     if (airline.bankrupt) {
       airline.history.push({
@@ -115,36 +128,56 @@ export function endQuarter(prev: GameState): EngineResult {
         profit: 0,
         pax: 0,
         netWorth: 0,
+        breakdown: { ...ZERO_BREAKDOWN },
       })
       continue
     }
     const t = totals[airline.id]!
-    // Overhead, maintenance, and admin inflate with the era (market.ts
-    // inflates the per-route operating costs); ownership tracks list price.
-    // Management complexity: sprawl carries a quadratic overhead.
-    let inflatable =
-      AIRLINE_OVERHEAD_PER_QUARTER + ROUTE_OVERHEAD_QUAD * airline.routes.length * airline.routes.length
-    let fixedCosts = 0
+    // Overhead, maintenance, admin, and salaries inflate with the era
+    // (market.ts inflates the per-route operating costs); ownership and
+    // lease payments track list price. Sprawl carries a quadratic overhead.
+    const inflate = (v: number) => Math.floor((v * inflationBp(state.turn)) / 10000)
+    let maintenance = 0
+    let admin = 0
+    let salaries = 0
+    let ownership = 0
     for (const ac of airline.fleet) {
       const type = getAircraftType(ac.type)
-      inflatable += Math.floor((type.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * ac.ageQuarters)) / 10000)
-      inflatable += AIRCRAFT_ADMIN_PER_QUARTER
+      maintenance += inflate(
+        Math.floor((type.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * ac.ageQuarters)) / 10000),
+      )
+      admin += inflate(AIRCRAFT_ADMIN_PER_QUARTER)
       // Crews are salaried per airframe whether it flies or not — parking
       // the schedule saves fuel and fees, never the payroll.
-      inflatable += Math.floor((type.price * CREW_SALARY_BP_PER_QUARTER) / 10000)
+      salaries += inflate(Math.floor((type.price * CREW_SALARY_BP_PER_QUARTER) / 10000))
       // Owned airframes carry ownership (depreciation+insurance); leased ones
       // pay the lessor instead.
-      fixedCosts += ac.leased
+      ownership += ac.leased
         ? Math.floor((type.price * LEASE_BP_PER_QUARTER) / 10000)
         : Math.floor((type.price * OWNERSHIP_BP_PER_QUARTER) / 10000)
     }
-    fixedCosts += Math.floor((inflatable * inflationBp(state.turn)) / 10000)
+    const overhead = inflate(
+      AIRLINE_OVERHEAD_PER_QUARTER + ROUTE_OVERHEAD_QUAD * airline.routes.length * airline.routes.length,
+    )
     let interest = 0
     for (const loan of airline.loans) {
       interest += Math.floor((loan.principal * loan.annualRateBp) / 4 / 10000)
     }
+    const breakdown = {
+      fuel: t.fuel,
+      fees: t.fees,
+      flightPay: t.flightPay,
+      service: t.service,
+      salaries,
+      ownership,
+      maintenance,
+      admin,
+      overhead,
+      interest,
+    }
     const revenue = t.revenue
-    const costs = t.cost + fixedCosts + interest
+    const costs =
+      t.cost + salaries + ownership + maintenance + admin + overhead + interest
     const profit = revenue - costs
     airline.cash += profit
 
@@ -165,6 +198,7 @@ export function endQuarter(prev: GameState): EngineResult {
       profit,
       pax: t.pax,
       netWorth: netWorth(airline),
+      breakdown,
     })
 
     events.push({
@@ -177,6 +211,7 @@ export function endQuarter(prev: GameState): EngineResult {
       cash: airline.cash,
       netWorth: netWorth(airline),
       pax: t.pax,
+      breakdown,
     })
 
     if (airline.insolventQuarters >= INSOLVENCY_QUARTERS_TO_FAIL) {
