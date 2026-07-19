@@ -156,6 +156,18 @@ test('wheel over the map zooms without scrolling the page', async ({ page }) => 
   expect(await page.evaluate(() => window.scrollY)).toBe(0)
 })
 
+test('the opportunities list plans a route in one click', async ({ page }) => {
+  await startGame(page)
+  await page.getByTestId('tab-routes').click()
+  await expect(page.getByTestId('opportunities')).toContainText('JFK–ORD')
+  await expect(page.getByTestId('negotiation-targets')).toContainText('Worth negotiating')
+  await page.getByTestId('plan-JFK-ORD').click()
+  await expect(page.getByTestId('route-setup')).toBeVisible()
+  await expect(page.getByTestId('route-setup')).toContainText('Open JFK–ORD')
+  await page.getByTestId('route-setup-cancel').click()
+  await expect(page.getByTestId('route-setup')).toHaveCount(0)
+})
+
 test('airline identity: name, livery, and a custom HQ with derived footholds', async ({ page }) => {
   await page.goto('/')
   await page.getByTestId('airline-name').fill('Pan Galactic')

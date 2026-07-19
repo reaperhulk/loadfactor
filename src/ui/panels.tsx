@@ -265,7 +265,28 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
   }
   rows.sort((x, y) => y.marketK - x.marketK)
   const top = rows.slice(0, 5)
-  if (top.length === 0) return null
+  // Where to expand next: the richest markets from your network you have NO
+  // slots for yet — negotiation targets, ranked by the same market dollars.
+  const networkList = [...network].sort()
+  const negotiable: { from: string; to: string; marketK: number }[] = []
+  for (const c of CITIES) {
+    if (slotsHeld(player, c.id) > 0) continue
+    if (slotsAllocated(state, c.id) >= c.slotPool) continue
+    let bestFrom = ''
+    let bestMarket = 0
+    for (const a of networkList) {
+      const km = distanceKm(a, c.id)
+      if (km < MIN_ROUTE_KM) continue
+      const m = Math.floor((pairWeeklyDemand(state, a, c.id) * baseFare(km)) / 1000)
+      if (m > bestMarket) {
+        bestMarket = m
+        bestFrom = a
+      }
+    }
+    if (bestFrom !== '') negotiable.push({ from: bestFrom, to: c.id, marketK: bestMarket })
+  }
+  negotiable.sort((x, y) => y.marketK - x.marketK)
+  if (top.length === 0 && negotiable.length === 0) return null
   return (
     <div data-testid="opportunities">
       <h3>Opportunities — unserved pairs you hold slots for</h3>
@@ -296,6 +317,16 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
           </tbody>
         </table>
       </div>
+      {negotiable.length > 0 && (
+        <p className="dim" data-testid="negotiation-targets">
+          Worth negotiating:{' '}
+          {negotiable
+            .slice(0, 3)
+            .map((n) => `${n.to} (${money(n.marketK)}/wk vs ${n.from})`)
+            .join(' · ')}{' '}
+          — win slots there from the airports tab or the city panel.
+        </p>
+      )}
     </div>
   )
 }
