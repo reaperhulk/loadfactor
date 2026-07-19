@@ -66,8 +66,17 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           {savedRows.map(({ save, slot }, i) => (
             <p key={slot} className="save-row" data-testid={`save-slot-${slot}`}>
               <span>
-                {save!.player?.name ?? 'Your airline'} <span className="dim">— {save!.scenario} · seed “{save!.seed}” ·{' '}
-                {save!.commands.filter((c) => c.type === 'end_quarter').length} quarters</span>
+                {save!.player?.name ?? 'Your airline'}{' '}
+                <span className="dim">
+                  — {(() => {
+                    try {
+                      return getScenario(save!.scenario).name
+                    } catch {
+                      return save!.scenario
+                    }
+                  })()}{' '}
+                  · seed “{save!.seed}” · {save!.commands.filter((c) => c.type === 'end_quarter').length} quarters
+                </span>
               </span>{' '}
               <button data-testid={i === 0 ? 'continue-save' : `continue-save-${slot}`} onClick={() => resumeSave(slot)}>
                 Continue

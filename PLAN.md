@@ -316,6 +316,15 @@ committing).
 - **M6 — Presentation.** Period styling, map polish, sound, PWA install,
   shareable replay links.
 
+**Status:** M0–M4 landed; M5 is live with four scenarios (Jet Age, Oil
+Crisis, Deregulation, Open Skies), the daily seed challenge, and a hall of
+fame; M6's presentation layer is largely in place (decade-tinted map, globe
+projection, ambient traffic that wears its metal, sound, PWA). Systems
+added beyond this ladder through the iteration loop: brand/marketing in
+the share battle, route spool-up with market memory, hemisphere
+seasonality, world index history, three save slots with JSON
+export/import, and TSV spreadsheet exports of every comparison table.
+
 ## 9. Risks & mitigations
 
 - **Economic model degenerates** (one dominant strategy). Mitigation: the
