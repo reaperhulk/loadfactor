@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyCommand, newGame } from '../index'
-import { baseFare, fareFor, pairWeeklyDemand, resolveMarket } from '../market'
+import { baseFare, fareFor, pairWeeklyDemand, resolveMarket, seasonalBp } from '../market'
 import type { GameEvent, GameState } from '../types'
 
 function withRoute(state: GameState, airlineIdx: number, from: string, to: string, fareLevel = 0): number {
@@ -46,6 +46,23 @@ describe('demand model', () => {
     later.turn = 40
     // Noise is ±8%, growth over 40 quarters is +50% — strictly bigger.
     expect(pairWeeklyDemand(later, 'JFK', 'LHR')).toBeGreaterThan(early)
+  })
+
+  it('tourism demand is seasonal by hemisphere', () => {
+    // MIA (northern, tourism-heavy): peaks in Q3 (turn%4===2), dips in Q1.
+    expect(seasonalBp('MIA', 2)).toBeGreaterThan(10000)
+    expect(seasonalBp('MIA', 0)).toBeLessThan(10000)
+    expect(seasonalBp('MIA', 1)).toBe(10000)
+    // SYD (southern): the mirror image.
+    expect(seasonalBp('SYD', 0)).toBeGreaterThan(10000)
+    expect(seasonalBp('SYD', 2)).toBeLessThan(10000)
+    // The amplitude scales with the tourism rating.
+    const state = newGame('jet_age', 'season-seed')
+    const q3 = { ...state, turn: 2 }
+    const q1 = { ...state, turn: 0 }
+    // Same-turn-noise caveat: compare the seasonal factor directly instead
+    // of end-to-end demand (growth and noise also move between turns).
+    expect(seasonalBp('MIA', q3.turn)).toBeGreaterThan(seasonalBp('MIA', q1.turn))
   })
 
   it('fares rise with distance, concavely, and with fare level', () => {

@@ -37,6 +37,7 @@ import {
   ROUTE_HISTORY_QUARTERS,
   ROUTE_MEMORY_QUARTERS,
   ROUTE_SPOOL_BP,
+  SEASON_TOUR_BP_PER_POINT,
   SERVICE_COST_PER_PAX,
   SERVICE_LEVEL_WEIGHT,
   WEEKS_PER_QUARTER,
@@ -107,6 +108,20 @@ export function fareFor(km: number, fareLevel: number): number {
   return Math.floor((baseFare(km) * FARE_LEVEL_PRICE_BP[fareLevel + 2]!) / 10000)
 }
 
+// Seasonal demand multiplier for a city at a turn: tourism peaks in the
+// city's summer quarter (Q3 north, Q1 south) and dips in its winter.
+// Exported so the UI can annotate city dossiers honestly.
+export function seasonalBp(cityId: string, turn: number): number {
+  const c = getCity(cityId)
+  const amp = c.tour * SEASON_TOUR_BP_PER_POINT
+  const q = (turn % 4) + 1
+  const peak = c.lat >= 0 ? 3 : 1
+  const trough = c.lat >= 0 ? 1 : 3
+  if (q === peak) return 10000 + amp
+  if (q === trough) return 10000 - amp
+  return 10000
+}
+
 // Total weekly pax demand on a city pair (both directions summed).
 export function pairWeeklyDemand(state: GameState, a: string, b: string): number {
   const raw = cityMass(a) * cityMass(b) - DEMAND_MASS_FLOOR
@@ -121,6 +136,8 @@ export function pairWeeklyDemand(state: GameState, a: string, b: string): number
   demand = Math.floor((demand * growthBp) / 10000)
   demand = Math.floor((demand * cityDemandModBp(state.world, a, getCity(a).region)) / 10000)
   demand = Math.floor((demand * cityDemandModBp(state.world, b, getCity(b).region)) / 10000)
+  demand = Math.floor((demand * seasonalBp(a, state.turn)) / 10000)
+  demand = Math.floor((demand * seasonalBp(b, state.turn)) / 10000)
   demand = Math.floor((demand * hashNoiseBp(state.seed, state.turn, pairKey(a, b), DEMAND_NOISE_SPREAD_BP)) / 10000)
   return demand
 }

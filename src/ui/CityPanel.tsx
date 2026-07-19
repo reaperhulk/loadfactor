@@ -4,10 +4,10 @@
 
 import { useMemo, useState } from 'react'
 import { CITIES, distanceKm, getCity } from '../data/cities'
-import { NEG_MIN_SPEND, SLOT_IDLE_QUARTERS_TO_LOSE, SLOT_IDLE_THRESHOLD } from '../data/constants'
+import { NEG_MIN_SPEND, SEASON_TOUR_BP_PER_POINT, SLOT_IDLE_QUARTERS_TO_LOSE, SLOT_IDLE_THRESHOLD } from '../data/constants'
 import { getEventDef } from '../data/events'
 import type { GameState } from '../engine'
-import { baseFare, pairWeeklyDemand } from '../engine/market'
+import { baseFare, pairWeeklyDemand, seasonalBp } from '../engine/market'
 import { negotiationDifficulty, scarcityChanceBp } from '../engine/negotiation'
 import { airlinesOnPair, networkCities, slotsAllocated, slotsFree, slotsHeld, slotsUsed } from '../engine/queries'
 import { cityMass, cityTier } from './MapView'
@@ -115,6 +115,18 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onClose }: Ci
       <Rating label="population" value={city.pop} />
       <Rating label="business" value={city.biz} />
       <Rating label="tourism" value={city.tour} />
+      {city.tour >= 4 && (
+        <p className="dim" data-testid="city-season">
+          Season: tourism demand peaks Q{city.lat >= 0 ? 3 : 1} (+
+          {((city.tour * SEASON_TOUR_BP_PER_POINT) / 100).toFixed(1)}%), dips Q{city.lat >= 0 ? 1 : 3}
+          {seasonalBp(city.id, state.turn) !== 10000 && (
+            <strong className={seasonalBp(city.id, state.turn) > 10000 ? 'pos' : 'neg'}>
+              {' '}
+              — {seasonalBp(city.id, state.turn) > 10000 ? 'in season now' : 'off season now'}
+            </strong>
+          )}
+        </p>
+      )}
 
       {activeEvents.length > 0 && (
         <div className="city-events">

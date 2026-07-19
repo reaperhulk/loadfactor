@@ -9,7 +9,7 @@ export interface City {
   id: string
   name: string
   region: Region
-  lat: number // presentation only — the engine never does trig, see PLAN.md §3.2
+  lat: number // projection is presentation-only (no trig in engine, PLAN.md §3.2); the SIGN feeds hemisphere seasonality
   lon: number
   pop: number // 1–10 authored demand ratings
   biz: number

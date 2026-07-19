@@ -81,6 +81,11 @@ export const ROUTE_SPOOL_BP = [8200, 9200, 9700] as const
 // the spool — travelers still know the product. Only genuinely new markets
 // (or long-abandoned ones) ramp.
 export const ROUTE_MEMORY_QUARTERS = 8
+// Seasonality: tourism demand peaks in a city's summer quarter and dips in
+// its winter (hemisphere by latitude sign; Q3 is northern summer). Amplitude
+// scales with the city's tourism rating — beach towns breathe, business
+// capitals barely notice.
+export const SEASON_TOUR_BP_PER_POINT = 60
 // Minutes of weekly block time one airframe can fly.
 export const WEEKLY_BLOCK_MINUTES = 6000
 export const MIN_ROUTE_KM = 300

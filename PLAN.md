@@ -93,6 +93,10 @@ points where precision matters).
 - **Load factor & revenue.** Pax flown = min(share of pair demand adjusted by
   fare elasticity, capacity). Load factor = pax/capacity. Revenue = pax ×
   fare (distance-based base × fare-level multiplier).
+- **Seasonality.** Tourism demand peaks in a city's summer quarter and dips
+  in its winter (hemisphere by latitude sign, Q3 north / Q1 south), amplitude
+  scaling with the tourism rating (`SEASON_TOUR_BP_PER_POINT`). Beach towns
+  breathe with the calendar; business capitals barely notice.
 - **Spool-up.** A route attaches only part of its demand share for its first
   quarters flown (`ROUTE_SPOOL_BP`, monopoly or contested alike) — travelers
   have to learn it exists. Incumbency is worth something, and a raid takes
