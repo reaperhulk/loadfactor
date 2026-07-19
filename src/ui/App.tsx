@@ -463,7 +463,13 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         <span className="key-hints">space = end quarter · 1–6 = panels · esc = deselect</span>
       </nav>
       <section className="panel">
-        {tab === 'routes' && <RoutesPanel state={state} onInspect={inspectRoute} />}
+        {tab === 'routes' && (
+          <RoutesPanel
+            state={state}
+            onInspect={inspectRoute}
+            onPlan={(from, to) => setPendingRoute({ from, to })}
+          />
+        )}
         {tab === 'fleet' && <FleetPanel state={state} />}
         {tab === 'airports' && <AirportsPanel state={state} />}
         {tab === 'rivals' && <RivalsPanel state={state} />}

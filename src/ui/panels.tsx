@@ -49,12 +49,27 @@ import { CabinLegend, ServiceLegend } from './legends'
 // model the cells render, so what you sort is exactly what you see.
 type RouteSortKey = 'name' | 'km' | 'load' | 'revenue' | 'profit' | 'margin' | 'rivals'
 
-export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect: (routeId: number) => void }) {
+export function RoutesPanel({
+  state,
+  onInspect,
+  onPlan,
+}: {
+  state: GameState
+  onInspect: (routeId: number) => void
+  onPlan?: (from: string, to: string) => void
+}) {
   const player = state.airlines[0]!
   const [sortKey, setSortKey] = useState<RouteSortKey>('profit')
   const [sortAsc, setSortAsc] = useState(false)
   if (player.routes.length === 0) {
-    return <p className="hint">No routes yet. Click a city on the map, then “Open route from here”.</p>
+    // Even before the first route, the opportunities list is the guidance
+    // that matters most.
+    return (
+      <div>
+        <p className="hint">No routes yet. Click a city on the map, then “Open route from here”.</p>
+        <Opportunities state={state} onPlan={onPlan} />
+      </div>
+    )
   }
   const networkOverhead = Math.floor(
     (ROUTE_OVERHEAD_QUAD * player.routes.length * player.routes.length * inflationBp(state.turn)) / 10000,
@@ -211,14 +226,14 @@ export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect:
       </tbody>
     </table></div>
     <ServiceLegend />
-    <Opportunities state={state} />
+    <Opportunities state={state} onPlan={onPlan} />
     </div>
   )
 }
 
 // The planning tool the bots keep to themselves: the richest unserved pairs
 // you could open from your current slots and network, market-dollars first.
-function Opportunities({ state }: { state: GameState }) {
+function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: string, to: string) => void }) {
   const player = state.airlines[0]!
   const network = networkCities(player)
   const cities = slotCities(player)
@@ -269,6 +284,13 @@ function Opportunities({ state }: { state: GameState }) {
                   {r.rivals > 0 ? `⚔ ${r.rivals} rival${r.rivals > 1 ? 's' : ''}` : 'open market'}
                 </td>
                 <td className="dim">{r.km > idleReach ? 'needs an idle aircraft with range' : 'launchable now'}</td>
+                <td>
+                  {onPlan && r.km <= idleReach && (
+                    <button data-testid={`plan-${r.from}-${r.to}`} onClick={() => onPlan(r.from, r.to)}>
+                      plan ✈
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
