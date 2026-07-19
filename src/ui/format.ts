@@ -31,5 +31,6 @@ export const COST_LABELS: Record<keyof CostBreakdown, string> = {
   maintenance: 'Maintenance',
   admin: 'Fleet admin',
   overhead: 'Overhead',
+  marketing: 'Marketing',
   interest: 'Interest',
 }

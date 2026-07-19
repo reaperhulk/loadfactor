@@ -9,6 +9,8 @@ import {
   CREW_SALARY_BP_PER_QUARTER,
   INSOLVENCY_QUARTERS_TO_FAIL,
   LEASE_BP_PER_QUARTER,
+  MARKETING_BASE_PER_LEVEL,
+  MARKETING_PER_ROUTE_PER_LEVEL,
   SLOT_IDLE_QUARTERS_TO_LOSE,
   SLOT_IDLE_THRESHOLD,
   MAINT_AGE_BP_PER_QUARTER,
@@ -116,6 +118,7 @@ export function endQuarter(prev: GameState): EngineResult {
     maintenance: 0,
     admin: 0,
     overhead: 0,
+    marketing: 0,
     interest: 0,
   }
   for (const airline of state.airlines) {
@@ -159,6 +162,10 @@ export function endQuarter(prev: GameState): EngineResult {
     const overhead = inflate(
       AIRLINE_OVERHEAD_PER_QUARTER + ROUTE_OVERHEAD_QUAD * airline.routes.length * airline.routes.length,
     )
+    // Brand spend: priced per level against network size (see constants).
+    const marketing =
+      airline.marketing *
+      inflate(MARKETING_BASE_PER_LEVEL + MARKETING_PER_ROUTE_PER_LEVEL * airline.routes.length)
     let interest = 0
     for (const loan of airline.loans) {
       interest += Math.floor((loan.principal * loan.annualRateBp) / 4 / 10000)
@@ -173,11 +180,12 @@ export function endQuarter(prev: GameState): EngineResult {
       maintenance,
       admin,
       overhead,
+      marketing,
       interest,
     }
     const revenue = t.revenue
     const costs =
-      t.cost + salaries + ownership + maintenance + admin + overhead + interest
+      t.cost + salaries + ownership + maintenance + admin + overhead + marketing + interest
     const profit = revenue - costs
     airline.cash += profit
 

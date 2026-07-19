@@ -364,6 +364,11 @@ test('M2 tools: daily challenge, leasing, used market, fuel hedge', async ({ pag
   await page.getByTestId('tab-finance').click()
   await page.getByTestId('hedge-4').click()
   await expect(page.getByTestId('hedge-panel')).toContainText('Fuel hedged')
+  // Brand: setting a marketing level sticks in the engine state.
+  await page.getByTestId('marketing-2').click()
+  await expect(page.getByTestId('marketing-2')).toBeDisabled()
+  const marketing = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.marketing)
+  expect(marketing).toBe(2)
 })
 
 test('an aircraft order cancels for the partial refund', async ({ page }) => {

@@ -102,6 +102,7 @@ export interface CostBreakdown {
   maintenance: number
   admin: number // per-airframe administration
   overhead: number // airline overhead + quadratic route-count complexity
+  marketing: number // brand spend (level × network size)
   interest: number
 }
 
@@ -132,6 +133,7 @@ export interface Airline {
   // Consecutive quarters each city's slots sat ≥2 unused (use it or lose it).
   slotIdle: Record<string, number>
   fuelHedge: FuelHedge | null
+  marketing: number // brand spend level 0..MARKETING_MAX_LEVEL
   insolventQuarters: number
   bankrupt: boolean
   history: QuarterStats[]
@@ -188,6 +190,7 @@ export type Command =
   | { type: 'hedge_fuel'; quarters: number }
   | { type: 'refit_cabin'; aircraftId: number; cabin: number }
   | { type: 'sell_aircraft'; aircraftId: number }
+  | { type: 'set_marketing'; level: number }
   | { type: 'negotiate_slots'; city: string; spend: number }
   | { type: 'take_loan'; amount: number }
   | { type: 'repay_loan'; loanId: number; amount: number }
@@ -211,6 +214,7 @@ export type GameEvent =
   | { type: 'cabin_refit'; airline: number; aircraftId: number; cabin: number; cost: number }
   | { type: 'aircraft_delivered'; airline: number; aircraftId: number; aircraftType: string }
   | { type: 'aircraft_sold'; airline: number; aircraftId: number; proceeds: number }
+  | { type: 'marketing_set'; airline: number; level: number }
   | { type: 'negotiation_started'; airline: number; city: string; spend: number }
   | { type: 'negotiation_failed'; airline: number; city: string }
   | { type: 'slots_granted'; airline: number; city: string; slots: number }

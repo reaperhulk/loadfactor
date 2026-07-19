@@ -267,8 +267,8 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
       </table>
       {contenders.length > 1 && (
         <p className="hint">
-          Share splits by appeal (yours = 100): schedule × cabin × fare posture × service. Out-schedule,
-          undercut, or out-serve them to take riders.
+          Share splits by appeal (yours = 100): schedule × cabin × fare posture × service × brand.
+          Out-schedule, undercut, out-serve, or out-market them to take riders.
         </p>
       )}
 

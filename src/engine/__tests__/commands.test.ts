@@ -197,6 +197,18 @@ describe('command validation', () => {
     expect(l.state.airlines[0]!.cash).toBe(18000)
   })
 
+  it('marketing level validates 0..3 and sticks on the airline', () => {
+    expectRejected(applyCommand(fresh(), { type: 'set_marketing', level: 4 }).events, 'marketing level must be 0..3')
+    expectRejected(applyCommand(fresh(), { type: 'set_marketing', level: -1 }).events, 'marketing level')
+    expectRejected(applyCommand(fresh(), { type: 'set_marketing', level: 1.5 }).events, 'marketing level')
+    const { state, events } = applyCommand(fresh(), { type: 'set_marketing', level: 2 })
+    expect(events[0]).toMatchObject({ type: 'marketing_set', level: 2 })
+    expect(state.airlines[0]!.marketing).toBe(2)
+    // Setting the level costs nothing up front — the spend lands in the
+    // quarterly P&L, not at the moment of the decision.
+    expect(state.airlines[0]!.cash).toBe(18000)
+  })
+
   it('refitting a cabin validates, charges cash, and sticks', () => {
     const state = fresh()
     expectRejected(applyCommand(state, { type: 'refit_cabin', aircraftId: 1, cabin: 7 }).events, 'cabin must be')

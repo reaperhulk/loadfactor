@@ -17,6 +17,9 @@ import {
   HEDGE_MIN_QUARTERS,
   HEDGE_PREMIUM_PER_AIRCRAFT,
   LEASE_BP_PER_QUARTER,
+  MARKETING_BASE_PER_LEVEL,
+  MARKETING_PER_ROUTE_PER_LEVEL,
+  MARKETING_WEIGHT_BP_PER_LEVEL,
   ROUTE_OVERHEAD_QUAD,
 } from '../data/constants'
 import { inflationBp } from '../engine/market'
@@ -865,6 +868,34 @@ export function FinancePanel({ state }: { state: GameState }) {
             ))}
           </>
         )}
+      </div>
+      <div className="city-negotiate" data-testid="marketing-panel">
+        <span title="brand spend buys pair appeal in every share battle: schedule × cabin × fare × service × brand">
+          Marketing:
+        </span>
+        {[0, 1, 2, 3].map((level) => (
+          <button
+            key={level}
+            data-testid={`marketing-${level}`}
+            className={player.marketing === level ? 'active sort-btn' : 'sort-btn'}
+            disabled={player.marketing === level}
+            onClick={() => dispatch({ type: 'set_marketing', level })}
+          >
+            {['off', 'low', 'mid', 'high'][level]}
+            {level > 0 &&
+              ` ${money(
+                level *
+                  Math.floor(
+                    ((MARKETING_BASE_PER_LEVEL + MARKETING_PER_ROUTE_PER_LEVEL * player.routes.length) *
+                      inflationBp(state.turn)) /
+                      10000,
+                  ),
+              )}/q`}
+          </button>
+        ))}
+        <span className="dim">
+          +{(MARKETING_WEIGHT_BP_PER_LEVEL / 100).toFixed(0)}% appeal per level on every pair
+        </span>
       </div>
       <label>
         Amount:{' '}

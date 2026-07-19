@@ -172,6 +172,12 @@ export function RivalsPanel({ state }: { state: GameState }) {
                   <p>
                     Net worth {money(netWorth(rival))} · {rival.routes.length} routes ·{' '}
                     {slotCities(rival).length} cities · hub {rival.hq}
+                    {rival.marketing > 0 && (
+                      <span title="their marketing level buys pair appeal in every shared market">
+                        {' '}
+                        · brand {['', 'low', 'mid', 'high'][rival.marketing]}
+                      </span>
+                    )}
                     {contested > 0 && (
                       <span className="neg">
                         {' '}

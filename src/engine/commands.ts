@@ -14,6 +14,7 @@ import {
   HEDGE_PREMIUM_PER_AIRCRAFT,
   LEASE_BP_PER_QUARTER,
   LOAN_RATE_ECONOMY_SLOPE,
+  MARKETING_MAX_LEVEL,
   MIN_LOAN_RATE_BP,
   MIN_ROUTE_KM,
   NEG_MIN_SPEND,
@@ -143,6 +144,13 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       return {
         events: [{ type: 'service_set', airline: airlineIdx, routeId: route.id, serviceLevel: route.serviceLevel }],
       }
+    }
+
+    case 'set_marketing': {
+      if (!Number.isInteger(command.level) || command.level < 0 || command.level > MARKETING_MAX_LEVEL)
+        return reject(airlineIdx, command, `marketing level must be 0..${MARKETING_MAX_LEVEL}`)
+      airline.marketing = command.level
+      return { events: [{ type: 'marketing_set', airline: airlineIdx, level: command.level }] }
     }
 
     case 'assign_aircraft': {

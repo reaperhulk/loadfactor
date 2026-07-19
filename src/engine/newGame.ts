@@ -49,6 +49,7 @@ function makeAirline(id: number, setup: AirlineSetup, controller: 'player' | 'ri
     negotiations: [],
     slotIdle: {},
     fuelHedge: null,
+    marketing: 0,
     insolventQuarters: 0,
     bankrupt: false,
     history: [],

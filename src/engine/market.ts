@@ -32,6 +32,7 @@ import {
   FUEL_INFLATION_BP_PER_QUARTER,
   LANDING_FEE_BASE,
   LANDING_FEE_PER_SEAT,
+  MARKETING_WEIGHT_BP_PER_LEVEL,
   OWNERSHIP_BP_PER_QUARTER,
   ROUTE_HISTORY_QUARTERS,
   SERVICE_COST_PER_PAX,
@@ -143,10 +144,12 @@ export function routeShareWeight(airline: Airline, route: Route): number {
     cabinTripWeight += alloc.trips * CABIN_WEIGHT[alloc.cabin - 1]!
   }
   if (capacity === 0) return 0
-  return Math.floor(
+  const base = Math.floor(
     (cabinTripWeight * FARE_LEVEL_WEIGHT[route.fareLevel + 2]! * SERVICE_LEVEL_WEIGHT[route.serviceLevel - 1]!) /
       100,
   )
+  // Brand: marketing spend buys pair appeal on every route the airline flies.
+  return Math.floor((base * (10000 + airline.marketing * MARKETING_WEIGHT_BP_PER_LEVEL)) / 10000)
 }
 
 // Per-route weekly accumulator, finalized to quarterly numbers at the end.

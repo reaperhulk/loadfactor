@@ -176,6 +176,13 @@ function greedyCommands(state: GameState): Command[] {
     commands.push({ type: 'hedge_fuel', quarters: 4 })
   }
 
+  // Brand: hold a modest marketing level while liquid, go dark when thin —
+  // the share edge on contested pairs beats the spend, but never over debt.
+  const wantMarketing = airline.cash >= cashBuffer && airline.routes.length >= 3 ? 1 : 0
+  if (airline.marketing !== wantMarketing) {
+    commands.push({ type: 'set_marketing', level: wantMarketing })
+  }
+
   // Prune routes losing >15% of their costs — deeper than demand noise (±8%)
   // can explain, so it's structural, not a bad quarter.
   for (const route of airline.routes) {

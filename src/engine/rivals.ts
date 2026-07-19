@@ -44,6 +44,7 @@ interface Personality {
   negotiateBudgetBp: number // spend as bp of city difficulty
   homeRegionUntil: number // cities held before negotiating outside the HQ region
   cabin: number // preferred cabin fit for the fleet (1 dense / 2 std / 3 prem)
+  marketing: number // brand posture: level held while cash is healthy
   // Competitive read on a pair: seats already fielded there count against its
   // expansion score at this rate. Under 10000 means incumbents look beatable
   // (price_war undercuts its way in); over means avoid crowded markets.
@@ -63,6 +64,7 @@ const PERSONALITIES: Record<string, Personality> = {
     negotiateBudgetBp: 10000,
     homeRegionUntil: 0,
     cabin: 2,
+    marketing: 1,
     contestDiscountBp: 10000,
     raidBonus: 8,
   },
@@ -75,6 +77,7 @@ const PERSONALITIES: Record<string, Personality> = {
     negotiateBudgetBp: 9000,
     homeRegionUntil: 0,
     cabin: 1,
+    marketing: 0,
     contestDiscountBp: 6000,
     raidBonus: 14,
   },
@@ -87,6 +90,7 @@ const PERSONALITIES: Record<string, Personality> = {
     negotiateBudgetBp: 11000,
     homeRegionUntil: 0,
     cabin: 3,
+    marketing: 2,
     contestDiscountBp: 13000,
     raidBonus: 4,
   },
@@ -99,6 +103,7 @@ const PERSONALITIES: Record<string, Personality> = {
     negotiateBudgetBp: 12000,
     homeRegionUntil: 6,
     cabin: 2,
+    marketing: 1,
     contestDiscountBp: 11000,
     raidBonus: 0,
   },
@@ -129,6 +134,13 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
     const room = debtCeiling(airline) - totalDebt(airline)
     const want = Math.min(room, cashBuffer)
     if (want >= 2000) apply(state, idx, { type: 'take_loan', amount: want }, events)
+  }
+
+  // Brand posture: hold the personality's marketing level while liquid; a
+  // thin treasury goes dark first — ad spend is the easiest cost to cut.
+  const wantMarketing = airline.cash >= cashBuffer ? personality.marketing : 0
+  if (airline.marketing !== wantMarketing) {
+    apply(state, idx, { type: 'set_marketing', level: wantMarketing }, events)
   }
 
   // Defensive play, same as the competent player bot: prune structurally

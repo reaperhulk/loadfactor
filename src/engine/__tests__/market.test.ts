@@ -107,6 +107,25 @@ describe('market resolution', () => {
     }
   })
 
+  it('brand spend wins share on an otherwise identical contested pair', () => {
+    const state = newGame('jet_age', 'brand-seed')
+    // Identical schedules, fares, service — the only difference is marketing.
+    const playerRoute = withRoute(state, 0, 'MIA', 'YYZ', 0)
+    const rivalRoute = withRoute(state, 1, 'MIA', 'YYZ', 0)
+    state.airlines[0]!.fleet[0]!.routeId = playerRoute
+    state.airlines[1]!.fleet[0]!.routeId = rivalRoute
+    state.airlines[0]!.marketing = 3
+    const events: GameEvent[] = []
+    resolveMarket(state, events)
+    const player = events.find((e) => e.type === 'route_result' && e.airline === 0)
+    const rival = events.find((e) => e.type === 'route_result' && e.airline === 1)
+    if (player?.type === 'route_result' && rival?.type === 'route_result') {
+      expect(player.pax).toBeGreaterThan(rival.pax)
+    } else {
+      expect.unreachable('both route results must exist')
+    }
+  })
+
   it('connecting pax ride spare seats over a hub on unserved pairs', () => {
     const state = newGame('jet_age', 'connect-seed')
     const airline = state.airlines[0]!

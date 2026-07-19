@@ -96,6 +96,15 @@ export const OWNERSHIP_BP_PER_QUARTER = 400
 export const AIRLINE_OVERHEAD_PER_QUARTER = 400 // $k
 export const AIRCRAFT_ADMIN_PER_QUARTER = 40 // $k per airframe
 
+// --- Brand (marketing spend) ---
+// A per-quarter marketing budget (levels 0..3) that buys pair appeal in the
+// share battle. Spend scales with network size so the lever stays priced to
+// the airline it promotes; the weight edge multiplies routeShareWeight.
+export const MARKETING_MAX_LEVEL = 3
+export const MARKETING_BASE_PER_LEVEL = 400 // $k/q per level
+export const MARKETING_PER_ROUTE_PER_LEVEL = 30 // $k/q per route per level
+export const MARKETING_WEIGHT_BP_PER_LEVEL = 400 // +4% pair appeal per level
+
 // --- Leasing, used market, hedging (M2 fleet depth) ---
 // Cancelling a purchase order refunds this bp of the price paid — the
 // manufacturer keeps a deposit. Leased orders cancel free (nothing was paid).

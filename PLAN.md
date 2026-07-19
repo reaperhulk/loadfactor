@@ -84,8 +84,12 @@ points where precision matters).
   and higher revenue per pax). Refits cost a slice of list price. The
   hardware axis under the soft-product service level.
 - **Market share.** Airlines serving the same pair split demand by
-  attractiveness weight = f(frequency, service level, fare level). Cheap
-  fares and better service win share but cost margin.
+  attractiveness weight = f(frequency, cabin, service level, fare level,
+  brand). Cheap fares and better service win share but cost margin.
+- **Brand.** A per-quarter marketing budget (`set_marketing`, levels 0–3)
+  multiplies the airline's share weight on every pair it flies. The spend
+  scales with network size and lands in its own cost bucket; rivals hold a
+  personality-set level while liquid and go dark when cash thins.
 - **Load factor & revenue.** Pax flown = min(share of pair demand adjusted by
   fare elasticity, capacity). Load factor = pax/capacity. Revenue = pax ×
   fare (distance-based base × fare-level multiplier).
