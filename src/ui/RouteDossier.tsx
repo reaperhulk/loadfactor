@@ -15,6 +15,7 @@ import {
   routeWeeklyCapacity,
 } from '../engine/queries'
 import { Sparkline } from './Sparkline'
+import { assignAndSchedule } from './assign'
 import { dispatch } from './session'
 
 function money(k: number): string {
@@ -51,6 +52,9 @@ export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
     .filter((c): c is NonNullable<typeof c> => c !== null)
 
   const assigned = player.fleet.filter((a) => a.routeId === route.id)
+  // Idle airframes with the legs for this route — one pick adds them to the
+  // schedule (assign + frequency bump in one intent).
+  const idleCapable = player.fleet.filter((a) => a.routeId === null && getAircraftType(a.type).rangeKm >= km)
   // Surface the market model: connecting traffic actually flown over this leg
   // last quarter, and elasticity of the current fare posture.
   const elasticityBp = FARE_DEMAND_BP[route.fareLevel + 2]!
@@ -176,6 +180,26 @@ export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
             })}
           </tbody>
         </table>
+      )}
+      {idleCapable.length > 0 && (
+        <label className="dossier-add-aircraft">
+          Add aircraft:{' '}
+          <select
+            data-testid="dossier-add-aircraft"
+            value=""
+            onChange={(e) => {
+              if (e.target.value !== '') assignAndSchedule(state, Number(e.target.value), route.id)
+            }}
+          >
+            <option value="">— idle aircraft ({idleCapable.length}) —</option>
+            {idleCapable.map((a) => (
+              <option key={a.id} value={a.id}>
+                {getAircraftType(a.type).name} · {cabinSeats(a.type, a.cabin)} seats ·{' '}
+                {roundTripsPerWeek(a.type, km)} rt/wk
+              </option>
+            ))}
+          </select>
+        </label>
       )}
     </aside>
   )

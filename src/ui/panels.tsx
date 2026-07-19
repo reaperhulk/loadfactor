@@ -30,6 +30,7 @@ import {
   totalDebt,
   yearOf,
 } from '../engine/queries'
+import { assignAndSchedule } from './assign'
 import { dispatch } from './session'
 import { Sparkline } from './Sparkline'
 
@@ -173,11 +174,9 @@ export function FleetPanel({ state }: { state: GameState }) {
                   <select
                     value={a.routeId ?? ''}
                     onChange={(e) =>
-                      dispatch({
-                        type: 'assign_aircraft',
-                        aircraftId: a.id,
-                        routeId: e.target.value === '' ? null : Number(e.target.value),
-                      })
+                      e.target.value === ''
+                        ? dispatch({ type: 'assign_aircraft', aircraftId: a.id, routeId: null })
+                        : assignAndSchedule(state, a.id, Number(e.target.value))
                     }
                   >
                     <option value="">— idle —</option>

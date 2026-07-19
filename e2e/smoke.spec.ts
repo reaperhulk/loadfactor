@@ -139,11 +139,6 @@ test('the route dossier and rivals intel expose the numbers', async ({ page }) =
       const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
       window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
     }
-    const state = window.__harness.getState()!
-    const routeId = state.airlines[0]!.routes[0]!.id
-    for (const aircraft of state.airlines[0]!.fleet) {
-      window.__harness.dispatch({ type: 'assign_aircraft', aircraftId: aircraft.id, routeId })
-    }
     window.__harness.endQuarter()
     window.__harness.endQuarter()
   })
@@ -153,6 +148,13 @@ test('the route dossier and rivals intel expose the numbers', async ({ page }) =
   await expect(page.getByTestId('route-dossier')).toBeVisible()
   await expect(page.getByTestId('route-dossier')).toContainText('The pair')
   await expect(page.getByTestId('route-dossier')).toContainText('rt/wk')
+  // Adding an idle plane from the dossier grows the schedule in one pick:
+  // assign + frequency bump together (a bare assign would fly nothing extra).
+  await expect(page.getByTestId('dossier-frequency')).toContainText('5/')
+  const before = await page.getByTestId('dossier-frequency').innerText()
+  await page.getByTestId('dossier-add-aircraft').selectOption({ index: 1 })
+  await expect(page.getByTestId('dossier-frequency')).not.toHaveText(before)
+  await expect(page.getByTestId('dossier-add-aircraft')).toHaveCount(0) // no idle aircraft left
   await page.getByTestId('route-dossier-close').click()
   await expect(page.getByTestId('route-dossier')).toHaveCount(0)
   // Rivals intel tab.
