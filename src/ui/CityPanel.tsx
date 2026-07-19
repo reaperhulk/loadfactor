@@ -133,6 +133,19 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onClose }: Ci
 
       <div className="city-slots" data-testid="city-slots">
         <strong>Slots</strong> — pool {city.slotPool} · rivals hold {rivalsHeld} · you hold {held} (using {used})
+        {rivalsHeld > 0 && (
+          <span className="dim" data-testid="slot-holders">
+            {' '}
+            (
+            {state.airlines
+              .slice(1)
+              .map((a) => ({ name: a.name, n: slotsHeld(a, cityId) }))
+              .filter((h) => h.n > 0)
+              .map((h) => `${h.name} ${h.n}`)
+              .join(' · ')}
+            )
+          </span>
+        )}
       </div>
 
       {cityId !== player.hq && held - used >= SLOT_IDLE_THRESHOLD && (

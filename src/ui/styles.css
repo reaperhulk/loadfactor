@@ -349,7 +349,8 @@ button.toast {
 
 .route-player {
   stroke: var(--accent);
-  stroke-width: 1.6;
+  /* Width carries data: scheduled seats/wk, set per-arc as --cap-w. */
+  stroke-width: var(--cap-w, 1.6);
   opacity: 0.9;
   fill: none;
   pointer-events: stroke;
@@ -358,23 +359,17 @@ button.toast {
 }
 
 .route-player:hover {
-  stroke-width: 3;
+  stroke-width: calc(var(--cap-w, 1.6) + 1.4);
   opacity: 1;
 }
 
 /* Haul classes: hops are faint threads, stages solid, long-haul trunks are
-   bold dashed corridors. */
+   dashed corridors. (Width itself now encodes capacity, not distance.) */
 .route-short {
-  stroke-width: 1;
   opacity: 0.7;
 }
 
-.route-medium {
-  stroke-width: 1.8;
-}
-
 .route-long {
-  stroke-width: 2.6;
   stroke-dasharray: 7 3;
   filter: drop-shadow(0 0 2px #4fa3ff66);
 }
@@ -397,7 +392,7 @@ button.toast {
 
 .route-rival {
   stroke: #8a5470;
-  stroke-width: 0.8;
+  stroke-width: var(--cap-w, 0.8);
   opacity: 0.55;
   fill: none;
   vector-effect: non-scaling-stroke;
@@ -1144,6 +1139,16 @@ input[type='number'] {
 
 .table-scroll table {
   white-space: nowrap;
+}
+
+/* Wide comparison tables scroll sideways on small screens; pin the airline
+   name column so every number stays attributable to its row. */
+[data-testid='standings'] th:first-child,
+[data-testid='standings'] td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--panel);
+  z-index: 1;
 }
 
 .key-hints {

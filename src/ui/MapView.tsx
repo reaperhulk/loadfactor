@@ -10,7 +10,17 @@ import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { WORLD_PATH, WORLD_RINGS } from '../data/worldmap.gen'
 import type { GameState, Route } from '../engine'
-import { effectiveFrequency, networkCities, slotsHeld } from '../engine/queries'
+import { effectiveFrequency, networkCities, routeWeeklyCapacity, slotsHeld } from '../engine/queries'
+import type { Airline } from '../engine'
+
+// Arc weight tells capacity: seats/wk drive stroke width, so the map itself
+// shows where an airline's hardware is concentrated. Fed to CSS as a custom
+// property so hover/transition rules still win.
+function capWidth(airline: Airline, route: Route, thin: boolean): number {
+  const cap = routeWeeklyCapacity(airline, route)
+  const w = (thin ? 0.4 : 0.7) + Math.sqrt(cap) / (thin ? 90 : 40)
+  return Math.min(thin ? 1.4 : 4, Math.max(thin ? 0.4 : 0.9, w))
+}
 
 function slotsUsedAt(routes: readonly Route[], city: string): number {
   let used = 0
@@ -690,6 +700,7 @@ export function MapView({
                   key={`${airline.id}-${r.id}`}
                   d={d}
                   className={`route-rival ${rivalColorClass(airline.id)}`}
+                  style={{ '--cap-w': capWidth(airline, r, true) } as React.CSSProperties}
                 />
               )
             }),
@@ -706,6 +717,7 @@ export function MapView({
                 d={d}
                 pathLength={1}
                 className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
+                style={{ '--cap-w': capWidth(player, r, false) } as React.CSSProperties}
                 data-testid={isNew ? 'route-line-new' : undefined}
                 onClick={() => {
                   if (suppressClick.current) {
