@@ -788,13 +788,20 @@ export function MapView({
           const dur = 4 + Math.min(14, km / 900)
           const path = tripPathFor(r.from, r.to)
           if (path === null) return [] // route crosses the horizon — no shuttle
+          // The glyph wears the metal: widebodies render visibly larger than
+          // regional jets (biggest airframe assigned to the route).
+          let biggestSeats = 100
+          for (const ac of player.fleet) {
+            if (ac.routeId === r.id) biggestSeats = Math.max(biggestSeats, getAircraftType(ac.type).seats)
+          }
+          const glyphScale = (0.62 + Math.min(0.5, biggestSeats / 800)) / uiScale
           return Array.from({ length: planes }, (_, i) => (
             <g key={`plane-${r.id}-${i}`} className="plane" data-testid={i === 0 ? `plane-${r.id}` : undefined}>
               {/* A silhouette whose nose points along +x: rotate="auto" then
                   keeps it flying nose-first on BOTH legs of the shuttle — the
                   ✈ text glyph points 45° off-axis and read as flying
                   backwards on the return leg. */}
-              <path d={PLANE_GLYPH} transform={`scale(${0.8 / uiScale})`} />
+              <path d={PLANE_GLYPH} transform={`scale(${glyphScale.toFixed(3)})`} />
               {/* The path itself runs out AND back, traversed forward only —
                   brief dwells at each end, correct nose-first orientation on
                   both legs in every engine (keyPoints reversal breaks

@@ -6,21 +6,19 @@
 import { getAircraftType, isAircraftType } from '../data/aircraft'
 import { distanceKm, getCity, isCity, pairKey } from '../data/cities'
 import {
-  BASE_LOAN_RATE_BP,
   CABIN_REFIT_COST_BP,
   ORDER_CANCEL_REFUND_BP,
   HEDGE_MAX_QUARTERS,
   HEDGE_MIN_QUARTERS,
   HEDGE_PREMIUM_PER_AIRCRAFT,
   LEASE_BP_PER_QUARTER,
-  LOAN_RATE_ECONOMY_SLOPE,
   MARKETING_MAX_LEVEL,
-  MIN_LOAN_RATE_BP,
   MIN_ROUTE_KM,
   NEG_MIN_SPEND,
 } from '../data/constants'
 import { effFuelBp } from './worldEvents'
 import {
+  currentLoanRateBp,
   debtCeiling,
   findRoute,
   maxRouteFrequency,
@@ -327,10 +325,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         return reject(airlineIdx, command, 'invalid amount')
       if (totalDebt(airline) + command.amount > debtCeiling(airline))
         return reject(airlineIdx, command, 'over the debt ceiling')
-      const annualRateBp = Math.max(
-        MIN_LOAN_RATE_BP,
-        BASE_LOAN_RATE_BP + Math.floor((10000 - state.world.economyBp) / LOAN_RATE_ECONOMY_SLOPE),
-      )
+      const annualRateBp = currentLoanRateBp(state)
       const loan = { id: airline.nextId++, principal: command.amount, annualRateBp }
       airline.loans.push(loan)
       airline.cash += command.amount

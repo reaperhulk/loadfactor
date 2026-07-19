@@ -27,6 +27,7 @@ import { negotiationDifficulty, scarcityChanceBp } from '../engine/negotiation'
 import {
   airlinesOnPair,
   allocateTrips,
+  currentLoanRateBp,
   networkCities,
   cabinSeats,
   debtCeiling,
@@ -1032,7 +1033,14 @@ export function FinancePanel({ state }: { state: GameState }) {
         <input type="number" value={amount} min={100} step={100} onChange={(e) => setAmount(Number(e.target.value))} />{' '}
         $k
       </label>
-      <button onClick={() => dispatch({ type: 'take_loan', amount })}>take loan</button>
+      <button onClick={() => dispatch({ type: 'take_loan', amount })}>take loan</button>{' '}
+      <span className="dim" data-testid="loan-rate">
+        today's rate {(currentLoanRateBp(state) / 100).toFixed(1)}%/yr
+        <span title="the rate follows the economy — borrow in booms, not busts">
+          {' '}
+          ({state.world.economyBp >= 10000 ? 'cheap money' : 'tight money'})
+        </span>
+      </span>
       <div className="table-scroll"><table>
         <tbody>
           {player.loans.map((l) => (

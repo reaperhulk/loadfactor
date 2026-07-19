@@ -3,17 +3,29 @@
 
 import { getAircraftType } from '../data/aircraft'
 import {
+  BASE_LOAN_RATE_BP,
   CABIN_SEATS_BP,
   DEBT_BASE_ALLOWANCE,
   DEBT_LTV_BP,
   RESALE_DECAY_BP_PER_QUARTER,
   RESALE_FLOOR_BP,
+  LOAN_RATE_ECONOMY_SLOPE,
+  MIN_LOAN_RATE_BP,
   RESALE_INITIAL_BP,
   WEEKLY_BLOCK_MINUTES,
 } from '../data/constants'
 import { distanceKm, pairKey } from '../data/cities'
 import { getScenario } from '../data/scenarios'
 import type { Airline, GameState, Route } from './types'
+
+// Today's market rate for a new loan: base plus a spread that widens as the
+// economy sours. One definition, shared by take_loan and the finance panel.
+export function currentLoanRateBp(state: GameState): number {
+  return Math.max(
+    MIN_LOAN_RATE_BP,
+    BASE_LOAN_RATE_BP + Math.floor((10000 - state.world.economyBp) / LOAN_RATE_ECONOMY_SLOPE),
+  )
+}
 
 export function yearOf(state: GameState): number {
   return getScenario(state.scenario).startYear + Math.floor(state.turn / 4)
