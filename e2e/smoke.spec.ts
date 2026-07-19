@@ -174,6 +174,11 @@ test('the route dossier and rivals intel expose the numbers', async ({ page }) =
   await page.getByTestId('tab-rivals').click()
   await expect(page.getByTestId('rivals-panel')).toContainText('Albion Airways')
   await expect(page.getByTestId('rivals-panel')).toContainText('net worth by quarter')
+  // Rival networks draw on the map (rivals expanded during the two resolved
+  // quarters) and the toggle hides them.
+  await expect(page.locator('.route-rival').first()).toBeVisible()
+  await page.getByTestId('toggle-rivals').click()
+  await expect(page.locator('.route-rival')).toHaveCount(0)
 })
 
 test('the shop estimates per-route economics, coach marks guide, mute persists', async ({ page }) => {

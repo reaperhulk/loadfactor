@@ -2,8 +2,10 @@
 // personality, hubs, fleet composition, network size, momentum.
 
 import { getAircraftType } from '../data/aircraft'
+import { pairKey } from '../data/cities'
 import type { Airline, GameState } from '../engine'
 import { netWorth, slotCities } from '../engine/queries'
+import { RIVAL_COLORS } from './MapView'
 import { RaceChart, Sparkline } from './Sparkline'
 
 function money(k: number): string {
@@ -50,9 +52,16 @@ export function RivalsPanel({ state }: { state: GameState }) {
       <div className="rival-cards">
         {state.airlines.slice(1).map((rival) => {
           const last = rival.history[rival.history.length - 1]
+          // Pairs where this rival and the player are in direct battle.
+          const myPairs = new Set(state.airlines[0]!.routes.map((r) => pairKey(r.from, r.to)))
+          const contested = rival.routes.filter((r) => myPairs.has(pairKey(r.from, r.to))).length
           return (
             <div key={rival.id} className="rival-card" data-testid={`rival-${rival.id}`}>
               <h4>
+                <span
+                  className="rival-chip"
+                  style={{ background: RIVAL_COLORS[(rival.id - 1) % RIVAL_COLORS.length] }}
+                />
                 {rival.name} {rival.bankrupt && <span className="neg">— bankrupt</span>}
               </h4>
               <p className="dim">{PERSONALITY_BLURBS[rival.personality] ?? rival.personality}</p>
@@ -61,6 +70,12 @@ export function RivalsPanel({ state }: { state: GameState }) {
                   <p>
                     Net worth {money(netWorth(rival))} · {rival.routes.length} routes ·{' '}
                     {slotCities(rival).length} cities · hub {rival.hq}
+                    {contested > 0 && (
+                      <span className="neg">
+                        {' '}
+                        · ⚔ {contested} pair{contested === 1 ? '' : 's'} contested with you
+                      </span>
+                    )}
                   </p>
                   <p className="dim">{fleetSummary(rival)}</p>
                   <div className="trend-row">

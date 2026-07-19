@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent, WheelEvent } from 'react'
-import { CITIES, distanceKm, getCity, type City } from '../data/cities'
+import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { WORLD_PATH } from '../data/worldmap.gen'
 import type { GameState, Route } from '../engine'
@@ -30,6 +30,13 @@ function y(lat: number): number {
 
 export function cityMass(c: City): number {
   return c.pop * 4 + c.biz * 3 + c.tour * 2
+}
+
+// One color per rival, everywhere it appears (map arcs, panel chips).
+export const RIVAL_COLORS = ['#d0636e', '#9d7bd8', '#d8a052'] as const
+
+export function rivalColorClass(airlineId: number): string {
+  return `rival-c${(airlineId - 1) % RIVAL_COLORS.length}`
 }
 
 // Level of detail: majors always visible, regionals from mid zoom, small
@@ -160,6 +167,11 @@ export function MapView({
   const scale = W / view.w
   const flownRoutes = player.routes.filter((r) => player.fleet.some((a) => a.routeId === r.id))
   const network = networkCities(player)
+  const [showRivals, setShowRivals] = useState(true)
+  // Every pair any rival serves — player arcs on these run contested-hot.
+  const rivalPairs = new Set(
+    state.airlines.slice(1).flatMap((a) => a.routes.map((r) => pairKey(r.from, r.to))),
+  )
 
   // Visibility only changes when the game state, selection, or an LOD
   // threshold crossing changes — not on every animation frame of a zoom.
@@ -316,21 +328,28 @@ export function MapView({
       >
         <rect x={0} y={0} width={W} height={H} className="map-sea" />
         <path d={WORLD_PATH} className="map-land" />
-        {/* Rival routes, thin, under the player's */}
-        {state.airlines.slice(1).map((airline) =>
-          airline.routes.map((r) => (
-            <path key={`${airline.id}-${r.id}`} d={arcPath(r.from, r.to)} className="route-rival" />
-          )),
-        )}
+        {/* Rival networks, thin and color-coded per airline, under the
+            player's arcs. Toggleable for decluttering. */}
+        {showRivals &&
+          state.airlines.slice(1).map((airline) =>
+            airline.routes.map((r) => (
+              <path
+                key={`${airline.id}-${r.id}`}
+                d={arcPath(r.from, r.to)}
+                className={`route-rival ${rivalColorClass(airline.id)}`}
+              />
+            )),
+          )}
         {player.routes.map((r) => {
           const km = distanceKm(r.from, r.to)
           const isNew = newRouteIds.has(r.id)
+          const contested = rivalPairs.has(pairKey(r.from, r.to))
           return (
             <g key={r.id}>
               <path
                 d={arcPath(r.from, r.to)}
                 pathLength={1}
-                className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}`}
+                className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}${contested ? ' route-contested' : ''}`}
                 data-testid={isNew ? 'route-line-new' : undefined}
                 onClick={() => {
                   if (suppressClick.current) {
@@ -462,6 +481,14 @@ export function MapView({
         </button>
         <button data-testid="zoom-reset" aria-label="reset zoom" onClick={() => applyView(FULL_VIEW, false)}>
           ⤢
+        </button>
+        <button
+          data-testid="toggle-rivals"
+          aria-label={showRivals ? 'hide rival networks' : 'show rival networks'}
+          className={showRivals ? 'active' : ''}
+          onClick={() => setShowRivals((v) => !v)}
+        >
+          ⚔
         </button>
       </div>
     </div>

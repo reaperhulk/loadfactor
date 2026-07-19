@@ -244,9 +244,34 @@ button:disabled {
 .route-rival {
   stroke: #8a5470;
   stroke-width: 0.8;
-  opacity: 0.7;
+  opacity: 0.55;
   fill: none;
   vector-effect: non-scaling-stroke;
+}
+
+/* Each rival's network keeps one color everywhere: map arcs, panel chips. */
+.rival-c0 {
+  stroke: #d0636e;
+}
+.rival-c1 {
+  stroke: #9d7bd8;
+}
+.rival-c2 {
+  stroke: #d8a052;
+}
+
+/* A pair a rival also serves: your arc runs hot. */
+.route-player.route-contested {
+  stroke: #e08a4a;
+}
+
+.rival-chip {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: baseline;
 }
 
 /* Reward: a fresh route draws itself across the map… */
