@@ -15,7 +15,7 @@ export interface Toast {
   text: string
 }
 
-const EVENT_ICONS: Record<string, string> = {
+export const EVENT_ICONS: Record<string, string> = {
   recession: '📉',
   boom: '📈',
   oil_shock: '🛢️',
@@ -25,7 +25,7 @@ const EVENT_ICONS: Record<string, string> = {
   tourism_wave: '🏖️',
 }
 
-const EVENT_NAMES: Record<string, string> = {
+export const EVENT_NAMES: Record<string, string> = {
   recession: 'Global recession',
   boom: 'Economic boom',
   oil_shock: 'Oil shock',

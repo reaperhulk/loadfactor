@@ -620,7 +620,15 @@ export function MapView({
         <rect x={0} y={0} width={W} height={H} className="map-sea" />
         {isGlobe ? (
           <>
-            <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} className="globe-disc" />
+            <defs>
+              {/* A soft key light up-left: the disc reads as a sphere. */}
+              <radialGradient id="globeShade" cx="38%" cy="32%" r="80%">
+                <stop offset="0%" stopColor="#1b2a45" />
+                <stop offset="70%" stopColor="#111b2e" />
+                <stop offset="100%" stopColor="#0b111e" />
+              </radialGradient>
+            </defs>
+            <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} fill="url(#globeShade)" className="globe-disc" />
             <path d={globeGraticule(globe)} className="graticule" />
             <path d={globeLandPath(globe)} className="map-land" data-testid="globe-land" />
             <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} className="globe-limb" />
@@ -785,6 +793,9 @@ export function MapView({
           const r = (2 + cityMass(c) / 18) / Math.sqrt(uiScale)
           return (
             <g key={c.id} onClick={() => handleCityClick(c.id)} className="city">
+              {selected === c.id && (
+                <circle cx={p.X} cy={p.Y} r={r + 5 / uiScale} className="selection-ring" />
+              )}
               {inNetwork && <circle cx={p.X} cy={p.Y} r={r + 2.5 / uiScale} className="city-network-ring" />}
               <circle
                 data-testid={`city-${c.id}`}

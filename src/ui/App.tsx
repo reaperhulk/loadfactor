@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { CITIES } from '../data/cities'
+import { getEventDef } from '../data/events'
 import { SCENARIOS, getScenario } from '../data/scenarios'
 import { netWorth, quarterOf, yearOf } from '../engine/queries'
 import { CityPanel } from './CityPanel'
@@ -15,7 +16,7 @@ import { RouteDossier } from './RouteDossier'
 import { RouteSetupDialog } from './RouteSetupDialog'
 import { dispatch, getPlayerColor, getReplay, getSession, loadSave, resumeSave, startGame, reset } from './session'
 import { subscribe } from './session'
-import { ToastStack } from './toasts'
+import { EVENT_ICONS, EVENT_NAMES, ToastStack } from './toasts'
 import type { GameState, Replay } from '../engine'
 import { money } from './format'
 
@@ -317,6 +318,28 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         )}
       </header>
       <CoachMarks state={state} />
+      {state.world.events.length > 0 && (
+        <div className="events-strip" data-testid="events-strip">
+          {state.world.events.map((e) => {
+            const def = getEventDef(e.id)
+            const pct = def.demandModBp !== undefined ? (def.demandModBp - 10000) / 100 : null
+            return (
+              <span key={`${e.id}-${e.city ?? e.region ?? 'world'}`} className="event-chip">
+                {EVENT_ICONS[e.id] ?? '🌍'} {EVENT_NAMES[e.id] ?? def.name}
+                {e.city ? ` · ${e.city}` : e.region ? ` · ${e.region.toUpperCase()}` : ''}
+                {pct !== null && (
+                  <span className={pct >= 0 ? 'pos' : 'neg'}>
+                    {' '}
+                    {pct >= 0 ? '+' : ''}
+                    {pct.toFixed(0)}%
+                  </span>
+                )}
+                <span className="dim"> · {e.quartersLeft}q</span>
+              </span>
+            )
+          })}
+        </div>
+      )}
       {showReport && session.reportEvents.length > 0 && (
         <ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} />
       )}

@@ -176,6 +176,50 @@ button:disabled {
   fill: var(--accent);
 }
 
+/* Active world events, always on screen while they run. */
+.events-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+}
+.event-chip {
+  background: #131b2c;
+  border: 1px solid #26304a;
+  border-radius: 12px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+
+/* The selected city announces itself. */
+.selection-ring {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.2px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+  animation: selection-pulse 1.6s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes selection-pulse {
+  0%,
+  100% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.25);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .selection-ring {
+    animation: none;
+  }
+}
+
 /* Armed destructive buttons run hot until they decay or fire. */
 .confirm-armed {
   background: #7a2c34;
@@ -229,9 +273,7 @@ button:disabled {
 }
 
 /* The globe: a lit disc for the visible hemisphere, a crisp limb ring. */
-.globe-disc {
-  fill: #101a2b;
-}
+/* Fill comes from the inline radial gradient (CSS would override it). */
 .graticule {
   fill: none;
   stroke: #1b2740;
@@ -396,13 +438,13 @@ button.toast {
   fill: var(--accent);
 }
 .chart-end-label.race-rival-1 {
-  fill: #d78fae;
+  fill: #d0636e;
 }
 .chart-end-label.race-rival-2 {
-  fill: #8fd7b8;
+  fill: #9d7bd8;
 }
 .chart-end-label.race-rival-3 {
-  fill: #d7c98f;
+  fill: #d8a052;
 }
 
 .game-legend {
@@ -884,15 +926,15 @@ input[type='number'] {
 }
 
 .race-rival-1 {
-  stroke: #d78fae;
+  stroke: #d0636e;
 }
 
 .race-rival-2 {
-  stroke: #8fd7b8;
+  stroke: #9d7bd8;
 }
 
 .race-rival-3 {
-  stroke: #d7c98f;
+  stroke: #d8a052;
 }
 
 .race-legend {
@@ -908,15 +950,15 @@ input[type='number'] {
 }
 
 .race-key.rival-1 {
-  color: #d78fae;
+  color: #d0636e;
 }
 
 .race-key.rival-2 {
-  color: #8fd7b8;
+  color: #9d7bd8;
 }
 
 .race-key.rival-3 {
-  color: #d7c98f;
+  color: #d8a052;
 }
 
 .rival-cards {
