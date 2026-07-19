@@ -462,6 +462,7 @@ export function FleetPanel({ state }: { state: GameState }) {
                 </td>
                 <td>
                   <ConfirmButton
+                    data-testid={`cancel-order-${o.id}`}
                     label={o.leased ? 'cancel lease' : `cancel (${money(refund)} back)`}
                     confirmLabel="sure?"
                     onConfirm={() => dispatch({ type: 'cancel_order', orderId: o.id })}

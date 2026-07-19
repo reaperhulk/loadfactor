@@ -365,3 +365,24 @@ test('M2 tools: daily challenge, leasing, used market, fuel hedge', async ({ pag
   await page.getByTestId('hedge-4').click()
   await expect(page.getByTestId('hedge-panel')).toContainText('Fuel hedged')
 })
+
+test('an aircraft order cancels for the partial refund', async ({ page }) => {
+  await startGame(page)
+  await page.getByTestId('tab-fleet').click()
+  const cashBefore = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)
+  await page.getByTestId('order-cv240').click()
+  await expect(page.locator('text=on order')).toBeVisible()
+  const cashAfterOrder = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)
+  const price = cashBefore - cashAfterOrder
+  expect(price).toBeGreaterThan(0)
+  // Cancelling is a two-step ConfirmButton: arm, then confirm.
+  const cancel = page.locator('[data-testid^="cancel-order-"]')
+  await expect(cancel).toContainText('back') // the refund is quoted up front
+  await cancel.click()
+  await expect(cancel).toHaveText('sure?')
+  await cancel.click()
+  await expect(page.locator('text=on order')).toHaveCount(0)
+  // 80% of the purchase price comes back (ORDER_CANCEL_REFUND_BP).
+  const cashFinal = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)
+  expect(cashFinal).toBe(cashAfterOrder + Math.floor(price * 0.8))
+})

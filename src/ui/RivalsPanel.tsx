@@ -204,6 +204,18 @@ export function RivalsPanel({ state }: { state: GameState }) {
                     })()}
                   </p>
                   <p className="dim">{fleetSummary(rival)}</p>
+                  {rival.routes.length > 0 && (
+                    <p className="dim" data-testid={`rival-${rival.id}-newest`}>
+                      {/* Route ids ascend as routes open — the tail is where
+                          they're expanding right now. */}
+                      Newest routes:{' '}
+                      {[...rival.routes]
+                        .sort((a, b) => b.id - a.id)
+                        .slice(0, 3)
+                        .map((r) => `${r.from}–${r.to}`)
+                        .join(', ')}
+                    </p>
+                  )}
                   <div className="trend-row">
                     <span className="dim">profit</span>
                     <Sparkline points={rival.history.slice(-16).map((h) => h.profit)} className="sparkline spark-profit" />

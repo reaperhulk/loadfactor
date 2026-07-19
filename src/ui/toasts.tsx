@@ -13,6 +13,9 @@ export interface Toast {
   kind: 'route' | 'delivery' | 'slots' | 'event' | 'victory' | 'defeat' | 'error'
   icon: string
   text: string
+  // When set, clicking the toast opens this route's dossier (the battle card)
+  // instead of merely dismissing — alerts should be actionable.
+  routeId?: number
 }
 
 export const EVENT_ICONS: Record<string, string> = {
@@ -62,7 +65,13 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
           out.push({ kind: 'route', icon: '✈️', text: `Route opened: ${e.from} – ${e.to}` })
         } else if (myPairs.has(pairKey(e.from, e.to))) {
           const rival = state?.airlines[e.airline]?.name ?? 'A rival'
-          out.push({ kind: 'error', icon: '⚔️', text: `${rival} moved onto ${e.from} – ${e.to}` })
+          const mine = state?.airlines[0]?.routes.find((r) => pairKey(r.from, r.to) === pairKey(e.from, e.to))
+          out.push({
+            kind: 'error',
+            icon: '⚔️',
+            text: `${rival} moved onto ${e.from} – ${e.to}`,
+            routeId: mine?.id,
+          })
         }
         break
       case 'aircraft_delivered':
@@ -104,7 +113,15 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
 
 const TOAST_MS = 4200
 
-export function ToastStack({ events, state }: { events: GameEvent[]; state?: GameState }) {
+export function ToastStack({
+  events,
+  state,
+  onOpenRoute,
+}: {
+  events: GameEvent[]
+  state?: GameState
+  onOpenRoute?: (routeId: number) => void
+}) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const nextId = useRef(1)
   const seen = useRef<GameEvent[] | null>(null)
@@ -142,11 +159,16 @@ export function ToastStack({ events, state }: { events: GameEvent[]; state?: Gam
         <button
           key={t.id}
           className={`toast toast-${t.kind}`}
-          title="dismiss"
-          onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+          title={t.routeId !== undefined && onOpenRoute ? 'open the battle card' : 'dismiss'}
+          data-route-id={t.routeId}
+          onClick={() => {
+            if (t.routeId !== undefined && onOpenRoute) onOpenRoute(t.routeId)
+            setToasts((prev) => prev.filter((x) => x.id !== t.id))
+          }}
         >
           <span className="toast-icon">{t.icon}</span>
           {t.text}
+          {t.routeId !== undefined && onOpenRoute && <span className="dim"> — view battle</span>}
         </button>
       ))}
     </div>
