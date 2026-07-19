@@ -147,6 +147,23 @@ export const AIRCRAFT: readonly AircraftType[] = [
     availableTo: 2035,
   },
   {
+    // The glamour toy: twice the speed (so twice the weekly round trips),
+    // tiny cabin, ferocious fuel burn. A prestige machine that only pays on
+    // dense premium long-haul — exactly like the real one mostly didn't.
+    id: 'concorde',
+    name: 'Concorde',
+    seats: 100,
+    rangeKm: 7200,
+    speedKmh: 2000,
+    turnaroundMin: 80,
+    price: 40000,
+    fuelPerKm: 17,
+    maintBase: 380,
+    deliveryQuarters: 4,
+    availableFrom: 1976,
+    availableTo: 1990,
+  },
+  {
     id: 'b757',
     name: 'Boeing 757-200',
     seats: 200,

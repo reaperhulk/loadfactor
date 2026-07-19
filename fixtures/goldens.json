@@ -53,9 +53,9 @@
   "oil-crisis-greedy": {
     "checkpointHashes": {
       "10": "97b700c6",
-      "20": "66724d13",
-      "30": "a9cdbc06",
-      "40": "f2c574db"
+      "20": "1270c434",
+      "30": "4d5f5121",
+      "40": "4d17e1ea"
     },
     "summary": {
       "turn": 40,
@@ -69,10 +69,10 @@
   },
   "deregulation-greedy": {
     "checkpointHashes": {
-      "10": "12745786",
-      "20": "55a98f88",
-      "30": "fb13f01f",
-      "40": "3c6840d1"
+      "10": "0793adc9",
+      "20": "a7bfb814",
+      "30": "61a12e9d",
+      "40": "5dca9bdc"
     },
     "summary": {
       "turn": 40,
@@ -86,8 +86,8 @@
   },
   "open-skies-greedy": {
     "checkpointHashes": {
-      "10": "74cf899e",
-      "20": "8bd23d3d",
+      "10": "3c454e07",
+      "20": "1268bfb3",
       "30": "e9ccd759",
       "40": "ae7a431a"
     },

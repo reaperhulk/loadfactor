@@ -112,6 +112,18 @@ test('the quarterly report reflects the resolved quarter', async ({ page }) => {
   })
   // Serving a route puts an ambient plane on the map.
   await expect(page.locator('[data-testid^="plane-"]')).toHaveCount(1)
+  // Unassign one plane, then the bulk button puts the idle fleet back to work.
+  await page.evaluate(() => {
+    const s = window.__harness.getState()!
+    window.__harness.dispatch({ type: 'assign_aircraft', aircraftId: s.airlines[0]!.fleet[0]!.id, routeId: null })
+  })
+  await page.getByTestId('tab-fleet').click()
+  await page.getByTestId('assign-all-idle').click()
+  const idleLeft = await page.evaluate(
+    () => window.__harness.getState()!.airlines[0]!.fleet.filter((a) => a.routeId === null).length,
+  )
+  expect(idleLeft).toBe(0)
+  await page.getByTestId('tab-routes').click()
   // Ending the quarter presents the report card with the P&L…
   await page.getByTestId('end-quarter').click()
   await expect(page.getByTestId('report-card')).toBeVisible()
