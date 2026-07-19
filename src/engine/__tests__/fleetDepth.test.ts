@@ -7,10 +7,10 @@ import { applyCommand, newGame } from '../index'
 
 describe('fleet depth', () => {
   it('leasing delivers fast, pays quarterly, and returns for nothing', () => {
-    let r = applyCommand(newGame('jet_age', 'lease-seed'), { type: 'lease_aircraft', aircraftType: 'meridian80' })
+    let r = applyCommand(newGame('jet_age', 'lease-seed'), { type: 'lease_aircraft', aircraftType: 'caravelle' })
     expect(r.events[0]).toMatchObject({
       type: 'aircraft_leased',
-      paymentPerQuarter: Math.floor((getAircraftType('meridian80').price * LEASE_BP_PER_QUARTER) / 10000),
+      paymentPerQuarter: Math.floor((getAircraftType('caravelle').price * LEASE_BP_PER_QUARTER) / 10000),
     })
     expect(r.state.airlines[0]!.cash).toBe(18000) // no capex
     r = applyCommand(r.state, { type: 'end_quarter' })

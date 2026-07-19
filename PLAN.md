@@ -115,10 +115,11 @@ points where precision matters).
   oil shock, recession, boom, Olympics (host-city demand spike), regional
   conflict (demand collapse), new-aircraft fanfare. Events have durations and
   modifiers; they are announced in the report.
-- **Eras & fleet progression.** Aircraft are fictional-but-plausible analogs
-  gated by availability windows (turbo-props → early jets → widebodies →
-  efficient twins). Old types stop being sold, keep flying, and age into
-  maintenance hogs — fleet renewal is a strategic drumbeat.
+- **Eras & fleet progression.** Aircraft are real airframes (Caravelle, 727,
+  DC-8, 747, 767, MD-11…) with gameplay-tuned stats, gated by availability
+  windows (piston twins → early jets → widebodies → efficient twins). Old
+  types stop being sold, keep flying, and age into maintenance hogs — fleet
+  renewal is a strategic drumbeat.
 - **Slots.** Airports have finite slot pools by city size. Negotiations cost
   cash and resolve with a seeded roll whose odds scale with spend and slot
   scarcity. Rivals compete for the same pools. Slots are use-it-or-lose-it:

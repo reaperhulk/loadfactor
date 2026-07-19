@@ -3,7 +3,7 @@
 An airline business simulation inspired by Aerobiz Supersonic — with the dial
 turned toward the parts we loved most: route building, fleet strategy, and
 cold-blooded quarterly economics. Negotiate airport slots, open routes, buy
-fictional-but-plausible jets across the eras, set fares and service, ride out
+real airframes across the eras — Caravelles to 747s to MD-11s, set fares and service, ride out
 oil shocks and recessions, and out-grow rival airlines before the scenario
 clock runs out.
 

@@ -201,6 +201,11 @@ button:disabled {
   fill: var(--dim);
   /* font-size comes from the SVG attribute — it scales with zoom */
   pointer-events: none;
+  /* Halo so a name stays readable over dots, arcs, and coastlines. */
+  paint-order: stroke;
+  stroke: #0e1522;
+  stroke-width: 2px;
+  stroke-linejoin: round;
 }
 
 .route-player {
@@ -311,6 +316,22 @@ button:disabled {
 }
 .chart-end-label.race-rival-3 {
   fill: #d7c98f;
+}
+
+.game-legend {
+  margin: 8px 0;
+  font-size: 0.85rem;
+}
+.game-legend summary {
+  cursor: pointer;
+}
+.game-legend table {
+  margin: 6px 0;
+}
+.game-legend td,
+.game-legend th {
+  padding: 2px 10px 2px 0;
+  text-align: left;
 }
 
 .sort-btn {

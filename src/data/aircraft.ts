@@ -1,6 +1,8 @@
-// The fleet catalog. Fictional-but-plausible analogs of real airliner
-// generations, gated by availability years so fleet renewal is a strategic
-// drumbeat across a scenario (PLAN.md §2.3).
+// The fleet catalog: real airframes spanning the airliner generations, gated
+// by availability years so fleet renewal is a strategic drumbeat across a
+// scenario (PLAN.md §2.3). Stats are gameplay-tuned, not spec sheets — each
+// type keeps its real-world character (role, era, relative size and legs)
+// inside the game's balance envelope.
 
 export interface AircraftType {
   id: string
@@ -19,8 +21,8 @@ export interface AircraftType {
 
 export const AIRCRAFT: readonly AircraftType[] = [
   {
-    id: 'pelican40',
-    name: 'Pelican 40',
+    id: 'cv240',
+    name: 'Convair 240',
     seats: 40,
     rangeKm: 1600,
     speedKmh: 480,
@@ -33,8 +35,8 @@ export const AIRCRAFT: readonly AircraftType[] = [
     availableTo: 1974,
   },
   {
-    id: 'meridian80',
-    name: 'Meridian 80',
+    id: 'caravelle',
+    name: 'Sud Caravelle',
     seats: 80,
     rangeKm: 3000,
     speedKmh: 800,
@@ -47,8 +49,8 @@ export const AIRCRAFT: readonly AircraftType[] = [
     availableTo: 1982,
   },
   {
-    id: 'zephyr120',
-    name: 'Zephyr 120',
+    id: 'b727',
+    name: 'Boeing 727',
     seats: 120,
     rangeKm: 4300,
     speedKmh: 850,
@@ -61,8 +63,8 @@ export const AIRCRAFT: readonly AircraftType[] = [
     availableTo: 1992,
   },
   {
-    id: 'corsair160',
-    name: 'Corsair 160',
+    id: 'dc8_62',
+    name: 'DC-8 Super 62',
     seats: 160,
     rangeKm: 7200,
     speedKmh: 880,
@@ -75,8 +77,8 @@ export const AIRCRAFT: readonly AircraftType[] = [
     availableTo: 1998,
   },
   {
-    id: 'atlas320',
-    name: 'Atlas 320',
+    id: 'b747_100',
+    name: 'Boeing 747-100',
     seats: 320,
     rangeKm: 9800,
     speedKmh: 900,
@@ -89,8 +91,8 @@ export const AIRCRAFT: readonly AircraftType[] = [
     availableTo: 2010,
   },
   {
-    id: 'titan420',
-    name: 'Titan 420',
+    id: 'b747_200',
+    name: 'Boeing 747-200B',
     seats: 420,
     rangeKm: 11800,
     speedKmh: 910,
@@ -103,8 +105,8 @@ export const AIRCRAFT: readonly AircraftType[] = [
     availableTo: 2020,
   },
   {
-    id: 'aurora180',
-    name: 'Aurora 180',
+    id: 'b767',
+    name: 'Boeing 767',
     seats: 180,
     rangeKm: 6800,
     speedKmh: 870,
@@ -117,8 +119,8 @@ export const AIRCRAFT: readonly AircraftType[] = [
     availableTo: 2035,
   },
   {
-    id: 'albatross260',
-    name: 'Albatross 260',
+    id: 'md11',
+    name: 'MD-11',
     seats: 260,
     rangeKm: 12500,
     speedKmh: 905,

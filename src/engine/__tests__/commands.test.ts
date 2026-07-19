@@ -29,7 +29,7 @@ describe('command validation', () => {
   })
 
   it('validates the launch schedule against the aircraft', () => {
-    // Meridian 80 tops out at 22 round trips/week on JFK-ORD.
+    // Sud Caravelle tops out at 22 round trips/week on JFK-ORD.
     expectRejected(
       applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: 1, frequency: 99 }).events,
       'frequency must be 1..22',
@@ -55,7 +55,7 @@ describe('command validation', () => {
       applyCommand(r.state, { type: 'set_frequency', routeId, frequency: 23 }).events,
       'frequency must be 1..22',
     )
-    // Assigning the second Meridian doubles the ceiling.
+    // Assigning the second Caravelle doubles the ceiling.
     r = applyCommand(r.state, { type: 'assign_aircraft', aircraftId: 2, routeId })
     r = applyCommand(r.state, { type: 'set_frequency', routeId, frequency: 44 })
     expect(r.state.airlines[0]!.routes[0]!.frequency).toBe(44)
@@ -109,7 +109,7 @@ describe('command validation', () => {
   it('rejects a launch beyond the aircraft range', () => {
     const state = fresh()
     state.airlines[0]!.slots['LHR'] = 2 // grant a transatlantic foothold
-    // Meridian 80 range 3000km < JFK-LHR 5541km.
+    // Sud Caravelle range 3000km < JFK-LHR 5541km.
     const opened = applyCommand(state, { type: 'open_route', from: 'JFK', to: 'LHR', aircraftId: 1, frequency: 3 })
     expectRejected(opened.events, 'range')
   })
@@ -124,19 +124,19 @@ describe('command validation', () => {
   })
 
   it('orders deduct cash and reject when unaffordable or off-sale', () => {
-    // 1960: Titan 420 (1972+) is not on sale yet.
-    expectRejected(applyCommand(fresh(), { type: 'order_aircraft', aircraftType: 'titan420' }).events, 'not on sale')
-    // Two Meridians are affordable from 18000, the third is not (3 × 6800).
-    let r = applyCommand(fresh(), { type: 'order_aircraft', aircraftType: 'meridian80' })
+    // 1960: Boeing 747-200B (1972+) is not on sale yet.
+    expectRejected(applyCommand(fresh(), { type: 'order_aircraft', aircraftType: 'b747_200' }).events, 'not on sale')
+    // Two Caravelles are affordable from 18000, the third is not (3 × 6800).
+    let r = applyCommand(fresh(), { type: 'order_aircraft', aircraftType: 'caravelle' })
     expect(r.state.airlines[0]!.cash).toBe(18000 - 6800)
-    r = applyCommand(r.state, { type: 'order_aircraft', aircraftType: 'meridian80' })
-    const third = applyCommand(r.state, { type: 'order_aircraft', aircraftType: 'meridian80' })
+    r = applyCommand(r.state, { type: 'order_aircraft', aircraftType: 'caravelle' })
+    const third = applyCommand(r.state, { type: 'order_aircraft', aircraftType: 'caravelle' })
     expectRejected(third.events, 'insufficient cash')
   })
 
   it('enforces the debt ceiling and clamps repayment', () => {
     const state = fresh()
-    // Ceiling: 2 × Meridian resale (6800 × 88% = 5984) × 60% + 20000 = 27180.
+    // Ceiling: 2 × Caravelle resale (6800 × 88% = 5984) × 60% + 20000 = 27180.
     const over = applyCommand(state, { type: 'take_loan', amount: 29000 })
     expectRejected(over.events, 'debt ceiling')
     let r = applyCommand(state, { type: 'take_loan', amount: 10000 })

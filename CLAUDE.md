@@ -9,8 +9,9 @@ Read PLAN.md before making architectural changes — it is the design contract.
 - `src/engine/__tests__/` — Unit, determinism, property, and golden tests.
 - `src/data/` — Content as plain data: cities (real world, authored demand
   ratings), `distances.gen.ts` (generated — run `npm run gen:distances`
-  after editing cities, never edit by hand), fictional aircraft catalog with
-  era windows, scenarios, world events, tuning constants.
+  after editing cities, never edit by hand), real-aircraft catalog with
+  gameplay-tuned stats and era windows, scenarios, world events, tuning
+  constants.
 - `src/harness/` — Headless tooling: strategy bots, career simulation, state
   hashing. `src/harness/__tests__/` holds the balance envelope and perf
   budget.

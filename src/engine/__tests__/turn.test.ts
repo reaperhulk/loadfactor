@@ -46,7 +46,7 @@ describe('quarter resolution', () => {
   it('orders age and deliver on schedule', () => {
     let r = applyCommand(newGame('jet_age', 'delivery-seed'), {
       type: 'order_aircraft',
-      aircraftType: 'meridian80', // deliveryQuarters: 2
+      aircraftType: 'caravelle', // deliveryQuarters: 2
     })
     expect(r.state.airlines[0]!.orders).toHaveLength(1)
     r = applyCommand(r.state, { type: 'end_quarter' })

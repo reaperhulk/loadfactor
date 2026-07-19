@@ -44,7 +44,7 @@ export const SCENARIOS: readonly Scenario[] = [
       cash: 18000,
       hqSlots: 8,
       extraSlots: { ORD: 4, MIA: 2, YYZ: 2 },
-      starterFleet: ['meridian80', 'meridian80'],
+      starterFleet: ['caravelle', 'caravelle'],
     },
     rivals: [
       {
@@ -55,7 +55,7 @@ export const SCENARIOS: readonly Scenario[] = [
         // Footholds at medium-haul distances — LHR-CDG/AMS sit in the
         // ground-competition demand band and would starve the AI.
         extraSlots: { FRA: 2, MAD: 2, FCO: 2 },
-        starterFleet: ['meridian80', 'meridian80'],
+        starterFleet: ['caravelle', 'caravelle'],
         personality: 'premium',
       },
       {
@@ -64,7 +64,7 @@ export const SCENARIOS: readonly Scenario[] = [
         cash: 18000,
         hqSlots: 8,
         extraSlots: { HKG: 4, SEL: 2, SIN: 2 },
-        starterFleet: ['meridian80', 'meridian80'],
+        starterFleet: ['caravelle', 'caravelle'],
         personality: 'fortress',
       },
     ],
@@ -85,7 +85,7 @@ export const SCENARIOS: readonly Scenario[] = [
       cash: 25000,
       hqSlots: 8,
       extraSlots: { MAD: 2, FCO: 2, IST: 2 },
-      starterFleet: ['zephyr120', 'zephyr120'],
+      starterFleet: ['b727', 'b727'],
     },
     rivals: [
       {
@@ -94,7 +94,7 @@ export const SCENARIOS: readonly Scenario[] = [
         cash: 25000,
         hqSlots: 8,
         extraSlots: { ORD: 2, MIA: 2, BOS: 2 },
-        starterFleet: ['zephyr120', 'zephyr120'],
+        starterFleet: ['b727', 'b727'],
         personality: 'price_war',
       },
       {
@@ -103,7 +103,7 @@ export const SCENARIOS: readonly Scenario[] = [
         cash: 25000,
         hqSlots: 8,
         extraSlots: { KIX: 2, SEL: 2, HKG: 2 },
-        starterFleet: ['zephyr120', 'zephyr120'],
+        starterFleet: ['b727', 'b727'],
         personality: 'fortress',
       },
     ],
@@ -125,7 +125,7 @@ export const SCENARIOS: readonly Scenario[] = [
       cash: 30000,
       hqSlots: 8,
       extraSlots: { SFO: 2, SEA: 2, DEN: 2 },
-      starterFleet: ['aurora180', 'aurora180'],
+      starterFleet: ['b767', 'b767'],
     },
     rivals: [
       {
@@ -134,7 +134,7 @@ export const SCENARIOS: readonly Scenario[] = [
         cash: 30000,
         hqSlots: 8,
         extraSlots: { ATL: 2, ORD: 2, BOS: 2 },
-        starterFleet: ['aurora180', 'aurora180'],
+        starterFleet: ['b767', 'b767'],
         personality: 'price_war',
       },
       {
@@ -143,7 +143,7 @@ export const SCENARIOS: readonly Scenario[] = [
         cash: 30000,
         hqSlots: 8,
         extraSlots: { KIX: 2, SEL: 2, TPE: 2 },
-        starterFleet: ['aurora180', 'aurora180'],
+        starterFleet: ['b767', 'b767'],
         personality: 'fortress',
       },
       {
@@ -152,7 +152,7 @@ export const SCENARIOS: readonly Scenario[] = [
         cash: 30000,
         hqSlots: 8,
         extraSlots: { MAD: 2, FCO: 2, ARN: 2 },
-        starterFleet: ['aurora180', 'aurora180'],
+        starterFleet: ['b767', 'b767'],
         personality: 'premium',
       },
     ],

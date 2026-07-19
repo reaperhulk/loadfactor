@@ -253,6 +253,10 @@ export function MapView({
   }
 
   const onPointerDown = (e: PointerEvent<SVGSVGElement>): void => {
+    // A fresh gesture wipes any stale suppression. When a drag ends over
+    // empty map, no click handler consumes the flag — without this, the NEXT
+    // city click gets eaten and selection needs two clicks.
+    suppressClick.current = false
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (pointers.current.size === 2) {
       pinch.current = pinchGeometry()
@@ -474,14 +478,27 @@ export function MapView({
                         : 'city-dot'
                 }
               />
-              {labeled.has(c.id) && (
-                <text x={x(c.lon) + r + 3 / scale} y={y(c.lat) + 3 / scale} fontSize={9 / scale} className="city-label">
-                  {c.id}
-                </text>
-              )}
             </g>
           )
         })}
+        {/* Labels draw in their own layer ABOVE every dot, with a halo — a
+            neighboring city's dot can never sit on top of a name. */}
+        {visible
+          .filter((c) => labeled.has(c.id))
+          .map((c) => {
+            const r = (2 + cityMass(c) / 18) / Math.sqrt(scale)
+            return (
+              <text
+                key={`label-${c.id}`}
+                x={x(c.lon) + r + 3 / scale}
+                y={y(c.lat) + 3 / scale}
+                fontSize={9 / scale}
+                className="city-label"
+              >
+                {c.id}
+              </text>
+            )
+          })}
       </svg>
       <div className="map-controls">
         <button data-testid="zoom-in" aria-label="zoom in" onClick={() => zoomAt(null, null, 1.5)}>

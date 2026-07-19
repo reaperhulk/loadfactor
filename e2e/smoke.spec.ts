@@ -53,7 +53,7 @@ test('routes open via the city panel plan-route flow with a launch schedule', as
   await page.getByTestId('city-ORD').click()
   // The launch dialog: aircraft + frequency (bounded by distance) + fare.
   await expect(page.getByTestId('route-setup')).toBeVisible()
-  await expect(page.getByTestId('route-setup')).toContainText('Meridian 80')
+  await expect(page.getByTestId('route-setup')).toContainText('Sud Caravelle')
   await expect(page.getByTestId('route-setup-freq')).toContainText('rt/wk')
   await page.getByTestId('route-setup-confirm').click()
   await expect(page.getByTestId('route-setup')).toHaveCount(0)
@@ -201,12 +201,12 @@ test('the shop estimates per-route economics, coach marks guide, mute persists',
     }
   })
   await page.getByTestId('tab-fleet').click()
-  await expect(page.getByTestId('shop-table')).toContainText('Meridian 80')
+  await expect(page.getByTestId('shop-table')).toContainText('Sud Caravelle')
   await page.getByTestId('shop-route').selectOption({ label: 'JFK–ORD' })
   await expect(page.getByTestId('shop-table')).toContainText('Est. cost/q here')
   await expect(page.getByTestId('shop-table')).toContainText('Seats/wk here')
   // Ordering from the shop deducts cash.
-  await page.getByTestId('order-meridian80').click()
+  await page.getByTestId('order-caravelle').click()
   await expect(page.getByTestId('cash')).toContainText('$11.2M')
 
   // Mute toggle flips and persists across reload.
@@ -267,7 +267,7 @@ test('M2 tools: daily challenge, leasing, used market, fuel hedge', async ({ pag
   await expect(page.getByTestId('date')).toHaveText('1960 Q1')
   // Lease from the shop: no capex, delivers next quarter.
   await page.getByTestId('tab-fleet').click()
-  await page.getByTestId('lease-meridian80').click()
+  await page.getByTestId('lease-caravelle').click()
   await expect(page.getByTestId('cash')).toContainText('$18.0M')
   await page.evaluate(() => window.__harness.endQuarter())
   await expect(page.locator('text=(leased)')).toBeVisible()

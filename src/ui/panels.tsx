@@ -38,6 +38,7 @@ import { assignAndSchedule } from './assign'
 import { dispatch } from './session'
 import { Sparkline } from './Sparkline'
 import { COST_LABELS, money } from './format'
+import { CabinLegend, ServiceLegend } from './legends'
 
 // Sort keys for the routes comparison table. Each computes from the same row
 // model the cells render, so what you sort is exactly what you see.
@@ -192,6 +193,7 @@ export function RoutesPanel({ state, onInspect }: { state: GameState; onInspect:
         })}
       </tbody>
     </table></div>
+    <ServiceLegend />
     </div>
   )
 }
@@ -285,6 +287,7 @@ export function FleetPanel({ state }: { state: GameState }) {
           ))}
         </tbody>
       </table></div>
+      <CabinLegend />
       <h3>Order new aircraft ({year})</h3>
       <Shop state={state} />
     </div>
