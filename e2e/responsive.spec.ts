@@ -61,6 +61,12 @@ for (const viewport of VIEWPORTS) {
     expect(await horizontalOverflow(page), 'report card fits').toBeLessThanOrEqual(0)
     await page.getByTestId('report-card-close').click()
     await expect(page.getByTestId('date')).toHaveText('1960 Q3')
+
+    // The populated menu (save rows, import box open) must fit too.
+    await page.reload()
+    await expect(page.getByTestId('save-slot-0')).toBeVisible()
+    await page.locator('summary', { hasText: 'Import a career' }).click()
+    expect(await horizontalOverflow(page), 'populated menu fits').toBeLessThanOrEqual(0)
   })
 }
 
