@@ -70,18 +70,19 @@ export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () =>
         newSlotCities={EMPTY}
       />
       <div className="replay-controls">
-        <button onClick={() => setIndex(0)} title="restart">
+        <button onClick={() => setIndex(0)} title="restart" aria-label="restart replay">
           ⏮
         </button>
-        <button onClick={() => setIndex((i) => Math.max(0, i - 1))} title="back one quarter">
+        <button onClick={() => setIndex((i) => Math.max(0, i - 1))} title="back one quarter" aria-label="back one quarter">
           ⏪
         </button>
-        <button onClick={() => setPlaying((p) => !p)} data-testid="replay-playpause">
+        <button onClick={() => setPlaying((p) => !p)} data-testid="replay-playpause" aria-label={playing ? 'pause replay' : 'play replay'}>
           {playing ? '⏸' : '▶'}
         </button>
         <button
           onClick={() => setIndex((i) => Math.min(last, i + 1))}
           title="forward one quarter"
+          aria-label="forward one quarter"
           data-testid="replay-step"
         >
           ⏩
@@ -90,12 +91,14 @@ export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () =>
           className={fast ? 'active' : ''}
           onClick={() => setFast((f) => !f)}
           title="playback speed"
+          aria-label="toggle playback speed"
           data-testid="replay-speed"
         >
           {fast ? '4×' : '1×'}
         </button>
         <input
           type="range"
+          aria-label="replay position"
           min={0}
           max={last}
           value={index}

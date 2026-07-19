@@ -176,6 +176,17 @@ button:disabled {
   fill: var(--accent);
 }
 
+/* Year-in-review block on the Q1 report card. */
+.year-review {
+  border-top: 1px solid #2b3a5a;
+  margin-top: 8px;
+  padding-top: 4px;
+}
+
+.year-review h3 {
+  margin: 4px 0;
+}
+
 /* Cost-mix bands: a 100%-stacked slice per quarter. */
 .cost-mix svg {
   display: block;

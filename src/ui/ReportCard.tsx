@@ -203,6 +203,41 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
           </p>
         )}
 
+        {(() => {
+          // Year in review: when a Q4 resolves (the report shows as the new
+          // year's Q1), digest the four quarters just flown against the four
+          // before them. The annual rhythm is the era's heartbeat.
+          if (quarterOf(state) !== 1 || player.history.length < 4) return null
+          const h = player.history
+          const yearSlice = h.slice(-4)
+          const prevSlice = h.slice(-8, -4)
+          const sum = (rows: typeof yearSlice, pick: (q: (typeof h)[number]) => number) =>
+            rows.reduce((acc, q) => acc + pick(q), 0)
+          const revenue = sum(yearSlice, (q) => q.revenue)
+          const profit = sum(yearSlice, (q) => q.profit)
+          const pax = sum(yearSlice, (q) => q.pax)
+          const prevPax = prevSlice.length === 4 ? sum(prevSlice, (q) => q.pax) : null
+          const paxGrowth = prevPax !== null && prevPax > 0 ? Math.round(((pax - prevPax) * 100) / prevPax) : null
+          return (
+            <div className="year-review" data-testid="year-review">
+              <h3>{yearOf(state) - 1} in review</h3>
+              <p>
+                Revenue {money(revenue)} · profit{' '}
+                <span className={profit >= 0 ? 'pos' : 'neg'}>{money(profit)}</span> ·{' '}
+                {pax.toLocaleString('en-US')} pax
+                {paxGrowth !== null && (
+                  <span className={paxGrowth >= 0 ? 'pos' : 'neg'}>
+                    {' '}
+                    ({paxGrowth >= 0 ? '▲' : '▼'}
+                    {Math.abs(paxGrowth)}% vs prior year)
+                  </span>
+                )}{' '}
+                · {player.routes.length} routes · {player.fleet.length} aircraft
+              </p>
+            </div>
+          )
+        })()}
+
         {quarterOf(state) === 1 &&
           AIRCRAFT.some((t) => t.availableFrom === yearOf(state)) && (
             <p className="pos" data-testid="new-aircraft-news">
