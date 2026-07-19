@@ -107,6 +107,10 @@ button:disabled {
 
 .map-wrap {
   position: relative;
+  /* Dragging the map must pan it, never paint a text selection across city
+     labels (or bleed selection into the page around it). */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .map {

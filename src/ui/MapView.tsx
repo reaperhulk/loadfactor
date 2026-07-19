@@ -32,6 +32,14 @@ export function cityMass(c: City): number {
   return c.pop * 4 + c.biz * 3 + c.tour * 2
 }
 
+// Top-view airliner silhouette, nose on the +x axis — animateMotion's
+// rotate="auto" aligns +x with the direction of travel, so this glyph always
+// flies nose-first.
+const PLANE_GLYPH =
+  'M 7 0 C 6 -0.9 5 -1 4 -1 L 1.2 -1 L -1.8 -5 L -3.6 -5 L -1.9 -1 L -4.6 -1 ' +
+  'L -6.2 -2.6 L -6.8 -2.6 L -5.8 0 L -6.8 2.6 L -6.2 2.6 L -4.6 1 L -1.9 1 ' +
+  'L -3.6 5 L -1.8 5 L 1.2 1 L 4 1 C 5 1 6 0.9 7 0 Z'
+
 // One color per rival, everywhere it appears (map arcs, panel chips).
 export const RIVAL_COLORS = ['#d0636e', '#9d7bd8', '#d8a052'] as const
 
@@ -435,9 +443,11 @@ export function MapView({
           const path = arcPath(r.from, r.to)
           return Array.from({ length: planes }, (_, i) => (
             <g key={`plane-${r.id}-${i}`} className="plane" data-testid={i === 0 ? `plane-${r.id}` : undefined}>
-              <text fontSize={11 / scale} dy={3.5 / scale} textAnchor="middle">
-                ✈
-              </text>
+              {/* A silhouette whose nose points along +x: rotate="auto" then
+                  keeps it flying nose-first on BOTH legs of the shuttle — the
+                  ✈ text glyph points 45° off-axis and read as flying
+                  backwards on the return leg. */}
+              <path d={PLANE_GLYPH} transform={`scale(${0.8 / scale})`} />
               <animateMotion
                 dur={`${dur.toFixed(1)}s`}
                 begin={`${(-((r.id * 13) % 60) / 10 - (i * dur) / planes).toFixed(1)}s`}
