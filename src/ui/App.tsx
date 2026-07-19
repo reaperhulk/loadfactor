@@ -5,6 +5,7 @@ import { SCENARIOS, getScenario } from '../data/scenarios'
 import { netWorth, quarterOf, yearOf } from '../engine/queries'
 import { CityPanel } from './CityPanel'
 import { CoachMarks } from './CoachMarks'
+import { ConfirmButton } from './ConfirmButton'
 import { useCountUp } from './countUp'
 import { isMuted, setMuted } from './sounds'
 import { MapView } from './MapView'
@@ -109,12 +110,21 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
       <div className="scenario-card continue-card">
         <h2>Daily challenge</h2>
         <p className="dim">Everyone flies the same seed today. Compare final net worth with your friends.</p>
-        <button
-          data-testid="start-daily"
-          onClick={() => startGame('jet_age', `daily-${new Date().toISOString().slice(0, 10)}`, custom())}
-        >
-          ▶ Fly today’s seed
-        </button>
+        {save ? (
+          <ConfirmButton
+            data-testid="start-daily"
+            label="▶ Fly today’s seed"
+            confirmLabel="overwrite your saved game?"
+            onConfirm={() => startGame('jet_age', `daily-${new Date().toISOString().slice(0, 10)}`, custom())}
+          />
+        ) : (
+          <button
+            data-testid="start-daily"
+            onClick={() => startGame('jet_age', `daily-${new Date().toISOString().slice(0, 10)}`, custom())}
+          >
+            ▶ Fly today’s seed
+          </button>
+        )}
       </div>
       {SCENARIOS.map((s) => (
         <div key={s.id} className="scenario-card">
@@ -125,12 +135,21 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
             {money(s.targetNetWorth)} · vs{' '}
             {s.rivals.map((r) => `${r.name} (${r.personality ?? 'balanced'})`).join(', ')}
           </p>
-          <button
-            data-testid={`start-${s.id}`}
-            onClick={() => startGame(s.id, seed || new Date().toISOString().slice(0, 10), custom())}
-          >
-            Start
-          </button>
+          {save ? (
+            <ConfirmButton
+              data-testid={`start-${s.id}`}
+              label="Start"
+              confirmLabel="overwrite your saved game?"
+              onConfirm={() => startGame(s.id, seed || new Date().toISOString().slice(0, 10), custom())}
+            />
+          ) : (
+            <button
+              data-testid={`start-${s.id}`}
+              onClick={() => startGame(s.id, seed || new Date().toISOString().slice(0, 10), custom())}
+            >
+              Start
+            </button>
+          )}
         </div>
       ))}
     </main>

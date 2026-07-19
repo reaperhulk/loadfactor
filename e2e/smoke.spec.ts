@@ -189,8 +189,14 @@ test('airline identity: name, livery, and a custom HQ with derived footholds', a
   await page.getByTestId('tab-rivals').click()
   await expect(page.getByTestId('standings')).toContainText('Pan Galactic (you)')
   await expect(page.getByTestId('standings')).toContainText('Albion Airways')
-  // The identity survives a reload through the save.
+  // The identity survives a reload through the save — and the replay viewer
+  // rebuilds the career WITH the customization (a custom HQ replayed against
+  // the authored world would silently diverge).
   await page.reload()
+  await page.getByTestId('watch-save-replay').click()
+  await expect(page.getByTestId('replay-viewer')).toBeVisible()
+  await expect(page.locator('.standings')).toContainText('Pan Galactic')
+  await page.getByTestId('replay-exit').click()
   await page.getByTestId('continue-save').click()
   const resumed = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.name)
   expect(resumed).toBe('Pan Galactic')

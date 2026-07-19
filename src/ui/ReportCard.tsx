@@ -105,6 +105,26 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
                 <td />
               </tr>
             )}
+            {(() => {
+              // Position in the race, and whether this quarter moved it.
+              const rankAt = (pick: (a: (typeof state.airlines)[number]) => number): number => {
+                const alive = state.airlines.filter((a) => !a.bankrupt)
+                alive.sort((a, b) => pick(b) - pick(a))
+                return alive.findIndex((a) => a.id === 0) + 1
+              }
+              const rankNow = rankAt((a) => a.history[a.history.length - 1]?.netWorth ?? 0)
+              const rankPrev = prev ? rankAt((a) => a.history[a.history.length - 2]?.netWorth ?? 0) : rankNow
+              if (rankNow === 0) return null
+              return (
+                <tr>
+                  <td>Position</td>
+                  <td className={rankNow === 1 ? 'pos' : ''}>#{rankNow}</td>
+                  <td className={rankNow < rankPrev ? 'pos' : rankNow > rankPrev ? 'neg' : 'dim'}>
+                    {rankNow < rankPrev ? `▲ from #${rankPrev}` : rankNow > rankPrev ? `▼ from #${rankPrev}` : '±0'}
+                  </td>
+                </tr>
+              )
+            })()}
             <tr>
               <td>Passengers</td>
               <td>{now.pax.toLocaleString('en-US')}</td>
