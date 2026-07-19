@@ -55,6 +55,10 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
   const slotLosses = events.filter(
     (e): e is Extract<GameEvent, { type: 'slot_lost' }> => e.type === 'slot_lost' && e.airline === 0,
   )
+  const negotiationFails = events.filter(
+    (e): e is Extract<GameEvent, { type: 'negotiation_failed' }> =>
+      e.type === 'negotiation_failed' && e.airline === 0,
+  )
   // Rivals moving onto pairs the player serves — the quarter's declarations
   // of war belong on the front page.
   const myPairs = new Set(player.routes.map((r) => pairKey(r.from, r.to)))
@@ -159,12 +163,13 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
           </p>
         )}
 
-        {(deliveries.length > 0 || slotWins.length > 0 || slotLosses.length > 0) && (
+        {(deliveries.length > 0 || slotWins.length > 0 || slotLosses.length > 0 || negotiationFails.length > 0) && (
           <p>
             {[
               ...deliveries.map((d) => `${getAircraftType(d.aircraftType).name} delivered`),
               ...slotWins.map((s) => `${s.slots} slots won at ${s.city}`),
               ...slotLosses.map((s) => `idle slot forfeited at ${s.city}`),
+              ...negotiationFails.map((n) => `negotiation failed at ${n.city}`),
             ].join(' · ')}
           </p>
         )}

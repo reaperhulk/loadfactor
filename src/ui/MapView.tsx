@@ -4,7 +4,7 @@
 // are fine here — the engine never sees screen coordinates.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { PointerEvent, WheelEvent } from 'react'
+import type { PointerEvent } from 'react'
 import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { WORLD_PATH } from '../data/worldmap.gen'
@@ -230,12 +230,27 @@ export function MapView({
     applyView({ x: mx - ((mx - t.x) / t.w) * w, y: my - ((my - t.y) / t.h) * h, w, h }, immediate)
   }
 
-  const onWheel = (e: WheelEvent<SVGSVGElement>): void => {
-    // Proportional to scroll delta: gentle on trackpads (many small deltas),
-    // one comfortable step per mouse-wheel notch, hard-clamped per event.
-    const factor = Math.min(1.6, Math.max(0.625, Math.pow(1.0018, -e.deltaY)))
-    zoomAt(e.clientX, e.clientY, factor)
-  }
+  // Wheel zoom must be a NATIVE non-passive listener: React registers onWheel
+  // passively, so preventDefault() is ignored there and the page scrolls
+  // underneath the map while it zooms. The handler lives in a ref (refreshed
+  // every render) so the once-attached listener always sees current state.
+  const wheelRef = useRef<(e: globalThis.WheelEvent) => void>(() => {})
+  useEffect(() => {
+    wheelRef.current = (e: globalThis.WheelEvent) => {
+      e.preventDefault()
+      // Proportional to scroll delta: gentle on trackpads (many small
+      // deltas), one comfortable step per mouse-wheel notch, hard-clamped.
+      const factor = Math.min(1.6, Math.max(0.625, Math.pow(1.0018, -e.deltaY)))
+      zoomAt(e.clientX, e.clientY, factor)
+    }
+  })
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    const handler = (e: globalThis.WheelEvent): void => wheelRef.current(e)
+    el.addEventListener('wheel', handler, { passive: false })
+    return () => el.removeEventListener('wheel', handler)
+  }, [])
 
   // Touch pinch: two active pointers zoom about their midpoint and pan with
   // it, writing through immediately (easing would fight fingers).
@@ -335,7 +350,6 @@ export function MapView({
         role="img"
         aria-label="World route map"
         data-testid="map"
-        onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

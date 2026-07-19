@@ -137,6 +137,25 @@ test('opening a route triggers the reward animation and toast', async ({ page })
   await expect(page.getByTestId('route-line-new')).toHaveCount(0)
 })
 
+test('wheel over the map zooms without scrolling the page', async ({ page }) => {
+  // A short viewport forces the page to overflow vertically, so a leaked
+  // wheel event would visibly scroll it.
+  await page.setViewportSize({ width: 900, height: 460 })
+  await startGame(page)
+  // The coach mark floats over the map — wheel events on it never reach the
+  // SVG listener, so clear it before scrolling.
+  await page.getByTestId('coach-dismiss').click()
+  const map = page.getByTestId('map')
+  const box = (await map.boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.wheel(0, -600)
+  await page.mouse.wheel(0, -600)
+  await page.mouse.wheel(0, -600)
+  // The map zoomed (a tier-3 field fades in) and the page did not move.
+  await expect(page.getByTestId('city-DOH')).toHaveCount(1)
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+})
+
 test('zoom reveals small cities that are hidden at world view', async ({ page }) => {
   await startGame(page)
   // Doha is a tier-3 field with no player stake: invisible at world zoom.
