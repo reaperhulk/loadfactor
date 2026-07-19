@@ -44,12 +44,18 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
     return r ? `${r.from}–${r.to}` : 'closed route'
   }
 
+  let transferPax = 0
+  for (const r of routeResults) transferPax += r.transferPax
+
   const deliveries = events.filter(
     (e): e is Extract<GameEvent, { type: 'aircraft_delivered' }> =>
       e.type === 'aircraft_delivered' && e.airline === 0,
   )
   const slotWins = events.filter(
     (e): e is Extract<GameEvent, { type: 'slots_granted' }> => e.type === 'slots_granted' && e.airline === 0,
+  )
+  const slotLosses = events.filter(
+    (e): e is Extract<GameEvent, { type: 'slot_lost' }> => e.type === 'slot_lost' && e.airline === 0,
   )
   const worldNews = events.filter(
     (e): e is Extract<GameEvent, { type: 'world_event_started' }> => e.type === 'world_event_started',
@@ -86,6 +92,13 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
               <td>{now.pax.toLocaleString('en-US')}</td>
               <td className="dim">{prev ? delta(now.pax, prev.pax).replace('$', '').replace('M', 'M') : ''}</td>
             </tr>
+            {transferPax > 0 && (
+              <tr>
+                <td className="dim">of which connecting</td>
+                <td className="dim">{transferPax.toLocaleString('en-US')}</td>
+                <td />
+              </tr>
+            )}
             <tr>
               <td>Net worth</td>
               <td>{money(now.netWorth)}</td>
@@ -109,11 +122,13 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
           </p>
         )}
 
-        {(deliveries.length > 0 || slotWins.length > 0) && (
+        {(deliveries.length > 0 || slotWins.length > 0 || slotLosses.length > 0) && (
           <p>
-            {deliveries.map((d) => `${getAircraftType(d.aircraftType).name} delivered`).join(' · ')}
-            {deliveries.length > 0 && slotWins.length > 0 && ' · '}
-            {slotWins.map((s) => `${s.slots} slots won at ${s.city}`).join(' · ')}
+            {[
+              ...deliveries.map((d) => `${getAircraftType(d.aircraftType).name} delivered`),
+              ...slotWins.map((s) => `${s.slots} slots won at ${s.city}`),
+              ...slotLosses.map((s) => `idle slot forfeited at ${s.city}`),
+            ].join(' · ')}
           </p>
         )}
 

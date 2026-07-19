@@ -7,7 +7,13 @@ import { distanceKm, pairKey } from '../data/cities'
 import { FARE_DEMAND_BP } from '../data/constants'
 import type { GameState } from '../engine'
 import { fareFor, pairWeeklyDemand } from '../engine/market'
-import { effectiveFrequency, maxRouteFrequency, roundTripsPerWeek, routeWeeklyCapacity } from '../engine/queries'
+import {
+  cabinSeats,
+  effectiveFrequency,
+  maxRouteFrequency,
+  roundTripsPerWeek,
+  routeWeeklyCapacity,
+} from '../engine/queries'
 import { Sparkline } from './Sparkline'
 import { dispatch } from './session'
 
@@ -153,7 +159,12 @@ export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
               const type = getAircraftType(a.type)
               return (
                 <tr key={a.id}>
-                  <td>{type.name}</td>
+                  <td>
+                    {type.name}{' '}
+                    <span className="dim">
+                      {['', 'dense', 'std', 'prem'][a.cabin]} · {cabinSeats(a.type, a.cabin)} seats
+                    </span>
+                  </td>
                   <td>{roundTripsPerWeek(a.type, km)} rt/wk</td>
                   <td>
                     <button onClick={() => dispatch({ type: 'assign_aircraft', aircraftId: a.id, routeId: null })}>

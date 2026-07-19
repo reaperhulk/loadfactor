@@ -9,6 +9,8 @@ import type { GameEvent, GameState } from '../engine'
 import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor } from '../engine/market'
 import {
   CABIN_REFIT_COST_BP,
+  SLOT_IDLE_QUARTERS_TO_LOSE,
+  SLOT_IDLE_THRESHOLD,
   HEDGE_MAX_QUARTERS,
   HEDGE_MIN_QUARTERS,
   HEDGE_PREMIUM_PER_AIRCRAFT,
@@ -349,6 +351,8 @@ export function AirportsPanel({ state }: { state: GameState }) {
             const held = slotsHeld(player, c.id)
             const used = slotsUsed(player, c.id)
             const negotiating = player.negotiations.some((n) => n.city === c.id)
+            // Use it or lose it: idle slots (HQ exempt) are on a countdown.
+            const atRisk = c.id !== player.hq && held - used >= SLOT_IDLE_THRESHOLD
             return (
               <tr key={c.id}>
                 <td>
@@ -356,6 +360,12 @@ export function AirportsPanel({ state }: { state: GameState }) {
                 </td>
                 <td>
                   {held} / {used}
+                  {atRisk && (
+                    <span className="neg" title="idle slots are reclaimed — open routes or lose one">
+                      {' '}
+                      ⚠ {SLOT_IDLE_QUARTERS_TO_LOSE - (player.slotIdle[c.id] ?? 0)}q
+                    </span>
+                  )}
                 </td>
                 <td>{money(negotiationDifficulty(c.id))}</td>
                 <td>

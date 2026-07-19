@@ -63,6 +63,7 @@ describe('build fuzzer', () => {
         renewAge: 90,
         negotiateBudgetBp: 15000,
         cashBuffer: 1000,
+        cabin: 1, // pack every seat the sprawl can sell
       },
     },
     {
@@ -77,6 +78,7 @@ describe('build fuzzer', () => {
         renewAge: 48,
         negotiateBudgetBp: 12000,
         cashBuffer: 6000,
+        cabin: 3, // premium fit to stack yield on top of the gouge
       },
     },
   ]

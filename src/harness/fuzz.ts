@@ -33,6 +33,7 @@ export interface Genome {
   renewAge: number // sell airframes at this age (quarters) [24..90]
   negotiateBudgetBp: number // spend as bp of city difficulty [3000..15000]
   cashBuffer: number // keep this much cash when buying [1000..12000]
+  cabin: number // fleet cabin doctrine: 1 dense / 2 standard / 3 premium
 }
 
 export const GENOME_RANGES: Record<keyof Genome, readonly [number, number]> = {
@@ -44,6 +45,7 @@ export const GENOME_RANGES: Record<keyof Genome, readonly [number, number]> = {
   renewAge: [24, 90],
   negotiateBudgetBp: [3000, 15000],
   cashBuffer: [1000, 12000],
+  cabin: [1, 3],
 }
 
 const GENOME_KEYS = Object.keys(GENOME_RANGES).sort() as (keyof Genome)[]
@@ -69,6 +71,17 @@ export function genomeCommands(state: GameState, g: Genome): Command[] {
     .sort((a, b) => b.ageQuarters - a.ageQuarters)
     .slice(0, 2)
   for (const ac of geriatric) commands.push({ type: 'sell_aircraft', aircraftId: ac.id })
+
+  // Cabin doctrine: refit the fleet toward the genome's fit, two a quarter
+  // (the validator rejects unaffordable refits — that is a genome's problem).
+  let refits = 0
+  for (const ac of airline.fleet) {
+    if (refits >= 2) break
+    if (ac.cabin !== g.cabin && !geriatric.some((old) => old.id === ac.id)) {
+      commands.push({ type: 'refit_cabin', aircraftId: ac.id, cabin: g.cabin })
+      refits++
+    }
+  }
 
   const launch = launchCommands(state, g.expandThreshold, g.fareBias, g.serviceLevel)
   commands.push(...launch.commands)
