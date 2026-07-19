@@ -255,6 +255,17 @@ button:disabled {
   margin: 6px 0;
 }
 
+.attention-chip {
+  cursor: pointer;
+  border: 1px solid #7a5a2c;
+  background: #2b2313;
+  color: var(--ink);
+}
+
+.attention-chip:hover {
+  background: #3a2f18;
+}
+
 .scenario-chips {
   display: flex;
   gap: 6px;

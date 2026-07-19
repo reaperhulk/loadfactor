@@ -66,6 +66,15 @@ test('routes open via the city panel plan-route flow with a launch schedule', as
   await expect(page.getByTestId('route-MIA-ORD')).toBeVisible()
 })
 
+test('every scenario starts from its menu card', async ({ page }) => {
+  await page.goto('/')
+  await page.getByTestId('seed-input').fill('menu-seed')
+  await page.getByTestId('start-open_skies').click()
+  await expect(page.getByTestId('date')).toHaveText('1995 Q1')
+  // The attention strip nudges toward the parked starter fleet.
+  await expect(page.getByTestId('attention-strip')).toContainText('idle plane')
+})
+
 test('the city panel shows stats and negotiates in context', async ({ page }) => {
   await startGame(page)
   await page.getByTestId('city-LAX').click()

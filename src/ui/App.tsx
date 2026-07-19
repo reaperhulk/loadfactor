@@ -422,6 +422,31 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         )}
       </header>
       <CoachMarks state={state} />
+      {(() => {
+        // Needs attention: money leaking or about to. Each chip jumps to the
+        // tab where the fix lives.
+        const idlePlanes = player.fleet.filter((a) => a.routeId === null).length
+        const atRiskCities = Object.keys(player.slotIdle)
+          .sort()
+          .filter((c) => (player.slotIdle[c] ?? 0) > 0).length
+        const hedgeExpiring = player.fuelHedge !== null && player.fuelHedge.quartersLeft === 1
+        const chips: { key: string; text: string; tab: Tab }[] = []
+        if (idlePlanes > 0)
+          chips.push({ key: 'idle', text: `🛩 ${idlePlanes} idle plane${idlePlanes > 1 ? 's' : ''}`, tab: 'fleet' })
+        if (atRiskCities > 0)
+          chips.push({ key: 'slots', text: `🕳 slots at risk in ${atRiskCities} cit${atRiskCities > 1 ? 'ies' : 'y'}`, tab: 'airports' })
+        if (hedgeExpiring) chips.push({ key: 'hedge', text: '⛽ fuel hedge expires next quarter', tab: 'finance' })
+        if (chips.length === 0) return null
+        return (
+          <div className="events-strip attention-strip" data-testid="attention-strip">
+            {chips.map((c) => (
+              <button key={c.key} className="event-chip attention-chip" onClick={() => setTab(c.tab)}>
+                {c.text}
+              </button>
+            ))}
+          </div>
+        )
+      })()}
       {state.world.events.length > 0 && (
         <div className="events-strip" data-testid="events-strip">
           {state.world.events.map((e) => {
