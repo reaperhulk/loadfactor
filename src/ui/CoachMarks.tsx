@@ -2,6 +2,7 @@
 // state — never a modal tour. Dismiss once and it never returns (persisted).
 
 import { useState } from 'react'
+import { pairKey } from '../data/cities'
 import type { GameState } from '../engine'
 import { slotCities } from '../engine/queries'
 
@@ -20,6 +21,17 @@ function nextHint(state: GameState): string | null {
   }
   if (state.turn <= 4 && player.negotiations.length === 0 && slotCities(player).length <= 4) {
     return 'Growth needs gates: open a city dossier and negotiate for slots at a new airport.'
+  }
+  // A rival is on one of your pairs and you're not fighting back with brand.
+  const myPairs = new Set(player.routes.map((r) => pairKey(r.from, r.to)))
+  const contested = state.airlines
+    .slice(1)
+    .some((a) => a.routes.some((r) => myPairs.has(pairKey(r.from, r.to))))
+  if (state.turn >= 3 && contested && player.marketing === 0) {
+    return 'A rival is on one of your pairs. Marketing (finance tab) buys appeal in every share battle.'
+  }
+  if (state.turn >= 3 && player.routes.length >= 1) {
+    return 'The routes tab ranks the richest unserved markets under Opportunities — plan one in a click.'
   }
   return null
 }

@@ -176,6 +176,28 @@ button:disabled {
   fill: var(--accent);
 }
 
+/* Cost-mix bands: a 100%-stacked slice per quarter. */
+.cost-mix svg {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  height: 72px;
+  border-radius: 6px;
+  outline: 1px solid #2b3a5a;
+}
+
+.cost-mix .dim {
+  font-size: 0.8rem;
+}
+
+.bucket-chip {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  vertical-align: baseline;
+}
+
 .fame-list {
   list-style: none;
   margin: 0;

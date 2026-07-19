@@ -181,6 +181,55 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
         </details>
       )}
 
+      {(() => {
+        // Fare what-if: the engine's own share/elasticity math replayed at
+        // each posture, holding everyone else fixed. Direct traffic only —
+        // connections and cabin yield ride on top, so treat it as relative.
+        const othersWeight = contenders.filter((c) => !c.me).reduce((sum, c) => sum + c.weight, 0)
+        const myCapacity = routeWeeklyCapacity(player, route)
+        if (myCapacity === 0) return null
+        const rows = [-2, -1, 0, 1, 2].map((level) => {
+          const weight = routeShareWeight(player, { ...route, fareLevel: level })
+          const total = weight + othersWeight
+          let pax = total > 0 ? Math.floor((demand * weight) / total) : 0
+          pax = Math.floor((pax * FARE_DEMAND_BP[level + 2]!) / 10000)
+          pax = Math.min(pax, myCapacity)
+          const fare = fareFor(km, level)
+          return { level, fare, pax, revenueK: Math.floor((pax * fare) / 1000) }
+        })
+        const best = Math.max(...rows.map((r) => r.revenueK))
+        return (
+          <details className="dossier-history" data-testid="fare-whatif">
+            <summary className="dim">What-if: fare posture</summary>
+            <table>
+              <thead>
+                <tr className="dim">
+                  <th>fare</th>
+                  <th>est. pax/wk</th>
+                  <th>est. revenue/wk</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.level} className={r.level === route.fareLevel ? 'me' : ''}>
+                    <td>
+                      ${r.fare}
+                      {r.level === route.fareLevel && <span className="dim"> (now)</span>}
+                    </td>
+                    <td>{r.pax.toLocaleString('en-US')}</td>
+                    <td className={r.revenueK === best ? 'pos' : ''}>{money(r.revenueK)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="hint">
+              Direct traffic at today's demand, rivals held fixed. Costs barely move with fare — the
+              best revenue row is usually the best profit row.
+            </p>
+          </details>
+        )
+      })()}
+
       <h3>Controls</h3>
       <div className="dossier-controls">
         <span data-testid="dossier-frequency">

@@ -251,6 +251,10 @@ test('the route dossier and rivals intel expose the numbers', async ({ page }) =
   await expect(page.getByTestId('route-dossier')).toBeVisible()
   await expect(page.getByTestId('route-dossier')).toContainText('The pair')
   await expect(page.getByTestId('route-dossier')).toContainText('rt/wk')
+  // The fare what-if table replays the share math at every posture.
+  await page.getByTestId('fare-whatif').locator('summary').click()
+  await expect(page.getByTestId('fare-whatif')).toContainText('est. revenue/wk')
+  await expect(page.getByTestId('fare-whatif')).toContainText('(now)')
   // Adding an idle plane from the dossier grows the schedule in one pick:
   // assign + frequency bump together (a bare assign would fly nothing extra).
   await expect(page.getByTestId('dossier-frequency')).toContainText('5/')

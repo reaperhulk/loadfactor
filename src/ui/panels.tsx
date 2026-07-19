@@ -763,8 +763,64 @@ export function AirportsPanel({ state }: { state: GameState }) {
 // The cost buckets in a stable presentation order, labelled from the shared
 // format module so every surface names them identically.
 const COST_BUCKETS: readonly { key: keyof CostBreakdown; label: string }[] = (
-  ['fuel', 'salaries', 'ownership', 'maintenance', 'fees', 'service', 'flightPay', 'overhead', 'admin', 'interest'] as const
+  ['fuel', 'salaries', 'ownership', 'maintenance', 'fees', 'service', 'flightPay', 'overhead', 'admin', 'marketing', 'interest'] as const
 ).map((key) => ({ key, label: COST_LABELS[key] }))
+
+// One color per bucket, shared by the mix bands and the structure table so
+// the chart and the numbers read as one exhibit.
+const BUCKET_COLORS: Record<keyof CostBreakdown, string> = {
+  fuel: '#d0636e',
+  salaries: '#58c98a',
+  ownership: '#4fa3ff',
+  maintenance: '#9d7bd8',
+  fees: '#d8a052',
+  service: '#8fbf6f',
+  flightPay: '#c9b458',
+  overhead: '#5b6b8c',
+  admin: '#7a8fb3',
+  marketing: '#e07ab8',
+  interest: '#b3564f',
+}
+
+// How the cost mix evolved: each quarter is a 100%-stacked slice of its
+// breakdown. Structure drift (fuel creeping up, ownership swelling after a
+// buying spree) is visible at a glance; absolutes live in the table below.
+function CostMixHistory({ state }: { state: GameState }) {
+  const player = state.airlines[0]!
+  const hist = player.history.slice(-16).filter((h) => h.costs > 0)
+  if (hist.length < 2) return null
+  const w = 360
+  const h = 72
+  const bw = w / hist.length
+  return (
+    <div className="cost-mix" data-testid="cost-mix">
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-label="cost mix by quarter">
+        {hist.map((q, i) => {
+          let yTop = h
+          return COST_BUCKETS.map((b) => {
+            const v = q.breakdown[b.key]
+            if (v <= 0) return null
+            const bh = (v / q.costs) * h
+            yTop -= bh
+            return (
+              <rect
+                key={`${q.turn}-${b.key}`}
+                x={i * bw}
+                y={yTop}
+                width={bw + 0.4}
+                height={bh}
+                fill={BUCKET_COLORS[b.key]}
+              >
+                <title>{`t${q.turn} ${b.label}: ${money(v)} (${Math.round((v * 100) / q.costs)}%)`}</title>
+              </rect>
+            )
+          })
+        })}
+      </svg>
+      <span className="dim">cost mix, last {hist.length}q →</span>
+    </div>
+  )
+}
 
 // Where the money went last quarter: exact engine attribution (the buckets
 // sum to reported costs), largest first, with proportional bars and the
@@ -785,13 +841,15 @@ function CostStructure({ state }: { state: GameState }) {
   return (
     <div className="cost-structure" data-testid="cost-structure">
       <h3>Cost structure — {money(now.costs)} last quarter</h3>
-      <table>
+      <div className="table-scroll"><table>
         <tbody>
           {rows.map((r) => {
             const delta = r.prevValue === undefined ? null : r.value - r.prevValue
             return (
               <tr key={r.key}>
-                <td>{r.label}</td>
+                <td>
+                  <span className="bucket-chip" style={{ background: BUCKET_COLORS[r.key] }} /> {r.label}
+                </td>
                 <td className="cost-bar-cell">
                   <span className="cost-bar" style={{ width: `${Math.round((r.value * 100) / max)}%` }} />
                 </td>
@@ -804,7 +862,7 @@ function CostStructure({ state }: { state: GameState }) {
             )
           })}
         </tbody>
-      </table>
+      </table></div>
     </div>
   )
 }
@@ -835,6 +893,7 @@ export function FinancePanel({ state }: { state: GameState }) {
         </div>
       )}
       <CostStructure state={state} />
+      <CostMixHistory state={state} />
       <p>
         Debt {money(debt)} of {money(ceiling)} ceiling
       </p>
