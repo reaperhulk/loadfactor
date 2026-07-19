@@ -13,6 +13,8 @@ import {
   airlinesOnPair,
   debtCeiling,
   maxRouteFrequency,
+  netWorth,
+  pairWeeklySeats,
   roundTripsPerWeek,
   routeWeeklyCapacity,
   slotCities,
@@ -22,7 +24,7 @@ import {
   yearOf,
 } from './queries'
 import { chanceBp } from './rng'
-import type { Command, GameEvent, GameState } from './types'
+import type { Airline, Command, GameEvent, GameState } from './types'
 
 function apply(state: GameState, idx: number, cmd: Command, events: GameEvent[]): void {
   events.push(...applyPlanningCommand(state, idx, cmd).events)
@@ -40,6 +42,13 @@ interface Personality {
   negotiateBudgetBp: number // spend as bp of city difficulty
   homeRegionUntil: number // cities held before negotiating outside the HQ region
   cabin: number // preferred cabin fit for the fleet (1 dense / 2 std / 3 prem)
+  // Competitive read on a pair: seats already fielded there count against its
+  // expansion score at this rate. Under 10000 means incumbents look beatable
+  // (price_war undercuts its way in); over means avoid crowded markets.
+  contestDiscountBp: number
+  // Negotiation bonus (mass points) for cities where the current net-worth
+  // leader is entrenched — raid the winner's fortress, not empty fields.
+  raidBonus: number
 }
 
 const PERSONALITIES: Record<string, Personality> = {
@@ -52,6 +61,8 @@ const PERSONALITIES: Record<string, Personality> = {
     negotiateBudgetBp: 10000,
     homeRegionUntil: 0,
     cabin: 2,
+    contestDiscountBp: 10000,
+    raidBonus: 8,
   },
   price_war: {
     orderChanceBp: 8000,
@@ -62,6 +73,8 @@ const PERSONALITIES: Record<string, Personality> = {
     negotiateBudgetBp: 9000,
     homeRegionUntil: 0,
     cabin: 1,
+    contestDiscountBp: 6000,
+    raidBonus: 14,
   },
   premium: {
     orderChanceBp: 6000,
@@ -72,6 +85,8 @@ const PERSONALITIES: Record<string, Personality> = {
     negotiateBudgetBp: 11000,
     homeRegionUntil: 0,
     cabin: 3,
+    contestDiscountBp: 13000,
+    raidBonus: 4,
   },
   fortress: {
     orderChanceBp: 7000,
@@ -82,7 +97,16 @@ const PERSONALITIES: Record<string, Personality> = {
     negotiateBudgetBp: 12000,
     homeRegionUntil: 6,
     cabin: 2,
+    contestDiscountBp: 11000,
+    raidBonus: 0,
   },
+}
+
+// Expansion score for an unserved-by-us pair: weekly demand net of the seats
+// every airline already flies there, scaled by how the personality reads a
+// contest. Pure and exported for tests.
+export function expansionScore(demand: number, fieldedSeats: number, contestDiscountBp: number): number {
+  return demand - Math.floor((fieldedSeats * contestDiscountBp) / 10000)
 }
 
 // One rival's planning turn. Shared skeleton: stay solvent, keep planes
@@ -189,7 +213,7 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
     const cities = slotCities(airline)
     const served = new Set(airline.routes.map((r) => pairKey(r.from, r.to)))
     let best: { from: string; to: string; km: number } | null = null
-    let bestDemand = 0
+    let bestScore = 0
     for (let i = 0; i < cities.length; i++) {
       for (let j = i + 1; j < cities.length; j++) {
         const a = cities[i]!
@@ -198,14 +222,20 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
         if (slotsFree(airline, a) < 1 || slotsFree(airline, b) < 1) continue
         const km = distanceKm(a, b)
         if (km > maxRange || km < AI_MIN_ROUTE_KM) continue
-        const demand = pairWeeklyDemand(state, a, b)
-        if (demand > bestDemand) {
-          bestDemand = demand
+        // Read the market, not just the map: demand net of seats everyone
+        // already flies there, at the personality's contest appetite.
+        const score = expansionScore(
+          pairWeeklyDemand(state, a, b),
+          pairWeeklySeats(state, a, b),
+          personality.contestDiscountBp,
+        )
+        if (score > bestScore) {
+          bestScore = score
           best = { from: a, to: b, km }
         }
       }
     }
-    if (best && bestDemand > personality.expandMinDemand) {
+    if (best && bestScore > personality.expandMinDemand) {
       const launch = idle.find((ac) => getAircraftType(ac.type).rangeKm >= best.km)
       if (launch) {
         apply(
@@ -261,17 +291,25 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   }
 
   // Push into the most attractive city we do not hold slots at yet. A
-  // fortress builds out its home region before venturing abroad.
+  // fortress builds out its home region before venturing abroad; aggressive
+  // archetypes bias toward cities where the current leader is entrenched.
   if (airline.negotiations.length === 0 && airline.cash >= 4000) {
     const homeRegion = getCity(airline.hq).region
     const stayHome = slotCities(airline).length < personality.homeRegionUntil
+    // The net-worth leader among the other airlines — the one worth raiding.
+    let leader: Airline | null = null
+    for (const other of state.airlines) {
+      if (other.id === idx || other.bankrupt) continue
+      if (leader === null || netWorth(other) > netWorth(leader)) leader = other
+    }
     let target: string | null = null
     let bestMass = 0
     for (const c of CITIES) {
       if ((airline.slots[c.id] ?? 0) > 0) continue
       if (slotsAllocated(state, c.id) >= c.slotPool) continue
       if (stayHome && c.region !== homeRegion) continue
-      const mass = c.pop * 4 + c.biz * 3 + c.tour * 2
+      let mass = c.pop * 4 + c.biz * 3 + c.tour * 2
+      if (leader !== null && (leader.slots[c.id] ?? 0) >= 2) mass += personality.raidBonus
       if (mass > bestMass) {
         bestMass = mass
         target = c.id

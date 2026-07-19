@@ -138,6 +138,19 @@ export function routeWeeklyCapacity(airline: Airline, route: Route): number {
   return seats
 }
 
+// Weekly seats all airlines together field on a pair — how contested the
+// market already is in hardware, not just in flags on a map.
+export function pairWeeklySeats(state: GameState, a: string, b: string): number {
+  const key = pairKey(a, b)
+  let seats = 0
+  for (const airline of state.airlines) {
+    for (const r of airline.routes) {
+      if (pairKey(r.from, r.to) === key) seats += routeWeeklyCapacity(airline, r)
+    }
+  }
+  return seats
+}
+
 // Airlines serving a pair, optionally excluding one (for "my competitors").
 export function airlinesOnPair(state: GameState, a: string, b: string, excludeIdx?: number): number {
   const key = pairKey(a, b)
