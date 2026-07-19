@@ -46,7 +46,7 @@ import {
 } from '../engine/queries'
 import { assignAndSchedule } from './assign'
 import { ConfirmButton } from './ConfirmButton'
-import { dispatch } from './session'
+import { dispatch, getSession } from './session'
 import { Sparkline } from './Sparkline'
 import { COST_LABELS, money } from './format'
 import { CabinLegend, ServiceLegend } from './legends'
@@ -374,6 +374,38 @@ export function FleetPanel({ state }: { state: GameState }) {
   const geriatricSoon = player.fleet.filter((a) => a.ageQuarters >= 40 && a.ageQuarters < 48).length
   return (
     <div>
+      {player.fleet.some((a) => a.routeId === null) && player.routes.length > 0 && (
+        <button
+          data-testid="assign-all-idle"
+          title="assign every idle airframe to the in-range route most starved for seats"
+          onClick={() => {
+            // Greedy pass, one plane at a time against live state so each
+            // assignment sees the capacity the previous one just added.
+            for (let guard = 0; guard < 50; guard++) {
+              const s = getSession()?.state
+              if (!s) return
+              const p = s.airlines[0]!
+              const idle = p.fleet.find((a) => a.routeId === null)
+              if (!idle) return
+              const t = getAircraftType(idle.type)
+              let bestRoute: (typeof p.routes)[number] | null = null
+              let bestGap = 0
+              for (const r of p.routes) {
+                if (distanceKm(r.from, r.to) > t.rangeKm) continue
+                const gap = pairWeeklyDemand(s, r.from, r.to) - routeWeeklyCapacity(p, r)
+                if (gap > bestGap) {
+                  bestGap = gap
+                  bestRoute = r
+                }
+              }
+              if (!bestRoute) return
+              assignAndSchedule(s, idle.id, bestRoute.id)
+            }
+          }}
+        >
+          🛠 put idle fleet to work
+        </button>
+      )}
       {player.fleet.length > 0 && (
         <p className="dim" data-testid="renewal-forecast">
           Fleet upkeep {money(maintAt(0))}/q now → {money(maintAt(8))}/q in 2 years on the same metal

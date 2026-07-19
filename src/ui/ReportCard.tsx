@@ -288,6 +288,38 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
             </p>
           )}
 
+        {(() => {
+          // The macro backdrop: how the economy and fuel indices moved this
+          // quarter — the two lines most margin stories trace back to.
+          const ih = state.world.indexHistory
+          if (ih.length < 2) return null
+          const nowIdx = ih[ih.length - 1]!
+          const prevIdx = ih[ih.length - 2]!
+          const dEcon = nowIdx.economyBp - prevIdx.economyBp
+          const dFuel = nowIdx.fuelBp - prevIdx.fuelBp
+          if (Math.abs(dEcon) < 100 && Math.abs(dFuel) < 100) return null
+          return (
+            <p className="dim" data-testid="report-macro">
+              Macro: economy {(nowIdx.economyBp / 100).toFixed(0)}%
+              {Math.abs(dEcon) >= 100 && (
+                <span className={dEcon > 0 ? 'pos' : 'neg'}>
+                  {' '}
+                  ({dEcon > 0 ? '▲' : '▼'}
+                  {Math.abs(dEcon / 100).toFixed(0)})
+                </span>
+              )}{' '}
+              · fuel {(nowIdx.fuelBp / 100).toFixed(0)}%
+              {Math.abs(dFuel) >= 100 && (
+                <span className={dFuel > 0 ? 'neg' : 'pos'}>
+                  {' '}
+                  ({dFuel > 0 ? '▲' : '▼'}
+                  {Math.abs(dFuel / 100).toFixed(0)})
+                </span>
+              )}
+            </p>
+          )
+        })()}
+
         {worldNews.length > 0 && (
           <p className="dim">
             World:{' '}
