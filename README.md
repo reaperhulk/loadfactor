@@ -22,17 +22,27 @@ npm install
 npm run dev     # then open http://localhost:5173
 ```
 
-- **Expand**: negotiate for slots at new airports, then open routes between
-  cities you hold slots at.
-- **Equip**: order aircraft (they deliver quarters later), assign them to
-  routes, retire the fuel-hogs before their maintenance bills bite.
-- **Price**: set each route's fare and service level — chase load factor with
-  cheap seats or yield with premium service, and fight rivals for share.
-- **Survive**: quarterly interest, fuel indexes, recessions, and events with
-  era flavor. Bankruptcy is two bad quarters away.
+- **Found**: name your airline, pick its livery color, and choose any city as
+  HQ — footholds derive from the geography around your home.
+- **Expand**: negotiate for slots at new airports, then grow a CONNECTED
+  network — every new route must touch your HQ or a city you already serve.
+  Use-it-or-lose-it: idle slots go back to the authority. The Opportunities
+  list ranks the richest unserved pairs and negotiation targets by market
+  dollars.
+- **Equip**: order or lease aircraft (they deliver quarters later), buy used,
+  fit cabins dense or premium, assign airframes to schedules, and retire the
+  maintenance hogs before the renewal forecast bites.
+- **Price**: set each route's fare and service tier — chase load factor with
+  cheap seats or yield with premium — and fight rivals seat-for-seat on
+  contested pairs (the dossier's battle card shows the exact share math).
+- **Connect**: unserved pairs one-stop over your own hubs; transfer hubs glow
+  with connecting traffic on the map (flat or rotatable globe projection).
+- **Survive**: quarterly interest, fuel indexes and hedges, recessions, oil
+  shocks, and era events. Crews are salaried whether the metal flies or not.
+  Bankruptcy is two bad quarters away and the HUD says so.
 - **Win**: the scenario is a race over a fixed window — finish the final
-  quarter #1 among the airlines on the scenario metric (net worth, market
-  share) while clearing its qualifying floor.
+  quarter #1 among the airlines by net worth while clearing its qualifying
+  floor. The standings sheet and race chart keep the score honest.
 
 ## Testing
 

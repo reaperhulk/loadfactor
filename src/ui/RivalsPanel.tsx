@@ -41,6 +41,10 @@ function fieldedSeats(airline: Airline): number {
 // airline (you first), best value per column highlighted — the spreadsheet
 // answer to "how am I doing relative to them".
 function StandingsTable({ state }: { state: GameState }) {
+  const worldPax = state.airlines.reduce(
+    (sum, a) => sum + (a.history[a.history.length - 1]?.pax ?? 0),
+    0,
+  )
   const rows = state.airlines.map((a) => {
     const last = a.history[a.history.length - 1]
     return {
@@ -53,6 +57,7 @@ function StandingsTable({ state }: { state: GameState }) {
       profit: last?.profit ?? 0,
       marginBp: last && last.revenue > 0 ? Math.floor((last.profit * 10000) / last.revenue) : 0,
       pax: last?.pax ?? 0,
+      shareBp: worldPax > 0 ? Math.floor(((last?.pax ?? 0) * 10000) / worldPax) : 0,
       seats: fieldedSeats(a),
       routes: a.routes.length,
       cities: slotCities(a).length,
@@ -76,6 +81,7 @@ function StandingsTable({ state }: { state: GameState }) {
             <th>profit/q</th>
             <th>margin</th>
             <th>pax/q</th>
+            <th title="share of all passengers flown industry-wide last quarter">share</th>
             <th>seats/wk</th>
             <th>routes</th>
             <th>cities</th>
@@ -92,6 +98,7 @@ function StandingsTable({ state }: { state: GameState }) {
               {cell(r, 'profit', money(r.profit))}
               {cell(r, 'marginBp', `${(r.marginBp / 100).toFixed(1)}%`)}
               {cell(r, 'pax', r.pax.toLocaleString('en-US'))}
+              {cell(r, 'shareBp', `${(r.shareBp / 100).toFixed(1)}%`)}
               {cell(r, 'seats', r.seats.toLocaleString('en-US'))}
               {cell(r, 'routes', String(r.routes))}
               {cell(r, 'cities', String(r.cities))}
