@@ -204,6 +204,30 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
         )}
 
         {(() => {
+          // Espionage-lite: rivals winning slots at YOUR airports are staging
+          // for something — say so before the routes appear.
+          const myCities = new Set<string>()
+          for (const r of player.routes) {
+            myCities.add(r.from)
+            myCities.add(r.to)
+          }
+          for (const c of Object.keys(player.slots).sort()) if ((player.slots[c] ?? 0) > 0) myCities.add(c)
+          const rivalGains = events.filter(
+            (e): e is Extract<GameEvent, { type: 'slots_granted' }> =>
+              e.type === 'slots_granted' && e.airline !== 0 && myCities.has(e.city),
+          )
+          if (rivalGains.length === 0) return null
+          return (
+            <p className="neg" data-testid="report-rival-slots">
+              🕵{' '}
+              {rivalGains
+                .map((g) => `${state.airlines[g.airline]?.name ?? 'A rival'} won ${g.slots} slots at ${g.city} — your airport`)
+                .join(' · ')}
+            </p>
+          )
+        })()}
+
+        {(() => {
           // Year in review: when a Q4 resolves (the report shows as the new
           // year's Q1), digest the four quarters just flown against the four
           // before them. The annual rhythm is the era's heartbeat.

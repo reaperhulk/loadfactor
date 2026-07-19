@@ -6,7 +6,7 @@ import { AIRCRAFT, getAircraftType, typesOnSale } from '../data/aircraft'
 import { CITIES, distanceKm, pairKey } from '../data/cities'
 import { MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
 import type { CostBreakdown, GameEvent, GameState } from '../engine'
-import { baseFare, estimateAircraftQuarterCost, estimateWeeklySeats, fareFor, pairWeeklyDemand } from '../engine/market'
+import { baseFare, estimateAircraftQuarterCost, estimateWeeklySeats, fareFor, pairWeeklyDemand, seasonalBp } from '../engine/market'
 import {
   CABIN_REFIT_COST_BP,
   MAINT_AGE_BP_PER_QUARTER,
@@ -303,7 +303,19 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
                   {r.from}–{r.to}
                 </td>
                 <td>{r.km}km</td>
-                <td>{r.demand}/wk</td>
+                <td>
+                  {r.demand}/wk
+                  {(() => {
+                    // A seasonal pair's demand number is a snapshot, not a
+                    // promise — flag which way the calendar is leaning.
+                    const bp = Math.floor(
+                      (seasonalBp(r.from, state.turn) * seasonalBp(r.to, state.turn)) / 10000,
+                    )
+                    if (bp > 10100) return <span className="pos" title="tourism high season — demand dips off-season"> 🌞</span>
+                    if (bp < 9900) return <span className="neg" title="tourism off season — demand rises in season"> ❄</span>
+                    return null
+                  })()}
+                </td>
                 <td title="weekly demand × base fare">{money(r.marketK)}/wk</td>
                 <td className={r.rivals > 0 ? 'neg' : 'pos'}>
                   {r.rivals > 0 ? `⚔ ${r.rivals} rival${r.rivals > 1 ? 's' : ''}` : 'open market'}

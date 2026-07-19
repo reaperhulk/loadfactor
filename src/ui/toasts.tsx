@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AIRCRAFT, getAircraftType } from '../data/aircraft'
 import { pairKey } from '../data/cities'
+import { ROUTE_SPOOL_BP } from '../data/constants'
 import type { GameEvent, GameState } from '../engine'
 import { quarterOf, yearOf } from '../engine/queries'
 
@@ -50,6 +51,19 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
     for (const t of AIRCRAFT) {
       if (t.availableFrom === yearOf(state)) {
         out.push({ kind: 'delivery', icon: '🛒', text: `${t.name} is now on sale — ${t.seats} seats, ${t.rangeKm}km` })
+      }
+    }
+  }
+  // A route that just finished its spool-up is now at full market strength.
+  if (state && events.some((e) => e.type === 'quarter_report')) {
+    for (const r of state.airlines[0]?.routes ?? []) {
+      if (r.history.length === ROUTE_SPOOL_BP.length && r.lastCapacity > 0) {
+        out.push({
+          kind: 'route',
+          icon: '📈',
+          text: `${r.from} – ${r.to} is established — full demand from next quarter`,
+          routeId: r.id,
+        })
       }
     }
   }
@@ -159,7 +173,7 @@ export function ToastStack({
         <button
           key={t.id}
           className={`toast toast-${t.kind}`}
-          title={t.routeId !== undefined && onOpenRoute ? 'open the battle card' : 'dismiss'}
+          title={t.routeId !== undefined && onOpenRoute ? 'open the route dossier' : 'dismiss'}
           data-route-id={t.routeId}
           onClick={() => {
             if (t.routeId !== undefined && onOpenRoute) onOpenRoute(t.routeId)
@@ -168,7 +182,7 @@ export function ToastStack({
         >
           <span className="toast-icon">{t.icon}</span>
           {t.text}
-          {t.routeId !== undefined && onOpenRoute && <span className="dim"> — view battle</span>}
+          {t.routeId !== undefined && onOpenRoute && <span className="dim"> — view route</span>}
         </button>
       ))}
     </div>
