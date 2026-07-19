@@ -25,8 +25,13 @@ Read PLAN.md before making architectural changes — it is the design contract.
 - `npm run dev` — Vite dev server (http://localhost:5173)
 - `npm test` — Vitest watch; `npm run test:unit` for one-shot
 - `npm run test:e2e` — Playwright browser suite (builds + serves automatically)
-- `npm run check` — full local gate: lint + typecheck + unit tests + build.
-  **Run this before committing.**
+- `npm run check` — lint + typecheck + unit tests + build (CI's `check` job,
+  byte for byte).
+- `npm run ci` — `check` plus the Playwright e2e suite: **everything CI runs,
+  in CI's order. Run this before committing; a green run here guarantees a
+  green run on GitHub.** Tests must never depend on runner speed (vitest has
+  a generous global testTimeout; keep wall-clock budgets sized for a 2x
+  slower machine) — that is what keeps this guarantee honest.
 - `npm run goldens:update` — regenerate golden fixtures after an intentional
   balance change; commit the diff and say so in the commit message.
 - `npm run gen:distances` — regenerate the city distance table after editing
