@@ -14,6 +14,7 @@ import {
   debtCeiling,
   maxRouteFrequency,
   netWorth,
+  networkCities,
   pairWeeklySeats,
   roundTripsPerWeek,
   routeWeeklyCapacity,
@@ -245,6 +246,7 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
     for (const ac of idle) maxRange = Math.max(maxRange, getAircraftType(ac.type).rangeKm)
     const cities = slotCities(airline)
     const served = new Set(airline.routes.map((r) => pairKey(r.from, r.to)))
+    const network = networkCities(airline)
     let best: { from: string; to: string; km: number } | null = null
     let bestScore = 0
     for (let i = 0; i < cities.length; i++) {
@@ -252,6 +254,7 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
         const a = cities[i]!
         const b = cities[j]!
         if (served.has(pairKey(a, b))) continue
+        if (!network.has(a) && !network.has(b)) continue // routes must touch the network
         if (slotsFree(airline, a) < 1 || slotsFree(airline, b) < 1) continue
         const km = distanceKm(a, b)
         if (km > maxRange || km < AI_MIN_ROUTE_KM) continue

@@ -41,7 +41,7 @@ import {
 import { hashNoiseBp } from './rng'
 import { allocateTrips, roundTripsPerWeek } from './queries'
 import { cityDemandModBp, effEconomyBp, effFuelBp } from './worldEvents'
-import type { GameEvent, GameState, Route } from './types'
+import type { Airline, GameEvent, GameState, Route } from './types'
 
 function cityMass(cityId: string): number {
   const c = getCity(cityId)
@@ -131,6 +131,24 @@ interface Entrant {
   weight: number // attractiveness for market-share split
 }
 
+// The attractiveness weight a route brings to a contested pair: schedule ×
+// cabin appeal × fare posture × service. Zero when nothing flies. This is
+// the exact number resolution splits share by — exported so the UI can show
+// a pair battle honestly.
+export function routeShareWeight(airline: Airline, route: Route): number {
+  let cabinTripWeight = 0
+  let capacity = 0
+  for (const alloc of allocateTrips(airline, route)) {
+    capacity += alloc.seats * alloc.trips * 2
+    cabinTripWeight += alloc.trips * CABIN_WEIGHT[alloc.cabin - 1]!
+  }
+  if (capacity === 0) return 0
+  return Math.floor(
+    (cabinTripWeight * FARE_LEVEL_WEIGHT[route.fareLevel + 2]! * SERVICE_LEVEL_WEIGHT[route.serviceLevel - 1]!) /
+      100,
+  )
+}
+
 // Per-route weekly accumulator, finalized to quarterly numbers at the end.
 interface RouteAcc {
   airlineIdx: number
@@ -170,23 +188,13 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
     for (const route of airline.routes) {
       let weeklyRoundTrips = 0
       let weeklyCapacity = 0
-      let cabinTripWeight = 0 // Σ trips × cabin weight — trip-weighted appeal
       let yieldNum = 0 // Σ seats × cabin yield — capacity-weighted revenue/pax
       for (const alloc of allocateTrips(airline, route)) {
         weeklyRoundTrips += alloc.trips
         weeklyCapacity += alloc.seats * alloc.trips * 2
-        cabinTripWeight += alloc.trips * CABIN_WEIGHT[alloc.cabin - 1]!
         yieldNum += alloc.seats * alloc.trips * 2 * CABIN_YIELD_BP[alloc.cabin - 1]!
       }
-      const weight =
-        weeklyCapacity === 0
-          ? 0
-          : Math.floor(
-              (cabinTripWeight *
-                FARE_LEVEL_WEIGHT[route.fareLevel + 2]! *
-                SERVICE_LEVEL_WEIGHT[route.serviceLevel - 1]!) /
-                100,
-            )
+      const weight = routeShareWeight(airline, route)
       const yieldBp = weeklyCapacity === 0 ? 10000 : Math.floor(yieldNum / weeklyCapacity)
       const key = pairKey(route.from, route.to)
       const list = pairs.get(key) ?? []

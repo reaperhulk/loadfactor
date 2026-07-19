@@ -162,6 +162,16 @@ button:disabled {
   fill: var(--accent);
 }
 
+/* Ring around cities in the player's operating network — new routes must
+   touch one of these. */
+.city-network-ring {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1px;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 .city-dot.selected {
   fill: #ffd166;
 }

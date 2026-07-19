@@ -6,7 +6,7 @@ import { getAircraftType } from '../data/aircraft'
 import { distanceKm, pairKey } from '../data/cities'
 import { FARE_DEMAND_BP } from '../data/constants'
 import type { GameState } from '../engine'
-import { fareFor, pairWeeklyDemand } from '../engine/market'
+import { fareFor, pairWeeklyDemand, routeShareWeight } from '../engine/market'
 import {
   cabinSeats,
   effectiveFrequency,
@@ -36,7 +36,8 @@ export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
   const demand = pairWeeklyDemand(state, route.from, route.to)
   const key = pairKey(route.from, route.to)
 
-  // Everyone on this pair, with their fielded weekly capacity.
+  // Everyone on this pair: fielded capacity, last quarter's ridership, and
+  // the exact attractiveness weight resolution splits share by.
   const contenders = state.airlines
     .map((airline) => {
       const theirRoute = airline.routes.find((r) => pairKey(r.from, r.to) === key)
@@ -45,11 +46,15 @@ export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
         name: airline.name,
         me: airline.id === 0,
         capacity: routeWeeklyCapacity(airline, theirRoute),
+        pax: theirRoute.lastPax,
         fare: fareFor(km, theirRoute.fareLevel),
         serviceLevel: theirRoute.serviceLevel,
+        weight: routeShareWeight(airline, theirRoute),
       }
     })
     .filter((c): c is NonNullable<typeof c> => c !== null)
+  const totalPax = contenders.reduce((sum, c) => sum + c.pax, 0)
+  const myWeight = contenders.find((c) => c.me)?.weight ?? 0
 
   const assigned = player.fleet.filter((a) => a.routeId === route.id)
   // Idle airframes with the legs for this route — one pick adds them to the
@@ -139,19 +144,39 @@ export function RouteDossier({ state, routeId, onClose }: RouteDossierProps) {
         <button onClick={() => dispatch({ type: 'close_route', routeId: route.id })}>close route</button>
       </div>
 
-      <h3>The pair</h3>
-      <table>
+      <h3>The pair{contenders.length > 1 ? ' — contested' : ''}</h3>
+      <table data-testid="pair-battle">
+        <thead>
+          <tr className="dim">
+            <th />
+            <th>share</th>
+            <th>seats/wk</th>
+            <th>fare</th>
+            <th>svc</th>
+            <th>appeal</th>
+          </tr>
+        </thead>
         <tbody>
           {contenders.map((c) => (
             <tr key={c.name} className={c.me ? 'me' : ''}>
               <td>{c.me ? 'You' : c.name}</td>
-              <td>{c.capacity} seats/wk</td>
+              <td>{totalPax > 0 ? `${Math.round((c.pax * 100) / totalPax)}%` : '—'}</td>
+              <td>{c.capacity}</td>
               <td>${c.fare}</td>
-              <td className="dim">{['', 'basic', 'standard', 'premium'][c.serviceLevel]}</td>
+              <td className="dim">{['', 'basic', 'std', 'prem'][c.serviceLevel]}</td>
+              <td className={!c.me && myWeight > 0 && c.weight > myWeight ? 'neg' : ''}>
+                {myWeight > 0 ? Math.round((c.weight * 100) / myWeight) : c.weight > 0 ? '∞' : '—'}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
+      {contenders.length > 1 && (
+        <p className="hint">
+          Share splits by appeal (yours = 100): schedule × cabin × fare posture × service. Out-schedule,
+          undercut, or out-serve them to take riders.
+        </p>
+      )}
 
       <h3>Fleet on this route</h3>
       {assigned.length === 0 ? (

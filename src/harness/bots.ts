@@ -8,10 +8,12 @@ import { CITIES, distanceKm, pairKey } from '../data/cities'
 import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
 import { pairWeeklyDemand } from '../engine/market'
 import { negotiationDifficulty } from '../engine/negotiation'
+import { effFuelBp } from '../engine/worldEvents'
 import {
   airlinesOnPair,
   debtCeiling,
   maxRouteFrequency,
+  networkCities,
   roundTripsPerWeek,
   routeWeeklyCapacity,
   slotCities,
@@ -111,12 +113,14 @@ export function bestUnservedPair(state: GameState): { from: string; to: string; 
   for (const o of airline.orders) maxRange = Math.max(maxRange, getAircraftType(o.type).rangeKm)
   const cities = slotCities(airline)
   const served = new Set(airline.routes.map((r) => pairKey(r.from, r.to)))
+  const network = networkCities(airline)
   let best: { from: string; to: string; score: number } | null = null
   for (let i = 0; i < cities.length; i++) {
     for (let j = i + 1; j < cities.length; j++) {
       const a = cities[i]!
       const b = cities[j]!
       if (served.has(pairKey(a, b))) continue
+      if (!network.has(a) && !network.has(b)) continue // routes must touch the network
       if (slotsFree(airline, a) < 1 || slotsFree(airline, b) < 1) continue
       const km = distanceKm(a, b)
       if (km > maxRange || km < AI_MIN_ROUTE_KM) continue
@@ -157,9 +161,19 @@ function greedyCommands(state: GameState): Command[] {
   const airline = state.airlines[0]!
   const commands: Command[] = []
 
-  if (airline.cash < 3000) {
+  // Treasury: keep a buffer proportional to the cost base — one shock
+  // quarter must never be able to blow straight through it.
+  const lastCosts = airline.history[airline.history.length - 1]?.costs ?? 0
+  const cashBuffer = Math.max(3000, Math.floor(lastCosts / 2))
+  if (airline.cash < cashBuffer) {
     const room = debtCeiling(airline) - totalDebt(airline)
-    if (room >= 5000) commands.push({ type: 'take_loan', amount: Math.min(room, 8000) })
+    const want = Math.min(room, cashBuffer)
+    if (want >= 2000) commands.push({ type: 'take_loan', amount: want })
+  }
+
+  // Lock in cheap fuel when it is cheap.
+  if (airline.fuelHedge === null && airline.fleet.length > 0 && effFuelBp(state.world) <= 10500) {
+    commands.push({ type: 'hedge_fuel', quarters: 4 })
   }
 
   // Prune routes losing >15% of their costs — deeper than demand noise (±8%)
@@ -219,14 +233,16 @@ function greedyCommands(state: GameState): Command[] {
     let reach = 0
     for (const ac of airline.fleet) reach = Math.max(reach, getAircraftType(ac.type).rangeKm)
     for (const t of typesOnSale(yearOf(state))) reach = Math.max(reach, t.rangeKm)
-    const held = slotCities(airline)
+    // A new city only pays if it can pair with the NETWORK (routes must touch
+    // it) — score against served cities, not every slot held.
+    const anchors = [...networkCities(airline)].sort()
     let target: string | null = null
     let bestScore = 0
     for (const c of CITIES) {
       if ((airline.slots[c.id] ?? 0) > 0) continue
       if (slotsAllocated(state, c.id) >= c.slotPool) continue
       let cityScore = 0
-      for (const h of held) {
+      for (const h of anchors) {
         const km = distanceKm(c.id, h)
         if (km < AI_MIN_ROUTE_KM || km > reach) continue
         cityScore = Math.max(cityScore, pairScore(state, c.id, h))

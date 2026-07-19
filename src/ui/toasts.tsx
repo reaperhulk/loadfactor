@@ -4,7 +4,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { getAircraftType } from '../data/aircraft'
-import type { GameEvent } from '../engine'
+import { pairKey } from '../data/cities'
+import type { GameEvent, GameState } from '../engine'
 
 export interface Toast {
   id: number
@@ -34,9 +35,11 @@ const EVENT_NAMES: Record<string, string> = {
 }
 
 // Which events earn a toast, and how they read. Player-only for the personal
-// ones; world events always show.
-export function toastsFor(events: GameEvent[]): Omit<Toast, 'id'>[] {
+// ones; world events always show. `state` (post-resolution) lets rival moves
+// onto the player's own pairs surface as incursion alerts.
+export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, 'id'>[] {
   const out: Omit<Toast, 'id'>[] = []
+  const myPairs = new Set(state?.airlines[0]?.routes.map((r) => pairKey(r.from, r.to)) ?? [])
   for (const e of events) {
     switch (e.type) {
       case 'command_rejected':
@@ -45,7 +48,12 @@ export function toastsFor(events: GameEvent[]): Omit<Toast, 'id'>[] {
         if (e.airline === 0) out.push({ kind: 'error', icon: '⚠️', text: e.reason })
         break
       case 'route_opened':
-        if (e.airline === 0) out.push({ kind: 'route', icon: '✈️', text: `Route opened: ${e.from} – ${e.to}` })
+        if (e.airline === 0) {
+          out.push({ kind: 'route', icon: '✈️', text: `Route opened: ${e.from} – ${e.to}` })
+        } else if (myPairs.has(pairKey(e.from, e.to))) {
+          const rival = state?.airlines[e.airline]?.name ?? 'A rival'
+          out.push({ kind: 'error', icon: '⚔️', text: `${rival} moved onto ${e.from} – ${e.to}` })
+        }
         break
       case 'aircraft_delivered':
         if (e.airline === 0)
@@ -82,7 +90,7 @@ export function toastsFor(events: GameEvent[]): Omit<Toast, 'id'>[] {
 
 const TOAST_MS = 4200
 
-export function ToastStack({ events }: { events: GameEvent[] }) {
+export function ToastStack({ events, state }: { events: GameEvent[]; state?: GameState }) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const nextId = useRef(1)
   const seen = useRef<GameEvent[] | null>(null)
@@ -90,7 +98,7 @@ export function ToastStack({ events }: { events: GameEvent[] }) {
   useEffect(() => {
     if (seen.current === events) return // only react to a new engine result
     seen.current = events
-    const fresh = toastsFor(events)
+    const fresh = toastsFor(events, state)
     if (fresh.length === 0) return
     const stamped = fresh.map((t) => ({ ...t, id: nextId.current++ }))
     setToasts((prev) => [...prev, ...stamped].slice(-4)) // keep the stack short
@@ -99,7 +107,7 @@ export function ToastStack({ events }: { events: GameEvent[] }) {
       setToasts((prev) => prev.filter((t) => !ids.has(t.id)))
     }, TOAST_MS)
     return () => clearTimeout(timer)
-  }, [events])
+  }, [events, state])
 
   if (toasts.length === 0) return null
   return (

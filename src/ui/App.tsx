@@ -279,7 +279,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           <RouteDossier state={state} routeId={selectedRoute} onClose={() => setSelectedRoute(null)} />
         )}
       </div>
-      <ToastStack events={session.lastEvents} />
+      <ToastStack events={session.lastEvents} state={state} />
       <nav className="tabs">
         {TABS.map((t, i) => (
           <button

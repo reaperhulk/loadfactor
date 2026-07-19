@@ -170,6 +170,17 @@ describe('command validation', () => {
     expect(after.airlines[0]!.cash).toBe(18000 + 5984)
   })
 
+  it('routes must connect to the network: HQ or a served city', () => {
+    // MIA–YYZ touches neither JFK (HQ) nor any served city — rejected.
+    const state = fresh()
+    const rejected = applyCommand(state, { type: 'open_route', from: 'MIA', to: 'YYZ', aircraftId: 1, frequency: 5 })
+    expectRejected(rejected.events, 'must connect to your network')
+    // JFK–MIA touches the HQ; after it, MIA–YYZ touches served MIA — allowed.
+    const s = applyCommand(state, { type: 'open_route', from: 'JFK', to: 'MIA', aircraftId: 1, frequency: 5 }).state
+    const r2 = applyCommand(s, { type: 'open_route', from: 'MIA', to: 'YYZ', aircraftId: 2, frequency: 5 })
+    expect(r2.events[0]).toMatchObject({ type: 'route_opened', from: 'MIA', to: 'YYZ' })
+  })
+
   it('refitting a cabin validates, charges cash, and sticks', () => {
     const state = fresh()
     expectRejected(applyCommand(state, { type: 'refit_cabin', aircraftId: 1, cabin: 7 }).events, 'cabin must be')

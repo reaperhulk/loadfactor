@@ -3,6 +3,7 @@
 // player's stats history (this quarter vs last).
 
 import { getAircraftType } from '../data/aircraft'
+import { pairKey } from '../data/cities'
 import { getEventDef } from '../data/events'
 import type { GameEvent, GameState } from '../engine'
 import { quarterOf, yearOf } from '../engine/queries'
@@ -56,6 +57,13 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
   )
   const slotLosses = events.filter(
     (e): e is Extract<GameEvent, { type: 'slot_lost' }> => e.type === 'slot_lost' && e.airline === 0,
+  )
+  // Rivals moving onto pairs the player serves — the quarter's declarations
+  // of war belong on the front page.
+  const myPairs = new Set(player.routes.map((r) => pairKey(r.from, r.to)))
+  const incursions = events.filter(
+    (e): e is Extract<GameEvent, { type: 'route_opened' }> =>
+      e.type === 'route_opened' && e.airline !== 0 && myPairs.has(pairKey(e.from, e.to)),
   )
   const worldNews = events.filter(
     (e): e is Extract<GameEvent, { type: 'world_event_started' }> => e.type === 'world_event_started',
@@ -129,6 +137,15 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
               ...slotWins.map((s) => `${s.slots} slots won at ${s.city}`),
               ...slotLosses.map((s) => `idle slot forfeited at ${s.city}`),
             ].join(' · ')}
+          </p>
+        )}
+
+        {incursions.length > 0 && (
+          <p className="neg" data-testid="report-incursions">
+            ⚔{' '}
+            {incursions
+              .map((i) => `${state.airlines[i.airline]?.name ?? 'A rival'} moved onto ${i.from}–${i.to}`)
+              .join(' · ')}
           </p>
         )}
 

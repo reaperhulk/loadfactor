@@ -9,7 +9,7 @@ import { CITIES, distanceKm, getCity, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { WORLD_PATH } from '../data/worldmap.gen'
 import type { GameState, Route } from '../engine'
-import { effectiveFrequency, slotsHeld } from '../engine/queries'
+import { effectiveFrequency, networkCities, slotsHeld } from '../engine/queries'
 
 function slotsUsedAt(routes: readonly Route[], city: string): number {
   let used = 0
@@ -159,6 +159,7 @@ export function MapView({
   const player = state.airlines[0]!
   const scale = W / view.w
   const flownRoutes = player.routes.filter((r) => player.fleet.some((a) => a.routeId === r.id))
+  const network = networkCities(player)
 
   // Visibility only changes when the game state, selection, or an LOD
   // threshold crossing changes — not on every animation frame of a zoom.
@@ -410,10 +411,13 @@ export function MapView({
         })}
         {visible.map((c) => {
           const held = slotsHeld(player, c.id)
-          // In route-planning mode, legal destinations light up as targets.
+          // In route-planning mode, legal destinations light up as targets —
+          // and a route must touch the network (HQ or a served city).
+          const inNetwork = network.has(c.id)
           const isTarget =
             routeFrom !== null &&
             routeFrom !== c.id &&
+            (network.has(routeFrom) || inNetwork) &&
             held > slotsUsedAt(player.routes, c.id) &&
             !player.routes.some(
               (r) =>
@@ -422,6 +426,9 @@ export function MapView({
           const r = (2 + cityMass(c) / 18) / Math.sqrt(scale)
           return (
             <g key={c.id} onClick={() => handleCityClick(c.id)} className="city">
+              {inNetwork && (
+                <circle cx={x(c.lon)} cy={y(c.lat)} r={r + 2.5 / scale} className="city-network-ring" />
+              )}
               <circle
                 data-testid={`city-${c.id}`}
                 cx={x(c.lon)}

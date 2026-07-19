@@ -138,6 +138,18 @@ export function routeWeeklyCapacity(airline: Airline, route: Route): number {
   return seats
 }
 
+// Cities in an airline's operating network: the HQ plus every endpoint it
+// currently serves. New routes must touch this set — airlines build networks,
+// not disconnected cherry-picked pairs (PLAN.md §2.2).
+export function networkCities(airline: Airline): Set<string> {
+  const network = new Set<string>([airline.hq])
+  for (const r of airline.routes) {
+    network.add(r.from)
+    network.add(r.to)
+  }
+  return network
+}
+
 // Weekly seats all airlines together field on a pair — how contested the
 // market already is in hardware, not just in flags on a map.
 export function pairWeeklySeats(state: GameState, a: string, b: string): number {

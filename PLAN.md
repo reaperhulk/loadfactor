@@ -44,7 +44,10 @@ One turn = one calendar quarter. A scenario spans decades (e.g. 1960–1980 =
 80 turns).
 
 **Planning phase** (player acts, nothing resolves):
-- Open/close routes between cities where the airline holds slots.
+- Open/close routes between cities where the airline holds slots. A new
+  route must touch the airline's network — its HQ or a city it already
+  serves. Airlines build networks, never disconnected cherry-picked pairs;
+  slot negotiation is therefore a directional expansion decision.
 - Set each route's fare level (±2 steps around a distance-based base fare) and
   service level (1–3: no-frills → premium).
 - Assign/unassign owned aircraft to routes; order new aircraft (delivered

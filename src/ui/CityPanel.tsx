@@ -9,7 +9,7 @@ import { getEventDef } from '../data/events'
 import type { GameState } from '../engine'
 import { baseFare, pairWeeklyDemand } from '../engine/market'
 import { negotiationDifficulty, scarcityChanceBp } from '../engine/negotiation'
-import { airlinesOnPair, slotsAllocated, slotsFree, slotsHeld, slotsUsed } from '../engine/queries'
+import { airlinesOnPair, networkCities, slotsAllocated, slotsFree, slotsHeld, slotsUsed } from '../engine/queries'
 import { cityMass, cityTier } from './MapView'
 import { dispatch } from './session'
 
@@ -95,6 +95,7 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onClose }: Ci
           <span className="dim">
             {REGION_NAMES[city.region]} · {['', 'major hub', 'regional', 'small field'][cityTier(city)]} · mass{' '}
             {cityMass(city)}
+            {networkCities(player).has(cityId) && <span className="pos"> · in your network</span>}
           </span>
         </div>
         <button onClick={onClose} aria-label="close city panel" data-testid="city-panel-close">

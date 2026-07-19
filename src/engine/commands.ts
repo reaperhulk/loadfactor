@@ -22,6 +22,7 @@ import {
   debtCeiling,
   findRoute,
   maxRouteFrequency,
+  networkCities,
   resaleValue,
   roundTripsPerWeek,
   slotsAllocated,
@@ -55,6 +56,11 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         return reject(airlineIdx, command, 'route already open')
       const km = distanceKm(a, b)
       if (km < MIN_ROUTE_KM) return reject(airlineIdx, command, 'route too short')
+      // Airlines build networks: a new route must touch the HQ or a city
+      // already served, never float disconnected.
+      const network = networkCities(airline)
+      if (!network.has(a) && !network.has(b))
+        return reject(airlineIdx, command, 'route must connect to your network (touch your HQ or a served city)')
       if (slotsFree(airline, a) < 1) return reject(airlineIdx, command, `no free slots at ${a}`)
       if (slotsFree(airline, b) < 1) return reject(airlineIdx, command, `no free slots at ${b}`)
       // A route launches with a real schedule: one idle aircraft and a weekly

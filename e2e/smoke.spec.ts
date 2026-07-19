@@ -39,8 +39,14 @@ test('scenario starts and quarters advance deterministically', async ({ page }) 
 
 test('routes open via the city panel plan-route flow with a launch schedule', async ({ page }) => {
   await startGame(page)
-  // MIA and ORD are slotted at game start and their dots sit clear of
-  // neighbors on the projection (JFK is huddled under Toronto).
+  // Routes must touch the network — seed ORD into it via the harness so the
+  // click-flow pair (MIA–ORD, whose dots sit clear of neighbors on the
+  // projection; JFK is huddled under Toronto) is legal.
+  await page.evaluate(() => {
+    const snap = window.__harness.getState()!
+    const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
+  })
   await page.getByTestId('city-MIA').click()
   await expect(page.getByTestId('city-panel')).toBeVisible()
   await page.getByTestId('plan-route').click()
@@ -108,6 +114,13 @@ test('the quarterly report reflects the resolved quarter', async ({ page }) => {
 
 test('opening a route triggers the reward animation and toast', async ({ page }) => {
   await startGame(page)
+  // Seed ORD into the network first — a route must touch the HQ or a served
+  // city, and the MIA/ORD dots are the ones clear of neighbors to click.
+  await page.evaluate(() => {
+    const snap = window.__harness.getState()!
+    const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
+  })
   await page.getByTestId('city-MIA').click()
   await page.getByTestId('plan-route').click()
   await page.getByTestId('city-ORD').click()
