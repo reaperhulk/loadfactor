@@ -5,13 +5,14 @@
 
 import { getAircraftType, typesOnSale } from '../data/aircraft'
 import { CITIES, distanceKm, pairKey } from '../data/cities'
-import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND, ROUTE_MEMORY_QUARTERS, ROUTE_SPOOL_BP } from '../data/constants'
+import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND, ROUTE_MEMORY_QUARTERS, ROUTE_SPOOL_BP, TAKEOVER_BASE_K, TAKEOVER_PREMIUM_BP } from '../data/constants'
 import { pairWeeklyDemand, routeSpoolBp } from '../engine/market'
 import { negotiationDifficulty } from '../engine/negotiation'
 import { effFuelBp } from '../engine/worldEvents'
 import {
   airlinesOnPair,
   debtCeiling,
+  netWorth,
   maxRouteFrequency,
   networkCities,
   roundTripsPerWeek,
@@ -58,7 +59,16 @@ export function assignmentCommands(state: GameState, skip?: ReadonlySet<number>)
       const trips = roundTripsPerWeek(ac.type, km)
       commands.push({ type: 'assign_aircraft', aircraftId: ac.id, routeId: bestRoute.id })
       const newMax = maxRouteFrequency(airline, bestRoute) + (pendingTrips.get(bestRoute.id) ?? 0) + trips
-      commands.push({ type: 'set_frequency', routeId: bestRoute.id, frequency: newMax })
+      // Schedule to the MARKET, not the hangar: aim ~80% of weekly demand,
+      // clamped to what the enlarged fleet can fly. Setting the fleet max
+      // here used to flood thin pairs the moment a second plane arrived.
+      const demand = pairWeeklyDemand(state, bestRoute.from, bestRoute.to)
+      const target = Math.ceil((demand * 8) / 10 / Math.max(1, type.seats * 2))
+      commands.push({
+        type: 'set_frequency',
+        routeId: bestRoute.id,
+        frequency: Math.max(2, Math.min(newMax, Math.max(target, bestRoute.frequency))),
+      })
       pendingCapacity.set(bestRoute.id, (pendingCapacity.get(bestRoute.id) ?? 0) + type.seats * 20)
       pendingTrips.set(bestRoute.id, (pendingTrips.get(bestRoute.id) ?? 0) + trips)
     }
@@ -89,13 +99,26 @@ export function launchCommands(
         from: pair.from,
         to: pair.to,
         aircraftId: launch.id,
-        frequency: roundTripsPerWeek(launch.type, km),
+        frequency: launchFrequency(state, pair.from, pair.to, launch.type),
         fareLevel,
         serviceLevel,
       },
     ],
     usedAircraft: launch.id,
   }
+}
+
+// Size the launch schedule to the MARKET, not the airframe: a widebody at
+// full frequency floods a thin pair and burns fuel on empty seats (the
+// deregulation-era starter-767 trap). Aim to field ~70% of weekly demand,
+// never fewer than 2 round trips, never more than the airframe can fly.
+export function launchFrequency(state: GameState, from: string, to: string, typeId: string): number {
+  const km = distanceKm(from, to)
+  const maxFreq = roundTripsPerWeek(typeId, km)
+  const seats = getAircraftType(typeId).seats
+  const demand = pairWeeklyDemand(state, from, to)
+  const wanted = Math.ceil((demand * 7) / 10 / Math.max(1, seats * 2))
+  return Math.max(2, Math.min(maxFreq, wanted))
 }
 
 // Demand discounted by incumbent competition: a monopoly pair is worth far
@@ -181,6 +204,24 @@ function greedyCommands(state: GameState): Command[] {
     commands.push({ type: 'hedge_fuel', quarters: 4 })
   }
 
+  // Capacity discipline on the schedule itself: slack MONOPOLY routes trim
+  // (empty seats burn fuel with no share to defend); packed routes restore
+  // toward the fleet's maximum. Contested pairs hold frequency — schedule
+  // is share there.
+  for (const route of airline.routes) {
+    if (route.lastCapacity === 0) continue
+    const max = maxRouteFrequency(airline, route)
+    const eff = Math.min(route.frequency, max)
+    const contested = airlinesOnPair(state, route.from, route.to, 0) > 0
+    if (!contested && route.lastLoadFactorBp < 5500 && eff > 2) {
+      commands.push({ type: 'set_frequency', routeId: route.id, frequency: Math.max(2, Math.floor((eff * 3) / 4)) })
+    } else if (route.lastLoadFactorBp >= 9000 && eff < max) {
+      // Grow a packed schedule in measured steps — slamming to the fleet
+      // maximum floods the pair the moment a second widebody arrives.
+      commands.push({ type: 'set_frequency', routeId: route.id, frequency: Math.min(max, Math.max(eff + 1, Math.ceil((eff * 3) / 2))) })
+    }
+  }
+
   // Distress: under water, an idle airframe is a liability with a payroll.
   // Sell up to two (oldest first) — the same reflex the rivals have. Cash
   // today breaks an insolvency streak that would otherwise be fatal.
@@ -204,13 +245,20 @@ function greedyCommands(state: GameState): Command[] {
   // a genuinely NEW market is exempt (its economics aren't steady-state
   // yet); re-entries carry market memory and answer for their numbers
   // immediately, so a teardown-and-rebuild in a fuel spike stays viable.
+  let closable = airline.routes.length - 1 // never close the final route
   for (const route of airline.routes) {
+    const h = route.history
+    const prevQ = h.length >= 2 ? h[h.length - 2]! : null
+    const losingNow = route.lastCapacity > 0 && route.lastRevenue * 100 < route.lastCost * 85
+    const losingBefore = prevQ !== null && prevQ.capacity > 0 && prevQ.revenue * 100 < prevQ.cost * 85
     if (
+      closable > 0 &&
       routeSpoolBp(airline, route, state.turn) === 10000 &&
-      route.lastCapacity > 0 &&
-      route.lastRevenue * 100 < route.lastCost * 85
+      losingNow &&
+      losingBefore // one bad quarter is weather; two is structure
     ) {
       commands.push({ type: 'close_route', routeId: route.id })
+      closable--
     }
   }
 
@@ -221,6 +269,20 @@ function greedyCommands(state: GameState): Command[] {
     .sort((a, b) => b.ageQuarters - a.ageQuarters)
     .slice(0, 2)
   for (const ac of geriatric) commands.push({ type: 'sell_aircraft', aircraftId: ac.id })
+
+  // The endgame lever: a distressed rival's network for cash. Only when the
+  // price leaves a full treasury buffer standing.
+  for (const rival of state.airlines) {
+    if (rival.id === 0 || rival.bankrupt) continue
+    const worth = netWorth(rival)
+    const distressed = rival.insolventQuarters >= 1 || worth * 4 <= netWorth(airline)
+    if (!distressed) continue
+    const price = Math.max(TAKEOVER_BASE_K, Math.floor((Math.max(0, worth) * TAKEOVER_PREMIUM_BP) / 10000))
+    if (airline.cash >= price + cashBuffer * 2 && rival.routes.length >= 2) {
+      commands.push({ type: 'acquire_rival', target: rival.id })
+      break // one deal a quarter is plenty
+    }
+  }
 
   const launch = launchCommands(state, 300)
   commands.push(...launch.commands)

@@ -148,7 +148,13 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   // the network to paper-losers at once; closing everything in one quarter
   // collapses revenue while the freed planes keep drawing salaries.
   const losers = airline.routes
-    .filter((r) => routeSpoolBp(airline, r, state.turn) === 10000 && r.lastCapacity > 0 && r.lastRevenue * 100 < r.lastCost * 85)
+    .filter((r) => {
+      if (routeSpoolBp(airline, r, state.turn) !== 10000) return false
+      const prevQ = r.history.length >= 2 ? r.history[r.history.length - 2]! : null
+      const losingNow = r.lastCapacity > 0 && r.lastRevenue * 100 < r.lastCost * 85
+      const losingBefore = prevQ !== null && prevQ.capacity > 0 && prevQ.revenue * 100 < prevQ.cost * 85
+      return losingNow && losingBefore // one bad quarter is weather; two is structure
+    })
     .sort((a, b) => a.lastRevenue * b.lastCost - b.lastRevenue * a.lastCost)
     .slice(0, 2)
   for (const route of losers) {
@@ -207,8 +213,14 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
     const contested = airlinesOnPair(state, route.from, route.to, idx) > 0
     if (!contested && route.lastLoadFactorBp < 5500 && eff > 2) {
       apply(state, idx, { type: 'set_frequency', routeId: route.id, frequency: Math.max(2, Math.floor((eff * 3) / 4)) }, events)
-    } else if (route.lastLoadFactorBp >= 9000 && route.frequency < max) {
-      apply(state, idx, { type: 'set_frequency', routeId: route.id, frequency: max }, events)
+    } else if (route.lastLoadFactorBp >= 9000 && eff < max) {
+      // Measured growth, not a slam to the fleet maximum (widebody flood).
+      apply(
+        state,
+        idx,
+        { type: 'set_frequency', routeId: route.id, frequency: Math.min(max, Math.max(eff + 1, Math.ceil((eff * 3) / 2))) },
+        events,
+      )
     }
   }
 
@@ -295,6 +307,11 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
     if (best && bestScore > personality.expandMinDemand) {
       const launch = idle.find((ac) => getAircraftType(ac.type).rangeKm >= best.km)
       if (launch) {
+        // Size the launch to the market (~70% of weekly demand), not the
+        // airframe — a widebody at max frequency floods a thin pair.
+        const maxFreq = roundTripsPerWeek(launch.type, best.km)
+        const seats = getAircraftType(launch.type).seats
+        const wanted = Math.ceil((pairWeeklyDemand(state, best.from, best.to) * 7) / 10 / Math.max(1, seats * 2))
         apply(
           state,
           idx,
@@ -303,7 +320,7 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
             from: best.from,
             to: best.to,
             aircraftId: launch.id,
-            frequency: roundTripsPerWeek(launch.type, best.km),
+            frequency: Math.max(2, Math.min(maxFreq, wanted)),
             fareLevel: personality.fareLevel,
             serviceLevel: personality.serviceLevel,
           },

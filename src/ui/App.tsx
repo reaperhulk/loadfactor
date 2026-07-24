@@ -406,6 +406,17 @@ function GameOverOverlay({ state, onWatchReplay }: { state: GameState; onWatchRe
         <h2 className={state.phase === 'won' ? 'pos' : 'neg'}>
           {state.phase === 'won' ? '🏆 VICTORY' : 'DEFEAT'}
         </h2>
+        {state.phase === 'won' &&
+          (() => {
+            const idx = SCENARIOS.findIndex((s) => s.id === state.scenario)
+            const next = idx >= 0 ? SCENARIOS[idx + 1] : undefined
+            if (!next) return null
+            return (
+              <p className="pos" data-testid="era-unlocked">
+                🔓 {next.name} unlocked — the next era awaits
+              </p>
+            )
+          })()}
         <ol>
           {ranked.map((a) => (
             <li key={a.id} className={a.id === 0 ? 'me' : ''}>
