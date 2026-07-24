@@ -80,6 +80,21 @@ test('every scenario starts from its menu card', async ({ page }) => {
   await expect(page.getByTestId('attention-strip')).toContainText('idle plane')
 })
 
+test('a challenge link opens the same world for whoever follows it', async ({ page }) => {
+  await page.goto('/?scenario=open_skies&seed=challenge-seed')
+  await expect(page.getByTestId('challenge-card')).toContainText('Open Skies')
+  await page.getByTestId('start-challenge').click()
+  await expect(page.getByTestId('date')).toHaveText('1995 Q1')
+  const seed = await page.evaluate(() => window.__harness.getState()!.seed)
+  expect(seed).toBe('challenge-seed')
+  // The in-game share button hands out the same link.
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page.getByTestId('share-challenge').click()
+  const link = await page.evaluate(() => navigator.clipboard.readText())
+  expect(link).toContain('scenario=open_skies')
+  expect(link).toContain('seed=challenge-seed')
+})
+
 test('the city panel shows stats and negotiates in context', async ({ page }) => {
   await startGame(page)
   await page.getByTestId('city-LAX').click()

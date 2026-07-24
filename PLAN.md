@@ -319,8 +319,9 @@ committing).
 **Status:** M0–M4 landed (M3's slot bidding wars and the distressed-rival
 takeover endgame included); M5 is live with four scenarios (Jet Age, Oil
 Crisis, Deregulation, Open Skies), the daily seed challenge, and a hall of
-fame; M6's presentation layer is largely in place (decade-tinted map, globe
-projection, ambient traffic that wears its metal, sound, PWA). Systems
+fame; M5's unlock chain and achievements are in; M6's presentation layer is
+largely in place (decade-tinted map, globe projection, ambient traffic
+that wears its metal, sound, PWA, shareable challenge links). Systems
 added beyond this ladder through the iteration loop: brand/marketing in
 the share battle, route spool-up with market memory, hemisphere
 seasonality, world index history, three save slots with JSON

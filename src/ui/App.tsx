@@ -57,10 +57,41 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
     hq: hq !== '' ? hq : undefined,
     color: color !== LIVERY_COLORS[0] ? color : undefined,
   })
+  // A challenge link carries (scenario, seed) in the URL — determinism makes
+  // the same seed the same world for everyone who opens it.
+  const challenge = (() => {
+    const params = new URLSearchParams(window.location.search)
+    const scenario = params.get('scenario')
+    const chSeed = params.get('seed')
+    if (!scenario || !chSeed) return null
+    try {
+      return { scenario: getScenario(scenario), seed: chSeed }
+    } catch {
+      return null
+    }
+  })()
   return (
     <main className="menu">
       <h1>Load Factor</h1>
       <p className="tagline">Routes. Jets. Margins. Fill the seats.</p>
+      {challenge && (
+        <div className="scenario-card continue-card" data-testid="challenge-card">
+          <h2>⚔ Challenge accepted?</h2>
+          <p className="dim">
+            {challenge.scenario.name} · seed “{challenge.seed}” — same seed, same world. Beat their net
+            worth.
+          </p>
+          <button
+            data-testid="start-challenge"
+            onClick={() => {
+              window.history.replaceState(null, '', window.location.pathname)
+              startGame(challenge.scenario.id, challenge.seed, custom())
+            }}
+          >
+            ▶ Fly the challenge
+          </button>
+        </div>
+      )}
       {savedRows.length > 0 && (
         <div className="scenario-card continue-card">
           <h2>Saved games</h2>
@@ -529,6 +560,19 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             </span>
           )
         })()}
+        <button
+          data-testid="share-challenge"
+          title="copy a challenge link — same scenario, same seed, same world for whoever opens it"
+          aria-label="copy challenge link"
+          onClick={() => {
+            const url = `${window.location.origin}${window.location.pathname}?scenario=${encodeURIComponent(
+              state.scenario,
+            )}&seed=${encodeURIComponent(state.seed)}`
+            void navigator.clipboard?.writeText(url)
+          }}
+        >
+          ⚔ share
+        </button>
         <MuteToggle />
         {state.phase === 'planning' && (
           <button className="end-quarter" data-testid="end-quarter" onClick={endQuarter}>
