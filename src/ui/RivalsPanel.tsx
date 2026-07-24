@@ -100,6 +100,7 @@ function StandingsTable({ state }: { state: GameState }) {
                 r.cities,
                 r.fleet,
               ]),
+              'Standings',
             )
           }
         >

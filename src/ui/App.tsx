@@ -47,7 +47,7 @@ import {
 } from './legends'
 import { EVENT_ICONS, EVENT_NAMES, ToastStack } from './toasts'
 import type { GameState, Replay } from '../engine'
-import { money } from './format'
+import { copyText, money } from './format'
 
 type Tab = 'routes' | 'fleet' | 'airports' | 'rivals' | 'finance' | 'report'
 
@@ -124,6 +124,9 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           {savedRows.map(({ save, slot }, i) => (
             <p key={slot} className="save-row" data-testid={`save-slot-${slot}`}>
               <span>
+                {save!.finished && (
+                  <span title="this career is finished — a replayable record">🏁 </span>
+                )}
                 {save!.player?.name ?? 'Your airline'}{' '}
                 <span className="dim">
                   — {(() => {
@@ -150,7 +153,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
                 title="copy this career as JSON — paste it into Import on any browser"
                 onClick={() => {
                   const json = exportSave(slot)
-                  if (json) void navigator.clipboard?.writeText(json)
+                  if (json) copyText(json, 'Career JSON')
                 }}
               >
                 export
@@ -611,6 +614,23 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         <span className="dim" data-testid="race-clock" title="quarters until the race is scored">
           {Math.max(0, scenario.quarters - state.turn)}q left
         </span>
+        {(() => {
+          // The duel, always on screen: a challenge career shows the number
+          // to beat in the HUD, not just on a chart two tabs away.
+          const duel = getChallengeTarget()
+          if (!duel) return null
+          const mine = netWorth(player)
+          const ahead = mine > duel.worth
+          return (
+            <span
+              className={ahead ? 'pos' : 'neg'}
+              data-testid="duel-chip"
+              title={`challenge target: beat ${duel.by ?? 'the challenger'}'s ${money(duel.worth)}`}
+            >
+              ⚔ {ahead ? 'ahead of' : 'behind'} {duel.by ?? 'challenger'} by {money(Math.abs(mine - duel.worth))}
+            </span>
+          )
+        })()}
         {(player.insolventQuarters > 0 || player.cash < 0) && state.phase === 'planning' && (
           <span className="neg insolvency-warning" data-testid="insolvency-warning">
             ⚠ INSOLVENT — {player.insolventQuarters > 0 ? 'one more losing quarter folds the airline' : 'end the quarter in the red and the clock starts'}
@@ -655,7 +675,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
                 state.scenario,
               )}&seed=${encodeURIComponent(state.seed)}` +
               `&target=${netWorth(me)}&by=${encodeURIComponent(me.name)}`
-            void navigator.clipboard?.writeText(url)
+            copyText(url, 'Challenge link')
           }}
         >
           ⚔ share

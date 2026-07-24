@@ -161,6 +161,7 @@ export function RoutesPanel({
               x.marginBp,
               x.profit,
             ]),
+            'Routes table',
           )
         }
       >
@@ -467,6 +468,7 @@ export function FleetPanel({ state }: { state: GameState }) {
                     r ? `${r.from}-${r.to}` : 'idle',
                   ]
                 }),
+                'Fleet table',
               )
             }
           >

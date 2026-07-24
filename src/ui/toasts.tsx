@@ -158,6 +158,15 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
 
 const TOAST_MS = 4200
 
+// Out-of-band announcements (clipboard confirmations, UI-side notices) ride
+// the same toast stack as engine events. Fire-and-forget from anywhere.
+type Announcement = Omit<Toast, 'id'>
+const announceListeners = new Set<(a: Announcement) => void>()
+
+export function announce(text: string, icon = '⎘', kind: Toast['kind'] = 'slots'): void {
+  for (const l of announceListeners) l({ kind, icon, text })
+}
+
 export function ToastStack({
   events,
   state,
@@ -175,6 +184,28 @@ export function ToastStack({
   const nextId = useRef(1)
   const seen = useRef<GameEvent[] | null>(null)
   const timers = useRef<number[]>([])
+
+  const pushBatch = (fresh: Omit<Toast, 'id'>[]): void => {
+    if (fresh.length === 0) return
+    const stamped = fresh.map((t) => ({ ...t, id: nextId.current++ }))
+    setToasts((prev) => [...prev, ...stamped].slice(-4)) // keep the stack short
+    const ids = new Set(stamped.map((t) => t.id))
+    timers.current.push(
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => !ids.has(t.id)))
+      }, TOAST_MS),
+    )
+  }
+
+  // UI-side announcements arrive outside the engine-event flow.
+  useEffect(() => {
+    const listener = (a: Announcement): void => pushBatch([a])
+    announceListeners.add(listener)
+    return () => {
+      announceListeners.delete(listener)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (seen.current === events) return // only react to a new engine result

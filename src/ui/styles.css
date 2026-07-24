@@ -227,6 +227,14 @@ button:disabled {
   max-width: 560px;
 }
 
+/* The replay narrates its quarters; its cities are scenery, not buttons. */
+.replay-headlines {
+  margin: 4px 0;
+}
+.replay .city {
+  cursor: default;
+}
+
 /* Victory confetti: paper falls behind the game-over card. */
 .confetti {
   position: absolute;

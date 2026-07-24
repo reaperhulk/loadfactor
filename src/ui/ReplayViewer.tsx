@@ -3,33 +3,72 @@
 // at every quarter boundary; the viewer then just scrubs snapshots.
 
 import { useEffect, useMemo, useState } from 'react'
-import { applyCommand, newGame, type GameState, type Replay } from '../engine'
+import { getScenario } from '../data/scenarios'
+import { applyCommand, newGame, type GameEvent, type GameState, type Replay } from '../engine'
 import { netWorth, quarterOf, yearOf } from '../engine/queries'
 import { MapView } from './MapView'
 import { RaceChart } from './Sparkline'
+import { EVENT_ICONS, EVENT_NAMES } from './toasts'
 import { money } from './format'
 
 const EMPTY = new Set<never>()
 
-function snapshotQuarters(replay: Replay): GameState[] {
-  const snapshots: GameState[] = []
+interface ReplayFrame {
+  state: GameState
+  headlines: string[] // the quarter's big beats, for the narration strip
+}
+
+// The story beats worth narrating while decades scrub past: world events,
+// bankruptcies, consolidation, the player's city wins, and the ending.
+function headlinesFor(state: GameState, events: GameEvent[]): string[] {
+  const out: string[] = []
+  const name = (i: number): string => state.airlines[i]?.name ?? `airline ${i}`
+  for (const e of events) {
+    switch (e.type) {
+      case 'world_event_started':
+        out.push(`${EVENT_ICONS[e.eventId] ?? '🌍'} ${EVENT_NAMES[e.eventId] ?? e.eventId}${e.city ? ` — ${e.city}` : ''}`)
+        break
+      case 'airline_bankrupt':
+        out.push(`🕯️ ${name(e.airline)} went bankrupt`)
+        break
+      case 'rival_acquired':
+        out.push(`💼 ${name(e.airline)} acquired ${name(e.target)}`)
+        break
+      case 'slots_granted':
+        if (e.airline === 0) out.push(`🤝 won slots at ${e.city}`)
+        break
+      case 'game_over':
+        out.push(e.result === 'won' ? `🏆 ${e.reason}` : `🕯️ ${e.reason}`)
+        break
+      default:
+        break
+    }
+  }
+  return out.slice(0, 4)
+}
+
+function snapshotQuarters(replay: Replay): ReplayFrame[] {
+  const frames: ReplayFrame[] = []
   // The player customization is part of the replay — without it a custom-HQ
   // career would replay against the wrong world and silently diverge.
   let state = newGame(replay.scenario, replay.seed, replay.player)
-  snapshots.push(state)
+  frames.push({ state, headlines: [] })
   for (const command of replay.commands) {
-    state = applyCommand(state, command).state
-    if (command.type === 'end_quarter') snapshots.push(state)
+    const res = applyCommand(state, command)
+    state = res.state
+    if (command.type === 'end_quarter') {
+      frames.push({ state, headlines: headlinesFor(state, res.events) })
+    }
   }
-  return snapshots
+  return frames
 }
 
 export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () => void }) {
-  const snapshots = useMemo(() => snapshotQuarters(replay), [replay])
+  const frames = useMemo(() => snapshotQuarters(replay), [replay])
   const [index, setIndex] = useState(0)
   const [playing, setPlaying] = useState(true)
   const [fast, setFast] = useState(false)
-  const last = snapshots.length - 1
+  const last = frames.length - 1
 
   useEffect(() => {
     if (!playing) return
@@ -48,16 +87,26 @@ export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () =>
     return () => clearInterval(timer)
   }, [playing, fast, last])
 
-  const state = snapshots[index]!
+  const state = frames[index]!.state
+  const headlines = frames[index]!.headlines
   return (
     <main className="game replay" data-testid="replay-viewer">
       <header>
         <h1>Load Factor</h1>
         <span className="replay-badge">REPLAY</span>
+        <span data-testid="replay-identity">
+          {state.airlines[0]!.name} · {(() => {
+            try {
+              return getScenario(replay.scenario).name
+            } catch {
+              return replay.scenario
+            }
+          })()}
+        </span>
         <span data-testid="replay-date">
           {yearOf(state)} Q{quarterOf(state)}
         </span>
-        <span>{replay.seed}</span>
+        <span className="dim">seed “{replay.seed}”</span>
         <button className="end-quarter" onClick={onExit} data-testid="replay-exit">
           Exit replay
         </button>
@@ -112,6 +161,17 @@ export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () =>
           {index}/{last}
         </span>
       </div>
+      {/* The quarter's story beats, so decades of oil shocks and takeovers
+          don't scrub past as silently appearing arcs. */}
+      {headlines.length > 0 && (
+        <p className="events-strip replay-headlines" data-testid="replay-headlines">
+          {headlines.map((h, i) => (
+            <span key={i} className="event-chip">
+              {h}
+            </span>
+          ))}
+        </p>
+      )}
       {/* The race so far, up to the scrub position — the story under the map. */}
       {index >= 2 && (
         <div className="replay-chart" data-testid="replay-chart">

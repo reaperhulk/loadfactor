@@ -613,3 +613,34 @@ test('the handbook teaches every system, and legends live where they are used', 
   await page.getByTestId('tab-rivals').click()
   await expect(page.getByTestId('takeover-legend')).toBeAttached()
 })
+
+test('the share loop closes: copy feedback, duel HUD, and preserved careers', async ({ page }) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  // A duel career shows the number to beat in the HUD from turn one.
+  await page.goto('/?scenario=jet_age&seed=loop-seed&target=99999999&by=Ghost')
+  await page.getByTestId('start-challenge').click()
+  await expect(page.getByTestId('duel-chip')).toContainText('behind Ghost')
+  // Copying the challenge link confirms via toast instead of silence.
+  await page.getByTestId('share-challenge').click()
+  await expect(page.getByTestId('toasts')).toContainText('Challenge link copied')
+  // Ride the idle airline to game over: the finished career must SURVIVE
+  // "New game" — it is the only replayable record of those decades.
+  await page.evaluate(() => {
+    for (let i = 0; i < 40 && window.__harness.getState()!.phase === 'planning'; i++) {
+      window.__harness.endQuarter()
+    }
+  })
+  await expect(page.getByTestId('gameover-overlay')).toBeVisible()
+  await page.getByTestId('new-game').click()
+  const row = page.getByTestId('save-slot-0')
+  await expect(row).toBeVisible()
+  await expect(row).toContainText('🏁')
+  // The preserved record replays with identity and narration.
+  await page.getByTestId('watch-save-replay').click()
+  await expect(page.getByTestId('replay-viewer')).toBeVisible()
+  await expect(page.getByTestId('replay-identity')).toContainText('The Jet Age')
+  // Scrub to the end: the final quarter carries the game-over headline.
+  await page.getByTestId('replay-speed').click()
+  await expect(page.getByTestId('replay-headlines')).toContainText('🕯️', { timeout: 30000 })
+  await page.getByTestId('replay-exit').click()
+})

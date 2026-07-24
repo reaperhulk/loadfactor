@@ -45,6 +45,7 @@ interface SaveV1 extends Replay {
   color?: string
   savedAt?: number // wall-clock ms, presentation only (slot ordering/labels)
   challenge?: ChallengeTarget // the duel this career was started against
+  finished?: boolean // the career ended — the save is a finished record now
 }
 
 // A challenge link can carry the challenger's net worth — the number to beat.
@@ -78,6 +79,7 @@ function persist(): void {
     player: sessionPlayer ?? undefined,
     color: playerColor ?? undefined,
     challenge: challengeTarget ?? undefined,
+    finished: session.state.phase !== 'planning' || undefined,
     savedAt: Date.now(),
     commands: session.commandLog,
   }
@@ -131,10 +133,6 @@ export function clearSaveAt(slot: number): void {
   } catch {
     // ignore
   }
-}
-
-export function clearSave(): void {
-  clearSaveAt(activeSlot)
 }
 
 // Rebuild a session from a save by replaying it through the engine — one
@@ -325,11 +323,13 @@ export function getReplay(): Replay | null {
   }
 }
 
+// Back to the menu. The save STAYS: a finished career is the only replayable
+// record of those decades, and "New game" used to destroy it. Slots recycle
+// via nextFreeSlot (stalest first) or an explicit delete.
 export function reset(): void {
   session = null
   sessionPlayer = null
   playerColor = null
   challengeTarget = null
-  clearSave()
   notify()
 }
