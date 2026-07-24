@@ -236,3 +236,23 @@ export const OFFER_GAMES_LEAD_QUARTERS = 6 // commitments pay off this far out
 export const OFFER_GAMES_BONUS_BP = 3500 // +35% appeal on routes touching the host
 export const OFFER_SLOTS_GRANTED = 3
 export const OFFER_FUEL_PREMIUM_BP = 500 // the price of three years of certainty
+
+// ---- Reliability and reputation (F2): risk that scales with the airline ----
+// Airframes past this age start breaking; the chance climbs with every extra
+// quarter of service. Deferring renewal is now a gamble, not just a saving.
+export const GROUNDING_AGE_QUARTERS = 28
+export const GROUNDING_BP_PER_QUARTER_OVER = 18 // per quarter of age past the threshold
+export const GROUNDING_MAX_BP = 1400 // ceiling on any single airframe's risk
+export const GROUNDING_QUARTERS = 1 // out of service
+export const GROUNDING_REPAIR_BP = 400 // repair bill as bp of list price
+export const REPUTATION_HIT_PER_GROUNDING = 250 // bp knocked off per grounding
+export const REPUTATION_RECOVERY_BP = 120 // bp healed per quarter
+export const REPUTATION_MIN_BP = 7000 // reputation floor — never a death spiral
+// How strongly reputation moves appeal on a contested pair: at the floor an
+// airline carries a noticeable, survivable disadvantage.
+export const REPUTATION_APPEAL_WEIGHT_BP = 5000
+// Milestones on the era's objective, as percentages of its target. A rate
+// metric (load factor) needs a different ladder: 25% of a target load factor
+// is a terrible quarter, not an achievement — so rates mark the approach.
+export const MILESTONE_PCTS: readonly number[] = [25, 50, 75, 100]
+export const MILESTONE_PCTS_RATE: readonly number[] = [85, 95, 100]

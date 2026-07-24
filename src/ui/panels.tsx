@@ -8,6 +8,7 @@ import { MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
 import type { GameState } from '../engine'
 import { baseFare, fareFor, pairWeeklyDemand, seasonalBp } from '../engine/market'
 import {
+  GROUNDING_AGE_QUARTERS,
   CABIN_REFIT_COST_BP,
   MAINT_AGE_BP_PER_QUARTER,
   ORDER_CANCEL_REFUND_BP,
@@ -42,6 +43,7 @@ import { dispatch } from './session'
 import { copyTsv, money } from './format'
 import {
   CabinLegend,
+  ReliabilityLegend,
   ServiceLegend,
   SlotLegend,
 } from './legends'
@@ -401,6 +403,23 @@ export function FleetPanel({ state }: { state: GameState }) {
           🛠 put idle fleet to work
         </button>
       )}
+      {player.fleet.length > 0 && (() => {
+        const rep = player.reputationBp ?? 10000
+        const atRisk = player.fleet.filter((a) => a.ageQuarters >= GROUNDING_AGE_QUARTERS).length
+        if (atRisk === 0 && rep >= 10000) return null
+        return (
+          <p className={rep < 9500 ? 'neg' : 'dim'} data-testid="reliability-note">
+            {atRisk > 0 && (
+              <>
+                {atRisk} airframe{atRisk > 1 ? 's' : ''} past {GROUNDING_AGE_QUARTERS / 4} years — old metal
+                breaks, and a grounded plane still draws its crew.{' '}
+              </>
+            )}
+            Reputation {(rep / 100).toFixed(0)}%
+            {rep < 10000 && ' — repeated groundings cost you appeal on contested pairs'}
+          </p>
+        )
+      })()}
       {player.fleet.length > 0 && (
         <p className="dim" data-testid="renewal-forecast">
           Fleet upkeep {money(maintAt(0))}/q now → {money(maintAt(8))}/q in 2 years on the same metal
@@ -604,6 +623,7 @@ export function FleetPanel({ state }: { state: GameState }) {
       })()}
       <CabinLegend />
       <h3>Order new aircraft ({year})</h3>
+      <ReliabilityLegend />
       <Shop state={state} />
     </div>
   )

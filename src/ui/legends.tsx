@@ -15,6 +15,11 @@ import {
   DOMINANCE_PARITY_MULT_BP,
   DOMINANCE_SCRUTINY_MAX_BP,
   ENTRANT_EVERY_QUARTERS,
+  GROUNDING_AGE_QUARTERS,
+  GROUNDING_MAX_BP,
+  GROUNDING_REPAIR_BP,
+  REPUTATION_HIT_PER_GROUNDING,
+  REPUTATION_RECOVERY_BP,
   RESTRUCTURE_MAX,
   HEDGE_MAX_QUARTERS,
   HEDGE_MIN_QUARTERS,
@@ -262,6 +267,31 @@ export function RivalryLegend() {
       <p className="hint">
         The practical read: you cannot win by killing the field and coasting. Something will always
         be coming up behind you.
+      </p>
+    </details>
+  )
+}
+
+export function ReliabilityLegend() {
+  return (
+    <details className="game-legend" data-testid="reliability-legend">
+      <summary className="dim">Why do my old planes keep breaking?</summary>
+      <p className="dim">
+        Past {GROUNDING_AGE_QUARTERS / 4} years an airframe can fail its checks. The risk climbs with
+        every further quarter of service, up to {(GROUNDING_MAX_BP / 100).toFixed(0)}% a quarter for
+        the oldest metal. A grounding costs {(GROUNDING_REPAIR_BP / 100).toFixed(0)}% of list price to
+        repair, takes the aircraft out of the schedule for a quarter — and it goes on drawing crew
+        salaries and ownership the whole time.
+      </p>
+      <p className="dim">
+        Each grounding also knocks {(REPUTATION_HIT_PER_GROUNDING / 100).toFixed(1)}% off your
+        operational reputation, which costs you appeal on every contested pair. Reputation heals{' '}
+        {(REPUTATION_RECOVERY_BP / 100).toFixed(1)}% a quarter and can never fall far enough to be a
+        death spiral.
+      </p>
+      <p className="hint">
+        This is what makes deferring fleet renewal a gamble rather than a saving: a big old fleet
+        breaks more often, and the bills arrive exactly when the schedule can least afford the gap.
       </p>
     </details>
   )

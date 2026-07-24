@@ -41,9 +41,10 @@ import {
   HubLegend,
   MarketingLegend,
   SeasonLegend,
+  ReliabilityLegend,
+  RivalryLegend,
   ServiceLegend,
   SlotLegend,
-  RivalryLegend,
   SpoolLegend,
   TakeoverLegend,
 } from './legends'
@@ -802,6 +803,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
               <SlotLegend />
               <MarketingLegend />
               <HedgeLegend />
+              <ReliabilityLegend />
               <RivalryLegend />
               <TakeoverLegend />
               <CabinLegend />

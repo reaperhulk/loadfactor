@@ -151,6 +151,25 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
         })
         break
       }
+      case 'aircraft_grounded':
+        if (e.airline === 0) {
+          out.push({
+            kind: 'error',
+            icon: '🔧',
+            text: `${getAircraftType(e.aircraftType).name} grounded for maintenance — ${e.repairK}k repair, out for ${e.quarters}q`,
+          })
+        }
+        break
+      case 'milestone_reached':
+        out.push({
+          kind: 'victory',
+          icon: e.pctOfTarget >= 100 ? '🎯' : '📶',
+          text:
+            e.pctOfTarget >= 100
+              ? `Target reached — ${e.label} bar cleared`
+              : `${e.pctOfTarget}% of the ${e.label} target`,
+        })
+        break
       case 'offer_made':
         out.push({ kind: 'event', icon: '📨', text: `${e.headline} — decide within ${e.expiresTurn} quarters` })
         break

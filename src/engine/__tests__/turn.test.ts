@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyCommand, newGame } from '../index'
+import { GROUNDING_AGE_QUARTERS, REPUTATION_MIN_BP } from '../../data/constants'
+import { reputationAppealBp, routeWeeklyCapacity } from '../queries'
 import type { GameEvent, GameState } from '../types'
 
 function playerReport(events: GameEvent[]) {
@@ -166,5 +168,78 @@ describe('quarter resolution', () => {
     // command ever targets airline 0.
     expect(state.airlines[0]!.routes).toHaveLength(0)
     expect(state.airlines[0]!.cash).toBeLessThan(playerCashBefore)
+  })
+})
+
+describe('stakes that scale (F2)', () => {
+  it('old metal breaks: a grounded airframe stops flying but keeps costing', () => {
+    let state: GameState = newGame('jet_age', 'grounding-seed')
+    state = applyCommand(state, {
+      type: 'open_route',
+      from: 'JFK',
+      to: 'ORD',
+      aircraftId: 1,
+      frequency: 10,
+    }).state
+    // Age the fleet well past the reliability threshold and run until the
+    // maintenance gods notice.
+    for (const ac of state.airlines[0]!.fleet) ac.ageQuarters = GROUNDING_AGE_QUARTERS + 40
+    let grounded: { repairK: number } | null = null
+    for (let q = 0; q < 12 && grounded === null && state.phase === 'planning'; q++) {
+      const r = applyCommand(state, { type: 'end_quarter' })
+      state = r.state
+      for (const e of r.events) {
+        if (e.type === 'aircraft_grounded' && e.airline === 0) grounded = { repairK: e.repairK }
+      }
+      // Keep the fleet geriatric so the risk stays live.
+      for (const ac of state.airlines[0]!.fleet) ac.ageQuarters = GROUNDING_AGE_QUARTERS + 40
+    }
+    expect(grounded, 'a fleet this old eventually breaks').not.toBeNull()
+    expect(grounded!.repairK).toBeGreaterThan(0)
+    // Reputation took the hit, and never falls through the floor.
+    const rep = state.airlines[0]!.reputationBp ?? 10000
+    expect(rep).toBeLessThanOrEqual(10000)
+    expect(rep).toBeGreaterThanOrEqual(REPUTATION_MIN_BP)
+  })
+
+  it('a grounded airframe is removed from the schedule it was flying', () => {
+    let state: GameState = newGame('jet_age', 'ground-capacity')
+    state = applyCommand(state, {
+      type: 'open_route',
+      from: 'JFK',
+      to: 'ORD',
+      aircraftId: 1,
+      frequency: 10,
+    }).state
+    const airline = state.airlines[0]!
+    const route = airline.routes[0]!
+    const flying = routeWeeklyCapacity(airline, route, state.turn)
+    expect(flying).toBeGreaterThan(0)
+    // Ground the only assigned airframe: the route can fly nothing.
+    airline.fleet.find((a) => a.routeId === route.id)!.groundedUntil = state.turn + 2
+    expect(routeWeeklyCapacity(airline, route, state.turn)).toBe(0)
+    // Planning views (turn -1) still show what the fleet COULD fly.
+    expect(routeWeeklyCapacity(airline, route)).toBe(flying)
+  })
+
+  it('reputation scales appeal but can never spiral', () => {
+    const airline = newGame('jet_age', 'rep-seed').airlines[0]!
+    expect(reputationAppealBp(airline)).toBe(10000) // spotless: no effect
+    airline.reputationBp = REPUTATION_MIN_BP
+    const worst = reputationAppealBp(airline)
+    expect(worst).toBeLessThan(10000)
+    expect(worst, 'a battered operator is disadvantaged, not dead').toBeGreaterThan(8000)
+  })
+
+  it('milestones fire once as the era objective is crossed', () => {
+    let state: GameState = newGame('oil_crisis', 'milestone-seed') // cumulative profit
+    const seen: number[] = []
+    for (let q = 0; q < 40 && state.phase === 'planning'; q++) {
+      const r = applyCommand(state, { type: 'end_quarter' })
+      state = r.state
+      for (const e of r.events) if (e.type === 'milestone_reached') seen.push(e.pctOfTarget)
+    }
+    // An idle airline never climbs the ladder — no false celebrations.
+    expect(new Set(seen).size, 'each milestone announces at most once').toBe(seen.length)
   })
 })

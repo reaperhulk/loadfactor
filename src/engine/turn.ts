@@ -20,6 +20,16 @@ import {
   USED_MARGIN_BP,
   USED_OFFERS_PER_QUARTER,
   LOAN_AMORT_BP,
+  GROUNDING_AGE_QUARTERS,
+  GROUNDING_BP_PER_QUARTER_OVER,
+  GROUNDING_MAX_BP,
+  GROUNDING_QUARTERS,
+  GROUNDING_REPAIR_BP,
+  MILESTONE_PCTS,
+  MILESTONE_PCTS_RATE,
+  REPUTATION_HIT_PER_GROUNDING,
+  REPUTATION_MIN_BP,
+  REPUTATION_RECOVERY_BP,
   DOMINANCE_PARITY_MULT_BP,
   DOMINANCE_SCRUTINY_BP,
   DOMINANCE_SCRUTINY_MAX_BP,
@@ -34,7 +44,7 @@ import { getScenario } from '../data/scenarios'
 import { inflationBp, resolveMarket } from './market'
 import { resaleValue, routeWeeklyCapacity, slotCities, slotsFree, totalDebt } from './queries'
 import { resolveNegotiations } from './negotiation'
-import { netWorth, objectiveBeats, objectiveMet, objectiveScore, yearOf } from './queries'
+import { isGrounded, netWorth, objectiveBeats, objectiveMet, objectiveScore, objectiveScoreAt, yearOf } from './queries'
 import { dealUpkeep, expireOffersAndDeals, maybeOfferDeal } from './offers'
 import { deriveFootholds } from './newGame'
 import { runRivalTurn } from './rivals'
@@ -364,8 +374,39 @@ export function endQuarter(prev: GameState): EngineResult {
     const profit = revenue - costs
     airline.cash += profit - debtPayment
 
-    // 7. Aging, hedge runoff, solvency, stats.
+    // 7. Aging, reliability, hedge runoff, solvency, stats.
     for (const ac of airline.fleet) ac.ageQuarters++
+    // Old metal breaks. Risk climbs with every quarter past the threshold, is
+    // capped per airframe, and uses stateless per-entity hashing (PLAN §3.2)
+    // rather than a stream draw. A grounded airframe still draws salaries and
+    // ownership — that is the whole point of deferring renewal being a gamble.
+    for (const ac of airline.fleet) {
+      if (isGrounded(ac, state.turn)) continue
+      const over = ac.ageQuarters - GROUNDING_AGE_QUARTERS
+      if (over <= 0) continue
+      const riskBp = Math.min(GROUNDING_MAX_BP, over * GROUNDING_BP_PER_QUARTER_OVER)
+      // A clean uniform 0..9999 per (seed, turn, airframe): hashNoiseBp is
+      // centered on 10000 and would not give an honest probability here.
+      const roll = fnv1a(`${state.seed}|${state.turn}|ground:${airline.id}:${ac.id}`) % 10000
+      if (roll >= riskBp) continue
+      const repairK = Math.floor((getAircraftType(ac.type).price * GROUNDING_REPAIR_BP) / 10000)
+      ac.groundedUntil = state.turn + 1 + GROUNDING_QUARTERS
+      airline.cash -= repairK
+      airline.reputationBp = Math.max(
+        REPUTATION_MIN_BP,
+        (airline.reputationBp ?? 10000) - REPUTATION_HIT_PER_GROUNDING,
+      )
+      events.push({
+        type: 'aircraft_grounded',
+        airline: airline.id,
+        aircraftId: ac.id,
+        aircraftType: ac.type,
+        quarters: GROUNDING_QUARTERS,
+        repairK,
+      })
+    }
+    // Reputation heals slowly toward spotless.
+    airline.reputationBp = Math.min(10000, (airline.reputationBp ?? 10000) + REPUTATION_RECOVERY_BP)
     if (airline.fuelHedge !== null) {
       airline.fuelHedge.quartersLeft--
       if (airline.fuelHedge.quartersLeft <= 0) airline.fuelHedge = null
@@ -439,12 +480,30 @@ export function endQuarter(prev: GameState): EngineResult {
     }
   }
 
-  // 9. The world asks a question: at most one open offer at a time, and
+  // 9. Milestones on the era's objective: the back half needs a ladder to
+  // climb, not just a deadline to wait for.
+  {
+    const obj = getScenario(state.scenario).objective
+    const p0 = state.airlines[0]!
+    if (!p0.bankrupt && obj.higherIsBetter) {
+      const score = objectiveScore(p0, obj.kind)
+      const prevScore = p0.history.length >= 2 ? objectiveScoreAt(p0, obj.kind, p0.history.length - 1) : 0
+      const ladder = obj.unit === 'rate' ? MILESTONE_PCTS_RATE : MILESTONE_PCTS
+      for (const pct of ladder) {
+        const bar = Math.floor((obj.target * pct) / 100)
+        if (prevScore < bar && score >= bar) {
+          events.push({ type: 'milestone_reached', airline: 0, label: obj.label, pctOfTarget: pct })
+        }
+      }
+    }
+  }
+
+  // 10. The world asks a question: at most one open offer at a time, and
   // anything unanswered lapses.
   expireOffersAndDeals(state, events)
   maybeOfferDeal(state, events)
 
-  // 10. New entrants: an empty seat draws fresh capital on a fixed cadence, so
+  // 11. New entrants: an empty seat draws fresh capital on a fixed cadence, so
   // the map never becomes a one-airline world. Capped at the scenario's
   // intended field size.
   const liveRivals = state.airlines.filter((a) => a.controller === 'rival' && !a.bankrupt).length

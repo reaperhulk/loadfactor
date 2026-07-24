@@ -70,9 +70,13 @@ describe('balance envelope', () => {
     // Re-derived after F1 (a field that fights back) and F3 (each era scores
     // its OWN objective). Every era has seeds the competent bot wins and
     // seeds it loses close — that spread is the product, not a defect.
-    { scenario: 'jet_age', quarters: 80, wins: ['beta', 'gamma', 'delta', 'epsilon'], competitive: ['alpha'] },
+    // F2's reliability costs are a permanent new drag: epsilon now leads its
+    // field comfortably but finishes just under the qualifying bar, and alpha
+    // drops out of the competitive band entirely.
+    { scenario: 'jet_age', quarters: 80, wins: ['beta', 'gamma', 'delta'], competitive: ['epsilon'] },
     { scenario: 'oil_crisis', quarters: 60, wins: ['alpha', 'beta', 'gamma', 'theta'], competitive: [] },
-    { scenario: 'deregulation', quarters: 60, wins: ['beta', 'gamma'], competitive: ['alpha'] },
+    // deregulation/beta is now a 3% photo finish rather than a 1% win.
+    { scenario: 'deregulation', quarters: 60, wins: ['gamma'], competitive: ['alpha', 'beta'] },
     // open_skies alpha/gamma stay unpinned: hub-building on those worlds
     // never reaches the connecting volume the leaders find.
     { scenario: 'open_skies', quarters: 60, wins: ['beta', 'theta'], competitive: [] },

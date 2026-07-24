@@ -33,6 +33,9 @@ export interface OwnedAircraft {
   // Cabin fit: 1 = high-density (more seats, less appeal), 2 = standard,
   // 3 = premium (fewer seats, more appeal and yield). Refits cost cash.
   cabin: number
+  // Grounded for maintenance until this turn: the airframe still draws crew
+  // salaries and ownership, it just cannot fly. Old metal breaks (F2).
+  groundedUntil?: number
 }
 
 export interface AircraftOrder {
@@ -146,6 +149,10 @@ export interface Airline {
   history: QuarterStats[]
   nextId: number // shared id counter for aircraft/orders/routes/loans
   deals?: ActiveDeal[] // accepted world offers still running
+  // Operational reputation in basis points (10000 = spotless). Groundings
+  // damage it and it heals slowly; it scales appeal on every contested pair,
+  // so an aging fleet quietly costs market share as well as repair bills.
+  reputationBp?: number
   restructures?: number // rivals only: chapter-11 rounds used (see RESTRUCTURE_MAX)
   enteredTurn?: number // set on late entrants; absent for founding airlines
 }
@@ -306,6 +313,8 @@ export type GameEvent =
   | { type: 'offer_declined'; offerId: number }
   | { type: 'offer_expired'; offerId: number; headline: string }
   | { type: 'deal_ended'; kind: WorldOffer['kind']; city: string | null }
+  | { type: 'aircraft_grounded'; airline: number; aircraftId: number; aircraftType: string; quarters: number; repairK: number }
+  | { type: 'milestone_reached'; airline: number; label: string; pctOfTarget: number }
   | { type: 'game_over'; result: 'won' | 'lost'; reason: string }
 
 export interface EngineResult {

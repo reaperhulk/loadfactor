@@ -728,3 +728,19 @@ test('the world asks questions: an offer can be taken or passed', async ({ page 
   await expect(page.getByTestId('offer-card')).toHaveCount(0)
   await expect(page.getByTestId('active-deals')).toContainText('LHR')
 })
+
+test('stakes scale with the airline: groundings, reputation, milestones', async ({ page }) => {
+  await startGame(page)
+  await page.evaluate(() => {
+    const snap = window.__harness.getState()!
+    const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
+    // A geriatric fleet: the reliability warning must appear where the metal is.
+    const s = window.__harness.getState()!
+    for (const ac of s.airlines[0]!.fleet) ac.ageQuarters = 60
+    window.__harness.dispatch({ type: 'set_marketing', level: 0 })
+  })
+  await page.getByTestId('tab-fleet').click()
+  await expect(page.getByTestId('reliability-note')).toContainText('old metal breaks')
+  await expect(page.getByTestId('reliability-legend')).toBeAttached()
+})

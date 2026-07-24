@@ -13,6 +13,7 @@ import {
   MIN_LOAN_RATE_BP,
   RESALE_INITIAL_BP,
   WEEKLY_BLOCK_MINUTES,
+  REPUTATION_APPEAL_WEIGHT_BP,
 } from '../data/constants'
 import { distanceKm, pairKey } from '../data/cities'
 import { getScenario } from '../data/scenarios'
@@ -100,18 +101,27 @@ export function roundTripsPerWeek(type: string, km: number): number {
 }
 
 // Most round trips per week the assigned fleet could fly on this route.
-export function maxRouteFrequency(airline: Airline, route: Route): number {
+export function maxRouteFrequency(airline: Airline, route: Route, turn = -1): number {
   const km = distanceKm(route.from, route.to)
   let max = 0
   for (const a of airline.fleet) {
-    if (a.routeId === route.id) max += roundTripsPerWeek(a.type, km)
+    if (a.routeId !== route.id) continue
+    if (isGrounded(a, turn)) continue
+    max += roundTripsPerWeek(a.type, km)
   }
   return max
 }
 
+// An airframe in the hangar for maintenance flies nothing. `turn` of -1 means
+// "ignore grounding" — used by planning-time views that ask what the fleet
+// could fly, not what it flew this quarter.
+export function isGrounded(aircraft: { groundedUntil?: number }, turn: number): boolean {
+  return turn >= 0 && aircraft.groundedUntil !== undefined && turn < aircraft.groundedUntil
+}
+
 // The schedule actually flown: the requested frequency, capped by the fleet.
-export function effectiveFrequency(airline: Airline, route: Route): number {
-  return Math.min(route.frequency, maxRouteFrequency(airline, route))
+export function effectiveFrequency(airline: Airline, route: Route, turn = -1): number {
+  return Math.min(route.frequency, maxRouteFrequency(airline, route, turn))
 }
 
 // Sellable seats on one airframe after its cabin fit.
@@ -129,12 +139,13 @@ export interface TripAllocation {
 
 // Distribute the effective frequency across the assigned fleet in stable
 // fleet order — each airframe flies up to its own weekly maximum.
-export function allocateTrips(airline: Airline, route: Route): TripAllocation[] {
+export function allocateTrips(airline: Airline, route: Route, turn = -1): TripAllocation[] {
   const km = distanceKm(route.from, route.to)
-  let remaining = effectiveFrequency(airline, route)
+  let remaining = effectiveFrequency(airline, route, turn)
   const out: TripAllocation[] = []
   for (const a of airline.fleet) {
     if (a.routeId !== route.id) continue
+    if (isGrounded(a, turn)) continue
     const trips = Math.min(roundTripsPerWeek(a.type, km), remaining)
     remaining -= trips
     out.push({ aircraftId: a.id, type: a.type, cabin: a.cabin, seats: cabinSeats(a.type, a.cabin), trips })
@@ -143,9 +154,9 @@ export function allocateTrips(airline: Airline, route: Route): TripAllocation[] 
 }
 
 // Weekly seat capacity (both directions summed) an airline fields on a route.
-export function routeWeeklyCapacity(airline: Airline, route: Route): number {
+export function routeWeeklyCapacity(airline: Airline, route: Route, turn = -1): number {
   let seats = 0
-  for (const alloc of allocateTrips(airline, route)) {
+  for (const alloc of allocateTrips(airline, route, turn)) {
     seats += alloc.seats * alloc.trips * 2
   }
   return seats
@@ -234,6 +245,16 @@ export function objectiveScore(airline: Airline, kind: ObjectiveKind): number {
   }
 }
 
+// The same score computed over only the first `quarters` recorded quarters —
+// lets the engine tell "just crossed a milestone" from "was already past it".
+export function objectiveScoreAt(airline: Airline, kind: ObjectiveKind, quarters: number): number {
+  // Net worth is a balance-sheet reading, not a sum over history — slicing
+  // the history would return today's number and no crossing would ever be
+  // detected. Read what the books actually said that quarter.
+  if (kind === 'netWorth') return airline.history[quarters - 1]?.netWorth ?? 0
+  return objectiveScore({ ...airline, history: airline.history.slice(0, quarters) }, kind)
+}
+
 // True when `a` is doing better than `b` on this era's metric.
 export function objectiveBeats(a: number, b: number, higherIsBetter: boolean): boolean {
   return higherIsBetter ? a > b : a < b
@@ -242,4 +263,12 @@ export function objectiveBeats(a: number, b: number, higherIsBetter: boolean): b
 // True when a score clears the era's qualifying bar.
 export function objectiveMet(score: number, target: number, higherIsBetter: boolean): boolean {
   return higherIsBetter ? score >= target : score <= target
+}
+
+// Reputation as an appeal multiplier (10000 = no effect). A spotless operator
+// gets no bonus; a battered one carries a real but survivable penalty.
+export function reputationAppealBp(airline: Airline): number {
+  const rep = airline.reputationBp ?? 10000
+  if (rep >= 10000) return 10000
+  return 10000 - Math.floor(((10000 - rep) * REPUTATION_APPEAL_WEIGHT_BP) / 10000)
 }

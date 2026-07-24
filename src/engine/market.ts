@@ -45,7 +45,7 @@ import {
 } from '../data/constants'
 import { dealAppealBp } from './offers'
 import { hashNoiseBp } from './rng'
-import { allocateTrips, roundTripsPerWeek } from './queries'
+import { allocateTrips, reputationAppealBp, roundTripsPerWeek } from './queries'
 import { cityDemandModBp, effEconomyBp, effFuelBp } from './worldEvents'
 import type { Airline, GameEvent, GameState, Route } from './types'
 
@@ -256,7 +256,7 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       let weeklyRoundTrips = 0
       let weeklyCapacity = 0
       let yieldNum = 0 // Σ seats × cabin yield — capacity-weighted revenue/pax
-      for (const alloc of allocateTrips(airline, route)) {
+      for (const alloc of allocateTrips(airline, route, state.turn)) {
         weeklyRoundTrips += alloc.trips
         weeklyCapacity += alloc.seats * alloc.trips * 2
         yieldNum += alloc.seats * alloc.trips * 2 * CABIN_YIELD_BP[alloc.cabin - 1]!
@@ -264,7 +264,11 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       // Accepted world offers can lift a route's appeal (a capacity
       // commitment paying off once the Games actually land).
       const weight = Math.floor(
-        (routeShareWeight(airline, route) * dealAppealBp(state, airline.id, route.from, route.to)) / 10000,
+        (Math.floor(
+          (routeShareWeight(airline, route) * dealAppealBp(state, airline.id, route.from, route.to)) / 10000,
+        ) *
+          reputationAppealBp(airline)) /
+          10000,
       )
       const yieldBp = weeklyCapacity === 0 ? 10000 : Math.floor(yieldNum / weeklyCapacity)
       const key = pairKey(route.from, route.to)
@@ -320,7 +324,7 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       let weeklyFuel = 0
       let weeklyFees = 0
       let weeklyCrewMin = 0
-      for (const alloc of allocateTrips(airline, e.route)) {
+      for (const alloc of allocateTrips(airline, e.route, state.turn)) {
         const t = getAircraftType(alloc.type)
         weeklyFuel += Math.floor((alloc.trips * 2 * km * t.fuelPerKm * fuelBp) / 10000)
         // Fees bill the physical airframe, not the cabin fit.

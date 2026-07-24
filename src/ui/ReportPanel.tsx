@@ -39,6 +39,12 @@ function describeEvent(state: GameState, e: GameEvent): string | null {
       return `${name(e.airline)} restructured — ${money(e.debtWiped)} of debt written off, ${e.routesClosed} routes closed, ${e.fleetSold} aircraft sold`
     case 'airline_entered':
       return `${e.name} enters the market from ${e.hq}`
+    case 'aircraft_grounded':
+      return e.airline === 0
+        ? `${getAircraftType(e.aircraftType).name} grounded for maintenance — ${money(e.repairK)} repair`
+        : null
+    case 'milestone_reached':
+      return `Milestone: ${e.pctOfTarget}% of the ${e.label} target`
     case 'offer_made':
       return `Offer on the table: ${e.headline}`
     case 'offer_accepted':
@@ -85,6 +91,7 @@ function eventSection(e: GameEvent): LogFilter {
     case 'aircraft_delivered':
     case 'order_cancelled':
     case 'cabin_refit':
+    case 'aircraft_grounded':
       return 'fleet'
     case 'world_event_started':
     case 'world_event_ended':
