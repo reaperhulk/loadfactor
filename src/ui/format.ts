@@ -57,3 +57,12 @@ export const COST_LABELS: Record<keyof CostBreakdown, string> = {
   marketing: 'Marketing',
   interest: 'Interest',
 }
+
+// An objective score rendered in its own units: money, a passenger count, or
+// a load-factor rate. One formatter so the HUD, the menu, the standings and
+// the game-over card all read identically.
+export function objectiveValue(score: number, unit: 'money' | 'count' | 'rate'): string {
+  if (unit === 'money') return money(score)
+  if (unit === 'rate') return `${(score / 100).toFixed(1)}%`
+  return score.toLocaleString('en-US')
+}

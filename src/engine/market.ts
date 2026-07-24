@@ -216,6 +216,8 @@ interface AirlineTotals {
   revenue: number // $k per quarter
   cost: number // $k per quarter (route-level costs only)
   pax: number // per quarter
+  transferPax: number // of which connected over a hub
+  capacity: number // seats flown per quarter (the load-factor denominator)
   fuel: number // $k — route-cost components, summing to cost
   fees: number
   flightPay: number
@@ -231,6 +233,8 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
     revenue: 0,
     cost: 0,
     pax: 0,
+    transferPax: 0,
+    capacity: 0,
     fuel: 0,
     fees: 0,
     flightPay: 0,
@@ -433,6 +437,8 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       totals[airline.id]!.revenue += revenue
       totals[airline.id]!.cost += cost
       totals[airline.id]!.pax += quarterPax
+      totals[airline.id]!.transferPax += transferPax
+      totals[airline.id]!.capacity += route.lastCapacity
       totals[airline.id]!.fuel += fuel
       totals[airline.id]!.fees += fees
       totals[airline.id]!.flightPay += flightPay

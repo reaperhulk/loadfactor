@@ -13,7 +13,7 @@ import { RIVAL_COLORS } from './MapView'
 import { RaceChart, Sparkline } from './Sparkline'
 import { TakeoverLegend } from './legends'
 import { dispatch, getChallengeTarget } from './session'
-import { copyTsv, money } from './format'
+import { copyTsv, money, objectiveValue } from './format'
 
 const PERSONALITY_BLURBS: Record<string, string> = {
   player: '',
@@ -229,7 +229,8 @@ export function RivalsPanel({ state }: { state: GameState }) {
           <p className="dim" data-testid="race-pace">
             Pace: at the current trend you finish ~
             <strong className={projected >= scenario.targetNetWorth ? 'pos' : 'neg'}>{money(projected)}</strong>{' '}
-            in {Math.floor(remaining / 4)}y {remaining % 4}q — target {money(scenario.targetNetWorth)} plus #1
+            in {Math.floor(remaining / 4)}y {remaining % 4}q — this era is won on{' '}
+            <strong>{scenario.objective.label}</strong> ({objectiveValue(scenario.objective.target, scenario.objective.unit)} plus #1)
             {now < leader && <span className="neg"> (currently behind the leader)</span>}
           </p>
         )

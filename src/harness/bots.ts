@@ -14,6 +14,7 @@ import {
   negotiationCommands,
   orderCommands,
   pruneCommands,
+  refitCommands,
   renewalCommands,
   scheduleCommands,
   takeoverCommands,
@@ -21,6 +22,7 @@ import {
   yieldCommands,
   type PolicyDials,
 } from '../engine/policy'
+import { getScenario } from '../data/scenarios'
 import type { Command, GameState } from '../engine/types'
 
 export type BotName = 'naive' | 'greedy'
@@ -43,6 +45,37 @@ export const GREEDY_DIALS: PolicyDials = {
   raidBonus: 0,
   homeRegionUntil: 0,
   marketing: 1,
+}
+
+// A competent operator plays toward the ERA'S objective, not always toward
+// net worth (F3). Without this the reference bot flies a premium product into
+// an efficiency war and loses every seed — which says nothing about whether
+// the era is winnable, only that the bot was answering the wrong question.
+export function dialsFor(scenarioId: string): { dials: PolicyDials; cabin: number } {
+  const obj = getScenario(scenarioId).objective
+  switch (obj.kind) {
+    case 'loadFactor':
+      // Filling seats: cheap fares pull riders in, and a disciplined
+      // expansion bar keeps the bot from flying capacity it cannot sell.
+      return {
+        dials: { ...GREEDY_DIALS, fareLevel: -1, serviceLevel: 1, fareFloor: -2, expandMinDemand: 400 },
+        cabin: 1,
+      }
+    case 'pax':
+      // Bodies through the door: cheap dense seats on as many pairs as the
+      // network can legally reach.
+      return {
+        dials: { ...GREEDY_DIALS, fareLevel: -1, serviceLevel: 1, fareFloor: -2, expandMinDemand: 180 },
+        cabin: 1,
+      }
+    case 'transfer':
+      // Connecting traffic rides spare seats over a dense hub: expand
+      // aggressively and keep the product attractive enough to win the
+      // contested legs a hub is built from.
+      return { dials: { ...GREEDY_DIALS, expandMinDemand: 180, marketing: 2 }, cabin: 2 }
+    default:
+      return { dials: GREEDY_DIALS, cabin: 2 }
+  }
 }
 
 // Player-seat wrappers (the bot always drives airline 0).
@@ -80,24 +113,27 @@ function naiveCommands(state: GameState): Command[] {
 // losers, renew geriatric metal, buy the rival lever, expand, order, and
 // negotiate for the next city.
 function greedyCommands(state: GameState): Command[] {
+  const { dials, cabin } = dialsFor(state.scenario)
   const commands: Command[] = []
   commands.push(...treasuryCommands(state, 0))
   commands.push(...hedgeCommands(state, 0))
   commands.push(...scheduleCommands(state, 0))
   commands.push(...distressCommands(state, 0))
-  commands.push(...marketingCommands(state, 0, GREEDY_DIALS.marketing))
+  commands.push(...marketingCommands(state, 0, dials.marketing))
   const prune = pruneCommands(state, 0)
   commands.push(...prune)
   const renewal = renewalCommands(state, 0)
   commands.push(...renewal)
+  // Fleet doctrine: bring the cabins toward what this era rewards.
+  commands.push(...refitCommands(state, 0, cabin))
   // The player's takeover keeps the 4x-size clause — the human lever the
   // reference bot must exercise (rivals are rescue-only on purpose).
   commands.push(...takeoverCommands(state, 0, false))
-  const launch = policyLaunch(state, 0, GREEDY_DIALS)
+  const launch = policyLaunch(state, 0, dials)
   commands.push(...launch.commands)
   commands.push(...orderCommands(state, 0, { renewedThisQuarter: renewal.length > 0 }))
-  commands.push(...negotiationCommands(state, 0, GREEDY_DIALS))
-  commands.push(...yieldCommands(state, 0, GREEDY_DIALS.fareFloor))
+  commands.push(...negotiationCommands(state, 0, dials))
+  commands.push(...yieldCommands(state, 0, dials.fareFloor))
   const skip = launch.usedAircraft !== null ? new Set([launch.usedAircraft]) : undefined
   commands.push(...assignmentCommands(state, skip))
   return commands

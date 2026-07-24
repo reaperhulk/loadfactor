@@ -676,3 +676,21 @@ test('the race stays a race: bounded field, scrutiny surfaced, rules explained',
   await expect(page.getByTestId('scrutiny-note')).toContainText('scrutiny starts at')
   await expect(page.getByTestId('rivalry-legend')).toBeAttached()
 })
+
+test('each era scores its own objective, not always net worth', async ({ page }) => {
+  // Open Skies is won on CONNECTING passengers — the HUD, the handbook and
+  // the pace note must all talk about that, not about net worth.
+  await page.goto('/')
+  await page.getByTestId('seed-input').fill('objective-seed')
+  await page.getByTestId('start-open_skies').click()
+  await page.getByTestId('start-open_skies').click()
+  await expect(page.getByTestId('date')).toHaveText('1995 Q1')
+  await expect(page.getByTestId('objective-progress')).toContainText('connecting passengers')
+  await page.keyboard.press('?')
+  await expect(page.getByTestId('handbook-objective')).toContainText('Megahub')
+  await page.keyboard.press('Escape')
+  // The menu states each era's goal, so the campaign reads as five games.
+  await page.goto('/')
+  await expect(page.getByTestId('scenario-lcc_wars')).toContainText('lifetime load factor')
+  await expect(page.getByTestId('scenario-deregulation')).toContainText('passengers flown')
+})

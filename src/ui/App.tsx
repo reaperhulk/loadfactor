@@ -2,7 +2,7 @@ import { useEffect, useReducer, useState, useSyncExternalStore } from 'react'
 import { CITIES } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { SCENARIOS, getScenario } from '../data/scenarios'
-import { netWorth, networkCities, quarterOf, yearOf } from '../engine/queries'
+import { netWorth, networkCities, objectiveScore, quarterOf, yearOf } from '../engine/queries'
 import { CityPanel } from './CityPanel'
 import { CoachMarks } from './CoachMarks'
 import { ConfirmButton } from './ConfirmButton'
@@ -48,7 +48,7 @@ import {
 } from './legends'
 import { EVENT_ICONS, EVENT_NAMES, ToastStack } from './toasts'
 import type { GameState, Replay } from '../engine'
-import { copyText, money } from './format'
+import { copyText, money, objectiveValue } from './format'
 
 type Tab = 'routes' | 'fleet' | 'airports' | 'rivals' | 'finance' | 'report'
 
@@ -337,7 +337,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
         const prev = si > 0 ? SCENARIOS[si - 1]! : null
         const locked = prev !== null && !wonIds.has(prev.id)
         return (
-        <div key={s.id} className="scenario-card">
+        <div key={s.id} className="scenario-card" data-testid={`scenario-${s.id}`}>
           <h2>
             {s.name}
             {won && <span className="pos" title="you have won this era"> ✓</span>}
@@ -351,7 +351,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           <p>{s.description}</p>
           <p className="dim scenario-facts">
             {s.startYear}–{s.startYear + Math.floor(s.quarters / 4)} · {s.quarters} quarters · target{' '}
-            {money(s.targetNetWorth)} · vs{' '}
+            {objectiveValue(s.objective.target, s.objective.unit)} {s.objective.label} · vs{' '}
             {s.rivals.map((r) => `${r.name} (${r.personality ?? 'balanced'})`).join(', ')}
           </p>
           <p className="scenario-chips">
@@ -416,7 +416,13 @@ function GameOverOverlay({
   earned: string[] // achievement ids unlocked during this career
   onWatchReplay: (r: Replay) => void
 }) {
-  const ranked = [...state.airlines].sort((a, b) => netWorth(b) - netWorth(a))
+  // The final table ranks on the ERA's objective — the thing that actually
+  // decided the career — with net worth alongside for context.
+  const obj = getScenario(state.scenario).objective
+  const score = (a: (typeof state.airlines)[number]): number => objectiveScore(a, obj.kind)
+  const ranked = [...state.airlines].sort((a, b) =>
+    obj.higherIsBetter ? score(b) - score(a) : score(a) - score(b),
+  )
   // The career in numbers — what those decades added up to.
   const me = state.airlines[0]!
   const totalPax = me.history.reduce((s, h) => s + h.pax, 0)
@@ -470,10 +476,21 @@ function GameOverOverlay({
               </p>
             )
           })()}
-        <ol>
+        <p className="dim" data-testid="objective-name">
+          Scored on {obj.label} — target {objectiveValue(obj.target, obj.unit)}
+        </p>
+        <ol data-testid="final-standings">
           {ranked.map((a) => (
             <li key={a.id} className={a.id === 0 ? 'me' : ''}>
-              {a.name} — {a.bankrupt ? 'bankrupt' : money(netWorth(a))}
+              {a.name} —{' '}
+              {a.bankrupt ? (
+                'bankrupt'
+              ) : (
+                <>
+                  <strong>{objectiveValue(score(a), obj.unit)}</strong>
+                  {obj.kind !== 'netWorth' && <span className="dim"> · {money(netWorth(a))} net worth</span>}
+                </>
+              )}
             </li>
           ))}
         </ol>
@@ -639,7 +656,18 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         )}
         <span data-testid="cash">Cash {money(shownCash)}</span>
         <span data-testid="networth">
-          Net worth {money(shownWorth)} / {money(scenario.targetNetWorth)}
+          {scenario.objective.kind === 'netWorth' ? (
+            <>Net worth {money(shownWorth)} / {money(scenario.objective.target)}</>
+          ) : (
+            <>
+              Net worth {money(shownWorth)} ·{' '}
+              <span data-testid="objective-progress">
+                {scenario.objective.label} {objectiveValue(objectiveScore(player, scenario.objective.kind), scenario.objective.unit)}
+                {' / '}
+                {objectiveValue(scenario.objective.target, scenario.objective.unit)}
+              </span>
+            </>
+          )}
         </span>
         {(() => {
           // The race, always on screen: current rank among the living, and
@@ -760,6 +788,9 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
               slots), then end the quarter — everyone flies, demand splits by appeal (schedule × cabin
               × fare × service × brand), and the world moves. Every system below is explained where
               you use it too.
+            </p>
+            <p className="dim" data-testid="handbook-objective">
+              <strong>This era: {scenario.objective.blurb}</strong>
             </p>
             <div data-testid="handbook-systems">
               <HubLegend />

@@ -12,6 +12,27 @@ export interface AirlineSetup {
   personality?: RivalPersonality // rivals only; defaults to 'balanced'
 }
 
+// What an era actually asks of you (PLAN.md §2.4). Five scenarios that all
+// score net worth are five copies of one game; each era now names its own
+// measure of a great airline, so the optimal play differs era to era.
+export type ObjectiveKind =
+  | 'netWorth' // classic: build the most valuable airline
+  | 'profit' // cumulative profit — who actually made money through the era
+  | 'pax' // cumulative passengers flown — the fight for the flying public
+  | 'transfer' // cumulative connecting passengers — the megahub game
+  | 'loadFactor' // seats actually filled across the era — the efficiency war
+
+export interface ScenarioObjective {
+  kind: ObjectiveKind
+  // The qualifying bar: a floor for higher-is-better metrics, a ceiling for
+  // costPerSeat. Being #1 is never enough on its own.
+  target: number
+  higherIsBetter: boolean
+  label: string // axis name, e.g. "cumulative profit"
+  unit: 'money' | 'count' | 'rate'
+  blurb: string // one line telling the player how to win this era
+}
+
 export interface Scenario {
   id: string
   name: string
@@ -20,8 +41,12 @@ export interface Scenario {
   quarters: number
   player: AirlineSetup
   rivals: readonly AirlineSetup[]
-  // Scored when the final quarter resolves: the player wins by finishing #1
-  // in net worth among the airlines AND clearing this qualifying floor ($k).
+  // The era's own victory measure. Scored when the final quarter resolves:
+  // finish #1 among the live airlines on this metric AND clear its bar.
+  objective: ScenarioObjective
+  // Economic scale reference for the era: the runaway cap and the UI's
+  // "how big is big here" both read this. Equals the objective target for
+  // net-worth eras.
   targetNetWorth: number
   // Era flavor: multipliers on world-event draw weights (e.g. oil_shock ×4
   // in the Oil Crisis scenario). Unlisted events keep weight ×1.
@@ -77,6 +102,14 @@ export const SCENARIOS: readonly Scenario[] = [
         personality: 'price_war',
       },
     ],
+    objective: {
+      kind: 'netWorth',
+      target: 550_000,
+      higherIsBetter: true,
+      label: 'net worth',
+      unit: 'money',
+      blurb: 'Build the most valuable airline in the sky by 1980.',
+    },
     targetNetWorth: 550_000,
   },
   {
@@ -116,6 +149,14 @@ export const SCENARIOS: readonly Scenario[] = [
         personality: 'fortress',
       },
     ],
+    objective: {
+      kind: 'profit',
+      target: 1_800_000,
+      higherIsBetter: true,
+      label: 'cumulative profit',
+      unit: 'money',
+      blurb: 'Anyone can fly jets in a boom. Bank the most money ACROSS the crisis — every quarter of profit counts, every loss claws it back.',
+    },
     targetNetWorth: 400_000,
     eventWeightMult: { oil_shock: 4, recession: 2, boom: 0.5 },
   },
@@ -165,6 +206,14 @@ export const SCENARIOS: readonly Scenario[] = [
         personality: 'premium',
       },
     ],
+    objective: {
+      kind: 'pax',
+      target: 22_000_000,
+      higherIsBetter: true,
+      label: 'passengers flown',
+      unit: 'count',
+      blurb: 'The rules are gone and the public is the prize: carry more passengers than anyone else by 2000.',
+    },
     targetNetWorth: 600_000,
     eventWeightMult: { boom: 2, tourism_wave: 2 },
   },
@@ -214,6 +263,14 @@ export const SCENARIOS: readonly Scenario[] = [
         personality: 'price_war',
       },
     ],
+    objective: {
+      kind: 'transfer',
+      target: 5_000_000,
+      higherIsBetter: true,
+      label: 'connecting passengers',
+      unit: 'count',
+      blurb: 'Megahub or nothing: win on CONNECTING passengers — travellers who change planes inside your network.',
+    },
     targetNetWorth: 750_000,
     eventWeightMult: { boom: 2, tourism_wave: 2, conflict: 1.5 },
   },
@@ -263,6 +320,14 @@ export const SCENARIOS: readonly Scenario[] = [
         personality: 'premium',
       },
     ],
+    objective: {
+      kind: 'loadFactor',
+      target: 7600,
+      higherIsBetter: true,
+      label: 'lifetime load factor',
+      unit: 'rate',
+      blurb: 'Fill the seats. Every empty seat you fly is money burned — win on the share of seats actually sold across the era.',
+    },
     targetNetWorth: 750_000,
     eventWeightMult: { travel_slump: 3, oil_shock: 2, alliance_boom: 2, boom: 0.75 },
   },

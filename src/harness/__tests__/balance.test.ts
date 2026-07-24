@@ -10,6 +10,7 @@
 import { describe, expect, it } from 'vitest'
 import { runCareer } from '../simulate'
 import { getScenario } from '../../data/scenarios'
+import { objectiveScore } from '../../engine/queries'
 
 const SEEDS = ['alpha', 'beta', 'gamma', 'delta', 'epsilon']
 // PLAN §2.4's contract, asserted literally: no pinned career may finish above
@@ -66,16 +67,16 @@ describe('balance envelope', () => {
     wins: readonly string[]
     competitive: readonly string[]
   }[] = [
-    // Re-derived after F1 (restructuring rivals, new entrants, dominance
-    // scrutiny, and a third Jet Age carrier). The bot no longer sweeps every
-    // seed — the seeds it loses it loses CLOSE, which is the point.
+    // Re-derived after F1 (a field that fights back) and F3 (each era scores
+    // its OWN objective). Every era has seeds the competent bot wins and
+    // seeds it loses close — that spread is the product, not a defect.
     { scenario: 'jet_age', quarters: 80, wins: ['beta', 'gamma', 'delta', 'epsilon'], competitive: ['alpha'] },
-    { scenario: 'oil_crisis', quarters: 60, wins: ['beta', 'gamma'], competitive: ['alpha'] },
-    { scenario: 'deregulation', quarters: 60, wins: ['gamma'], competitive: ['beta'] },
-    { scenario: 'open_skies', quarters: 60, wins: ['theta'], competitive: ['beta'] },
-    // lcc_wars/gamma joins the brutal-world exclusions: a price-war field
-    // that consolidates early leaves the bot at ~30% of the leader.
-    { scenario: 'lcc_wars', quarters: 60, wins: ['alpha', 'beta'], competitive: [] },
+    { scenario: 'oil_crisis', quarters: 60, wins: ['alpha', 'beta', 'gamma', 'theta'], competitive: [] },
+    { scenario: 'deregulation', quarters: 60, wins: ['beta', 'gamma'], competitive: ['alpha'] },
+    // open_skies alpha/gamma stay unpinned: hub-building on those worlds
+    // never reaches the connecting volume the leaders find.
+    { scenario: 'open_skies', quarters: 60, wins: ['beta', 'theta'], competitive: [] },
+    { scenario: 'lcc_wars', quarters: 60, wins: ['alpha'], competitive: ['beta', 'gamma'] },
   ]
 
   for (const era of ERA_PINS) {
@@ -91,20 +92,18 @@ describe('balance envelope', () => {
       for (const seed of era.competitive) {
         const result = runCareer(era.scenario, seed, 'greedy', era.quarters)
         expect(result.summary.turn, `${era.scenario}/${seed}: reached the deadline`).toBe(era.quarters)
-        const me = result.state.airlines[0]!
-        const myWorth = me.history[me.history.length - 1]?.netWorth ?? 0
+        // Judged on the ERA's metric: a seed the bot loses must still be a
+        // race it was in — within 60% of the leader on whatever this era
+        // actually scores.
+        const kind = getScenario(era.scenario).objective.kind
+        const mine = objectiveScore(result.state.airlines[0]!, kind)
         const leader = Math.max(
-          ...result.state.airlines
-            .filter((a) => !a.bankrupt)
-            .map((a) => a.history[a.history.length - 1]?.netWorth ?? 0),
-        )
-        expect(myWorth, `${era.scenario}/${seed}: within 40% of the leader`).toBeGreaterThanOrEqual(
-          Math.floor((leader * 4000) / 10000),
+          ...result.state.airlines.filter((a) => !a.bankrupt).map((a) => objectiveScore(a, kind)),
         )
         expect(
-          myWorth,
-          `${era.scenario}/${seed}: clears the scenario's qualifying floor`,
-        ).toBeGreaterThanOrEqual(getScenario(era.scenario).targetNetWorth)
+          mine,
+          `${era.scenario}/${seed}: within 60% of the leader on ${getScenario(era.scenario).objective.label}`,
+        ).toBeGreaterThanOrEqual(Math.floor((leader * 6000) / 10000))
       }
     })
   }

@@ -114,6 +114,8 @@ export interface QuarterStats {
   profit: number
   debtPayment?: number // principal amortized this quarter (cash out, not a cost)
   pax: number
+  transferPax?: number // connecting passengers carried (hub objectives)
+  capacity?: number // seats flown (cost-per-seat objectives)
   netWorth: number
   breakdown: CostBreakdown
 }

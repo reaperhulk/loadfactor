@@ -34,7 +34,7 @@ import { getScenario } from '../data/scenarios'
 import { inflationBp, resolveMarket } from './market'
 import { resaleValue, routeWeeklyCapacity, slotCities, slotsFree, totalDebt } from './queries'
 import { resolveNegotiations } from './negotiation'
-import { netWorth, yearOf } from './queries'
+import { netWorth, objectiveBeats, objectiveMet, objectiveScore, yearOf } from './queries'
 import { deriveFootholds } from './newGame'
 import { runRivalTurn } from './rivals'
 import type { Airline, EngineResult, GameEvent, GameState } from './types'
@@ -377,6 +377,8 @@ export function endQuarter(prev: GameState): EngineResult {
       profit,
       debtPayment,
       pax: t.pax,
+      transferPax: t.transferPax,
+      capacity: t.capacity,
       netWorth: netWorth(airline),
       breakdown,
     })
@@ -455,25 +457,33 @@ export function endQuarter(prev: GameState): EngineResult {
     state.phase = 'lost'
     events.push({ type: 'game_over', result: 'lost', reason: 'bankruptcy' })
   } else if (state.turn + 1 >= scenario.quarters) {
-    const playerWorth = netWorth(player)
+    // Scored on the ERA's own measure, not always net worth (PLAN §2.4):
+    // finish #1 among the live airlines AND clear the qualifying bar.
+    const obj = scenario.objective
+    const myScore = objectiveScore(player, obj.kind)
     let bestRival: Airline | null = null
+    let bestRivalScore = 0
     for (const rival of state.airlines) {
       if (rival.id === 0 || rival.bankrupt) continue
-      if (bestRival === null || netWorth(rival) > netWorth(bestRival)) bestRival = rival
+      const score = objectiveScore(rival, obj.kind)
+      if (bestRival === null || objectiveBeats(score, bestRivalScore, obj.higherIsBetter)) {
+        bestRival = rival
+        bestRivalScore = score
+      }
     }
-    if (playerWorth < scenario.targetNetWorth) {
+    if (!objectiveMet(myScore, obj.target, obj.higherIsBetter)) {
       state.phase = 'lost'
       events.push({
         type: 'game_over',
         result: 'lost',
-        reason: `missed the $${Math.floor(scenario.targetNetWorth / 1000)}M target`,
+        reason: `missed the ${obj.label} target`,
       })
-    } else if (bestRival !== null && netWorth(bestRival) >= playerWorth) {
+    } else if (bestRival !== null && !objectiveBeats(myScore, bestRivalScore, obj.higherIsBetter)) {
       state.phase = 'lost'
-      events.push({ type: 'game_over', result: 'lost', reason: `outscored by ${bestRival.name}` })
+      events.push({ type: 'game_over', result: 'lost', reason: `outscored by ${bestRival.name} on ${obj.label}` })
     } else {
       state.phase = 'won'
-      events.push({ type: 'game_over', result: 'won', reason: 'finished #1 with the target met' })
+      events.push({ type: 'game_over', result: 'won', reason: `finished #1 on ${obj.label}` })
     }
   }
   state.turn++

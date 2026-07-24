@@ -16,6 +16,7 @@ import {
 } from '../data/constants'
 import { distanceKm, pairKey } from '../data/cities'
 import { getScenario } from '../data/scenarios'
+import type { ObjectiveKind } from '../data/scenarios'
 import type { Airline, GameState, Route } from './types'
 
 // Today's market rate for a new loan: base plus a spread that widens as the
@@ -192,4 +193,53 @@ export function slotCities(airline: Airline): string[] {
   return Object.keys(airline.slots)
     .filter((c) => (airline.slots[c] ?? 0) > 0)
     .sort()
+}
+
+// The era's own measure of a great airline (PLAN.md §2.4). Pure over an
+// airline's recorded history plus its balance sheet, so the UI, the engine's
+// victory check, and the bots all read the identical number.
+//
+// loadFactor is reported in basis points (10000 = every seat sold).
+export function objectiveScore(airline: Airline, kind: ObjectiveKind): number {
+  switch (kind) {
+    case 'netWorth':
+      return netWorth(airline)
+    case 'profit': {
+      let total = 0
+      for (const h of airline.history) total += h.profit
+      return total
+    }
+    case 'pax': {
+      let total = 0
+      for (const h of airline.history) total += h.pax
+      return total
+    }
+    case 'transfer': {
+      let total = 0
+      for (const h of airline.history) total += h.transferPax ?? 0
+      return total
+    }
+    case 'loadFactor': {
+      let pax = 0
+      let seats = 0
+      for (const h of airline.history) {
+        pax += h.pax
+        seats += h.capacity ?? 0
+      }
+      // Never flew a seat, never filled one: an airline with no capacity
+      // scores zero rather than dividing by nothing.
+      if (seats <= 0) return 0
+      return Math.floor((pax * 10000) / seats) // basis points
+    }
+  }
+}
+
+// True when `a` is doing better than `b` on this era's metric.
+export function objectiveBeats(a: number, b: number, higherIsBetter: boolean): boolean {
+  return higherIsBetter ? a > b : a < b
+}
+
+// True when a score clears the era's qualifying bar.
+export function objectiveMet(score: number, target: number, higherIsBetter: boolean): boolean {
+  return higherIsBetter ? score >= target : score <= target
 }
