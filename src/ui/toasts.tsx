@@ -151,6 +151,12 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
         })
         break
       }
+      case 'offer_made':
+        out.push({ kind: 'event', icon: '📨', text: `${e.headline} — decide within ${e.expiresTurn} quarters` })
+        break
+      case 'offer_expired':
+        out.push({ kind: 'error', icon: '⌛', text: `Offer lapsed: ${e.headline}` })
+        break
       case 'airline_entered':
         out.push({ kind: 'event', icon: '🚀', text: `${e.name} enters the market from ${e.hq}` })
         break

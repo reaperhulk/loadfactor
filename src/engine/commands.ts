@@ -17,6 +17,7 @@ import {
   TAKEOVER_BASE_K,
   TAKEOVER_PREMIUM_BP,
   NEG_MIN_SPEND,
+  OFFER_FUEL_PREMIUM_BP,
 } from '../data/constants'
 import { effFuelBp } from './worldEvents'
 import {
@@ -306,6 +307,50 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       airline.fleet = airline.fleet.filter((a) => a.id !== aircraft.id)
       airline.cash += proceeds
       return { events: [{ type: 'aircraft_sold', airline: airlineIdx, aircraftId: aircraft.id, proceeds }] }
+    }
+
+    case 'accept_offer': {
+      const offer = state.world.offers.find((o) => o.id === command.offerId)
+      if (!offer) return reject(airlineIdx, command, 'that offer is no longer on the table')
+      if (airlineIdx !== 0) return reject(airlineIdx, command, 'offers are made to the player')
+      if (airline.cash < offer.costK)
+        return reject(airlineIdx, command, `not enough cash — this costs $${offer.costK}k up front`)
+      airline.cash -= offer.costK
+      airline.deals = [
+        ...(airline.deals ?? []),
+        {
+          offerId: offer.id,
+          kind: offer.kind,
+          city: offer.city,
+          fromTurn: offer.benefitFromTurn,
+          untilTurn: offer.untilTurn,
+          upkeepK: offer.upkeepK,
+          demandBonusBp: offer.demandBonusBp,
+        },
+      ]
+      const events: GameEvent[] = [
+        { type: 'offer_accepted', offerId: offer.id, kind: offer.kind, costK: offer.costK },
+      ]
+      // Slots land immediately; a fuel contract becomes the running hedge.
+      if (offer.slots > 0 && offer.city !== null) {
+        airline.slots[offer.city] = (airline.slots[offer.city] ?? 0) + offer.slots
+        events.push({ type: 'slots_granted', airline: airlineIdx, city: offer.city, slots: offer.slots })
+      }
+      if (offer.kind === 'fuel_contract') {
+        airline.fuelHedge = {
+          bp: Math.floor((effFuelBp(state.world) * (10000 + OFFER_FUEL_PREMIUM_BP)) / 10000),
+          quartersLeft: offer.untilTurn - state.turn,
+        }
+      }
+      state.world.offers = state.world.offers.filter((o) => o.id !== offer.id)
+      return { events }
+    }
+
+    case 'decline_offer': {
+      const offer = state.world.offers.find((o) => o.id === command.offerId)
+      if (!offer) return reject(airlineIdx, command, 'that offer is no longer on the table')
+      state.world.offers = state.world.offers.filter((o) => o.id !== offer.id)
+      return { events: [{ type: 'offer_declined', offerId: offer.id }] }
     }
 
     case 'acquire_rival': {

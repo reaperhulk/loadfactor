@@ -43,6 +43,7 @@ import {
   SERVICE_LEVEL_WEIGHT,
   WEEKS_PER_QUARTER,
 } from '../data/constants'
+import { dealAppealBp } from './offers'
 import { hashNoiseBp } from './rng'
 import { allocateTrips, roundTripsPerWeek } from './queries'
 import { cityDemandModBp, effEconomyBp, effFuelBp } from './worldEvents'
@@ -260,7 +261,11 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
         weeklyCapacity += alloc.seats * alloc.trips * 2
         yieldNum += alloc.seats * alloc.trips * 2 * CABIN_YIELD_BP[alloc.cabin - 1]!
       }
-      const weight = routeShareWeight(airline, route)
+      // Accepted world offers can lift a route's appeal (a capacity
+      // commitment paying off once the Games actually land).
+      const weight = Math.floor(
+        (routeShareWeight(airline, route) * dealAppealBp(state, airline.id, route.from, route.to)) / 10000,
+      )
       const yieldBp = weeklyCapacity === 0 ? 10000 : Math.floor(yieldNum / weeklyCapacity)
       const key = pairKey(route.from, route.to)
       const list = pairs.get(key) ?? []

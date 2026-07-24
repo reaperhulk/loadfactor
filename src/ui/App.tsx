@@ -9,6 +9,7 @@ import { ConfirmButton } from './ConfirmButton'
 import { useCountUp } from './countUp'
 import { isMuted, setMuted } from './sounds'
 import { MapView } from './MapView'
+import { ActiveDeals, OfferCard } from './OfferCard'
 import { AirportsPanel, FinancePanel, FleetPanel, ReportPanel, RoutesPanel } from './panels'
 import { ReplayViewer } from './ReplayViewer'
 import { ReportCard } from './ReportCard'
@@ -742,6 +743,8 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           </div>
         )
       })()}
+      <OfferCard state={state} />
+      <ActiveDeals state={state} />
       {state.world.events.length > 0 && (
         <div className="events-strip" data-testid="events-strip">
           {state.world.events.map((e) => {

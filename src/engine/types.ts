@@ -13,6 +13,7 @@ export interface RngStreams {
   events: Rng
   negotiations: Rng
   rivals: Rng
+  offers: Rng
 }
 
 export interface Loan {
@@ -144,6 +145,7 @@ export interface Airline {
   bankrupt: boolean
   history: QuarterStats[]
   nextId: number // shared id counter for aircraft/orders/routes/loans
+  deals?: ActiveDeal[] // accepted world offers still running
   restructures?: number // rivals only: chapter-11 rounds used (see RESTRUCTURE_MAX)
   enteredTurn?: number // set on late entrants; absent for founding airlines
 }
@@ -155,6 +157,36 @@ export interface ActiveEvent {
   region: Region | null
 }
 
+// A timed decision the world puts in front of the player (PLAN §2.3 / F5).
+// World events are weather — they happen TO you. Offers are questions: pay
+// now for a payoff later, take an asset and carry the obligation, bet on the
+// fuel curve. They expire if ignored.
+export interface WorldOffer {
+  id: number
+  kind: 'capacity_commitment' | 'regulator_slots' | 'fuel_contract'
+  city: string | null
+  expiresTurn: number // decide before this turn resolves
+  costK: number // paid on acceptance
+  upkeepK: number // charged each quarter until untilTurn
+  benefitFromTurn: number // when the upside starts (commitments pay off later)
+  untilTurn: number // when the benefit and the obligation both end
+  slots: number // regulator_slots: authority granted at `city`
+  demandBonusBp: number // capacity_commitment: appeal on routes touching `city`
+  headline: string
+  detail: string
+}
+
+// An accepted offer, living on the airline until it runs out.
+export interface ActiveDeal {
+  offerId: number
+  kind: WorldOffer['kind']
+  city: string | null
+  fromTurn: number // the benefit starts here (a commitment pays off later)
+  untilTurn: number
+  upkeepK: number
+  demandBonusBp: number
+}
+
 export interface WorldState {
   economyBp: number // random-walk index, 10000 = neutral
   fuelBp: number // random-walk fuel price index, 10000 = baseline
@@ -163,6 +195,8 @@ export interface WorldState {
   // The macro story per resolved quarter (fuel is the EFFECTIVE index,
   // event shocks included), rolling window for the finance charts.
   indexHistory: { turn: number; economyBp: number; fuelBp: number }[]
+  offers: WorldOffer[] // open questions awaiting the player's answer
+  nextOfferId: number
 }
 
 export interface GameState {
@@ -203,6 +237,8 @@ export type Command =
   | { type: 'sell_aircraft'; aircraftId: number }
   | { type: 'set_marketing'; level: number }
   | { type: 'acquire_rival'; target: number }
+  | { type: 'accept_offer'; offerId: number }
+  | { type: 'decline_offer'; offerId: number }
   | { type: 'negotiate_slots'; city: string; spend: number }
   | { type: 'take_loan'; amount: number }
   | { type: 'repay_loan'; loanId: number; amount: number }
@@ -265,6 +301,11 @@ export type GameEvent =
   | { type: 'airline_bankrupt'; airline: number }
   | { type: 'airline_restructured'; airline: number; routesClosed: number; fleetSold: number; debtWiped: number }
   | { type: 'airline_entered'; airline: number; name: string; hq: string }
+  | { type: 'offer_made'; offerId: number; kind: WorldOffer['kind']; headline: string; expiresTurn: number }
+  | { type: 'offer_accepted'; offerId: number; kind: WorldOffer['kind']; costK: number }
+  | { type: 'offer_declined'; offerId: number }
+  | { type: 'offer_expired'; offerId: number; headline: string }
+  | { type: 'deal_ended'; kind: WorldOffer['kind']; city: string | null }
   | { type: 'game_over'; result: 'won' | 'lost'; reason: string }
 
 export interface EngineResult {

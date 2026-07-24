@@ -1521,3 +1521,15 @@ input[type='number'] {
     right: 14px;
   }
 }
+
+/* A world offer is a question, not a notification: it gets card weight and a
+   gold edge so it reads as something awaiting an answer. */
+.offer-card {
+  border-left: 3px solid #ffd166;
+  background: linear-gradient(100deg, #2b2313, var(--panel) 60%);
+  max-width: none;
+}
+.offer-card h2 {
+  font-size: 1.05rem;
+  margin: 0 0 6px;
+}

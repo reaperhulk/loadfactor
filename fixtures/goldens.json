@@ -1,10 +1,10 @@
 {
   "greedy-alpha": {
     "checkpointHashes": {
-      "10": "91d83106",
-      "20": "d49e64ea",
-      "30": "c6f7c1ee",
-      "40": "3d298a48"
+      "10": "7fc07e65",
+      "20": "42bf7fa5",
+      "30": "23ce6ddf",
+      "40": "afd19439"
     },
     "summary": {
       "turn": 40,
@@ -18,10 +18,10 @@
   },
   "greedy-beta": {
     "checkpointHashes": {
-      "10": "54fbdf5a",
-      "20": "7c42d987",
-      "30": "01c265e8",
-      "40": "f7d6efbc"
+      "10": "d6f82c87",
+      "20": "95d1a0ee",
+      "30": "8752bcb9",
+      "40": "2acf7216"
     },
     "summary": {
       "turn": 40,
@@ -35,10 +35,10 @@
   },
   "naive-alpha": {
     "checkpointHashes": {
-      "10": "1c9b1b08",
-      "20": "63acfac8",
-      "30": "06e2497a",
-      "40": "c965860f"
+      "10": "10311d2f",
+      "20": "f658d79b",
+      "30": "fe02e663",
+      "40": "93832aa0"
     },
     "summary": {
       "turn": 40,
@@ -52,10 +52,10 @@
   },
   "oil-crisis-greedy": {
     "checkpointHashes": {
-      "10": "890a8bb9",
-      "20": "b5ba5c5b",
-      "30": "34098d33",
-      "40": "1c65944f"
+      "10": "53ecd7a2",
+      "20": "2c9d630e",
+      "30": "ea7c9bd6",
+      "40": "76277696"
     },
     "summary": {
       "turn": 40,
@@ -69,10 +69,10 @@
   },
   "deregulation-greedy": {
     "checkpointHashes": {
-      "10": "0a2bb5d2",
-      "20": "c0e91497",
-      "30": "f9cb0a72",
-      "40": "e06896d7"
+      "10": "54c224cb",
+      "20": "17228f0a",
+      "30": "d1c6bded",
+      "40": "f5265a28"
     },
     "summary": {
       "turn": 40,
@@ -86,10 +86,10 @@
   },
   "open-skies-greedy": {
     "checkpointHashes": {
-      "10": "116c4aae",
-      "20": "c0d70166",
-      "30": "13b78b85",
-      "40": "372c4138"
+      "10": "b5110fbb",
+      "20": "e8bc3ca1",
+      "30": "f430dc90",
+      "40": "60f2e283"
     },
     "summary": {
       "turn": 40,
@@ -103,10 +103,10 @@
   },
   "lcc-wars-greedy": {
     "checkpointHashes": {
-      "10": "d336a167",
-      "20": "7c94e6f3",
-      "30": "4d82f823",
-      "40": "400d6dc4"
+      "10": "eef1751e",
+      "20": "5e99f420",
+      "30": "05f9828a",
+      "40": "a74d0a81"
     },
     "summary": {
       "turn": 40,

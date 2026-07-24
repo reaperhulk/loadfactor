@@ -350,3 +350,81 @@ describe('command validation', () => {
     expect(JSON.stringify(state)).toBe(snapshot)
   })
 })
+
+describe('world offers (F5)', () => {
+  function withOffer(kind: 'capacity_commitment' | 'regulator_slots' | 'fuel_contract'): GameState {
+    const state = fresh()
+    state.world.offers.push({
+      id: 7,
+      kind,
+      city: kind === 'fuel_contract' ? null : 'LHR',
+      expiresTurn: state.turn + 3,
+      costK: 1000,
+      upkeepK: kind === 'regulator_slots' ? 250 : 0,
+      benefitFromTurn: kind === 'capacity_commitment' ? state.turn + 6 : state.turn,
+      untilTurn: state.turn + 12,
+      slots: kind === 'regulator_slots' ? 3 : 0,
+      demandBonusBp: kind === 'capacity_commitment' ? 3500 : 0,
+      headline: 'A question',
+      detail: 'with a tradeoff',
+    })
+    return state
+  }
+
+  it('accepting pays up front, records the deal, and clears the table', () => {
+    const state = withOffer('capacity_commitment')
+    const cashBefore = state.airlines[0]!.cash
+    const { state: after, events } = applyCommand(state, { type: 'accept_offer', offerId: 7 })
+    expect(events[0]).toMatchObject({ type: 'offer_accepted', offerId: 7, costK: 1000 })
+    expect(after.airlines[0]!.cash).toBe(cashBefore - 1000)
+    expect(after.airlines[0]!.deals).toHaveLength(1)
+    expect(after.world.offers).toHaveLength(0) // answered, off the table
+  })
+
+  it('regulator slots land immediately and bill every quarter', () => {
+    const state = withOffer('regulator_slots')
+    const before = state.airlines[0]!.slots['LHR'] ?? 0
+    const { state: after, events } = applyCommand(state, { type: 'accept_offer', offerId: 7 })
+    expect(after.airlines[0]!.slots['LHR']).toBe(before + 3)
+    expect(events.some((e) => e.type === 'slots_granted' && e.city === 'LHR')).toBe(true)
+    expect(after.airlines[0]!.deals![0]!.upkeepK).toBe(250)
+  })
+
+  it('a fuel contract becomes the running hedge', () => {
+    const state = withOffer('fuel_contract')
+    const { state: after } = applyCommand(state, { type: 'accept_offer', offerId: 7 })
+    expect(after.airlines[0]!.fuelHedge).not.toBeNull()
+    expect(after.airlines[0]!.fuelHedge!.quartersLeft).toBe(12)
+  })
+
+  it('declining clears the offer without charging, and an answered offer cannot be answered twice', () => {
+    const state = withOffer('capacity_commitment')
+    const cashBefore = state.airlines[0]!.cash
+    const { state: after, events } = applyCommand(state, { type: 'decline_offer', offerId: 7 })
+    expect(events[0]).toMatchObject({ type: 'offer_declined', offerId: 7 })
+    expect(after.airlines[0]!.cash).toBe(cashBefore)
+    expect(after.world.offers).toHaveLength(0)
+    expectRejected(applyCommand(after, { type: 'accept_offer', offerId: 7 }).events, 'no longer on the table')
+  })
+
+  it('an offer you cannot afford is rejected, not silently half-applied', () => {
+    const state = withOffer('capacity_commitment')
+    state.airlines[0]!.cash = 10
+    const { state: after, events } = applyCommand(state, { type: 'accept_offer', offerId: 7 })
+    expectRejected(events, 'not enough cash')
+    expect(after.airlines[0]!.cash).toBe(10)
+    expect(after.world.offers).toHaveLength(1) // still on the table
+  })
+
+  it('an unanswered offer lapses on its deadline', () => {
+    let state = withOffer('capacity_commitment')
+    let expired = false
+    for (let q = 0; q < 4 && !expired; q++) {
+      const r = applyCommand(state, { type: 'end_quarter' })
+      state = r.state
+      expired = r.events.some((e) => e.type === 'offer_expired' && e.offerId === 7)
+    }
+    expect(expired, 'the world does not wait forever').toBe(true)
+    expect(state.world.offers.some((o) => o.id === 7)).toBe(false)
+  })
+})

@@ -87,8 +87,19 @@ export function newGame(scenarioId: string, seed: string, player?: PlayerSetup):
       events: deriveStream(seed, 'events'),
       negotiations: deriveStream(seed, 'negotiations'),
       rivals: deriveStream(seed, 'rivals'),
+      // Offers get their own stream so adding them cannot perturb the
+      // world-event or negotiation draws the balance envelope is pinned to.
+      offers: deriveStream(seed, 'offers'),
     },
-    world: { economyBp: 10000, fuelBp: 10000, events: [], usedMarket: [], indexHistory: [] },
+    world: {
+      economyBp: 10000,
+      fuelBp: 10000,
+      events: [],
+      usedMarket: [],
+      indexHistory: [],
+      offers: [],
+      nextOfferId: 1,
+    },
     airlines,
   }
 }

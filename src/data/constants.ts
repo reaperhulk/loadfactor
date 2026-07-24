@@ -228,3 +228,11 @@ export const FUEL_STEP_BP = 400
 export const FUEL_REVERSION_DIV = 30
 // Chance per quarter that a new world event is drawn (if any is eligible).
 export const EVENT_DRAW_CHANCE_BP = 1500
+
+// ---- World offers (F5): timed questions the world puts to the player ----
+export const OFFER_CHANCE_BP = 1400 // per quarter, when nothing is pending
+export const OFFER_DECISION_QUARTERS = 3 // answer within this many quarters
+export const OFFER_GAMES_LEAD_QUARTERS = 6 // commitments pay off this far out
+export const OFFER_GAMES_BONUS_BP = 3500 // +35% appeal on routes touching the host
+export const OFFER_SLOTS_GRANTED = 3
+export const OFFER_FUEL_PREMIUM_BP = 500 // the price of three years of certainty

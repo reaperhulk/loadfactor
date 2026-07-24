@@ -39,6 +39,16 @@ function describeEvent(state: GameState, e: GameEvent): string | null {
       return `${name(e.airline)} restructured — ${money(e.debtWiped)} of debt written off, ${e.routesClosed} routes closed, ${e.fleetSold} aircraft sold`
     case 'airline_entered':
       return `${e.name} enters the market from ${e.hq}`
+    case 'offer_made':
+      return `Offer on the table: ${e.headline}`
+    case 'offer_accepted':
+      return `Took the deal — ${money(e.costK)} committed`
+    case 'offer_declined':
+      return `Passed on an offer`
+    case 'offer_expired':
+      return `Offer lapsed: ${e.headline}`
+    case 'deal_ended':
+      return `A commitment ran its course${e.city ? ` at ${e.city}` : ''}`
     case 'quarter_report':
       return e.airline === 0
         ? `Quarter closed: revenue ${money(e.revenue)}, profit ${money(e.profit)}, net worth ${money(e.netWorth)}`
@@ -81,6 +91,11 @@ function eventSection(e: GameEvent): LogFilter {
     case 'airline_bankrupt':
     case 'airline_restructured':
     case 'airline_entered':
+    case 'offer_made':
+    case 'offer_accepted':
+    case 'offer_declined':
+    case 'offer_expired':
+    case 'deal_ended':
     case 'rival_acquired':
       return 'world'
     default:

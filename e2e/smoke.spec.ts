@@ -694,3 +694,37 @@ test('each era scores its own objective, not always net worth', async ({ page })
   await expect(page.getByTestId('scenario-lcc_wars')).toContainText('lifetime load factor')
   await expect(page.getByTestId('scenario-deregulation')).toContainText('passengers flown')
 })
+
+test('the world asks questions: an offer can be taken or passed', async ({ page }) => {
+  await startGame(page)
+  // Put a concrete offer on the table through the engine, then answer it in
+  // the UI the way a player would.
+  await page.evaluate(() => {
+    const s = window.__harness.getState()!
+    s.world.offers.push({
+      id: 99,
+      kind: 'regulator_slots',
+      city: 'LHR',
+      expiresTurn: s.turn + 3,
+      costK: 1200,
+      upkeepK: 300,
+      benefitFromTurn: s.turn,
+      untilTurn: s.turn + 16,
+      slots: 3,
+      demandBonusBp: 0,
+      headline: 'Authority deal: 3 slots at London',
+      detail: 'Gates now, an upkeep charge later.',
+    })
+    // Nudge the session to re-render with the mutated world.
+    window.__harness.dispatch({ type: 'set_marketing', level: 0 })
+  })
+  const card = page.getByTestId('offer-card')
+  await expect(card).toContainText('London')
+  await expect(page.getByTestId('offer-deadline')).toContainText('quarters to decide')
+  await page.getByTestId('offer-accept').click()
+  // Taking it grants the gates immediately and starts a running commitment.
+  const slots = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.slots['LHR'] ?? 0)
+  expect(slots).toBeGreaterThanOrEqual(3)
+  await expect(page.getByTestId('offer-card')).toHaveCount(0)
+  await expect(page.getByTestId('active-deals')).toContainText('LHR')
+})

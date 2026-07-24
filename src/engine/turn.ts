@@ -35,6 +35,7 @@ import { inflationBp, resolveMarket } from './market'
 import { resaleValue, routeWeeklyCapacity, slotCities, slotsFree, totalDebt } from './queries'
 import { resolveNegotiations } from './negotiation'
 import { netWorth, objectiveBeats, objectiveMet, objectiveScore, yearOf } from './queries'
+import { dealUpkeep, expireOffersAndDeals, maybeOfferDeal } from './offers'
 import { deriveFootholds } from './newGame'
 import { runRivalTurn } from './rivals'
 import type { Airline, EngineResult, GameEvent, GameState } from './types'
@@ -322,6 +323,9 @@ export function endQuarter(prev: GameState): EngineResult {
         overhead += Math.floor((t.revenue * chargeBp) / 10000)
       }
     }
+    // Public-service obligations and other accepted deals bill every quarter
+    // until they run out — the price of the gates you took early.
+    overhead += dealUpkeep(airline)
     // Brand spend: priced per level against network size (see constants).
     const marketing =
       airline.marketing *
@@ -435,7 +439,12 @@ export function endQuarter(prev: GameState): EngineResult {
     }
   }
 
-  // 9. New entrants: an empty seat draws fresh capital on a fixed cadence, so
+  // 9. The world asks a question: at most one open offer at a time, and
+  // anything unanswered lapses.
+  expireOffersAndDeals(state, events)
+  maybeOfferDeal(state, events)
+
+  // 10. New entrants: an empty seat draws fresh capital on a fixed cadence, so
   // the map never becomes a one-airline world. Capped at the scenario's
   // intended field size.
   const liveRivals = state.airlines.filter((a) => a.controller === 'rival' && !a.bankrupt).length
