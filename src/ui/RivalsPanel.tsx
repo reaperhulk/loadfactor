@@ -11,6 +11,7 @@ import { getScenario } from '../data/scenarios'
 import { ConfirmButton } from './ConfirmButton'
 import { RIVAL_COLORS } from './MapView'
 import { RaceChart, Sparkline } from './Sparkline'
+import { TakeoverLegend } from './legends'
 import { dispatch, getChallengeTarget } from './session'
 import { copyTsv, money } from './format'
 
@@ -231,6 +232,7 @@ export function RivalsPanel({ state }: { state: GameState }) {
           </span>
         ))}
       </div>
+      <TakeoverLegend />
       <div className="rival-cards">
         {state.airlines.slice(1).map((rival) => {
           const last = rival.history[rival.history.length - 1]

@@ -50,7 +50,13 @@ import { ConfirmButton } from './ConfirmButton'
 import { dispatch, getSession, type QuarterRecord } from './session'
 import { Sparkline } from './Sparkline'
 import { COST_LABELS, copyTsv, money } from './format'
-import { CabinLegend, ServiceLegend } from './legends'
+import {
+  CabinLegend,
+  HedgeLegend,
+  MarketingLegend,
+  ServiceLegend,
+  SlotLegend,
+} from './legends'
 
 // Sort keys for the routes comparison table. Each computes from the same row
 // model the cells render, so what you sort is exactly what you see.
@@ -886,6 +892,7 @@ export function AirportsPanel({ state }: { state: GameState }) {
         onChange={(e) => setQuery(e.target.value)}
         data-testid="airports-search"
       />
+      <SlotLegend />
       <div className="table-scroll"><table>
         <thead>
           <tr>
@@ -1202,6 +1209,8 @@ export function FinancePanel({ state }: { state: GameState }) {
           +{(MARKETING_WEIGHT_BP_PER_LEVEL / 100).toFixed(0)}% appeal per level on every pair
         </span>
       </div>
+      <MarketingLegend />
+      <HedgeLegend />
       <label>
         Amount:{' '}
         <input type="number" value={amount} min={100} step={100} onChange={(e) => setAmount(Number(e.target.value))} />{' '}

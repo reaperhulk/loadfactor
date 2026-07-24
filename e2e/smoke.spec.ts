@@ -582,3 +582,34 @@ test('keyboard reaches the network and every control has an accessible name', as
   )
   expect(unlabeledImages).toEqual([])
 })
+
+test('the handbook teaches every system, and legends live where they are used', async ({ page }) => {
+  await startGame(page)
+  // '?' opens the handbook: intro + all nine system legends + shortcuts.
+  await page.keyboard.press('?')
+  await expect(page.getByTestId('handbook-intro')).toContainText('race')
+  for (const legend of [
+    'hub-legend',
+    'spool-legend',
+    'season-legend',
+    'slot-legend',
+    'marketing-legend',
+    'hedge-legend',
+    'takeover-legend',
+    'cabin-legend',
+    'service-legend',
+  ]) {
+    await expect(page.getByTestId('handbook-systems').getByTestId(legend)).toBeAttached()
+  }
+  // A legend expands to real, live-constant prose.
+  await page.getByTestId('handbook-systems').getByTestId('hub-legend').locator('summary').click()
+  await expect(page.getByTestId('handbook-systems').getByTestId('hub-legend')).toContainText('one-stop')
+  await page.keyboard.press('Escape')
+  // In context: the finance tab explains marketing and hedging where the
+  // buttons are; rivals intel explains takeovers next to the buy buttons.
+  await page.getByTestId('tab-finance').click()
+  await expect(page.getByTestId('marketing-legend')).toBeAttached()
+  await expect(page.getByTestId('hedge-legend')).toBeAttached()
+  await page.getByTestId('tab-rivals').click()
+  await expect(page.getByTestId('takeover-legend')).toBeAttached()
+})

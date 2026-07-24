@@ -1,12 +1,14 @@
 // First-flight coaching: one contextual hint at a time, derived from game
-// state — never a modal tour. Dismiss once and it never returns (persisted).
+// state — never a modal tour. Dismissal persists PER SCENARIO: waving off
+// the hints in your first jet_age career must not silently disable coaching
+// for every era you ever start (each one opens with a different board).
 
 import { useState } from 'react'
 import { pairKey } from '../data/cities'
 import type { GameState } from '../engine'
 import { slotCities } from '../engine/queries'
 
-const COACH_KEY = 'loadfactor:coach:v1'
+const COACH_KEY = 'loadfactor:coach:v1' // legacy global key, still honored
 
 function nextHint(state: GameState): string | null {
   const player = state.airlines[0]!
@@ -37,9 +39,13 @@ function nextHint(state: GameState): string | null {
 }
 
 export function CoachMarks({ state }: { state: GameState }) {
+  const scenarioKey = `${COACH_KEY}:${state.scenario}`
   const [dismissed, setDismissed] = useState(() => {
     try {
-      return localStorage.getItem(COACH_KEY) === 'done'
+      // A pre-per-scenario global dismissal still silences jet_age only —
+      // the era the player actually dismissed it in.
+      const legacy = localStorage.getItem(COACH_KEY) === 'done' && state.scenario === 'jet_age'
+      return legacy || localStorage.getItem(scenarioKey) === 'done'
     } catch {
       return true
     }
@@ -54,7 +60,7 @@ export function CoachMarks({ state }: { state: GameState }) {
         data-testid="coach-dismiss"
         onClick={() => {
           try {
-            localStorage.setItem(COACH_KEY, 'done')
+            localStorage.setItem(scenarioKey, 'done')
           } catch {
             // storage unavailable — session-only dismissal
           }

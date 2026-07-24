@@ -34,6 +34,17 @@ import {
   reset,
 } from './session'
 import { subscribe } from './session'
+import {
+  CabinLegend,
+  HedgeLegend,
+  HubLegend,
+  MarketingLegend,
+  SeasonLegend,
+  ServiceLegend,
+  SlotLegend,
+  SpoolLegend,
+  TakeoverLegend,
+} from './legends'
 import { EVENT_ICONS, EVENT_NAMES, ToastStack } from './toasts'
 import type { GameState, Replay } from '../engine'
 import { money } from './format'
@@ -720,7 +731,26 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       )}
       {showHelp && (
         <div className="gameover-overlay" data-testid="help-overlay" onClick={() => setShowHelp(false)}>
-          <div className="gameover-card report-card" onClick={(e) => e.stopPropagation()}>
+          <div className="gameover-card report-card handbook" onClick={(e) => e.stopPropagation()}>
+            <h2>Handbook</h2>
+            <p className="dim" data-testid="handbook-intro">
+              The game is a race: finish the era as the #1 airline by net worth AND clear the
+              scenario's floor. Each quarter you plan (open routes, assign jets, set fares, negotiate
+              slots), then end the quarter — everyone flies, demand splits by appeal (schedule × cabin
+              × fare × service × brand), and the world moves. Every system below is explained where
+              you use it too.
+            </p>
+            <div data-testid="handbook-systems">
+              <HubLegend />
+              <SpoolLegend />
+              <SeasonLegend />
+              <SlotLegend />
+              <MarketingLegend />
+              <HedgeLegend />
+              <TakeoverLegend />
+              <CabinLegend />
+              <ServiceLegend />
+            </div>
             <h2>Shortcuts</h2>
             <table className="report-lines">
               <tbody>

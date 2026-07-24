@@ -20,6 +20,7 @@ import { ConfirmButton } from './ConfirmButton'
 import { Sparkline } from './Sparkline'
 import { assignAndSchedule } from './assign'
 import { estimateWeeklyPax } from './estimate'
+import { HubLegend, SpoolLegend } from './legends'
 import { dispatch } from './session'
 import { money } from './format'
 
@@ -295,6 +296,9 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
           </details>
         )
       })()}
+
+      <SpoolLegend />
+      <HubLegend />
 
       <h3>Controls</h3>
       <div className="dossier-controls">

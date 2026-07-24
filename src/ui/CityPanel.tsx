@@ -3,6 +3,7 @@
 // presence, and slot negotiations. Opens when a city is clicked on the map.
 
 import { useMemo, useState } from 'react'
+import { SeasonLegend } from './legends'
 import { CITIES, distanceKm, getCity } from '../data/cities'
 import { NEG_MIN_SPEND, SEASON_TOUR_BP_PER_POINT, SLOT_IDLE_QUARTERS_TO_LOSE, SLOT_IDLE_THRESHOLD } from '../data/constants'
 import { getEventDef } from '../data/events'
@@ -274,6 +275,7 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
           </table>
         </>
       )}
+      <SeasonLegend />
     </aside>
   )
 }
