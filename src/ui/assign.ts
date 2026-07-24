@@ -6,8 +6,9 @@
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm } from '../data/cities'
 import type { GameState } from '../engine'
-import { maxRouteFrequency, roundTripsPerWeek } from '../engine/queries'
-import { dispatch } from './session'
+import { pairWeeklyDemand } from '../engine/market'
+import { maxRouteFrequency, roundTripsPerWeek, routeWeeklyCapacity } from '../engine/queries'
+import { dispatch, getSession } from './session'
 
 export function assignAndSchedule(state: GameState, aircraftId: number, routeId: number): void {
   const player = state.airlines[0]!
@@ -25,5 +26,31 @@ export function assignAndSchedule(state: GameState, aircraftId: number, routeId:
   const target = Math.min(maxRouteFrequency(player, route) + trips, route.frequency + trips)
   if (target > route.frequency) {
     dispatch({ type: 'set_frequency', routeId, frequency: target })
+  }
+}
+
+// Put every idle airframe to work: a greedy pass, one plane at a time
+// against LIVE session state so each assignment sees the capacity the
+// previous one just added. The guard bounds a pathological loop.
+export function assignAllIdle(): void {
+  for (let guard = 0; guard < 50; guard++) {
+    const s = getSession()?.state
+    if (!s) return
+    const p = s.airlines[0]!
+    const idle = p.fleet.find((a) => a.routeId === null)
+    if (!idle) return
+    const range = getAircraftType(idle.type).rangeKm
+    let bestRoute: (typeof p.routes)[number] | null = null
+    let bestGap = 0
+    for (const r of p.routes) {
+      if (distanceKm(r.from, r.to) > range) continue
+      const gap = pairWeeklyDemand(s, r.from, r.to) - routeWeeklyCapacity(p, r)
+      if (gap > bestGap) {
+        bestGap = gap
+        bestRoute = r
+      }
+    }
+    if (!bestRoute) return
+    assignAndSchedule(s, idle.id, bestRoute.id)
   }
 }

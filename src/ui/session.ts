@@ -106,11 +106,6 @@ export function loadSaveAt(slot: number): SaveV1 | null {
   }
 }
 
-// The legacy single-save read: slot 0.
-export function loadSave(): SaveV1 | null {
-  return loadSaveAt(0)
-}
-
 export function listSaves(): (SaveV1 | null)[] {
   return SLOT_KEYS.map((_, i) => loadSaveAt(i))
 }

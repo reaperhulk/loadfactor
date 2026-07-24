@@ -204,7 +204,6 @@ export function ToastStack({
     return () => {
       announceListeners.delete(listener)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

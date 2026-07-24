@@ -2,24 +2,17 @@
 // report. Every button is a Command dispatch — no state is touched directly.
 
 import { useState } from 'react'
-import { AIRCRAFT, getAircraftType, typesOnSale } from '../data/aircraft'
+import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, pairKey } from '../data/cities'
 import { MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
-import type { CostBreakdown, GameEvent, GameState } from '../engine'
-import { baseFare, estimateAircraftQuarterCost, estimateWeeklySeats, fareFor, pairWeeklyDemand, seasonalBp } from '../engine/market'
+import type { GameState } from '../engine'
+import { baseFare, fareFor, pairWeeklyDemand, seasonalBp } from '../engine/market'
 import {
   CABIN_REFIT_COST_BP,
   MAINT_AGE_BP_PER_QUARTER,
   ORDER_CANCEL_REFUND_BP,
   SLOT_IDLE_QUARTERS_TO_LOSE,
   SLOT_IDLE_THRESHOLD,
-  HEDGE_MAX_QUARTERS,
-  HEDGE_MIN_QUARTERS,
-  HEDGE_PREMIUM_PER_AIRCRAFT,
-  LEASE_BP_PER_QUARTER,
-  MARKETING_BASE_PER_LEVEL,
-  MARKETING_PER_ROUTE_PER_LEVEL,
-  MARKETING_WEIGHT_BP_PER_LEVEL,
   ROUTE_OVERHEAD_QUAD,
 } from '../data/constants'
 import { inflationBp } from '../engine/market'
@@ -27,10 +20,8 @@ import { negotiationDifficulty, scarcityChanceBp } from '../engine/negotiation'
 import {
   airlinesOnPair,
   allocateTrips,
-  currentLoanRateBp,
   networkCities,
   cabinSeats,
-  debtCeiling,
   effectiveFrequency,
   maxRouteFrequency,
   resaleValue,
@@ -41,19 +32,16 @@ import {
   slotsFree,
   slotsHeld,
   slotsUsed,
-  totalDebt,
   yearOf,
 } from '../engine/queries'
-import { getScenario } from '../data/scenarios'
-import { assignAndSchedule } from './assign'
+import { Shop } from './Shop'
+import { assignAllIdle, assignAndSchedule } from './assign'
+import { sortHeaderFactory } from './sortHeader'
 import { ConfirmButton } from './ConfirmButton'
-import { dispatch, getSession, type QuarterRecord } from './session'
-import { Sparkline } from './Sparkline'
-import { COST_LABELS, copyTsv, money } from './format'
+import { dispatch } from './session'
+import { copyTsv, money } from './format'
 import {
   CabinLegend,
-  HedgeLegend,
-  MarketingLegend,
   ServiceLegend,
   SlotLegend,
 } from './legends'
@@ -119,24 +107,14 @@ export function RoutesPanel({
         return dir * (a.profit - b.profit)
     }
   })
-  const header = (key: RouteSortKey, label: string) => (
-    <th>
-      <button
-        className={`link-btn sort-btn${sortKey === key ? ' active' : ''}`}
-        data-testid={`sort-${key}`}
-        onClick={() => {
-          if (sortKey === key) setSortAsc(!sortAsc)
-          else {
-            setSortKey(key)
-            setSortAsc(key === 'name' || key === 'km')
-          }
-        }}
-      >
-        {label}
-        {sortKey === key ? (sortAsc ? ' ▲' : ' ▼') : ''}
-      </button>
-    </th>
-  )
+  const header = sortHeaderFactory<RouteSortKey>({
+    current: sortKey,
+    asc: sortAsc,
+    setKey: setSortKey,
+    setAsc: setSortAsc,
+    defaultAscFor: (k) => k === 'name' || k === 'km',
+    testPrefix: 'sort-',
+  })
   return (
     <div>
     <p className="dim" data-testid="network-overhead">
@@ -404,36 +382,21 @@ export function FleetPanel({ state }: { state: GameState }) {
   }
   const geriatricNow = player.fleet.filter((a) => a.ageQuarters >= 48).length
   const geriatricSoon = player.fleet.filter((a) => a.ageQuarters >= 40 && a.ageQuarters < 48).length
+  const fleetHeader = sortHeaderFactory<FleetSortKey>({
+    current: fleetSort,
+    asc: fleetAsc,
+    setKey: setFleetSort,
+    setAsc: setFleetAsc,
+    defaultAscFor: (k) => k === 'type',
+    testPrefix: 'fleet-sort-',
+  })
   return (
     <div>
       {player.fleet.some((a) => a.routeId === null) && player.routes.length > 0 && (
         <button
           data-testid="assign-all-idle"
           title="assign every idle airframe to the in-range route most starved for seats"
-          onClick={() => {
-            // Greedy pass, one plane at a time against live state so each
-            // assignment sees the capacity the previous one just added.
-            for (let guard = 0; guard < 50; guard++) {
-              const s = getSession()?.state
-              if (!s) return
-              const p = s.airlines[0]!
-              const idle = p.fleet.find((a) => a.routeId === null)
-              if (!idle) return
-              const t = getAircraftType(idle.type)
-              let bestRoute: (typeof p.routes)[number] | null = null
-              let bestGap = 0
-              for (const r of p.routes) {
-                if (distanceKm(r.from, r.to) > t.rangeKm) continue
-                const gap = pairWeeklyDemand(s, r.from, r.to) - routeWeeklyCapacity(p, r)
-                if (gap > bestGap) {
-                  bestGap = gap
-                  bestRoute = r
-                }
-              }
-              if (!bestRoute) return
-              assignAndSchedule(s, idle.id, bestRoute.id)
-            }
-          }}
+          onClick={assignAllIdle}
         >
           🛠 put idle fleet to work
         </button>
@@ -507,24 +470,7 @@ export function FleetPanel({ state }: { state: GameState }) {
               return fdir * (x.type.name.localeCompare(y.type.name) || x.a.id - y.a.id)
           }
         })
-        const fheader = (key: FleetSortKey, label: string, title?: string) => (
-          <th title={title}>
-            <button
-              className={`link-btn sort-btn${fleetSort === key ? ' active' : ''}`}
-              data-testid={`fleet-sort-${key}`}
-              onClick={() => {
-                if (fleetSort === key) setFleetAsc(!fleetAsc)
-                else {
-                  setFleetSort(key)
-                  setFleetAsc(key === 'type')
-                }
-              }}
-            >
-              {label}
-              {fleetSort === key ? (fleetAsc ? ' ▲' : ' ▼') : ''}
-            </button>
-          </th>
-        )
+        const fheader = fleetHeader
         return (
       <div className="table-scroll"><table>
         <thead>
@@ -659,184 +605,6 @@ export function FleetPanel({ state }: { state: GameState }) {
       <CabinLegend />
       <h3>Order new aircraft ({year})</h3>
       <Shop state={state} />
-    </div>
-  )
-}
-
-// The showroom: full specs, and — pick one of your routes — an honest
-// estimate of what each type would cost and carry there per quarter.
-function Shop({ state }: { state: GameState }) {
-  const player = state.airlines[0]!
-  const year = yearOf(state)
-  const [routeId, setRouteId] = useState<number | ''>('')
-  const route = player.routes.find((r) => r.id === routeId)
-  const km = route ? distanceKm(route.from, route.to) : null
-  return (
-    <div>
-      <label>
-        Estimate economics on:{' '}
-        <select
-          data-testid="shop-route"
-          value={routeId}
-          onChange={(e) => setRouteId(e.target.value === '' ? '' : Number(e.target.value))}
-        >
-          <option value="">— pick a route —</option>
-          {player.routes.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.from}–{r.to}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div className="table-scroll">
-        <table data-testid="shop-table">
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Seats</th>
-              <th>Range</th>
-              <th>Speed</th>
-              <th>Fuel $/km</th>
-              <th>Maint/q</th>
-              <th>Delivery</th>
-              <th>Price</th>
-              {km !== null && <th>Est. cost/q here</th>}
-              {km !== null && <th>Seats/wk here</th>}
-              {km !== null && <th title="quarterly cost divided by quarterly seats — lower is better">$/seat here</th>}
-              {km !== null && <th title="load factor where this airframe breaks even at your route's fare">B/E load</th>}
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {(() => {
-              // Compute the comparison rows once so the best value per
-              // column can be highlighted — comparison at a glance.
-              const rows = typesOnSale(year).map((t) => {
-                const cost = km !== null ? estimateAircraftQuarterCost(state, t.id, km) : null
-                const seats = km !== null ? estimateWeeklySeats(t.id, km) : null
-                const outOfRange = km !== null && cost === -1
-                // $ per seat per quarter and the breakeven load factor at
-                // this route's current fare (both honest engine estimates).
-                const seatsPerQuarter = seats !== null && seats > 0 ? seats * 13 : 0
-                const perSeat =
-                  !outOfRange && cost !== null && seatsPerQuarter > 0
-                    ? Math.round((cost * 1000) / seatsPerQuarter)
-                    : null
-                const fare = route && km !== null ? fareFor(km, route.fareLevel) : null
-                const breakevenBp =
-                  !outOfRange && cost !== null && fare !== null && seatsPerQuarter > 0
-                    ? Math.floor((cost * 1000 * 10000) / (seatsPerQuarter * fare))
-                    : null
-                return { t, cost, seats, outOfRange, perSeat, breakevenBp }
-              })
-              const bestPerSeat = Math.min(...rows.map((r) => r.perSeat ?? Infinity))
-              const bestBreakeven = Math.min(...rows.map((r) => r.breakevenBp ?? Infinity))
-              return rows.map(({ t, cost, seats, outOfRange, perSeat, breakevenBp }) => (
-                <tr key={t.id} className={outOfRange ? 'dim' : ''}>
-                  <td>{t.name}</td>
-                  <td>{t.seats}</td>
-                  <td>{t.rangeKm}km</td>
-                  <td>{t.speedKmh}km/h</td>
-                  <td>${t.fuelPerKm}</td>
-                  <td>{money(t.maintBase)}</td>
-                  <td>{t.deliveryQuarters}q</td>
-                  <td>{money(t.price)}</td>
-                  {km !== null && <td>{outOfRange ? 'out of range' : money(cost!)}</td>}
-                  {km !== null && <td>{outOfRange ? '—' : seats}</td>}
-                  {km !== null && (
-                    <td className={perSeat !== null && perSeat === bestPerSeat ? 'pos' : ''}>
-                      {perSeat === null ? '—' : `$${perSeat}`}
-                    </td>
-                  )}
-                  {km !== null && (
-                    <td
-                      className={
-                        breakevenBp === null
-                          ? ''
-                          : breakevenBp === bestBreakeven
-                            ? 'pos'
-                            : breakevenBp > 10000
-                              ? 'neg'
-                              : ''
-                      }
-                      title={breakevenBp !== null && breakevenBp > 10000 ? 'cannot break even at this fare' : undefined}
-                    >
-                      {breakevenBp === null ? '—' : `${Math.round(breakevenBp / 100)}%`}
-                    </td>
-                  )}
-                  <td>
-                    <button
-                      disabled={player.cash < t.price}
-                      title={player.cash < t.price ? `need ${money(t.price)} cash — you have ${money(player.cash)}` : undefined}
-                      data-testid={`order-${t.id}`}
-                      onClick={() => dispatch({ type: 'order_aircraft', aircraftType: t.id })}
-                    >
-                      order
-                    </button>{' '}
-                    <button
-                      data-testid={`lease-${t.id}`}
-                      title="no capital outlay; quarterly payments, no resale value"
-                      onClick={() => dispatch({ type: 'lease_aircraft', aircraftType: t.id })}
-                    >
-                      lease {money(Math.floor((t.price * LEASE_BP_PER_QUARTER) / 10000))}/q
-                    </button>
-                  </td>
-                </tr>
-              ))
-            })()}
-          </tbody>
-        </table>
-      </div>
-      {(() => {
-        // The horizon: airframes entering the market in the next few years —
-        // fleet planning is an era decision, not an impulse buy.
-        const coming = AIRCRAFT.filter((t) => t.availableFrom > year && t.availableFrom <= year + 4).sort(
-          (a, b) => a.availableFrom - b.availableFrom,
-        )
-        if (coming.length === 0) return null
-        return (
-          <p className="dim" data-testid="shop-horizon">
-            On the horizon:{' '}
-            {coming.map((t) => `${t.name} (${t.availableFrom} · ${t.seats} seats · ${t.rangeKm}km)`).join(' · ')}
-          </p>
-        )
-      })()}
-      {state.world.usedMarket.length > 0 && (
-        <>
-          <h3>Used market (this quarter)</h3>
-          <div className="table-scroll">
-            <table data-testid="used-market">
-              <tbody>
-                {state.world.usedMarket.map((o) => {
-                  const t = getAircraftType(o.type)
-                  const discountBp = 10000 - Math.floor((o.price * 10000) / t.price)
-                  return (
-                    <tr key={o.id}>
-                      <td>{t.name}</td>
-                      <td>{(o.ageQuarters / 4).toFixed(1)}y old</td>
-                      <td>
-                        {money(o.price)}{' '}
-                        <span className="pos" title={`vs ${money(t.price)} new`}>
-                          −{(discountBp / 100).toFixed(0)}%
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          disabled={player.cash < o.price}
-                          data-testid={`buy-used-${o.id}`}
-                          onClick={() => dispatch({ type: 'buy_used', offerId: o.id })}
-                        >
-                          buy — flies next quarter
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
     </div>
   )
 }
@@ -980,548 +748,6 @@ export function AirportsPanel({ state }: { state: GameState }) {
   )
 }
 
-// The cost buckets in a stable presentation order, labelled from the shared
-// format module so every surface names them identically.
-const COST_BUCKETS: readonly { key: keyof CostBreakdown; label: string }[] = (
-  ['fuel', 'salaries', 'ownership', 'maintenance', 'fees', 'service', 'flightPay', 'overhead', 'admin', 'marketing', 'interest'] as const
-).map((key) => ({ key, label: COST_LABELS[key] }))
-
-// One color per bucket, shared by the mix bands and the structure table so
-// the chart and the numbers read as one exhibit.
-const BUCKET_COLORS: Record<keyof CostBreakdown, string> = {
-  fuel: '#d0636e',
-  salaries: '#58c98a',
-  ownership: '#4fa3ff',
-  maintenance: '#9d7bd8',
-  fees: '#d8a052',
-  service: '#8fbf6f',
-  flightPay: '#c9b458',
-  overhead: '#5b6b8c',
-  admin: '#7a8fb3',
-  marketing: '#e07ab8',
-  interest: '#b3564f',
-}
-
-// How the cost mix evolved: each quarter is a 100%-stacked slice of its
-// breakdown. Structure drift (fuel creeping up, ownership swelling after a
-// buying spree) is visible at a glance; absolutes live in the table below.
-function CostMixHistory({ state }: { state: GameState }) {
-  const player = state.airlines[0]!
-  const hist = player.history.slice(-16).filter((h) => h.costs > 0)
-  if (hist.length < 2) return null
-  const w = 360
-  const h = 72
-  const bw = w / hist.length
-  return (
-    <div className="cost-mix" data-testid="cost-mix">
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-label="cost mix by quarter">
-        {hist.map((q, i) => {
-          let yTop = h
-          return COST_BUCKETS.map((b) => {
-            const v = q.breakdown[b.key]
-            if (v <= 0) return null
-            const bh = (v / q.costs) * h
-            yTop -= bh
-            return (
-              <rect
-                key={`${q.turn}-${b.key}`}
-                x={i * bw}
-                y={yTop}
-                width={bw + 0.4}
-                height={bh}
-                fill={BUCKET_COLORS[b.key]}
-              >
-                <title>{`t${q.turn} ${b.label}: ${money(v)} (${Math.round((v * 100) / q.costs)}%)`}</title>
-              </rect>
-            )
-          })
-        })}
-      </svg>
-      <span className="dim">cost mix, last {hist.length}q →</span>
-    </div>
-  )
-}
-
-// Where the money went last quarter: exact engine attribution (the buckets
-// sum to reported costs), largest first, with proportional bars and the
-// quarter-over-quarter move per bucket.
-function CostStructure({ state }: { state: GameState }) {
-  const player = state.airlines[0]!
-  const now = player.history[player.history.length - 1]
-  const prev = player.history[player.history.length - 2]
-  if (!now || now.costs <= 0) return null
-  const rows = COST_BUCKETS.map((b) => ({
-    ...b,
-    value: now.breakdown[b.key],
-    prevValue: prev?.breakdown[b.key],
-  }))
-    .filter((r) => r.value > 0 || (r.prevValue ?? 0) > 0)
-    .sort((a, b) => b.value - a.value)
-  const max = Math.max(...rows.map((r) => r.value), 1)
-  return (
-    <div className="cost-structure" data-testid="cost-structure">
-      <h3>Cost structure — {money(now.costs)} last quarter</h3>
-      <div className="table-scroll"><table>
-        <tbody>
-          {rows.map((r) => {
-            const delta = r.prevValue === undefined ? null : r.value - r.prevValue
-            return (
-              <tr key={r.key}>
-                <td>
-                  <span className="bucket-chip" style={{ background: BUCKET_COLORS[r.key] }} /> {r.label}
-                </td>
-                <td className="cost-bar-cell">
-                  <span className="cost-bar" style={{ width: `${Math.round((r.value * 100) / max)}%` }} />
-                </td>
-                <td>{money(r.value)}</td>
-                <td className="dim">{Math.round((r.value * 100) / now.costs)}%</td>
-                <td className={delta === null || delta === 0 ? 'dim' : delta > 0 ? 'neg' : 'pos'}>
-                  {delta === null || delta === 0 ? '±0' : delta > 0 ? `▲ ${money(delta)}` : `▼ ${money(-delta)}`}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table></div>
-    </div>
-  )
-}
-
-export function FinancePanel({ state }: { state: GameState }) {
-  const player = state.airlines[0]!
-  const [amount, setAmount] = useState(5000)
-  const ceiling = debtCeiling(player)
-  const debt = totalDebt(player)
-  return (
-    <div>
-      {player.history.length >= 2 && (
-        <div className="finance-trends">
-          <div className="trend-row">
-            <span className="dim">net worth</span>
-            <Sparkline points={player.history.map((h) => h.netWorth)} width={180} />
-            <span>{money(player.history[player.history.length - 1]!.netWorth)}</span>
-          </div>
-          <div className="trend-row">
-            <span className="dim">profit</span>
-            <Sparkline points={player.history.map((h) => h.profit)} width={180} className="sparkline spark-profit" />
-            <span
-              className={player.history[player.history.length - 1]!.profit >= 0 ? 'pos' : 'neg'}
-            >
-              {money(player.history[player.history.length - 1]!.profit)}/q
-            </span>
-          </div>
-        </div>
-      )}
-      {state.world.indexHistory.length >= 2 && (
-        <div data-testid="world-indices">
-          <h3>The world</h3>
-          <div className="trend-row">
-            <span className="dim">economy</span>
-            <Sparkline
-              points={state.world.indexHistory.map((h) => h.economyBp)}
-              width={180}
-              className="sparkline spark-profit"
-            />
-            <span className={state.world.economyBp >= 10000 ? 'pos' : 'neg'}>
-              {(state.world.economyBp / 100).toFixed(0)}%
-            </span>
-          </div>
-          <div className="trend-row">
-            <span className="dim" title="effective fuel index, event shocks included">
-              fuel
-            </span>
-            <Sparkline
-              points={state.world.indexHistory.map((h) => h.fuelBp)}
-              width={180}
-              className="sparkline spark-lf"
-            />
-            <span
-              className={
-                (state.world.indexHistory[state.world.indexHistory.length - 1]?.fuelBp ?? 10000) > 11000
-                  ? 'neg'
-                  : 'dim'
-              }
-            >
-              {((state.world.indexHistory[state.world.indexHistory.length - 1]?.fuelBp ?? 10000) / 100).toFixed(0)}%
-            </span>
-          </div>
-        </div>
-      )}
-      <CostStructure state={state} />
-      <CostMixHistory state={state} />
-      <p>
-        Debt {money(debt)} of {money(ceiling)} ceiling
-      </p>
-      <div className="city-negotiate" data-testid="hedge-panel">
-        {player.fuelHedge !== null ? (
-          <span>
-            ⛽ Fuel hedged at index {(player.fuelHedge.bp / 100).toFixed(0)}% for{' '}
-            {player.fuelHedge.quartersLeft} more quarter(s)
-            {player.fuelHedge.quartersLeft === 1 && (
-              <span className="neg"> — expires next quarter, you'll be back on the market index</span>
-            )}
-          </span>
-        ) : (
-          <>
-            <span>Fuel hedge:</span>
-            {[4, 8].map((q) => (
-              <button
-                key={q}
-                data-testid={`hedge-${q}`}
-                disabled={
-                  player.fleet.length === 0 ||
-                  q < HEDGE_MIN_QUARTERS ||
-                  q > HEDGE_MAX_QUARTERS ||
-                  player.cash < HEDGE_PREMIUM_PER_AIRCRAFT * player.fleet.length * q
-                }
-                title="lock today's fuel index for your whole fleet"
-                onClick={() => dispatch({ type: 'hedge_fuel', quarters: q })}
-              >
-                {q}q — {money(HEDGE_PREMIUM_PER_AIRCRAFT * player.fleet.length * q)}
-              </button>
-            ))}
-          </>
-        )}
-      </div>
-      <div className="city-negotiate" data-testid="marketing-panel">
-        <span title="brand spend buys pair appeal in every share battle: schedule × cabin × fare × service × brand">
-          Marketing:
-        </span>
-        {[0, 1, 2, 3].map((level) => (
-          <button
-            key={level}
-            data-testid={`marketing-${level}`}
-            className={player.marketing === level ? 'active sort-btn' : 'sort-btn'}
-            disabled={player.marketing === level}
-            onClick={() => dispatch({ type: 'set_marketing', level })}
-          >
-            {['off', 'low', 'mid', 'high'][level]}
-            {level > 0 &&
-              ` ${money(
-                level *
-                  Math.floor(
-                    ((MARKETING_BASE_PER_LEVEL + MARKETING_PER_ROUTE_PER_LEVEL * player.routes.length) *
-                      inflationBp(state.turn)) /
-                      10000,
-                  ),
-              )}/q`}
-          </button>
-        ))}
-        <span className="dim">
-          +{(MARKETING_WEIGHT_BP_PER_LEVEL / 100).toFixed(0)}% appeal per level on every pair
-        </span>
-      </div>
-      <MarketingLegend />
-      <HedgeLegend />
-      <label>
-        Amount:{' '}
-        <input type="number" value={amount} min={100} step={100} onChange={(e) => setAmount(Number(e.target.value))} />{' '}
-        $k
-      </label>
-      <button onClick={() => dispatch({ type: 'take_loan', amount })}>take loan</button>{' '}
-      <span className="dim" data-testid="loan-rate">
-        today's rate {(currentLoanRateBp(state) / 100).toFixed(1)}%/yr
-        <span title="the rate follows the economy — borrow in booms, not busts">
-          {' '}
-          ({state.world.economyBp >= 10000 ? 'cheap money' : 'tight money'})
-        </span>
-      </span>
-      <div className="table-scroll"><table>
-        <tbody>
-          {player.loans.map((l) => (
-            <tr key={l.id}>
-              <td>{money(l.principal)}</td>
-              <td>{(l.annualRateBp / 100).toFixed(1)}%/yr</td>
-              <td>
-                <button onClick={() => dispatch({ type: 'repay_loan', loanId: l.id, amount })}>
-                  repay {money(Math.min(amount, l.principal))}
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table></div>
-      <h3>History</h3>
-      <div className="table-scroll"><table>
-        <thead>
-          <tr>
-            <th>Q</th>
-            <th>Revenue</th>
-            <th>Costs</th>
-            <th>Profit</th>
-            <th>Net worth</th>
-          </tr>
-        </thead>
-        <tbody>
-          {player.history.slice(-8).reverse().map((h) => (
-            <tr key={h.turn}>
-              <td>{h.turn + 1}</td>
-              <td>{money(h.revenue)}</td>
-              <td>{money(h.costs)}</td>
-              <td className={h.profit >= 0 ? 'pos' : 'neg'}>{money(h.profit)}</td>
-              <td>{money(h.netWorth)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table></div>
-    </div>
-  )
-}
-
-function describeEvent(state: GameState, e: GameEvent): string | null {
-  const name = (idx: number): string => state.airlines[idx]?.name ?? `airline ${idx}`
-  switch (e.type) {
-    case 'command_rejected':
-      return e.airline === 0 ? `Rejected: ${e.reason}` : null
-    case 'route_opened':
-      return `${name(e.airline)} opened ${e.from}–${e.to}`
-    case 'route_closed':
-      return e.airline === 0 ? `Closed route` : null
-    case 'aircraft_delivered':
-      return `${name(e.airline)} took delivery of a ${getAircraftType(e.aircraftType).name}`
-    case 'slots_granted':
-      return `${name(e.airline)} won ${e.slots} slots at ${e.city}`
-    case 'negotiation_failed':
-      return e.airline === 0 ? `Slot talks at ${e.city} failed` : null
-    case 'slot_lost':
-      return e.airline === 0 ? `Idle slot at ${e.city} forfeited` : null
-    case 'bidding_war':
-      return `Bidding war at ${e.city} — ${e.airlines.map((a) => name(a)).join(' vs ')}`
-    case 'rival_acquired':
-      return `${name(e.airline)} acquired ${name(e.target)} for ${money(e.price)} (${e.routes} routes, ${e.aircraft} aircraft)`
-    case 'world_event_started':
-      return `World: ${e.eventId.replace('_', ' ')}${e.city ? ` in ${e.city}` : ''}${e.region ? ` in region ${e.region}` : ''}`
-    case 'world_event_ended':
-      return `World: ${e.eventId.replace('_', ' ')} ended`
-    case 'airline_bankrupt':
-      return `${name(e.airline)} went bankrupt`
-    case 'quarter_report':
-      return e.airline === 0
-        ? `Quarter closed: revenue ${money(e.revenue)}, profit ${money(e.profit)}, net worth ${money(e.netWorth)}`
-        : null
-    case 'game_over':
-      return e.result === 'won' ? `VICTORY: ${e.reason}` : `DEFEAT: ${e.reason}`
-    default:
-      return null
-  }
-}
-
-// The newspaper's sections: which events land under which filter.
-const LOG_FILTERS = [
-  { key: 'all', label: 'all news' },
-  { key: 'network', label: 'routes' },
-  { key: 'airports', label: 'airports' },
-  { key: 'fleet', label: 'fleet' },
-  { key: 'world', label: 'world' },
-  { key: 'money', label: 'money' },
-] as const
-type LogFilter = (typeof LOG_FILTERS)[number]['key']
-
-function eventSection(e: GameEvent): LogFilter {
-  switch (e.type) {
-    case 'route_opened':
-    case 'route_closed':
-      return 'network'
-    case 'slots_granted':
-    case 'slot_lost':
-    case 'negotiation_failed':
-    case 'negotiation_started':
-    case 'bidding_war':
-      return 'airports'
-    case 'aircraft_delivered':
-    case 'order_cancelled':
-    case 'cabin_refit':
-      return 'fleet'
-    case 'world_event_started':
-    case 'world_event_ended':
-    case 'airline_bankrupt':
-    case 'rival_acquired':
-      return 'world'
-    default:
-      return 'money'
-  }
-}
-
-// One resolved quarter rendered as the day's paper: the route results table
-// on top, the filtered wire log underneath.
-function QuarterPage({ state, events }: { state: GameState; events: GameEvent[] }) {
-  const [filter, setFilter] = useState<LogFilter>('all')
-  const lines = events
-    .filter((e) => filter === 'all' || eventSection(e) === filter)
-    .map((e) => describeEvent(state, e))
-    .filter((l): l is string => l !== null)
-  const results = events
-    .filter(
-      (e): e is Extract<GameEvent, { type: 'route_result' }> => e.type === 'route_result' && e.airline === 0,
-    )
-    .sort((a, b) => b.revenue - b.cost - (a.revenue - a.cost))
-  const player = state.airlines[0]!
-  const routeName = (routeId: number): string => {
-    const r = player.routes.find((x) => x.id === routeId)
-    return r ? `${r.from}–${r.to}` : '(closed)'
-  }
-  return (
-    <div>
-      {results.length > 0 && (
-        <div className="table-scroll">
-          <table data-testid="report-results">
-            <thead>
-              <tr className="dim">
-                <th>route</th>
-                <th>pax</th>
-                <th>conn</th>
-                <th>load</th>
-                <th>rev</th>
-                <th>cost</th>
-                <th>P&L</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((r) => (
-                <tr key={r.routeId}>
-                  <td>{routeName(r.routeId)}</td>
-                  <td>{r.pax.toLocaleString('en-US')}</td>
-                  <td className="dim">{r.transferPax}</td>
-                  <td>{(r.loadFactorBp / 100).toFixed(0)}%</td>
-                  <td>{money(r.revenue)}</td>
-                  <td>{money(r.cost)}</td>
-                  <td className={r.revenue - r.cost >= 0 ? 'pos' : 'neg'}>{money(r.revenue - r.cost)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <p className="dim">
-        {LOG_FILTERS.map((f) => (
-          <button
-            key={f.key}
-            className={`link-btn sort-btn${filter === f.key ? ' active' : ''}`}
-            data-testid={`report-filter-${f.key}`}
-            onClick={() => setFilter(f.key)}
-          >
-            {f.label}
-          </button>
-        ))}
-      </p>
-      <ul className="report" data-testid="report">
-        {lines.map((line, i) => (
-          <li key={i}>{line}</li>
-        ))}
-        {lines.length === 0 && <li className="dim">Nothing on this wire for that quarter.</li>}
-      </ul>
-    </div>
-  )
-}
-
-// The annual review: each completed year's totals from the ledger the
-// engine already keeps — where the decades came from, at a glance.
-function AnnualReview({ state }: { state: GameState }) {
-  const player = state.airlines[0]!
-  const startYear = getScenario(state.scenario).startYear
-  const years: { year: number; revenue: number; profit: number; pax: number; endWorth: number }[] = []
-  for (let i = 0; i + 4 <= player.history.length; i += 4) {
-    const slice = player.history.slice(i, i + 4)
-    years.push({
-      year: startYear + Math.floor((slice[0]!.turn ?? i) / 4),
-      revenue: slice.reduce((s, h) => s + h.revenue, 0),
-      profit: slice.reduce((s, h) => s + h.profit, 0),
-      pax: slice.reduce((s, h) => s + h.pax, 0),
-      endWorth: slice[slice.length - 1]!.netWorth,
-    })
-  }
-  if (years.length === 0) return <p className="hint">Finish a full year to read the annual review.</p>
-  const bestProfit = Math.max(...years.map((y) => y.profit))
-  return (
-    <div className="table-scroll">
-      <table data-testid="annual-review">
-        <thead>
-          <tr className="dim">
-            <th>year</th>
-            <th>revenue</th>
-            <th>profit</th>
-            <th>passengers</th>
-            <th>net worth</th>
-          </tr>
-        </thead>
-        <tbody>
-          {years.map((y) => (
-            <tr key={y.year}>
-              <td>{y.year}</td>
-              <td>{money(y.revenue)}</td>
-              <td className={y.profit >= 0 ? (y.profit === bestProfit ? 'pos' : '') : 'neg'}>
-                {money(y.profit)}
-                {y.profit === bestProfit && years.length > 1 && ' ★'}
-              </td>
-              <td>{y.pax.toLocaleString('en-US')}</td>
-              <td>{money(y.endWorth)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-export function ReportPanel({ state, archive }: { state: GameState; archive: QuarterRecord[] }) {
-  // idx === null shows the latest edition; the arrows browse the morgue.
-  const [idx, setIdx] = useState<number | null>(null)
-  const [view, setView] = useState<'quarter' | 'years'>('quarter')
-  if (archive.length === 0) return <p className="hint">End the quarter to see your first report.</p>
-  const shown = Math.min(idx ?? archive.length - 1, archive.length - 1)
-  const record = archive[shown]!
-  const startYear = getScenario(state.scenario).startYear
-  const dateOf = (turn: number): string => `${startYear + Math.floor(turn / 4)} Q${(turn % 4) + 1}`
-  return (
-    <div>
-      <p>
-        <button
-          className={`link-btn sort-btn${view === 'quarter' ? ' active' : ''}`}
-          data-testid="report-view-quarter"
-          onClick={() => setView('quarter')}
-        >
-          quarterly
-        </button>
-        <button
-          className={`link-btn sort-btn${view === 'years' ? ' active' : ''}`}
-          data-testid="report-view-years"
-          onClick={() => setView('years')}
-        >
-          annual review
-        </button>
-        {view === 'quarter' && (
-          <span className="report-nav">
-            {' · '}
-            <button
-              aria-label="previous quarter"
-              data-testid="report-prev"
-              disabled={shown === 0}
-              onClick={() => setIdx(shown - 1)}
-            >
-              ‹
-            </button>{' '}
-            <strong data-testid="report-date">{dateOf(record.turn)}</strong>{' '}
-            <button
-              aria-label="next quarter"
-              data-testid="report-next"
-              disabled={shown >= archive.length - 1}
-              onClick={() => setIdx(shown + 1 >= archive.length - 1 ? null : shown + 1)}
-            >
-              ›
-            </button>
-            {shown < archive.length - 1 && (
-              <button className="link-btn" data-testid="report-latest" onClick={() => setIdx(null)}>
-                latest
-              </button>
-            )}
-          </span>
-        )}
-      </p>
-      {view === 'quarter' ? (
-        <QuarterPage key={shown} state={state} events={record.events} />
-      ) : (
-        <AnnualReview state={state} />
-      )}
-    </div>
-  )
-}
+// Split-out screens re-exported so callers keep one panels entry point.
+export { FinancePanel } from './FinancePanel'
+export { ReportPanel } from './ReportPanel'

@@ -148,15 +148,18 @@ button:disabled {
   transition: fill 1200ms ease, stroke 1200ms ease;
 }
 
+/* The promise is "sepia-warm sixties through a cool, neon-tinged 2000s" —
+   these are real hue shifts, not three near-identical blues. Landmasses stay
+   darker than every arc and dot so the network always reads on top. */
 .map.era-1960 {
-  --sea: #131320;
-  --land: #262436;
-  --coast: #3a3650;
+  --sea: #191410;
+  --land: #383021;
+  --coast: #57472e;
 }
 .map.era-1970 {
-  --sea: #12141e;
-  --land: #232634;
-  --coast: #35394e;
+  --sea: #16130f;
+  --land: #302b1f;
+  --coast: #4a412b;
 }
 .map.era-1980 {
   --sea: #0e1522;
@@ -164,14 +167,14 @@ button:disabled {
   --coast: #2c3a54;
 }
 .map.era-1990 {
-  --sea: #0b1424;
-  --land: #17263e;
-  --coast: #27395c;
+  --sea: #0a1526;
+  --land: #152a46;
+  --coast: #21406b;
 }
 .map.era-2000 {
-  --sea: #091323;
-  --land: #132441;
-  --coast: #223a63;
+  --sea: #061223;
+  --land: #0e2547;
+  --coast: #17417c;
 }
 
 .map-controls {

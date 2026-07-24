@@ -316,16 +316,24 @@ committing).
 - **M6 — Presentation.** Period styling, map polish, sound, PWA install,
   shareable replay links.
 
-**Status:** M0–M4 landed (M3's slot bidding wars and the distressed-rival
-takeover endgame included); M5 is live with four scenarios (Jet Age, Oil
-Crisis, Deregulation, Open Skies), the daily seed challenge, and a hall of
-fame; M5's unlock chain and achievements are in; M6's presentation layer is
-largely in place (decade-tinted map, globe projection, ambient traffic
-that wears its metal, sound, PWA, shareable challenge links). Systems
-added beyond this ladder through the iteration loop: brand/marketing in
-the share battle, route spool-up with market memory, hemisphere
-seasonality, world index history, three save slots with JSON
-export/import, and TSV spreadsheet exports of every comparison table.
+**Status:** the full M0–M6 ladder has landed. M5 runs five scenarios (Jet
+Age, Oil Crisis, Deregulation, Open Skies, and the 2000s Low-Cost Wars
+from Barcelona) with the unlock chain, achievements, the daily seed
+challenge, and a hall of fame. M6's presentation layer is in place
+(decade-tinted map with real per-era palettes, globe projection, ambient
+traffic that wears its metal, sound, PWA, shareable challenge links that
+carry a duel target). Systems added beyond the ladder through the
+iteration loop: brand/marketing in the share battle, route spool-up with
+market memory, hemisphere seasonality, world index history, three save
+slots with JSON export/import (finished careers preserved as replayable
+records), TSV spreadsheet exports of every comparison table, a
+quarter-archive newspaper with an annual review, in-context legends for
+every system plus a handbook, and modern-era world events (travel slump,
+alliance boom). The §2.4 difficulty contract is asserted literally: loans
+amortize, hubs pay transfer handling, and no pinned career may finish
+above 10× its scenario's qualifying floor. The reference bot, the rival
+personalities, and the fuzz genome all run one shared strategy brain
+(src/engine/policy.ts) — personalities and genomes are dials, not forks.
 
 ## 9. Risks & mitigations
 
