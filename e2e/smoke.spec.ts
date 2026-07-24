@@ -174,6 +174,9 @@ test('opening a route triggers the reward animation and toast', async ({ page })
     const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
     window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
   })
+  // A fresh browser has no achievements — the very first route is a career
+  // milestone and earns the gold unlock toast alongside the route reward.
+  await expect(page.getByTestId('toasts')).toContainText('Achievement unlocked — First flight')
   await page.getByTestId('city-MIA').click()
   await page.getByTestId('plan-route').click()
   await page.getByTestId('city-ORD').click()

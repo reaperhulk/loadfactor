@@ -44,4 +44,24 @@ describe('incursion toasts', () => {
     expect(toasts[0]!.kind).toBe('route')
     expect(toasts[0]!.routeId).toBeUndefined()
   })
+
+  it('a rival absorbing another rival is market news; my own deal is a victory', () => {
+    const state = stateWithRoute()
+    const consolidation: GameEvent[] = [
+      { type: 'rival_acquired', airline: 1, target: 2, price: 5000, aircraft: 3, routes: 2 },
+    ]
+    const news = toastsFor(consolidation, state)
+    expect(news).toHaveLength(1)
+    expect(news[0]!.kind).toBe('event')
+    expect(news[0]!.text).toContain(state.airlines[1]!.name)
+    expect(news[0]!.text).toContain(state.airlines[2]!.name)
+
+    const myDeal: GameEvent[] = [
+      { type: 'rival_acquired', airline: 0, target: 1, price: 5000, aircraft: 3, routes: 2 },
+    ]
+    const cheer = toastsFor(myDeal, state)
+    expect(cheer).toHaveLength(1)
+    expect(cheer[0]!.kind).toBe('victory')
+    expect(cheer[0]!.text).toContain(state.airlines[1]!.name)
+  })
 })

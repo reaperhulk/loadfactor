@@ -50,6 +50,31 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     test: (s) => s.airlines[0]!.fleet.some((a) => a.type === 'concorde'),
   },
   {
+    id: 'war_winner',
+    icon: '⚖️',
+    name: 'Spoils of war',
+    desc: 'Win a bidding war and take the slots',
+    // A bidding war you were party to, resolved with the slots in your hands.
+    test: (_s, events) =>
+      events.some(
+        (war) =>
+          war.type === 'bidding_war' &&
+          war.airlines.includes(0) &&
+          events.some((e) => e.type === 'slots_granted' && e.airline === 0 && e.city === war.city),
+      ),
+  },
+  {
+    id: 'oil_proof',
+    icon: '🛢️',
+    name: 'Shockproof',
+    desc: 'Fly a profitable quarter through an oil shock',
+    // Judged right after a quarter resolves, while the shock still burns.
+    test: (s, events) =>
+      events.some((e) => e.type === 'quarter_report' && e.airline === 0) &&
+      s.world.events.some((e) => e.id === 'oil_shock') &&
+      (s.airlines[0]!.history[s.airlines[0]!.history.length - 1]?.profit ?? 0) > 0,
+  },
+  {
     id: 'magnate',
     icon: '💼',
     name: 'Magnate',

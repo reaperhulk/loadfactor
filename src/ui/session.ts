@@ -14,13 +14,15 @@ import {
   type Replay,
 } from '../engine'
 import { getScenario } from '../data/scenarios'
-import { checkAchievements } from './achievements'
+import { checkAchievements, type AchievementDef } from './achievements'
 
 export interface Session {
   state: GameState
   lastEvents: GameEvent[] // events from the most recent engine call
   reportEvents: GameEvent[] // events from the most recent end_quarter
   commandLog: Command[]
+  lastUnlocks: AchievementDef[] // achievements unlocked by the latest engine call
+  careerUnlocks: string[] // achievement ids earned during this career
 }
 
 // A save IS a replay: (scenario, seed, customization, command log).
@@ -135,7 +137,7 @@ export function resumeSave(slot = 0): boolean {
     const upTo = runReplay({ ...save, commands: save.commands.slice(0, lastEnd) })
     reportEvents = applyCommand(upTo.state, { type: 'end_quarter' }).events
   }
-  session = { state, lastEvents: [], reportEvents, commandLog: [...save.commands] }
+  session = { state, lastEvents: [], reportEvents, commandLog: [...save.commands], lastUnlocks: [], careerUnlocks: [] }
   notify()
   return true
 }
@@ -175,6 +177,8 @@ export function startGame(
     lastEvents: [],
     reportEvents: [],
     commandLog: [],
+    lastUnlocks: [],
+    careerUnlocks: [],
   }
   persist()
   notify()
@@ -258,12 +262,16 @@ export function dispatch(command: Command): GameEvent[] {
   const wasPlanning = session.state.phase === 'planning'
   const { state, events } = applyCommand(session.state, command)
   if (wasPlanning && state.phase !== 'planning') recordFame(state)
-  checkAchievements(state, events)
+  const unlocks = checkAchievements(state, events)
   session = {
     state,
     lastEvents: events,
     reportEvents: command.type === 'end_quarter' ? events : session.reportEvents,
     commandLog: [...session.commandLog, command],
+    lastUnlocks: unlocks,
+    careerUnlocks: unlocks.length
+      ? [...session.careerUnlocks, ...unlocks.map((a) => a.id)]
+      : session.careerUnlocks,
   }
   persist()
   notify()

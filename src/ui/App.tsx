@@ -377,7 +377,15 @@ function MuteToggle() {
 }
 
 // Final standings, ranked — the scenario is a race, show the podium.
-function GameOverOverlay({ state, onWatchReplay }: { state: GameState; onWatchReplay: (r: Replay) => void }) {
+function GameOverOverlay({
+  state,
+  earned,
+  onWatchReplay,
+}: {
+  state: GameState
+  earned: string[] // achievement ids unlocked during this career
+  onWatchReplay: (r: Replay) => void
+}) {
   const ranked = [...state.airlines].sort((a, b) => netWorth(b) - netWorth(a))
   // The career in numbers — what those decades added up to.
   const me = state.airlines[0]!
@@ -428,6 +436,15 @@ function GameOverOverlay({ state, onWatchReplay }: { state: GameState; onWatchRe
           {Math.floor(state.turn / 4)} years · {totalPax.toLocaleString('en-US')} passengers flown · lifetime
           P&L {money(totalProfit)} · peak worth {money(peakWorth)}
         </p>
+        {earned.length > 0 && (
+          <p className="achievement-row" data-testid="career-achievements">
+            {ACHIEVEMENTS.filter((a) => earned.includes(a.id)).map((a) => (
+              <span key={a.id} className="event-chip" title={a.desc}>
+                {a.icon} {a.name}
+              </span>
+            ))}
+          </p>
+        )}
         <button
           data-testid="watch-replay"
           onClick={() => {
@@ -650,7 +667,9 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           onClose={() => setPendingRoute(null)}
         />
       )}
-      {state.phase !== 'planning' && <GameOverOverlay state={state} onWatchReplay={onWatchReplay} />}
+      {state.phase !== 'planning' && (
+        <GameOverOverlay state={state} earned={session.careerUnlocks} onWatchReplay={onWatchReplay} />
+      )}
       {showHelp && (
         <div className="gameover-overlay" data-testid="help-overlay" onClick={() => setShowHelp(false)}>
           <div className="gameover-card report-card" onClick={(e) => e.stopPropagation()}>
@@ -745,7 +764,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           />
         )}
       </div>
-      <ToastStack events={session.lastEvents} state={state} onOpenRoute={inspectRoute} />
+      <ToastStack events={session.lastEvents} state={state} unlocks={session.lastUnlocks} onOpenRoute={inspectRoute} />
       <nav className="tabs">
         {TABS.map((t, i) => (
           <button

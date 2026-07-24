@@ -80,6 +80,12 @@ const JINGLES: Record<string, () => void> = {
     note(220, 0, 0.4, 0.07, 'sawtooth')
     note(208, 0.25, 0.6, 0.06, 'sawtooth')
   },
+  // An achievement unlocks — a bright bell arpeggio above the usual palette.
+  achievement: () => {
+    note(659, 0, 0.12, 0.07)
+    note(880, 0.08, 0.12, 0.07)
+    note(1319, 0.16, 0.4, 0.09)
+  },
   // A rival marches onto your pair — two low war-drum hits.
   incursion: () => {
     note(196, 0, 0.14, 0.07, 'square')
@@ -132,6 +138,11 @@ export function installSounds(): void {
     lastEvents = session.lastEvents
     if (muted) return
     const jingle = soundFor(session.lastEvents)
+    // Achievements outrank everything except the game ending itself.
+    if (session.lastUnlocks.length > 0 && jingle !== 'victory' && jingle !== 'defeat') {
+      JINGLES['achievement']?.()
+      return
+    }
     if (jingle) JINGLES[jingle]?.()
   })
 }

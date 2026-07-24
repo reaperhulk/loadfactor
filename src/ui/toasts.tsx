@@ -11,7 +11,7 @@ import { quarterOf, yearOf } from '../engine/queries'
 
 export interface Toast {
   id: number
-  kind: 'route' | 'delivery' | 'slots' | 'event' | 'victory' | 'defeat' | 'error'
+  kind: 'route' | 'delivery' | 'slots' | 'event' | 'victory' | 'defeat' | 'error' | 'achievement'
   icon: string
   text: string
   // When set, clicking the toast opens this route's dossier (the battle card)
@@ -157,10 +157,14 @@ const TOAST_MS = 4200
 export function ToastStack({
   events,
   state,
+  unlocks,
   onOpenRoute,
 }: {
   events: GameEvent[]
   state?: GameState
+  // Achievements unlocked by the same engine call that produced `events` —
+  // they ride the same batch so the dedupe key (the events array) covers both.
+  unlocks?: { icon: string; name: string }[]
   onOpenRoute?: (routeId: number) => void
 }) {
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -172,6 +176,9 @@ export function ToastStack({
     if (seen.current === events) return // only react to a new engine result
     seen.current = events
     const fresh = toastsFor(events, state)
+    for (const a of unlocks ?? []) {
+      fresh.push({ kind: 'achievement', icon: a.icon, text: `Achievement unlocked — ${a.name}` })
+    }
     if (fresh.length === 0) return
     const stamped = fresh.map((t) => ({ ...t, id: nextId.current++ }))
     setToasts((prev) => [...prev, ...stamped].slice(-4)) // keep the stack short
@@ -183,7 +190,7 @@ export function ToastStack({
         setToasts((prev) => prev.filter((t) => !ids.has(t.id)))
       }, TOAST_MS),
     )
-  }, [events, state])
+  }, [events, state, unlocks])
 
   // Timers are cleared only on unmount, never between batches.
   useEffect(() => {

@@ -1281,6 +1281,13 @@ input[type='number'] {
   border-left-color: var(--neg);
 }
 
+/* Achievement unlocks get the gold treatment — a career moment, not a memo. */
+.toast-achievement {
+  border-left-color: #ffd166;
+  background: linear-gradient(105deg, #3a3114f2, #1d2740f2 55%);
+  box-shadow: 0 0 14px #ffd16640;
+}
+
 .toast-defeat {
   border-left-color: var(--neg);
 }
