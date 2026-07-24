@@ -4,7 +4,7 @@
 // are fine here — the engine never sees screen coordinates.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { PointerEvent } from 'react'
+import type { MouseEvent as ReactMouseEvent, PointerEvent } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
@@ -578,7 +578,8 @@ export function MapView({
             className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}${isAcquired ? ' route-acquired' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
             style={{ '--cap-w': capWidth(player, r, false) } as React.CSSProperties}
             data-testid={isNew ? 'route-line-new' : undefined}
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation() // an arc click must not select a nearby city
               if (suppressClick.current) {
                 suppressClick.current = false
                 return
@@ -873,6 +874,40 @@ export function MapView({
     onCityClick(cityId)
   }
 
+  // Fat-finger tap resolution: a tap that misses every dot still selects the
+  // nearest visible city within a finger's reach in SCREEN pixels. On a
+  // phone the dots render around a single CSS pixel — without this the
+  // game's primary verb is mouse-only. Precise dot/arc clicks stopPropagation
+  // so they keep their exact behavior.
+  const handleMapTap = (e: ReactMouseEvent<SVGSVGElement>): void => {
+    if (suppressClick.current) {
+      suppressClick.current = false
+      return
+    }
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const cssX = e.clientX - rect.left
+    const cssY = e.clientY - rect.top
+    // viewBox → CSS pixel mapping for the active projection.
+    const toCss = (p: GlobePoint): { x: number; y: number } =>
+      isGlobe
+        ? { x: (p.X / W) * rect.width, y: (p.Y / H) * rect.height }
+        : { x: ((p.X - view.x) / view.w) * rect.width, y: ((p.Y - view.y) / view.h) * rect.height }
+    let best: string | null = null
+    let bestD = 28 // max reach in CSS px — a comfortable fingertip
+    for (const c of visible) {
+      const p = pt(c.lon, c.lat)
+      if (!p.vis) continue
+      const s = toCss(p)
+      const d = Math.hypot(s.x - cssX, s.y - cssY)
+      if (d < bestD) {
+        bestD = d
+        best = c.id
+      }
+    }
+    if (best !== null) onCityClick(best)
+  }
+
   return (
     <div className="map-wrap">
       <svg
@@ -886,6 +921,7 @@ export function MapView({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onClick={handleMapTap}
       >
         <rect x={0} y={0} width={W} height={H} className="map-sea" />
         {isGlobe ? (
@@ -1019,7 +1055,14 @@ export function MapView({
           if (!p.vis) return null
           const r = (2 + cityMass(c) / 18) / Math.sqrt(uiScale)
           return (
-            <g key={c.id} onClick={() => handleCityClick(c.id)} className="city">
+            <g
+              key={c.id}
+              onClick={(e) => {
+                e.stopPropagation() // precise hit — don't also run the nearest-city resolver
+                handleCityClick(c.id)
+              }}
+              className="city"
+            >
               {selected === c.id && (
                 <circle cx={p.X} cy={p.Y} r={r + 5 / uiScale} className="selection-ring" />
               )}

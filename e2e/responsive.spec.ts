@@ -94,3 +94,61 @@ test('keyboard shortcuts: space ends quarter, digits switch tabs, esc deselects'
   await page.keyboard.press('Escape')
   await expect(page.locator('.city-dot.selected')).toHaveCount(0)
 })
+
+// The honest mobile contract: the primary verb (tapping a city) must work
+// with a FINGER, not just a synthetic element click; controls must be
+// finger-sized; chrome must not stack on itself; and tall overlays must
+// scroll their buttons into reach.
+test('mobile: fat-finger taps select cities and the chrome stays usable', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 })
+  await page.goto('/')
+  await page.getByTestId('seed-input').fill('touch-seed')
+  await page.getByTestId('start-jet_age').click()
+  await expect(page.getByTestId('date')).toHaveText('1960 Q1')
+
+  // A tap 12px NORTH of Chicago's (sub-pixel) dot — open water on the
+  // rendered map — must still select Chicago via nearest-city resolution.
+  const dot = await page.getByTestId('city-ORD').boundingBox()
+  expect(dot).not.toBeNull()
+  await page.mouse.click(dot!.x + dot!.width / 2, dot!.y + dot!.height / 2 - 12)
+  await expect(page.getByTestId('city-panel')).toContainText('Chicago')
+  await page.getByTestId('city-panel-close').click()
+
+  // Map controls are finger-sized on touch layouts.
+  for (const id of ['zoom-in', 'zoom-out', 'zoom-reset']) {
+    const box = await page.getByTestId(id).boundingBox()
+    expect(box!.width, `${id} width`).toBeGreaterThanOrEqual(40)
+    expect(box!.height, `${id} height`).toBeGreaterThanOrEqual(40)
+  }
+
+  // Zoomed in, the minimap must not sit under the control row.
+  await page.getByTestId('zoom-in').click()
+  await page.getByTestId('zoom-in').click()
+  const mini = await page.getByTestId('minimap').boundingBox()
+  const controls = await page.locator('.map-controls').boundingBox()
+  const overlap =
+    mini!.x < controls!.x + controls!.width &&
+    mini!.x + mini!.width > controls!.x &&
+    mini!.y < controls!.y + controls!.height &&
+    mini!.y + mini!.height > controls!.y
+  expect(overlap, 'minimap clear of the control row').toBe(false)
+})
+
+test('mobile: the game-over card scrolls its buttons into reach', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 })
+  await page.goto('/')
+  await page.getByTestId('seed-input').fill('gameover-touch')
+  await page.getByTestId('start-jet_age').click()
+  await expect(page.getByTestId('date')).toHaveText('1960 Q1')
+  // An idle airline burns out in a few years — ride it to the overlay.
+  await page.evaluate(() => {
+    for (let i = 0; i < 40 && window.__harness.getState()!.phase === 'planning'; i++) {
+      window.__harness.endQuarter()
+    }
+  })
+  await expect(page.getByTestId('gameover-overlay')).toBeVisible()
+  // Playwright refuses to click a target it cannot bring into view — this
+  // fails if the card clips its buttons instead of scrolling.
+  await page.getByTestId('new-game').click()
+  await expect(page.getByTestId('start-jet_age')).toBeVisible()
+})

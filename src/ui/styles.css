@@ -192,12 +192,20 @@ button:disabled {
 }
 
 /* Narrow screens: the control column would outgrow the short map and blanket
-   the tab bar below — lay it along the map's bottom edge instead. */
+   the tab bar below — lay it along the map's bottom edge instead. Controls
+   grow to finger size, and the minimap lifts above the control row so the
+   two never stack on the same corner. */
 @media (max-width: 640px) {
   .map-controls {
     flex-direction: row;
     top: auto;
     bottom: 10px;
+  }
+
+  .map-controls button {
+    width: 42px;
+    height: 42px;
+    font-size: 1.1rem;
   }
 }
 
@@ -913,6 +921,10 @@ td {
   padding: 28px 40px;
   text-align: center;
   animation: card-land 500ms cubic-bezier(0.2, 0.9, 0.3, 1.25);
+  /* A tall card (duel verdict + standings + medals) must scroll, never clip
+     its buttons off a short phone screen. */
+  max-height: 88vh;
+  overflow-y: auto;
 }
 
 .gameover-card h2 {
@@ -1476,5 +1488,25 @@ input[type='number'] {
   .standings {
     gap: 6px 14px;
     font-size: 0.78rem;
+  }
+}
+
+/* Touch-layout overrides. This block lives at the END of the sheet on
+   purpose: media queries add no specificity, so these must come after the
+   base rules they override or the cascade quietly ignores them. */
+@media (max-width: 640px) {
+  .minimap {
+    bottom: 62px; /* above the control row, never under it */
+  }
+
+  .tabs button {
+    min-height: 40px;
+  }
+
+  .toast-stack {
+    top: auto;
+    bottom: 64px;
+    left: 14px;
+    right: 14px;
   }
 }
