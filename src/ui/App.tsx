@@ -15,6 +15,7 @@ import { ReportCard } from './ReportCard'
 import { RivalsPanel } from './RivalsPanel'
 import { RouteDossier } from './RouteDossier'
 import { RouteSetupDialog } from './RouteSetupDialog'
+import { ACHIEVEMENTS, loadAchievements } from './achievements'
 import {
   clearAllData,
   clearSaveAt,
@@ -233,6 +234,27 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           </div>
         )
       })()}
+      {(() => {
+        const unlocked = loadAchievements()
+        const anyUnlocked = ACHIEVEMENTS.some((a) => unlocked[a.id])
+        if (!anyUnlocked) return null
+        return (
+          <div className="scenario-card" data-testid="achievements">
+            <h2>Achievements</h2>
+            <p className="achievement-row">
+              {ACHIEVEMENTS.map((a) => (
+                <span
+                  key={a.id}
+                  className={`event-chip${unlocked[a.id] ? '' : ' achievement-locked'}`}
+                  title={unlocked[a.id] ? `${a.name} — ${a.desc}` : `locked — ${a.desc}`}
+                >
+                  {a.icon} {unlocked[a.id] ? a.name : '???'}
+                </span>
+              ))}
+            </p>
+          </div>
+        )
+      })()}
       {(savedRows.length > 0 || loadFame().length > 0) && (
         <p className="dim menu-housekeeping">
           <ConfirmButton
@@ -246,9 +268,25 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           />
         </p>
       )}
-      {SCENARIOS.map((s) => (
+      {SCENARIOS.map((s, si) => {
+        // The unlock chain: each era opens when the previous one is WON —
+        // but it's an invitation, not a wall (start anyway, twice).
+        const wonIds = new Set(loadFame().filter((f) => f.won).map((f) => f.scenario))
+        const won = wonIds.has(s.id)
+        const prev = si > 0 ? SCENARIOS[si - 1]! : null
+        const locked = prev !== null && !wonIds.has(prev.id)
+        return (
         <div key={s.id} className="scenario-card">
-          <h2>{s.name}</h2>
+          <h2>
+            {s.name}
+            {won && <span className="pos" title="you have won this era"> ✓</span>}
+            {locked && (
+              <span className="dim" data-testid={`locked-${s.id}`} title={`unlocks when you win ${prev!.name}`}>
+                {' '}
+                🔒
+              </span>
+            )}
+          </h2>
           <p>{s.description}</p>
           <p className="dim scenario-facts">
             {s.startYear}–{s.startYear + Math.floor(s.quarters / 4)} · {s.quarters} quarters · target{' '}
@@ -262,11 +300,15 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
             {(s.eventWeightMult?.['boom'] ?? 1) > 1 && <span className="event-chip">📈 boom era</span>}
             {(s.eventWeightMult?.['conflict'] ?? 1) > 1 && <span className="event-chip">⚠️ unstable regions</span>}
           </p>
-          {overwrites !== null ? (
+          {overwrites !== null || locked ? (
             <ConfirmButton
               data-testid={`start-${s.id}`}
-              label="Start"
-              confirmLabel="all slots full — overwrite your oldest save?"
+              label={locked ? '🔒 Start' : 'Start'}
+              confirmLabel={
+                locked
+                  ? `${prev!.name} not yet won — start anyway?`
+                  : 'all slots full — overwrite your oldest save?'
+              }
               onConfirm={() => startGame(s.id, seed || new Date().toISOString().slice(0, 10), custom())}
             />
           ) : (
@@ -278,7 +320,8 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
             </button>
           )}
         </div>
-      ))}
+        )
+      })}
     </main>
   )
 }

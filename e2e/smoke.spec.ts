@@ -69,6 +69,11 @@ test('routes open via the city panel plan-route flow with a launch schedule', as
 test('every scenario starts from its menu card', async ({ page }) => {
   await page.goto('/')
   await page.getByTestId('seed-input').fill('menu-seed')
+  // Later eras sit behind the unlock chain — an invitation, not a wall:
+  // the locked Start arms a confirm, and a second click goes anyway.
+  await expect(page.getByTestId('locked-open_skies')).toBeVisible()
+  await page.getByTestId('start-open_skies').click()
+  await expect(page.getByTestId('start-open_skies')).toContainText('start anyway')
   await page.getByTestId('start-open_skies').click()
   await expect(page.getByTestId('date')).toHaveText('1995 Q1')
   // The attention strip nudges toward the parked starter fleet.

@@ -266,6 +266,17 @@ button:disabled {
   background: #3a2f18;
 }
 
+.achievement-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.achievement-locked {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
 .scenario-chips {
   display: flex;
   gap: 6px;

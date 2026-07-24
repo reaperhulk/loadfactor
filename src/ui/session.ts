@@ -14,6 +14,7 @@ import {
   type Replay,
 } from '../engine'
 import { getScenario } from '../data/scenarios'
+import { checkAchievements } from './achievements'
 
 export interface Session {
   state: GameState
@@ -219,6 +220,7 @@ export function clearAllData(): void {
   try {
     localStorage.removeItem(FAME_KEY)
     localStorage.removeItem('loadfactor:coach:v1')
+    localStorage.removeItem('loadfactor:achievements:v1')
   } catch {
     // ignore
   }
@@ -256,6 +258,7 @@ export function dispatch(command: Command): GameEvent[] {
   const wasPlanning = session.state.phase === 'planning'
   const { state, events } = applyCommand(session.state, command)
   if (wasPlanning && state.phase !== 'planning') recordFame(state)
+  checkAchievements(state, events)
   session = {
     state,
     lastEvents: events,
