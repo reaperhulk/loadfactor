@@ -19,15 +19,40 @@ const SEEDS = ['alpha', 'beta', 'gamma', 'delta', 'epsilon']
 const runawayCap = (scenario: string): number => 10 * getScenario(scenario).targetNetWorth
 
 describe('balance envelope', () => {
-  it('the greedy bot survives the window and wins the race on every pinned seed', () => {
+  // Survival is the floor contract: a competent operator always reaches the
+  // deadline with a real network and without printing money. WINNING is
+  // pinned per seed below — since F1 the field fights back, so a close loss
+  // on a hostile seed is a feature, not a regression.
+  it('the greedy bot survives the full window on every jet_age seed', () => {
     for (const seed of SEEDS) {
       const result = runCareer('jet_age', seed, 'greedy', 80)
       expect(result.summary.turn, `${seed}: reached the 1980 deadline`).toBe(80)
-      expect(result.summary.phase, `${seed}: finished #1 with the target met`).toBe('won')
       expect(result.summary.routes, `${seed}: built a network`).toBeGreaterThanOrEqual(3)
       expect(result.summary.netWorth, `${seed}: no runaway money printer`).toBeLessThan(
         runawayCap('jet_age'),
       )
+    }
+  })
+
+  // Drama contract (F1): the race must still be live deep into the era. A
+  // rival field that dies by the midpoint is the failure mode this whole
+  // package exists to prevent — probes showed every rival bankrupt by
+  // quarter 30 of 80 before it.
+  it('the rival field survives to the deadline', () => {
+    for (const [scenario, quarters] of [
+      ['jet_age', 80],
+      ['lcc_wars', 60],
+    ] as const) {
+      for (const seed of ['alpha', 'beta', 'gamma']) {
+        const result = runCareer(scenario, seed, 'greedy', quarters)
+        const liveRivals = result.state.airlines.filter((a) => a.id !== 0 && !a.bankrupt).length
+        expect(liveRivals, `${scenario}/${seed}: someone is still racing at the deadline`).toBeGreaterThanOrEqual(1)
+        // Seats are recycled, never accumulated — the field stays the size
+        // the scenario intended.
+        expect(result.state.airlines.length, `${scenario}/${seed}: field size bounded`).toBeLessThanOrEqual(
+          getScenario(scenario).rivals.length + 1,
+        )
+      }
     }
   })
 
@@ -41,15 +66,16 @@ describe('balance envelope', () => {
     wins: readonly string[]
     competitive: readonly string[]
   }[] = [
-    // Re-derived after V3 (one shared strategy brain for bot AND rivals —
-    // smarter rivals shuffled every race). Excluded as brutal-world seeds,
-    // where every airline stalls or the start is structurally hostile:
-    // oil_crisis theta pins competitive; deregulation/alpha (the western
-    // b767 box) and open_skies/gamma are unpinned entirely.
-    { scenario: 'oil_crisis', quarters: 60, wins: ['alpha', 'beta', 'gamma'], competitive: ['theta'] },
-    { scenario: 'deregulation', quarters: 60, wins: ['beta', 'gamma'], competitive: [] },
-    { scenario: 'open_skies', quarters: 60, wins: ['theta'], competitive: ['alpha', 'beta'] },
-    { scenario: 'lcc_wars', quarters: 60, wins: ['alpha', 'beta', 'gamma'], competitive: [] },
+    // Re-derived after F1 (restructuring rivals, new entrants, dominance
+    // scrutiny, and a third Jet Age carrier). The bot no longer sweeps every
+    // seed — the seeds it loses it loses CLOSE, which is the point.
+    { scenario: 'jet_age', quarters: 80, wins: ['beta', 'gamma', 'delta', 'epsilon'], competitive: ['alpha'] },
+    { scenario: 'oil_crisis', quarters: 60, wins: ['beta', 'gamma'], competitive: ['alpha'] },
+    { scenario: 'deregulation', quarters: 60, wins: ['gamma'], competitive: ['beta'] },
+    { scenario: 'open_skies', quarters: 60, wins: ['theta'], competitive: ['beta'] },
+    // lcc_wars/gamma joins the brutal-world exclusions: a price-war field
+    // that consolidates early leaves the bot at ~30% of the leader.
+    { scenario: 'lcc_wars', quarters: 60, wins: ['alpha', 'beta'], competitive: [] },
   ]
 
   for (const era of ERA_PINS) {

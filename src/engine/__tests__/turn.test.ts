@@ -12,7 +12,9 @@ describe('quarter resolution', () => {
   it('advances the turn and emits a report per airline', () => {
     const { state, events } = applyCommand(newGame('jet_age', 'turn-seed'), { type: 'end_quarter' })
     expect(state.turn).toBe(1)
-    expect(events.filter((e) => e.type === 'quarter_report')).toHaveLength(3)
+    // One report per airline in the field — read from the state rather than
+    // hardcoded, since scenarios set their own field size.
+    expect(events.filter((e) => e.type === 'quarter_report')).toHaveLength(state.airlines.length)
   })
 
   it('the accounting reconciles: cash delta equals profit minus principal amortized', () => {

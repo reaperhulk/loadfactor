@@ -170,6 +170,38 @@ export const DEBT_LTV_BP = 6000
 export const DEBT_BASE_ALLOWANCE = 20000 // $k
 // Defeat: cash below zero at quarter end this many consecutive quarters.
 export const INSOLVENCY_QUARTERS_TO_FAIL = 2
+// A failing RIVAL restructures instead of liquidating, up to this many times:
+// creditors take the loss, the fleet and network shrink to a survivable core,
+// and the airline keeps racing. Only after the last chance does it die. A
+// race with nobody left in it is not a race (probes showed every rival
+// bankrupt by quarter 30 of 80).
+export const RESTRUCTURE_MAX = 2
+export const RESTRUCTURE_CASH_K = 9000 // survival capital injected, $k (inflated at use)
+export const RESTRUCTURE_KEEP_ROUTES = 3
+export const RESTRUCTURE_KEEP_FLEET = 3
+// An empty seat draws a new entrant on this cadence — the industry never
+// stays a one-airline world.
+export const ENTRANT_EVERY_QUARTERS = 6
+// A freshly capitalized entrant is not a distressed asset: it cannot be
+// bought for this many quarters. Without the grace period a respawning field
+// becomes a takeover farm for whoever is already winning.
+export const ENTRANT_GRACE_QUARTERS = 8
+// Market dominance draws regulatory scrutiny: above this share of industry
+// seats, an airline's overhead climbs with its excess share. Applies to
+// everyone, player included — the anti-runaway force that is also the
+// thematically honest one (regulators hate monopolies).
+// Dominance is measured against FAIR SHARE, not an absolute number: with
+// three airlines parity is 33%, so a flat 40% threshold taxes whoever is
+// merely ahead. Scrutiny starts at this multiple of parity (1.8x) — 60% in a
+// three-way race, 45% in a four-way.
+export const DOMINANCE_PARITY_MULT_BP = 18000
+// Charged against REVENUE (not overhead) so it scales with the airline it is
+// restraining rather than being rounding error to a monopolist.
+export const DOMINANCE_SCRUTINY_BP = 5000
+// Hard ceiling on the charge: scrutiny is a drag on dominance, never a
+// death sentence. The reference bot cannot perceive this mechanic, so an
+// uncapped version reads as pure punishment in the balance envelope.
+export const DOMINANCE_SCRUTINY_MAX_BP = 600
 
 // --- Slots & negotiations ---
 // Base negotiation difficulty scales with how attractive the city is:

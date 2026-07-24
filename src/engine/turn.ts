@@ -2,7 +2,8 @@
 // movement in this file flows through the quarterly P&L so the accounting test
 // can reconcile reported profit against the actual cash delta.
 
-import { AIRCRAFT, getAircraftType } from '../data/aircraft'
+import { AIRCRAFT, getAircraftType, typesOnSale } from '../data/aircraft'
+import { CITIES } from '../data/cities'
 import {
   AIRCRAFT_ADMIN_PER_QUARTER,
   AIRLINE_OVERHEAD_PER_QUARTER,
@@ -19,13 +20,22 @@ import {
   USED_MARGIN_BP,
   USED_OFFERS_PER_QUARTER,
   LOAN_AMORT_BP,
+  DOMINANCE_PARITY_MULT_BP,
+  DOMINANCE_SCRUTINY_BP,
+  DOMINANCE_SCRUTINY_MAX_BP,
+  ENTRANT_EVERY_QUARTERS,
+  RESTRUCTURE_CASH_K,
+  RESTRUCTURE_KEEP_FLEET,
+  RESTRUCTURE_KEEP_ROUTES,
+  RESTRUCTURE_MAX,
 } from '../data/constants'
-import { fnv1a } from './rng'
+import { fnv1a, nextInt } from './rng'
 import { getScenario } from '../data/scenarios'
 import { inflationBp, resolveMarket } from './market'
-import { resaleValue, slotCities, slotsFree } from './queries'
+import { resaleValue, routeWeeklyCapacity, slotCities, slotsFree, totalDebt } from './queries'
 import { resolveNegotiations } from './negotiation'
 import { netWorth, yearOf } from './queries'
+import { deriveFootholds } from './newGame'
 import { runRivalTurn } from './rivals'
 import type { Airline, EngineResult, GameEvent, GameState } from './types'
 import { updateWorld } from './worldEvents'
@@ -57,6 +67,130 @@ function liquidate(airline: Airline): void {
   airline.slots = {}
   airline.cash = 0
 }
+
+// Chapter 11, not the graveyard: creditors eat the debt, the fleet and
+// network shrink to a survivable core, and fresh capital arrives. The
+// airline keeps its slots and its seat in the race — weakened, not deleted.
+function restructure(airline: Airline, turn: number): GameEvent {
+  // Creditors take a haircut — half the principal, not a free clean slate.
+  // A rival that fails must come back weaker than the airlines that never
+  // did, or failure becomes the cheapest way to finance an airline.
+  const debtBefore = totalDebt(airline)
+  for (const loan of airline.loans) loan.principal = Math.floor(loan.principal / 2)
+  airline.loans = airline.loans.filter((l) => l.principal > 0)
+  const debtWiped = debtBefore - totalDebt(airline)
+  airline.orders = []
+  airline.negotiations = []
+  // Keep the best routes by last quarter's profit; the rest close.
+  const ranked = [...airline.routes].sort(
+    (a, b) => b.lastRevenue - b.lastCost - (a.lastRevenue - a.lastCost) || a.id - b.id,
+  )
+  const keptRoutes = ranked.slice(0, RESTRUCTURE_KEEP_ROUTES)
+  const keptRouteIds = new Set(keptRoutes.map((r) => r.id))
+  const routesClosed = airline.routes.length - keptRoutes.length
+  // Keep the youngest metal, and only what the surviving network can fly.
+  const keptFleet = [...airline.fleet]
+    .sort((a, b) => a.ageQuarters - b.ageQuarters || a.id - b.id)
+    .slice(0, RESTRUCTURE_KEEP_FLEET)
+  const fleetSold = airline.fleet.length - keptFleet.length
+  for (const ac of keptFleet) {
+    if (ac.routeId !== null && !keptRouteIds.has(ac.routeId)) ac.routeId = null
+  }
+  airline.routes = airline.routes.filter((r) => keptRouteIds.has(r.id))
+  airline.fleet = keptFleet
+  airline.cash = Math.max(airline.cash, Math.floor((RESTRUCTURE_CASH_K * inflationBp(turn)) / 10000))
+  airline.insolventQuarters = 0
+  airline.restructures = (airline.restructures ?? 0) + 1
+  airline.fuelHedge = null
+  return { type: 'airline_restructured', airline: airline.id, routesClosed, fleetSold, debtWiped }
+}
+
+// Total weekly seats an airline puts in the air — the industry-share
+// denominator for regulatory scrutiny.
+function fieldedSeats(airline: Airline): number {
+  let seats = 0
+  for (const r of airline.routes) seats += routeWeeklyCapacity(airline, r)
+  return seats
+}
+
+// A late entrant takes an empty seat: era-appropriate capital and metal, a
+// home the incumbents have not claimed, and a personality drawn from the
+// rivals stream. Ids equal the index, so entrants append.
+function admitEntrant(state: GameState, events: GameEvent[]): void {
+  const scenario = getScenario(state.scenario)
+  const taken = new Set(state.airlines.filter((a) => !a.bankrupt).map((a) => a.hq))
+  const home = [...CITIES]
+    .filter((c) => !taken.has(c.id) && c.slotPool >= 14)
+    .sort((a, b) => b.pop * 4 + b.biz * 3 + b.tour * 2 - (a.pop * 4 + a.biz * 3 + a.tour * 2) || (a.id < b.id ? -1 : 1))
+  if (home.length === 0) return
+  const pick = nextInt(state.rng.rivals, 0, Math.min(5, home.length - 1))
+  state.rng.rivals = pick.rng
+  const hq = home[pick.value]!.id
+  const personalities = ['price_war', 'balanced', 'premium', 'fortress'] as const
+  const pdraw = nextInt(state.rng.rivals, 0, personalities.length - 1)
+  state.rng.rivals = pdraw.rng
+  const ndraw = nextInt(state.rng.rivals, 0, ENTRANT_NAMES.length - 1)
+  state.rng.rivals = ndraw.rng
+  const used = new Set(state.airlines.map((a) => a.name))
+  let name = ENTRANT_NAMES[ndraw.value]!
+  for (let i = 0; used.has(name) && i < ENTRANT_NAMES.length; i++) {
+    name = ENTRANT_NAMES[(ndraw.value + i + 1) % ENTRANT_NAMES.length]!
+  }
+  // Era-appropriate metal: the smallest type on sale that can still work.
+  const onSale = typesOnSale(yearOf(state))
+  if (onSale.length === 0) return
+  let metal = onSale[0]!
+  for (const t of onSale) if (t.seats < metal.seats) metal = t
+  // Reuse a liquidated seat when one exists — the field stays the size the
+  // scenario intended instead of accumulating corpses (and the rivals panel,
+  // the race chart, and the state hash stay bounded).
+  const deadSeat = state.airlines.findIndex((a) => a.controller === 'rival' && a.bankrupt)
+  const id = deadSeat >= 0 ? deadSeat : state.airlines.length
+  const airline: Airline = {
+    id,
+    name,
+    controller: 'rival',
+    personality: personalities[pdraw.value]!,
+    hq,
+    // Fresh capital, scaled to the era's opening stake.
+    cash: Math.floor((scenario.player.cash * 12) / 10),
+    loans: [],
+    fleet: [],
+    orders: [],
+    routes: [],
+    slots: { [hq]: 8, ...deriveFootholds(hq) },
+    negotiations: [],
+    slotIdle: {},
+    servedUntil: {},
+    fuelHedge: null,
+    marketing: 0,
+    insolventQuarters: 0,
+    bankrupt: false,
+    history: [],
+    nextId: 1,
+    enteredTurn: state.turn,
+  }
+  for (let i = 0; i < 2; i++) {
+    airline.fleet.push({ id: airline.nextId++, type: metal.id, ageQuarters: 0, routeId: null, leased: false, cabin: 2 })
+  }
+  if (deadSeat >= 0) state.airlines[deadSeat] = airline
+  else state.airlines.push(airline)
+  events.push({ type: 'airline_entered', airline: id, name, hq })
+}
+
+// Startup names for late entrants, drawn deterministically.
+const ENTRANT_NAMES: readonly string[] = [
+  'Skyward',
+  'Vector Air',
+  'Northwind',
+  'Solstice Airways',
+  'Meridian Blue',
+  'Cardinal Air',
+  'Halcyon',
+  'Compass Airlines',
+  'Zephyr Jet',
+  'Aurora Lines',
+]
 
 export function endQuarter(prev: GameState): EngineResult {
   if (prev.phase !== 'planning') return { state: prev, events: [] }
@@ -160,9 +294,34 @@ export function endQuarter(prev: GameState): EngineResult {
         ? Math.floor((type.price * LEASE_BP_PER_QUARTER) / 10000)
         : Math.floor((type.price * OWNERSHIP_BP_PER_QUARTER) / 10000)
     }
-    const overhead = inflate(
+    let overhead = inflate(
       AIRLINE_OVERHEAD_PER_QUARTER + ROUTE_OVERHEAD_QUAD * airline.routes.length * airline.routes.length,
     )
+    // Regulatory scrutiny: past a share of industry seats, dominance costs
+    // real money (compliance, political friction, punitive fees, fare caps).
+    // Charged against REVENUE so it scales with the airline it restrains —
+    // an overhead-based charge is rounding error to a monopolist. Folded into
+    // the overhead bucket so the breakdown still sums exactly to costs.
+    const mySeats = fieldedSeats(airline)
+    if (mySeats > 0) {
+      let industrySeats = 0
+      let liveAirlines = 0
+      for (const a of state.airlines) {
+        industrySeats += fieldedSeats(a)
+        if (!a.bankrupt) liveAirlines++
+      }
+      const shareBp = industrySeats > 0 ? Math.floor((mySeats * 10000) / industrySeats) : 0
+      const parityBp = Math.floor(10000 / Math.max(1, liveAirlines))
+      const thresholdBp = Math.floor((parityBp * DOMINANCE_PARITY_MULT_BP) / 10000)
+      if (shareBp > thresholdBp) {
+        const excessBp = shareBp - thresholdBp
+        const chargeBp = Math.min(
+          DOMINANCE_SCRUTINY_MAX_BP,
+          Math.floor((excessBp * DOMINANCE_SCRUTINY_BP) / 10000),
+        )
+        overhead += Math.floor((t.revenue * chargeBp) / 10000)
+      }
+    }
     // Brand spend: priced per level against network size (see constants).
     const marketing =
       airline.marketing *
@@ -237,8 +396,13 @@ export function endQuarter(prev: GameState): EngineResult {
     })
 
     if (airline.insolventQuarters >= INSOLVENCY_QUARTERS_TO_FAIL) {
-      events.push({ type: 'airline_bankrupt', airline: airline.id })
-      if (airline.controller === 'rival') liquidate(airline)
+      if (airline.controller === 'rival' && (airline.restructures ?? 0) < RESTRUCTURE_MAX) {
+        // A rival gets its chapter-11 rounds before the receivers arrive.
+        events.push(restructure(airline, state.turn))
+      } else {
+        events.push({ type: 'airline_bankrupt', airline: airline.id })
+        if (airline.controller === 'rival') liquidate(airline)
+      }
     }
   }
 
@@ -267,6 +431,18 @@ export function endQuarter(prev: GameState): EngineResult {
     for (const city of Object.keys(airline.slotIdle).sort()) {
       if ((airline.slots[city] ?? 0) <= 0) delete airline.slotIdle[city]
     }
+  }
+
+  // 9. New entrants: an empty seat draws fresh capital on a fixed cadence, so
+  // the map never becomes a one-airline world. Capped at the scenario's
+  // intended field size.
+  const liveRivals = state.airlines.filter((a) => a.controller === 'rival' && !a.bankrupt).length
+  if (
+    liveRivals < getScenario(state.scenario).rivals.length &&
+    state.turn > 0 &&
+    state.turn % ENTRANT_EVERY_QUARTERS === 0
+  ) {
+    admitEntrant(state, events)
   }
 
   // Victory / defeat, then advance the clock. The scenario is a race over a

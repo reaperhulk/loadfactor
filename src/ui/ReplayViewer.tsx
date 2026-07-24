@@ -176,11 +176,17 @@ export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () =>
       {index >= 2 && (
         <div className="replay-chart" data-testid="replay-chart">
           <RaceChart
-            series={state.airlines.map((a, i) => ({
-              label: a.name,
-              points: a.history.map((h) => h.netWorth),
-              className: i === 0 ? 'race-me' : `race-rival-${i}`,
-            }))}
+            series={(() => {
+              const span = Math.max(...state.airlines.map((a) => a.history.length), 0)
+              return state.airlines.map((a, i) => {
+                const own = a.history.map((h) => h.netWorth)
+                return {
+                  label: a.name,
+                  points: [...Array<number>(Math.max(0, span - own.length)).fill(0), ...own],
+                  className: i === 0 ? 'race-me' : `race-rival-${i}`,
+                }
+              })
+            })()}
           />
         </div>
       )}

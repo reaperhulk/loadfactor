@@ -142,6 +142,18 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
         }
         break
       }
+      case 'airline_restructured': {
+        const who = state?.airlines[e.airline]?.name ?? 'A rival'
+        out.push({
+          kind: 'event',
+          icon: '⚖️',
+          text: `${who} restructured — creditors take a haircut, ${e.routesClosed} routes cut`,
+        })
+        break
+      }
+      case 'airline_entered':
+        out.push({ kind: 'event', icon: '🚀', text: `${e.name} enters the market from ${e.hq}` })
+        break
       case 'game_over':
         out.push(
           e.result === 'won'

@@ -177,7 +177,7 @@ test('the quarterly report reflects the resolved quarter', async ({ page }) => {
   // The finance tab attributes every cost dollar, and the HUD shows the race.
   await page.getByTestId('tab-finance').click()
   await expect(page.getByTestId('cost-structure')).toContainText('Fuel')
-  await expect(page.getByTestId('rank')).toContainText('/3')
+  await expect(page.getByTestId('rank')).toContainText(/#\d+\/\d+/)
   const loadFactor = await page.evaluate(
     () => window.__harness.getState()!.airlines[0]!.routes[0]!.lastLoadFactorBp,
   )
@@ -643,4 +643,36 @@ test('the share loop closes: copy feedback, duel HUD, and preserved careers', as
   await page.getByTestId('replay-speed').click()
   await expect(page.getByTestId('replay-headlines')).toContainText('🕯️', { timeout: 30000 })
   await page.getByTestId('replay-exit').click()
+})
+
+test('the race stays a race: bounded field, scrutiny surfaced, rules explained', async ({ page }) => {
+  await startGame(page)
+  // Keep the airline flying so the career survives to the assertions.
+  const field = await page.evaluate(() => {
+    const snap = window.__harness.getState()!
+    const before = snap.airlines.length
+    const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
+    const s2 = window.__harness.getState()!
+    const routeId = s2.airlines[0]!.routes[0]!.id
+    for (const ac of s2.airlines[0]!.fleet) {
+      window.__harness.dispatch({ type: 'assign_aircraft', aircraftId: ac.id, routeId })
+    }
+    // A single route is a thin business in the post-F1 world — run far enough
+    // to exercise the field mechanics, not far enough to go under.
+    for (let i = 0; i < 8 && window.__harness.getState()!.phase === 'planning'; i++) {
+      window.__harness.endQuarter()
+    }
+    const after = window.__harness.getState()!
+    return { before, after: after.airlines.length, phase: after.phase }
+  })
+  expect(field.phase).toBe('planning')
+  // Seats are recycled, never appended: the field stays the intended size no
+  // matter how many carriers fail and how many startups arrive.
+  expect(field.after).toBe(field.before)
+  // Dominance has a visible price, and the rivalry rules are explained where
+  // the player meets them.
+  await page.getByTestId('tab-finance').click()
+  await expect(page.getByTestId('scrutiny-note')).toContainText('scrutiny starts at')
+  await expect(page.getByTestId('rivalry-legend')).toBeAttached()
 })

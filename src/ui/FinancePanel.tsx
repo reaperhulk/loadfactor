@@ -3,6 +3,9 @@
 
 import { useState } from 'react'
 import {
+  DOMINANCE_PARITY_MULT_BP,
+  DOMINANCE_SCRUTINY_BP,
+  DOMINANCE_SCRUTINY_MAX_BP,
   HEDGE_MAX_QUARTERS,
   HEDGE_MIN_QUARTERS,
   HEDGE_PREMIUM_PER_AIRCRAFT,
@@ -12,8 +15,8 @@ import {
 } from '../data/constants'
 import type { CostBreakdown, GameState } from '../engine'
 import { inflationBp } from '../engine/market'
-import { currentLoanRateBp, debtCeiling, totalDebt } from '../engine/queries'
-import { HedgeLegend, MarketingLegend } from './legends'
+import { currentLoanRateBp, debtCeiling, routeWeeklyCapacity, totalDebt } from '../engine/queries'
+import { HedgeLegend, MarketingLegend, RivalryLegend } from './legends'
 import { Sparkline } from './Sparkline'
 import { dispatch } from './session'
 import { COST_LABELS, money } from './format'
@@ -249,6 +252,42 @@ export function FinancePanel({ state }: { state: GameState }) {
           +{(MARKETING_WEIGHT_BP_PER_LEVEL / 100).toFixed(0)}% appeal per level on every pair
         </span>
       </div>
+      {(() => {
+        // Where the player sits against regulatory scrutiny right now.
+        const seatsOf = (a: (typeof state.airlines)[number]): number => {
+          let n = 0
+          for (const r of a.routes) n += routeWeeklyCapacity(a, r)
+          return n
+        }
+        const mine = seatsOf(player)
+        let industry = 0
+        let live = 0
+        for (const a of state.airlines) {
+          industry += seatsOf(a)
+          if (!a.bankrupt) live++
+        }
+        if (industry === 0 || mine === 0) return null
+        const shareBp = Math.floor((mine * 10000) / industry)
+        const thresholdBp = Math.floor(
+          (Math.floor(10000 / Math.max(1, live)) * DOMINANCE_PARITY_MULT_BP) / 10000,
+        )
+        const over = shareBp > thresholdBp
+        return (
+          <p className={over ? 'neg' : 'dim'} data-testid="scrutiny-note">
+            Market share {(shareBp / 100).toFixed(0)}% of industry seats — scrutiny starts at{' '}
+            {(thresholdBp / 100).toFixed(0)}%
+            {over
+              ? ` · regulators are charging you ${(
+                  Math.min(
+                    DOMINANCE_SCRUTINY_MAX_BP,
+                    Math.floor(((shareBp - thresholdBp) * DOMINANCE_SCRUTINY_BP) / 10000),
+                  ) / 100
+                ).toFixed(2)}% of revenue`
+              : ' · clear for now'}
+          </p>
+        )
+      })()}
+      <RivalryLegend />
       <MarketingLegend />
       <HedgeLegend />
       <label>

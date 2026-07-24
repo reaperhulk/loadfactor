@@ -35,6 +35,10 @@ function describeEvent(state: GameState, e: GameEvent): string | null {
       return `World: ${e.eventId.replace('_', ' ')} ended`
     case 'airline_bankrupt':
       return `${name(e.airline)} went bankrupt`
+    case 'airline_restructured':
+      return `${name(e.airline)} restructured — ${money(e.debtWiped)} of debt written off, ${e.routesClosed} routes closed, ${e.fleetSold} aircraft sold`
+    case 'airline_entered':
+      return `${e.name} enters the market from ${e.hq}`
     case 'quarter_report':
       return e.airline === 0
         ? `Quarter closed: revenue ${money(e.revenue)}, profit ${money(e.profit)}, net worth ${money(e.netWorth)}`
@@ -75,6 +79,8 @@ function eventSection(e: GameEvent): LogFilter {
     case 'world_event_started':
     case 'world_event_ended':
     case 'airline_bankrupt':
+    case 'airline_restructured':
+    case 'airline_entered':
     case 'rival_acquired':
       return 'world'
     default:

@@ -142,6 +142,8 @@ export interface Airline {
   bankrupt: boolean
   history: QuarterStats[]
   nextId: number // shared id counter for aircraft/orders/routes/loans
+  restructures?: number // rivals only: chapter-11 rounds used (see RESTRUCTURE_MAX)
+  enteredTurn?: number // set on late entrants; absent for founding airlines
 }
 
 export interface ActiveEvent {
@@ -259,6 +261,8 @@ export type GameEvent =
       breakdown: CostBreakdown
     }
   | { type: 'airline_bankrupt'; airline: number }
+  | { type: 'airline_restructured'; airline: number; routesClosed: number; fleetSold: number; debtWiped: number }
+  | { type: 'airline_entered'; airline: number; name: string; hq: string }
   | { type: 'game_over'; result: 'won' | 'lost'; reason: string }
 
 export interface EngineResult {

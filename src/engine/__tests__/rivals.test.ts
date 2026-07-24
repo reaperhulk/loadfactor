@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { CITIES, getCity } from '../../data/cities'
+import {
+  ENTRANT_EVERY_QUARTERS,
+  INSOLVENCY_QUARTERS_TO_FAIL,
+  RESTRUCTURE_MAX,
+} from '../../data/constants'
 import { applyCommand, newGame, type GameEvent } from '../index'
 import { negotiationCommands, yieldCommands } from '../policy'
 import { pairWeeklySeats, routeWeeklyCapacity } from '../queries'
@@ -115,5 +120,88 @@ describe('rival intelligence', () => {
       expect(getCity(home[0]!.city).region).toBe(getCity(opened.airlines[0]!.hq).region)
     }
     expect(roam).toHaveLength(1)
+  })
+})
+
+describe('a field that fights back (F1)', () => {
+  it('a failing rival restructures instead of dying, then dies when the chances run out', () => {
+    let state = newGame('jet_age', 'restructure-seed')
+    const rival = state.airlines[1]!
+    rival.routes.push({
+      id: rival.nextId++,
+      from: 'LHR',
+      to: 'JFK',
+      fareLevel: 0,
+      serviceLevel: 2,
+      frequency: 5,
+      lastPax: 0,
+      lastCapacity: 0,
+      lastLoadFactorBp: 0,
+      lastRevenue: 0,
+      lastCost: 0,
+      lastTransferPax: 0,
+      history: [],
+    })
+    rival.loans.push({ id: rival.nextId++, principal: 30_000, annualRateBp: 900 })
+
+    // Drive it under water repeatedly; each failure should restructure first.
+    // The hole has to be unfixable: resolution recomputes solvency AFTER the
+    // rival's own turn, so a shallow deficit just gets borrowed away.
+    const seen: string[] = []
+    for (let round = 0; round < RESTRUCTURE_MAX + 1; round++) {
+      const target = state.airlines[1]!
+      target.cash = -50_000_000
+      target.insolventQuarters = INSOLVENCY_QUARTERS_TO_FAIL - 1
+      // Keep the other RIVALS too poor to rescue it: a distressed airline is
+      // a consolidation target, and an acquisition would end it before
+      // restructuring ever got its turn. The player seat stays funded — a
+      // broke player ends the whole game before the third round lands.
+      for (const other of state.airlines) if (other.id !== 0 && other.id !== 1) other.cash = 0
+      state.airlines[0]!.cash = 500_000
+      const r = applyCommand(state, { type: 'end_quarter' })
+      state = r.state
+      for (const e of r.events) {
+        if (e.type === 'airline_restructured' && e.airline === 1) seen.push('restructured')
+        if (e.type === 'airline_bankrupt' && e.airline === 1) seen.push('bankrupt')
+      }
+    }
+    expect(seen.filter((s) => s === 'restructured')).toHaveLength(RESTRUCTURE_MAX)
+    expect(seen).toContain('bankrupt')
+    // Restructuring is a haircut, not a gift: debt is halved, not erased.
+    expect(state.airlines[1]!.restructures).toBe(RESTRUCTURE_MAX)
+  })
+
+  it('an empty seat draws a new entrant instead of leaving a one-airline world', () => {
+    let state = newGame('jet_age', 'entrant-seed')
+    const founders = state.airlines.length
+    // Kill a rival outright (past its restructuring chances).
+    state.airlines[1]!.restructures = RESTRUCTURE_MAX
+    state.airlines[1]!.cash = -50_000_000
+    state.airlines[1]!.insolventQuarters = INSOLVENCY_QUARTERS_TO_FAIL - 1
+    state = applyCommand(state, { type: 'end_quarter' }).state
+    expect(state.airlines[1]!.bankrupt).toBe(true)
+
+    let entered: { name: string; hq: string } | null = null
+    for (let q = 0; q < ENTRANT_EVERY_QUARTERS * 2 && entered === null; q++) {
+      const r = applyCommand(state, { type: 'end_quarter' })
+      state = r.state
+      for (const e of r.events) if (e.type === 'airline_entered') entered = { name: e.name, hq: e.hq }
+    }
+    expect(entered, 'a new carrier took the empty seat').not.toBeNull()
+    // The seat is RECYCLED — the field never accumulates corpses.
+    expect(state.airlines).toHaveLength(founders)
+    expect(state.airlines[1]!.bankrupt).toBe(false)
+    expect(state.airlines[1]!.name).toBe(entered!.name)
+    expect(state.airlines[1]!.enteredTurn).toBeGreaterThan(0)
+  })
+
+  it('the player is never restructured — bankruptcy still ends the career', () => {
+    let state = newGame('jet_age', 'player-death-seed')
+    state.airlines[0]!.cash = -50_000_000
+    state.airlines[0]!.insolventQuarters = INSOLVENCY_QUARTERS_TO_FAIL - 1
+    const r = applyCommand(state, { type: 'end_quarter' })
+    state = r.state
+    expect(r.events.some((e) => e.type === 'airline_restructured' && e.airline === 0)).toBe(false)
+    expect(state.phase).toBe('lost')
   })
 })

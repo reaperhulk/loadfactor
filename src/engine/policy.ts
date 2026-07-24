@@ -16,6 +16,7 @@ import {
   NEG_MIN_SPEND,
   ROUTE_MEMORY_QUARTERS,
   ROUTE_SPOOL_BP,
+  ENTRANT_GRACE_QUARTERS,
   TAKEOVER_BASE_K,
   TAKEOVER_PREMIUM_BP,
 } from '../data/constants'
@@ -262,10 +263,15 @@ export function takeoverCommands(
   for (const other of state.airlines) {
     if (other.id === idx || other.bankrupt) continue
     if (idx !== 0 && other.controller === 'player') continue // engine rejects it anyway
+    // A newly capitalized entrant is not a distressed asset.
+    if (other.enteredTurn !== undefined && state.turn - other.enteredTurn < ENTRANT_GRACE_QUARTERS) continue
     const worth = netWorth(other)
+    // Small is not the same as failing: the size clause needs actual weakness
+    // beside it, or a respawning field becomes a takeover farm for the leader.
+    const lastProfit = other.history[other.history.length - 1]?.profit ?? 0
     const distressed = rescueOnly
       ? other.insolventQuarters >= 1
-      : other.insolventQuarters >= 1 || worth * 4 <= netWorth(airline)
+      : other.insolventQuarters >= 1 || (worth * 4 <= netWorth(airline) && lastProfit <= 0)
     if (!distressed || other.routes.length < 2) continue
     const price = Math.max(TAKEOVER_BASE_K, Math.floor((Math.max(0, worth) * TAKEOVER_PREMIUM_BP) / 10000))
     if (airline.cash >= price + buffer * 2) {

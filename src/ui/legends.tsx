@@ -12,6 +12,10 @@ import {
   CONNECT_DETOUR_MAX_BP,
   CONNECT_FARE_DISCOUNT_BP,
   CONNECT_WILLING_BP,
+  DOMINANCE_PARITY_MULT_BP,
+  DOMINANCE_SCRUTINY_MAX_BP,
+  ENTRANT_EVERY_QUARTERS,
+  RESTRUCTURE_MAX,
   HEDGE_MAX_QUARTERS,
   HEDGE_MIN_QUARTERS,
   HEDGE_PREMIUM_PER_AIRCRAFT,
@@ -233,6 +237,31 @@ export function TakeoverLegend() {
       <p className="hint">
         Loans amortize at {LOAN_AMORT_BP / 100}% of principal a quarter, so an acquired debt pile
         keeps draining cash long after the deal closes — price that in.
+      </p>
+    </details>
+  )
+}
+
+export function RivalryLegend() {
+  return (
+    <details className="game-legend" data-testid="rivalry-legend">
+      <summary className="dim">Who am I actually racing?</summary>
+      <p className="dim">
+        Airlines do not simply die. A failing rival restructures up to{' '}
+        {RESTRUCTURE_MAX} times — creditors take a haircut, the network shrinks to its best routes,
+        and it keeps racing weakened. Only after that does it liquidate, and an empty seat draws a
+        brand-new carrier within a few quarters (checked every {ENTRANT_EVERY_QUARTERS}). Freshly
+        capitalized entrants cannot be bought straight off the runway.
+      </p>
+      <p className="dim">
+        And dominance has a price: hold more than{' '}
+        {(DOMINANCE_PARITY_MULT_BP / 100).toFixed(0)}% of your fair share of industry seats and
+        regulators start charging for it — up to {(DOMINANCE_SCRUTINY_MAX_BP / 100).toFixed(0)}% of
+        revenue at full monopoly. It applies to every airline, you included.
+      </p>
+      <p className="hint">
+        The practical read: you cannot win by killing the field and coasting. Something will always
+        be coming up behind you.
       </p>
     </details>
   )

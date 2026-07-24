@@ -166,11 +166,20 @@ const RACE_METRICS = [
 
 export function RivalsPanel({ state }: { state: GameState }) {
   const [metric, setMetric] = useState<(typeof RACE_METRICS)[number]['key']>('netWorth')
-  const series = state.airlines.map((a, i) => ({
-    label: a.name,
-    points: a.history.map((h) => h[metric]),
-    className: i === 0 ? 'race-me' : `race-rival-${i}`,
-  }))
+  // Late entrants have shorter histories than the founders. The chart spaces
+  // points by index, so pad on the left with zeros — every series then shares
+  // one time axis, and an entrant's line correctly starts at the quarter it
+  // arrived rather than being stretched across the whole era.
+  const span = Math.max(...state.airlines.map((a) => a.history.length), 0)
+  const series = state.airlines.map((a, i) => {
+    const own = a.history.map((h) => h[metric])
+    const pad = Array<number>(Math.max(0, span - own.length)).fill(0)
+    return {
+      label: a.name,
+      points: [...pad, ...own],
+      className: i === 0 ? 'race-me' : `race-rival-${i}`,
+    }
+  })
   const mySeats = fieldedSeats(state.airlines[0]!)
 
   return (
