@@ -22,6 +22,7 @@ import {
   exportSave,
   importSave,
   dispatch,
+  getChallengeTarget,
   getPlayerColor,
   getReplay,
   getSession,
@@ -58,14 +59,21 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
     color: color !== LIVERY_COLORS[0] ? color : undefined,
   })
   // A challenge link carries (scenario, seed) in the URL — determinism makes
-  // the same seed the same world for everyone who opens it.
+  // the same seed the same world for everyone who opens it. `target`/`by`
+  // upgrade it to a duel: the challenger's net worth is the number to beat.
   const challenge = (() => {
     const params = new URLSearchParams(window.location.search)
     const scenario = params.get('scenario')
     const chSeed = params.get('seed')
     if (!scenario || !chSeed) return null
+    const rawTarget = Number.parseInt(params.get('target') ?? '', 10)
+    const by = params.get('by')?.trim() || undefined
     try {
-      return { scenario: getScenario(scenario), seed: chSeed }
+      return {
+        scenario: getScenario(scenario),
+        seed: chSeed,
+        duel: Number.isFinite(rawTarget) && rawTarget > 0 ? { worth: rawTarget, by } : null,
+      }
     } catch {
       return null
     }
@@ -78,14 +86,21 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
         <div className="scenario-card continue-card" data-testid="challenge-card">
           <h2>⚔ Challenge accepted?</h2>
           <p className="dim">
-            {challenge.scenario.name} · seed “{challenge.seed}” — same seed, same world. Beat their net
-            worth.
+            {challenge.scenario.name} · seed “{challenge.seed}” — same seed, same world.{' '}
+            {challenge.duel ? (
+              <span data-testid="duel-target">
+                Beat {challenge.duel.by ? <strong>{challenge.duel.by}</strong> : 'their'}{' '}
+                <strong className="pos">{money(challenge.duel.worth)}</strong> before the deadline.
+              </span>
+            ) : (
+              'Beat their net worth.'
+            )}
           </p>
           <button
             data-testid="start-challenge"
             onClick={() => {
               window.history.replaceState(null, '', window.location.pathname)
-              startGame(challenge.scenario.id, challenge.seed, custom())
+              startGame(challenge.scenario.id, challenge.seed, custom(), challenge.duel ?? undefined)
             }}
           >
             ▶ Fly the challenge
@@ -414,6 +429,21 @@ function GameOverOverlay({
         <h2 className={state.phase === 'won' ? 'pos' : 'neg'}>
           {state.phase === 'won' ? '🏆 VICTORY' : 'DEFEAT'}
         </h2>
+        {(() => {
+          // The duel verdict: a career started from a challenge link is
+          // scored against the challenger's number, win or lose the race.
+          const duel = getChallengeTarget()
+          if (!duel) return null
+          const mine = me.history[me.history.length - 1]?.netWorth ?? 0
+          const beat = mine > duel.worth
+          return (
+            <p className={beat ? 'pos' : 'neg'} data-testid="duel-verdict">
+              {beat
+                ? `⚔ Duel won — you beat ${duel.by ?? 'the challenger'}'s ${money(duel.worth)} with ${money(mine)}`
+                : `⚔ Duel lost — ${duel.by ?? 'the challenger'}'s ${money(duel.worth)} stood against your ${money(mine)}`}
+            </p>
+          )
+        })()}
         {state.phase === 'won' &&
           (() => {
             const idx = SCENARIOS.findIndex((s) => s.id === state.scenario)
@@ -593,9 +623,14 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           title="copy a challenge link — same scenario, same seed, same world for whoever opens it"
           aria-label="copy challenge link"
           onClick={() => {
-            const url = `${window.location.origin}${window.location.pathname}?scenario=${encodeURIComponent(
-              state.scenario,
-            )}&seed=${encodeURIComponent(state.seed)}`
+            // The link carries your current net worth as the number to beat —
+            // sharing mid-career throws down where you stand right now.
+            const me = state.airlines[0]!
+            const url =
+              `${window.location.origin}${window.location.pathname}?scenario=${encodeURIComponent(
+                state.scenario,
+              )}&seed=${encodeURIComponent(state.seed)}` +
+              `&target=${netWorth(me)}&by=${encodeURIComponent(me.name)}`
             void navigator.clipboard?.writeText(url)
           }}
         >

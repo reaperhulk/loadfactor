@@ -652,6 +652,19 @@ button.toast {
   fill: #d8a052;
 }
 
+/* The duel ghost: the challenger's number to beat, haunting the race chart. */
+.race-target-line {
+  stroke: #ffd166;
+  stroke-width: 1;
+  stroke-dasharray: 6 4;
+  opacity: 0.75;
+}
+.race-target-label {
+  fill: #ffd166;
+  font-size: 8px;
+  stroke: none;
+}
+
 .game-legend {
   margin: 8px 0;
   font-size: 0.85rem;

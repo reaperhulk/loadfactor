@@ -37,6 +37,19 @@ interface SaveV1 extends Replay {
   version: 1
   color?: string
   savedAt?: number // wall-clock ms, presentation only (slot ordering/labels)
+  challenge?: ChallengeTarget // the duel this career was started against
+}
+
+// A challenge link can carry the challenger's net worth — the number to beat.
+export interface ChallengeTarget {
+  worth: number // $k
+  by?: string // challenger's airline name
+}
+
+let challengeTarget: ChallengeTarget | null = null
+
+export function getChallengeTarget(): ChallengeTarget | null {
+  return challengeTarget
 }
 
 // The player's chosen livery color (a CSS color), applied as the accent.
@@ -57,6 +70,7 @@ function persist(): void {
     seed: session.state.seed,
     player: sessionPlayer ?? undefined,
     color: playerColor ?? undefined,
+    challenge: challengeTarget ?? undefined,
     savedAt: Date.now(),
     commands: session.commandLog,
   }
@@ -123,6 +137,7 @@ export function resumeSave(slot = 0): boolean {
   activeSlot = slot
   sessionPlayer = save.player ?? null
   playerColor = save.color ?? null
+  challengeTarget = save.challenge ?? null
   const { state } = runReplay(save)
   // Recover the last quarter's report so the Report panel isn't empty on resume.
   let lastEnd = -1
@@ -164,6 +179,7 @@ export function startGame(
   scenarioId: string,
   seed: string,
   custom?: PlayerSetup & { color?: string },
+  challenge?: ChallengeTarget,
 ): void {
   const player: PlayerSetup | null =
     custom && (custom.name !== undefined || custom.hq !== undefined)
@@ -171,6 +187,7 @@ export function startGame(
       : null
   sessionPlayer = player
   playerColor = custom?.color ?? null
+  challengeTarget = challenge ?? null
   activeSlot = nextFreeSlot().slot
   session = {
     state: newGame(scenarioId, seed, player ?? undefined),
@@ -292,6 +309,7 @@ export function reset(): void {
   session = null
   sessionPlayer = null
   playerColor = null
+  challengeTarget = null
   clearSave()
   notify()
 }

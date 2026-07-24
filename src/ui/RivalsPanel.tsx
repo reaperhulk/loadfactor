@@ -11,7 +11,7 @@ import { getScenario } from '../data/scenarios'
 import { ConfirmButton } from './ConfirmButton'
 import { RIVAL_COLORS } from './MapView'
 import { RaceChart, Sparkline } from './Sparkline'
-import { dispatch } from './session'
+import { dispatch, getChallengeTarget } from './session'
 import { copyTsv, money } from './format'
 
 const PERSONALITY_BLURBS: Record<string, string> = {
@@ -187,7 +187,17 @@ export function RivalsPanel({ state }: { state: GameState }) {
         ))}{' '}
         by quarter
       </h3>
-      <RaceChart series={series} format={metric === 'pax' ? (v) => v.toLocaleString('en-US') : undefined} />
+      <RaceChart
+        series={series}
+        format={metric === 'pax' ? (v) => v.toLocaleString('en-US') : undefined}
+        target={(() => {
+          // A duel career races the challenger's ghost — their final net
+          // worth as a dashed line the player climbs toward.
+          if (metric !== 'netWorth') return undefined
+          const duel = getChallengeTarget()
+          return duel ? { v: duel.worth, label: `⚔ ${duel.by ?? 'challenger'}` } : undefined
+        })()}
+      />
       {(() => {
         // Pace: extrapolate the last two years' net-worth trend to the
         // deadline. A projection, not a promise — but it turns "am I

@@ -81,18 +81,31 @@ test('every scenario starts from its menu card', async ({ page }) => {
 })
 
 test('a challenge link opens the same world for whoever follows it', async ({ page }) => {
-  await page.goto('/?scenario=open_skies&seed=challenge-seed')
+  // With target/by the link is a duel: the card names the number to beat.
+  await page.goto('/?scenario=open_skies&seed=challenge-seed&target=250000&by=Ghost%20Air')
   await expect(page.getByTestId('challenge-card')).toContainText('Open Skies')
+  await expect(page.getByTestId('duel-target')).toContainText('Ghost Air')
+  await expect(page.getByTestId('duel-target')).toContainText('$250.0M')
   await page.getByTestId('start-challenge').click()
   await expect(page.getByTestId('date')).toHaveText('1995 Q1')
   const seed = await page.evaluate(() => window.__harness.getState()!.seed)
   expect(seed).toBe('challenge-seed')
-  // The in-game share button hands out the same link.
+  // The challenger's ghost haunts the race chart once there is a race to draw.
+  await page.evaluate(() => {
+    window.__harness.endQuarter()
+    window.__harness.endQuarter()
+  })
+  await page.getByTestId('tab-rivals').click()
+  await expect(page.getByTestId('race-target')).toBeVisible()
+  await expect(page.getByTestId('rivals-panel')).toContainText('Ghost Air')
+  // The in-game share button hands out a link that carries YOUR net worth.
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.getByTestId('share-challenge').click()
   const link = await page.evaluate(() => navigator.clipboard.readText())
   expect(link).toContain('scenario=open_skies')
   expect(link).toContain('seed=challenge-seed')
+  expect(link).toMatch(/target=\d+/)
+  expect(link).toContain('by=')
 })
 
 test('the city panel shows stats and negotiates in context', async ({ page }) => {

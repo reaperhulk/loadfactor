@@ -50,16 +50,20 @@ export function RaceChart({
   width = 320,
   height = 120,
   format = money,
+  target,
 }: {
   series: readonly RaceSeries[]
   width?: number
   height?: number
   format?: (v: number) => string
+  // A ghost line to race against (e.g. a challenger's final net worth) —
+  // always kept inside the y-scale so the number to beat stays visible.
+  target?: { v: number; label: string }
 }) {
   const all = series.flatMap((s) => s.points)
   if (all.length < 2) return <p className="hint">Play a few quarters to see the race.</p>
   const lo = Math.min(0, ...all)
-  const hi = Math.max(...all)
+  const hi = Math.max(...all, target?.v ?? -Infinity)
   const span = hi - lo || 1
   const yFor = (v: number) => height - ((v - lo) / span) * (height - 2) - 1
   const gridLines = [0.25, 0.5, 0.75].map((f) => ({ v: lo + span * f, y: yFor(lo + span * f) }))
@@ -80,6 +84,14 @@ export function RaceChart({
           </text>
         </g>
       ))}
+      {target && (
+        <g data-testid="race-target">
+          <line x1={0} x2={plotW} y1={yFor(target.v)} y2={yFor(target.v)} className="race-target-line" />
+          <text x={2} y={Math.max(8, yFor(target.v) - 3)} className="race-target-label">
+            {target.label} {format(Math.round(target.v))}
+          </text>
+        </g>
+      )}
       {series.map((s) =>
         s.points.length >= 2 ? (
           <g key={s.label}>
