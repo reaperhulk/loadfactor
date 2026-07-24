@@ -116,6 +116,44 @@ function haulClass(km: number): string {
   return km >= 4500 ? 'route-long' : km >= 1500 ? 'route-medium' : 'route-short'
 }
 
+// Module-level path caches. Route/trip paths are pure in (projection,
+// endpoints), and the flat projection never moves — so during a zoom ease
+// (many renders per second) every path string is a Map hit instead of fresh
+// Bézier math. A globe move changes the projection key and flushes the
+// globe entries. Presentation-only mutable state; the engine sees none of it.
+const routePathCache = new Map<string, string>()
+const tripPathCache = new Map<string, string | null>()
+let cachedProjKey = 'flat'
+
+function flushOnProjChange(projKey: string): void {
+  if (projKey === cachedProjKey) return
+  cachedProjKey = projKey
+  routePathCache.clear()
+  tripPathCache.clear()
+}
+
+function cachedRoutePath(projKey: string, globe: GlobeView | null, fromId: string, toId: string): string {
+  flushOnProjChange(projKey)
+  const k = `${fromId}|${toId}`
+  let d = routePathCache.get(k)
+  if (d === undefined) {
+    d = globe !== null ? globeRoutePath(globe, fromId, toId) : arcPath(fromId, toId)
+    routePathCache.set(k, d)
+  }
+  return d
+}
+
+function cachedTripPath(projKey: string, globe: GlobeView | null, fromId: string, toId: string): string | null {
+  flushOnProjChange(projKey)
+  const k = `${fromId}|${toId}`
+  let d = tripPathCache.get(k)
+  if (d === undefined) {
+    d = globe !== null ? globeTripPath(globe, fromId, toId) : roundTripPath(fromId, toId)
+    tripPathCache.set(k, d)
+  }
+  return d
+}
+
 // ---- Globe (orthographic) projection ----------------------------------
 // The map can render as a rotatable globe: drag spins it, wheel zooms it,
 // routes follow real great circles, and the back hemisphere is culled.
@@ -443,10 +481,15 @@ export function MapView({
     const c = getCity(cityId)
     return pt(c.lon, c.lat)
   }
+  // Route path strings are pure in (projection, endpoints) — served from the
+  // module-level caches keyed by projKey, so the 60fps zoom ease stops
+  // rebuilding hundreds of Bézier strings per frame. projKey also names the
+  // projection for the layer memos below.
+  const projKey = isGlobe ? `g:${globe.cLon}:${globe.cLat}:${globe.s}` : 'flat'
   const routePathFor = (fromId: string, toId: string): string =>
-    isGlobe ? globeRoutePath(globe, fromId, toId) : arcPath(fromId, toId)
+    cachedRoutePath(projKey, isGlobe ? globe : null, fromId, toId)
   const tripPathFor = (fromId: string, toId: string): string | null =>
-    isGlobe ? globeTripPath(globe, fromId, toId) : roundTripPath(fromId, toId)
+    cachedTripPath(projKey, isGlobe ? globe : null, fromId, toId)
   const flownRoutes = player.routes.filter((r) => player.fleet.some((a) => a.routeId === r.id))
   const network = networkCities(player)
   // Launching needs an idle airframe with the legs — targets beyond every
@@ -483,6 +526,149 @@ export function MapView({
   const rivalPairs = new Set(
     state.airlines.slice(1).flatMap((a) => a.routes.map((r) => pairKey(r.from, r.to))),
   )
+
+  // Set when a drag/pinch gesture ends so the click that follows it is
+  // swallowed instead of selecting whatever the pointer happened to be over.
+  const suppressClick = useRef(false)
+
+  // Layer memoization: the arc and traffic layers are the map's node-count
+  // heavyweights, and none of them depend on the flat viewBox — so they
+  // rebuild only when the data or the projection moves, not on every frame
+  // of a zoom ease or an unrelated interaction (selection, planning mode).
+  // Decorative glyph sizes quantize to quarter steps for the same reason.
+  const glyphUi = Math.max(0.25, Math.round(uiScale * 4) / 4)
+  const pulseUi = newRouteIds.size > 0 ? uiScale : 1
+  const rivalArcsLayer = useMemo(() => {
+    if (!showRivals) return null
+    return state.airlines.slice(1).map((airline) =>
+      airline.routes.map((r) => {
+        const d = routePathFor(r.from, r.to)
+        if (d === '') return null
+        return (
+          <path
+            key={`${airline.id}-${r.id}`}
+            d={d}
+            className={`route-rival ${rivalColorClass(airline.id)}`}
+            style={{ '--cap-w': capWidth(airline, r, true) } as React.CSSProperties}
+          />
+        )
+      }),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, showRivals, isGlobe, globe, projKey])
+
+  const playerArcsLayer = useMemo(() => {
+    return player.routes.map((r) => {
+      const km = distanceKm(r.from, r.to)
+      const isNew = newRouteIds.has(r.id)
+      const contested = rivalPairs.has(pairKey(r.from, r.to))
+      const d = routePathFor(r.from, r.to)
+      if (d === '') return null
+      return (
+        <g key={r.id}>
+          <path
+            d={d}
+            pathLength={1}
+            className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
+            style={{ '--cap-w': capWidth(player, r, false) } as React.CSSProperties}
+            data-testid={isNew ? 'route-line-new' : undefined}
+            onClick={() => {
+              if (suppressClick.current) {
+                suppressClick.current = false
+                return
+              }
+              onRouteClick?.(r.id)
+            }}
+          />
+          {isNew &&
+            [r.from, r.to].map((cityId) => {
+              const p = cityPt(cityId)
+              if (!p.vis) return null
+              return <circle key={cityId} cx={p.X} cy={p.Y} r={10 / pulseUi} className="endpoint-pulse" />
+            })}
+        </g>
+      )
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, isGlobe, globe, projKey, newRouteIds, lens, pulseUi, onRouteClick])
+
+  const playerPlanesLayer = useMemo(() => {
+    return flownRoutes.flatMap((r) => {
+      const km = distanceKm(r.from, r.to)
+      const freq = effectiveFrequency(player, r)
+      const planes = Math.max(1, Math.min(4, Math.round(freq / 8)))
+      const path = tripPathFor(r.from, r.to)
+      if (path === null) return [] // route crosses the horizon — no shuttle
+      // The glyph wears the metal: widebodies render visibly larger than
+      // regional jets, and fast airframes visibly outrun the fleet
+      // (Concorde zips). Biggest/fastest airframe assigned to the route.
+      let biggestSeats = 100
+      let fastestKmh = 850
+      for (const ac of player.fleet) {
+        if (ac.routeId !== r.id) continue
+        const t = getAircraftType(ac.type)
+        biggestSeats = Math.max(biggestSeats, t.seats)
+        fastestKmh = Math.max(fastestKmh, t.speedKmh)
+      }
+      const glyphScale = (0.62 + Math.min(0.5, biggestSeats / 800)) / glyphUi
+      const dur = (4 + Math.min(14, km / 900)) * (850 / fastestKmh)
+      return Array.from({ length: planes }, (_, i) => (
+        <g key={`plane-${r.id}-${i}`} className="plane" data-testid={i === 0 ? `plane-${r.id}` : undefined}>
+          {/* A silhouette whose nose points along +x: rotate="auto" then
+              keeps it flying nose-first on BOTH legs of the shuttle — the
+              ✈ text glyph points 45° off-axis and read as flying
+              backwards on the return leg. */}
+          <path d={PLANE_GLYPH} transform={`scale(${glyphScale.toFixed(3)})`} />
+          {/* The path itself runs out AND back, traversed forward only —
+              brief dwells at each end, correct nose-first orientation on
+              both legs in every engine (keyPoints reversal breaks
+              rotate="auto" in WebKit; if an engine ignores keyPoints the
+              shuttle still reads correctly, just without the dwells). */}
+          <animateMotion
+            dur={`${dur.toFixed(1)}s`}
+            begin={`${(-((r.id * 13) % 60) / 10 - (i * dur) / planes).toFixed(1)}s`}
+            repeatCount="indefinite"
+            keyPoints="0;0.5;0.5;1;1"
+            keyTimes="0;0.45;0.5;0.95;1"
+            calcMode="linear"
+            rotate="auto"
+            path={path}
+          />
+        </g>
+      ))
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, isGlobe, globe, projKey, glyphUi])
+
+  const rivalPlanesLayer = useMemo(() => {
+    if (!showRivals) return null
+    return state.airlines
+      .slice(1)
+      .flatMap((airline) => airline.routes.map((r) => ({ airline, r })))
+      .slice(0, 12)
+      .map(({ airline, r }) => {
+        const path = tripPathFor(r.from, r.to)
+        if (path === null) return null
+        const km = distanceKm(r.from, r.to)
+        const dur = 5 + Math.min(15, km / 900)
+        return (
+          <g key={`rplane-${airline.id}-${r.id}`} className={`plane plane-rival ${rivalColorClass(airline.id)}`}>
+            <path d={PLANE_GLYPH} transform={`scale(${0.55 / glyphUi})`} />
+            <animateMotion
+              dur={`${dur.toFixed(1)}s`}
+              begin={`${(-((r.id * 17 + airline.id * 7) % 70) / 10).toFixed(1)}s`}
+              repeatCount="indefinite"
+              keyPoints="0;0.5;0.5;1;1"
+              keyTimes="0;0.45;0.5;0.95;1"
+              calcMode="linear"
+              rotate="auto"
+              path={path}
+            />
+          </g>
+        )
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, showRivals, isGlobe, globe, projKey, glyphUi])
 
   // Visibility only changes when the game state, selection, or an LOD
   // threshold crossing changes — not on every animation frame of a zoom.
@@ -673,8 +859,6 @@ export function MapView({
     if (wasDrag) suppressClick.current = true
   }
 
-  const suppressClick = useRef(false)
-
   const handleCityClick = (cityId: string): void => {
     if (suppressClick.current) {
       suppressClick.current = false
@@ -738,127 +922,15 @@ export function MapView({
           })}
         {/* Rival networks, thin and color-coded per airline, under the
             player's arcs. Toggleable for decluttering. */}
-        {showRivals &&
-          state.airlines.slice(1).map((airline) =>
-            airline.routes.map((r) => {
-              const d = routePathFor(r.from, r.to)
-              if (d === '') return null
-              return (
-                <path
-                  key={`${airline.id}-${r.id}`}
-                  d={d}
-                  className={`route-rival ${rivalColorClass(airline.id)}`}
-                  style={{ '--cap-w': capWidth(airline, r, true) } as React.CSSProperties}
-                />
-              )
-            }),
-          )}
-        {player.routes.map((r) => {
-          const km = distanceKm(r.from, r.to)
-          const isNew = newRouteIds.has(r.id)
-          const contested = rivalPairs.has(pairKey(r.from, r.to))
-          const d = routePathFor(r.from, r.to)
-          if (d === '') return null
-          return (
-            <g key={r.id}>
-              <path
-                d={d}
-                pathLength={1}
-                className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
-                style={{ '--cap-w': capWidth(player, r, false) } as React.CSSProperties}
-                data-testid={isNew ? 'route-line-new' : undefined}
-                onClick={() => {
-                  if (suppressClick.current) {
-                    suppressClick.current = false
-                    return
-                  }
-                  onRouteClick?.(r.id)
-                }}
-              />
-              {isNew &&
-                [r.from, r.to].map((cityId) => {
-                  const p = cityPt(cityId)
-                  if (!p.vis) return null
-                  return <circle key={cityId} cx={p.X} cy={p.Y} r={10 / uiScale} className="endpoint-pulse" />
-                })}
-            </g>
-          )
-        })}
+        {rivalArcsLayer}
+        {playerArcsLayer}
         {/* Constant traffic: planes shuttle back and forth on every served
             route — more of them the busier the schedule, and long-haul takes
             visibly longer than a hop. */}
-        {flownRoutes.flatMap((r) => {
-          const km = distanceKm(r.from, r.to)
-          const freq = effectiveFrequency(player, r)
-          const planes = Math.max(1, Math.min(4, Math.round(freq / 8)))
-          const path = tripPathFor(r.from, r.to)
-          if (path === null) return [] // route crosses the horizon — no shuttle
-          // The glyph wears the metal: widebodies render visibly larger than
-          // regional jets, and fast airframes visibly outrun the fleet
-          // (Concorde zips). Biggest/fastest airframe assigned to the route.
-          let biggestSeats = 100
-          let fastestKmh = 850
-          for (const ac of player.fleet) {
-            if (ac.routeId !== r.id) continue
-            const t = getAircraftType(ac.type)
-            biggestSeats = Math.max(biggestSeats, t.seats)
-            fastestKmh = Math.max(fastestKmh, t.speedKmh)
-          }
-          const glyphScale = (0.62 + Math.min(0.5, biggestSeats / 800)) / uiScale
-          const dur = (4 + Math.min(14, km / 900)) * (850 / fastestKmh)
-          return Array.from({ length: planes }, (_, i) => (
-            <g key={`plane-${r.id}-${i}`} className="plane" data-testid={i === 0 ? `plane-${r.id}` : undefined}>
-              {/* A silhouette whose nose points along +x: rotate="auto" then
-                  keeps it flying nose-first on BOTH legs of the shuttle — the
-                  ✈ text glyph points 45° off-axis and read as flying
-                  backwards on the return leg. */}
-              <path d={PLANE_GLYPH} transform={`scale(${glyphScale.toFixed(3)})`} />
-              {/* The path itself runs out AND back, traversed forward only —
-                  brief dwells at each end, correct nose-first orientation on
-                  both legs in every engine (keyPoints reversal breaks
-                  rotate="auto" in WebKit; if an engine ignores keyPoints the
-                  shuttle still reads correctly, just without the dwells). */}
-              <animateMotion
-                dur={`${dur.toFixed(1)}s`}
-                begin={`${(-((r.id * 13) % 60) / 10 - (i * dur) / planes).toFixed(1)}s`}
-                repeatCount="indefinite"
-                keyPoints="0;0.5;0.5;1;1"
-                keyTimes="0;0.45;0.5;0.95;1"
-                calcMode="linear"
-                rotate="auto"
-                path={path}
-              />
-            </g>
-          ))
-        })}
+        {playerPlanesLayer}
         {/* Rival traffic: one small plane per rival route (capped) so their
             networks read as alive, in the rival's own color. */}
-        {showRivals &&
-          state.airlines
-            .slice(1)
-            .flatMap((airline) => airline.routes.map((r) => ({ airline, r })))
-            .slice(0, 12)
-            .map(({ airline, r }) => {
-              const path = tripPathFor(r.from, r.to)
-              if (path === null) return null
-              const km = distanceKm(r.from, r.to)
-              const dur = 5 + Math.min(15, km / 900)
-              return (
-                <g key={`rplane-${airline.id}-${r.id}`} className={`plane plane-rival ${rivalColorClass(airline.id)}`}>
-                  <path d={PLANE_GLYPH} transform={`scale(${0.55 / uiScale})`} />
-                  <animateMotion
-                    dur={`${dur.toFixed(1)}s`}
-                    begin={`${(-((r.id * 17 + airline.id * 7) % 70) / 10).toFixed(1)}s`}
-                    repeatCount="indefinite"
-                    keyPoints="0;0.5;0.5;1;1"
-                    keyTimes="0;0.45;0.5;0.95;1"
-                    calcMode="linear"
-                    rotate="auto"
-                    path={path}
-                  />
-                </g>
-              )
-            })}
+        {rivalPlanesLayer}
         {/* Fresh slot wins ping gold at the airport. */}
         {[...newSlotCities].sort().map((cityId) => {
           const p = cityPt(cityId)

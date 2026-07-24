@@ -468,3 +468,31 @@ test('an aircraft order cancels for the partial refund', async ({ page }) => {
   const cashFinal = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)
   expect(cashFinal).toBe(cashAfterOrder + Math.floor(price * 0.8))
 })
+
+test('the late-game map stays within its structural render budget', async ({ page }) => {
+  await startGame(page)
+  // A working network keeps the player solvent while rivals expand for four
+  // years — a busy mid/late-game map without the game-over overlay.
+  await page.evaluate(() => {
+    const snap = window.__harness.getState()!
+    const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
+    const s = window.__harness.getState()!
+    const routeId = s.airlines[0]!.routes[0]!.id
+    for (const aircraft of s.airlines[0]!.fleet) {
+      window.__harness.dispatch({ type: 'assign_aircraft', aircraftId: aircraft.id, routeId })
+    }
+    for (let i = 0; i < 16; i++) window.__harness.endQuarter()
+  })
+  expect(await page.evaluate(() => window.__harness.getState()!.phase)).toBe('planning')
+  // Decorative traffic is hard-capped by design: at most 12 rival planes.
+  expect(await page.locator('.plane-rival').count()).toBeLessThanOrEqual(12)
+  const total = await page.evaluate(() => document.querySelectorAll('svg.map *').length)
+  expect(total, 'world-view element count').toBeLessThan(1600)
+  // Zooming in reveals the small airfields, still bounded.
+  await page.getByTestId('zoom-in').click()
+  await page.getByTestId('zoom-in').click()
+  await page.getByTestId('zoom-in').click()
+  const zoomed = await page.evaluate(() => document.querySelectorAll('svg.map *').length)
+  expect(zoomed, 'zoomed element count').toBeLessThan(2600)
+})
