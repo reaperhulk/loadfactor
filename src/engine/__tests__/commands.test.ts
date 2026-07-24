@@ -199,6 +199,60 @@ describe('command validation', () => {
     expect(l.state.airlines[0]!.cash).toBe(18000)
   })
 
+  it('acquire_rival: only distressed rivals sell, and everything transfers', () => {
+    // A healthy equal is not for sale.
+    expectRejected(applyCommand(fresh(), { type: 'acquire_rival', target: 1 }).events, 'not for sale')
+    expectRejected(applyCommand(fresh(), { type: 'acquire_rival', target: 0 }).events, 'no such rival')
+
+    // Distress the rival and give it an operation worth absorbing.
+    const state = fresh()
+    const rival = state.airlines[1]!
+    rival.insolventQuarters = 1
+    rival.slots['FRA'] = 2
+    rival.routes.push({
+      id: rival.nextId++,
+      from: 'FRA',
+      to: 'LHR',
+      fareLevel: 0,
+      serviceLevel: 2,
+      frequency: 5,
+      lastPax: 0,
+      lastCapacity: 0,
+      lastLoadFactorBp: 0,
+      lastRevenue: 0,
+      lastCost: 0,
+      lastTransferPax: 0,
+      history: [],
+    })
+    rival.fleet[0]!.routeId = rival.routes[0]!.id
+    rival.loans.push({ id: rival.nextId++, principal: 4000, annualRateBp: 800 })
+    state.airlines[0]!.cash = 60000
+
+    const before = state.airlines[0]!
+    const myFleet = before.fleet.length
+    const myRoutes = before.routes.length
+    const { state: after, events } = applyCommand(state, { type: 'acquire_rival', target: 1 })
+    const me = after.airlines[0]!
+    const shell = after.airlines[1]!
+    expect(events[0]).toMatchObject({ type: 'rival_acquired', target: 1, routes: 1 })
+    expect(shell.bankrupt).toBe(true)
+    expect(shell.fleet).toHaveLength(0)
+    expect(me.fleet).toHaveLength(myFleet + 2) // rival starter fleet came along
+    expect(me.routes).toHaveLength(myRoutes + 1)
+    expect(me.slots['FRA']).toBeGreaterThanOrEqual(2)
+    expect(me.loans.some((l) => l.principal === 4000)).toBe(true) // the debt came too
+    if (events[0]?.type === 'rival_acquired') {
+      expect(me.cash).toBe(60000 - events[0].price)
+    }
+    // Transferred metal points at the TRANSFERRED route id, not the old one.
+    const movedRoute = me.routes[me.routes.length - 1]!
+    const movedPlane = me.fleet.find((a) => a.routeId === movedRoute.id)
+    expect(movedPlane).toBeDefined()
+    // All ids stay unique within the acquirer.
+    const ids = [...me.fleet.map((a) => a.id), ...me.routes.map((r) => r.id), ...me.loans.map((l) => l.id)]
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
   it('same-city negotiations become a bidding war, biggest spend first', () => {
     const state = fresh()
     state.airlines[0]!.negotiations.push({ city: 'LHR', spend: 1000 })

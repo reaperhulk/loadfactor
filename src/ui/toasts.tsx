@@ -122,6 +122,16 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
         })
         break
       }
+      case 'rival_acquired': {
+        if (e.airline !== 0) break
+        const bought = state?.airlines[e.target]?.name ?? 'a rival'
+        out.push({
+          kind: 'victory',
+          icon: '💼',
+          text: `Acquired ${bought} — ${e.aircraft} aircraft, ${e.routes} routes, and their debt`,
+        })
+        break
+      }
       case 'game_over':
         out.push(
           e.result === 'won'

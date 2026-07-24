@@ -6,9 +6,12 @@ import { getAircraftType } from '../data/aircraft'
 import { pairKey } from '../data/cities'
 import type { Airline, GameState } from '../engine'
 import { netWorth, routeWeeklyCapacity, slotCities } from '../engine/queries'
+import { TAKEOVER_BASE_K, TAKEOVER_PREMIUM_BP } from '../data/constants'
 import { getScenario } from '../data/scenarios'
+import { ConfirmButton } from './ConfirmButton'
 import { RIVAL_COLORS } from './MapView'
 import { RaceChart, Sparkline } from './Sparkline'
+import { dispatch } from './session'
 import { copyTsv, money } from './format'
 
 const PERSONALITY_BLURBS: Record<string, string> = {
@@ -277,6 +280,34 @@ export function RivalsPanel({ state }: { state: GameState }) {
                     })()}
                   </p>
                   <p className="dim">{fleetSummary(rival)}</p>
+                  {(() => {
+                    // The endgame lever: distressed rivals can be bought
+                    // outright — fleet, routes, slots, and their debt.
+                    const me = state.airlines[0]!
+                    const worth = netWorth(rival)
+                    const distressed = rival.insolventQuarters >= 1 || worth * 4 <= netWorth(me)
+                    if (!distressed) return null
+                    const price = Math.max(
+                      TAKEOVER_BASE_K,
+                      Math.floor((Math.max(0, worth) * TAKEOVER_PREMIUM_BP) / 10000),
+                    )
+                    return (
+                      <p>
+                        <ConfirmButton
+                          data-testid={`acquire-${rival.id}`}
+                          label={`💼 acquire for ${money(price)}`}
+                          confirmLabel={`buy ${rival.name} — fleet, routes, slots, and their debt?`}
+                          disabled={me.cash < price}
+                          title={
+                            me.cash < price
+                              ? `need ${money(price)} cash`
+                              : 'everything transfers: aircraft, routes, slots, orders — and the loans'
+                          }
+                          onConfirm={() => dispatch({ type: 'acquire_rival', target: rival.id })}
+                        />
+                      </p>
+                    )
+                  })()}
                   {rival.routes.length > 0 && (
                     <p className="dim" data-testid={`rival-${rival.id}-newest`}>
                       {/* Route ids ascend as routes open — the tail is where

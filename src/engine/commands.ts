@@ -14,12 +14,15 @@ import {
   LEASE_BP_PER_QUARTER,
   MARKETING_MAX_LEVEL,
   MIN_ROUTE_KM,
+  TAKEOVER_BASE_K,
+  TAKEOVER_PREMIUM_BP,
   NEG_MIN_SPEND,
 } from '../data/constants'
 import { effFuelBp } from './worldEvents'
 import {
   currentLoanRateBp,
   debtCeiling,
+  netWorth,
   findRoute,
   maxRouteFrequency,
   networkCities,
@@ -303,6 +306,86 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       airline.fleet = airline.fleet.filter((a) => a.id !== aircraft.id)
       airline.cash += proceeds
       return { events: [{ type: 'aircraft_sold', airline: airlineIdx, aircraftId: aircraft.id, proceeds }] }
+    }
+
+    case 'acquire_rival': {
+      const target = state.airlines[command.target]
+      if (!target || command.target === airlineIdx) return reject(airlineIdx, command, 'no such rival')
+      if (target.bankrupt) return reject(airlineIdx, command, 'nothing left to buy — they liquidated')
+      // Only DISTRESSED rivals sell: insolvent last quarter, or worth a
+      // quarter of the acquirer or less. Healthy equals fight on.
+      const targetWorth = netWorth(target)
+      const distressed = target.insolventQuarters >= 1 || targetWorth * 4 <= netWorth(airline)
+      if (!distressed) return reject(airlineIdx, command, 'they are not for sale — too healthy to fold')
+      const price = Math.max(
+        TAKEOVER_BASE_K,
+        Math.floor((Math.max(0, targetWorth) * TAKEOVER_PREMIUM_BP) / 10000),
+      )
+      if (airline.cash < price) return reject(airlineIdx, command, `insufficient cash — the deal costs ${price}`)
+      airline.cash -= price
+
+      // Transfer the whole operation with fresh ids on the acquirer's
+      // counter. Routes first (building the id map), then fleet with
+      // routeId remapped; duplicate pairs fold into the acquirer's route
+      // (their planes arrive unassigned).
+      const routeIdMap = new Map<number, number | null>()
+      let routesMoved = 0
+      for (const r of target.routes) {
+        if (airline.routes.some((mine) => mine.from === r.from && mine.to === r.to)) {
+          routeIdMap.set(r.id, null)
+          continue
+        }
+        const moved = { ...r, id: airline.nextId++, history: r.history.map((h) => ({ ...h })) }
+        airline.routes.push(moved)
+        routeIdMap.set(r.id, moved.id)
+        routesMoved++
+      }
+      for (const ac of target.fleet) {
+        airline.fleet.push({
+          ...ac,
+          id: airline.nextId++,
+          routeId: ac.routeId === null ? null : (routeIdMap.get(ac.routeId) ?? null),
+        })
+      }
+      for (const o of target.orders) {
+        airline.orders.push({ ...o, id: airline.nextId++ })
+      }
+      for (const l of target.loans) {
+        airline.loans.push({ ...l, id: airline.nextId++ })
+      }
+      for (const c of Object.keys(target.slots).sort()) {
+        const n = target.slots[c] ?? 0
+        if (n > 0) airline.slots[c] = (airline.slots[c] ?? 0) + n
+      }
+      for (const p of Object.keys(target.servedUntil).sort()) {
+        airline.servedUntil[p] = Math.max(airline.servedUntil[p] ?? 0, target.servedUntil[p] ?? 0)
+      }
+      const boughtAircraft = target.fleet.length
+      // The target folds into the acquirer: an empty shell, marked bankrupt
+      // so standings, the race, and resolution all skip it. History stays
+      // for the charts.
+      target.bankrupt = true
+      target.routes = []
+      target.fleet = []
+      target.orders = []
+      target.loans = []
+      target.slots = {}
+      target.negotiations = []
+      target.slotIdle = {}
+      target.fuelHedge = null
+      target.cash = 0
+      return {
+        events: [
+          {
+            type: 'rival_acquired',
+            airline: airlineIdx,
+            target: command.target,
+            price,
+            aircraft: boughtAircraft,
+            routes: routesMoved,
+          },
+        ],
+      }
     }
 
     case 'negotiate_slots': {

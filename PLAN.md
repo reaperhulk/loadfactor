@@ -316,7 +316,8 @@ committing).
 - **M6 — Presentation.** Period styling, map polish, sound, PWA install,
   shareable replay links.
 
-**Status:** M0–M4 landed; M5 is live with four scenarios (Jet Age, Oil
+**Status:** M0–M4 landed (M3's slot bidding wars and the distressed-rival
+takeover endgame included); M5 is live with four scenarios (Jet Age, Oil
 Crisis, Deregulation, Open Skies), the daily seed challenge, and a hall of
 fame; M6's presentation layer is largely in place (decade-tinted map, globe
 projection, ambient traffic that wears its metal, sound, PWA). Systems

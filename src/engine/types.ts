@@ -197,6 +197,7 @@ export type Command =
   | { type: 'refit_cabin'; aircraftId: number; cabin: number }
   | { type: 'sell_aircraft'; aircraftId: number }
   | { type: 'set_marketing'; level: number }
+  | { type: 'acquire_rival'; target: number }
   | { type: 'negotiate_slots'; city: string; spend: number }
   | { type: 'take_loan'; amount: number }
   | { type: 'repay_loan'; loanId: number; amount: number }
@@ -223,6 +224,7 @@ export type GameEvent =
   | { type: 'marketing_set'; airline: number; level: number }
   | { type: 'negotiation_started'; airline: number; city: string; spend: number }
   | { type: 'bidding_war'; city: string; airlines: number[] } // descending spend order
+  | { type: 'rival_acquired'; airline: number; target: number; price: number; aircraft: number; routes: number }
   | { type: 'negotiation_failed'; airline: number; city: string }
   | { type: 'slots_granted'; airline: number; city: string; slots: number }
   | { type: 'slot_lost'; airline: number; city: string }

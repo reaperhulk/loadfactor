@@ -90,6 +90,14 @@ export const SEASON_TOUR_BP_PER_POINT = 60
 // quarter, every outbid attempt keeps only this share of its odds — the
 // authority is entertaining a richer suitor.
 export const NEG_OUTBID_MALUS_BP = 6000
+
+// --- Takeovers (M3 endgame) ---
+// A DISTRESSED rival (insolvent last quarter, or worth a quarter of you or
+// less) can be acquired for its net worth plus a premium, floored at a base
+// fee — lawyers get paid even when the equity is worthless. Everything
+// transfers: fleet, routes, slots, orders, and the debt.
+export const TAKEOVER_PREMIUM_BP = 13000
+export const TAKEOVER_BASE_K = 2000
 // Minutes of weekly block time one airframe can fly.
 export const WEEKLY_BLOCK_MINUTES = 6000
 export const MIN_ROUTE_KM = 300
