@@ -54,6 +54,10 @@ export const FARE_DEMAND_BP: readonly number[] = [11000, 10500, 10000, 8900, 740
 export const CONNECT_WILLING_BP = 5000
 export const CONNECT_FARE_DISCOUNT_BP = 9000
 export const CONNECT_DETOUR_MAX_BP = 14000
+// Hubs aren't free: every connecting pax pays baggage/transfer handling on
+// EACH leg. Without this, transfer revenue had zero marginal cost beyond
+// cabin service, and hub density was nearly free margin.
+export const TRANSFER_HANDLING_PER_PAX = 8 // $ per connecting pax per leg
 // Management complexity: quarterly overhead grows with the SQUARE of route
 // count ($k × routes²) — sprawl has a real carrying cost.
 export const ROUTE_OVERHEAD_QUAD = 25
@@ -154,6 +158,10 @@ export const RESALE_DECAY_BP_PER_QUARTER = 150
 export const RESALE_FLOOR_BP = 3000
 
 // --- Finance ---
+// Principal amortizes at this share of the remaining balance per quarter
+// (with a $100k floor so stubs extinguish). Debt used to be perpetual
+// interest-only capital — free leverage that compounded the late game.
+export const LOAN_AMORT_BP = 500
 export const BASE_LOAN_RATE_BP = 900 // annual
 export const LOAN_RATE_ECONOMY_SLOPE = 5 // +1bp per 5bp of economy weakness
 export const MIN_LOAN_RATE_BP = 500

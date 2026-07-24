@@ -112,6 +112,7 @@ export interface QuarterStats {
   revenue: number
   costs: number
   profit: number
+  debtPayment?: number // principal amortized this quarter (cash out, not a cost)
   pax: number
   netWorth: number
   breakdown: CostBreakdown
@@ -251,6 +252,7 @@ export type GameEvent =
       revenue: number
       costs: number
       profit: number
+      debtPayment: number // principal amortized (cash out, not a cost)
       cash: number
       netWorth: number
       pax: number

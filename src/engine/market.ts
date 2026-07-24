@@ -39,6 +39,7 @@ import {
   ROUTE_SPOOL_BP,
   SEASON_TOUR_BP_PER_POINT,
   SERVICE_COST_PER_PAX,
+  TRANSFER_HANDLING_PER_PAX,
   SERVICE_LEVEL_WEIGHT,
   WEEKS_PER_QUARTER,
 } from '../data/constants'
@@ -391,6 +392,8 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
           leg.weeklyTransfer += take
           leg.weeklyRevenue += Math.floor((take * legFare * leg.yieldBp) / 10000)
           leg.weeklyService += legService
+          // Transfer handling: the marginal cost of being a hub.
+          leg.weeklyFees += Math.floor((take * TRANSFER_HANDLING_PER_PAX * inflBp) / 10000)
         }
       }
     }

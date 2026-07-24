@@ -12,7 +12,11 @@ import { runCareer } from '../simulate'
 import { getScenario } from '../../data/scenarios'
 
 const SEEDS = ['alpha', 'beta', 'gamma', 'delta', 'epsilon']
-const RUNAWAY_CAP = 12_000_000 // $12B — tightened after the M2 growth taper
+// PLAN §2.4's contract, asserted literally: no pinned career may finish above
+// 10× its scenario's qualifying floor. Loan amortization and transfer
+// handling costs (V2) pulled the curve inside this for every era — a money
+// printer that reopens the gap trips these before it ships.
+const runawayCap = (scenario: string): number => 10 * getScenario(scenario).targetNetWorth
 
 describe('balance envelope', () => {
   it('the greedy bot survives the window and wins the race on every pinned seed', () => {
@@ -21,7 +25,9 @@ describe('balance envelope', () => {
       expect(result.summary.turn, `${seed}: reached the 1980 deadline`).toBe(80)
       expect(result.summary.phase, `${seed}: finished #1 with the target met`).toBe('won')
       expect(result.summary.routes, `${seed}: built a network`).toBeGreaterThanOrEqual(3)
-      expect(result.summary.netWorth, `${seed}: no runaway money printer`).toBeLessThan(RUNAWAY_CAP)
+      expect(result.summary.netWorth, `${seed}: no runaway money printer`).toBeLessThan(
+        runawayCap('jet_age'),
+      )
     }
   })
 
@@ -35,10 +41,11 @@ describe('balance envelope', () => {
     wins: readonly string[]
     competitive: readonly string[]
   }[] = [
-    { scenario: 'oil_crisis', quarters: 60, wins: ['alpha', 'beta'], competitive: ['theta'] },
-    { scenario: 'deregulation', quarters: 60, wins: ['alpha'], competitive: ['beta', 'gamma'] },
-    // The modern-era event deck (travel_slump, alliance_boom) reshuffled the
-    // open_skies worlds in the bot's favor — beta graduated to a win pin.
+    // Re-derived after V2 (amortizing loans + transfer handling): the tighter
+    // economy demoted oil_crisis/alpha to a photo-finish competitive pin and
+    // promoted beta/theta to wins.
+    { scenario: 'oil_crisis', quarters: 60, wins: ['beta', 'theta'], competitive: ['alpha'] },
+    { scenario: 'deregulation', quarters: 60, wins: ['alpha', 'beta'], competitive: ['gamma'] },
     { scenario: 'open_skies', quarters: 60, wins: ['beta', 'theta'], competitive: ['gamma'] },
     { scenario: 'lcc_wars', quarters: 60, wins: ['alpha', 'beta'], competitive: ['gamma'] },
   ]
@@ -49,7 +56,9 @@ describe('balance envelope', () => {
         const result = runCareer(era.scenario, seed, 'greedy', era.quarters)
         expect(result.summary.turn, `${era.scenario}/${seed}: reached the deadline`).toBe(era.quarters)
         expect(result.summary.phase, `${era.scenario}/${seed}: won the race`).toBe('won')
-        expect(result.summary.netWorth, `${era.scenario}/${seed}: no runaway`).toBeLessThan(RUNAWAY_CAP)
+        expect(result.summary.netWorth, `${era.scenario}/${seed}: no runaway`).toBeLessThan(
+          runawayCap(era.scenario),
+        )
       }
       for (const seed of era.competitive) {
         const result = runCareer(era.scenario, seed, 'greedy', era.quarters)

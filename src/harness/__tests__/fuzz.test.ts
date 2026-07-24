@@ -4,9 +4,12 @@
 // hole — investigate, fix, and pin the genome as a regression below.
 
 import { describe, expect, it } from 'vitest'
+import { getScenario } from '../../data/scenarios'
 import { fuzzBuilds, runGenomeCareer, type Genome } from '../fuzz'
 
-const RUNAWAY_CAP = 15_000_000 // $15B — the fuzzer searches harder than the pinned bots
+// The fuzzer searches harder than the pinned bots, so it gets headroom over
+// the envelope's 10× cap — but scaled to the scenario's floor, not absolute.
+const RUNAWAY_CAP = 15 * getScenario('jet_age').targetNetWorth
 
 const POP = Number(process.env.FUZZ_POP ?? 6)
 const GENS = Number(process.env.FUZZ_GENS ?? 2)

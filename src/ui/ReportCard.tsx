@@ -105,6 +105,15 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
                 <td />
               </tr>
             )}
+            {(now.debtPayment ?? 0) > 0 && (
+              <tr data-testid="report-debt-payment">
+                <td className="dim" title="principal amortized this quarter — cash out, not a cost">
+                  debt paid down
+                </td>
+                <td>{money(now.debtPayment!)}</td>
+                <td />
+              </tr>
+            )}
             {(() => {
               // Position in the race, and whether this quarter moved it.
               const rankAt = (pick: (a: (typeof state.airlines)[number]) => number): number => {

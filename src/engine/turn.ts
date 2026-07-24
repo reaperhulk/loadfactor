@@ -18,6 +18,7 @@ import {
   ROUTE_OVERHEAD_QUAD,
   USED_MARGIN_BP,
   USED_OFFERS_PER_QUARTER,
+  LOAN_AMORT_BP,
 } from '../data/constants'
 import { fnv1a } from './rng'
 import { getScenario } from '../data/scenarios'
@@ -170,6 +171,17 @@ export function endQuarter(prev: GameState): EngineResult {
     for (const loan of airline.loans) {
       interest += Math.floor((loan.principal * loan.annualRateBp) / 4 / 10000)
     }
+    // Principal amortizes AFTER interest accrues on the carried balance: a
+    // share of the remaining principal comes due each quarter, with a floor
+    // so stubs extinguish. Not a cost — a balance-sheet transfer — but it
+    // drains the treasury, so leverage must be productive, not parked.
+    let debtPayment = 0
+    for (const loan of airline.loans) {
+      const due = Math.min(loan.principal, Math.max(100, Math.floor((loan.principal * LOAN_AMORT_BP) / 10000)))
+      loan.principal -= due
+      debtPayment += due
+    }
+    airline.loans = airline.loans.filter((l) => l.principal > 0)
     const breakdown = {
       fuel: t.fuel,
       fees: t.fees,
@@ -187,7 +199,7 @@ export function endQuarter(prev: GameState): EngineResult {
     const costs =
       t.cost + salaries + ownership + maintenance + admin + overhead + marketing + interest
     const profit = revenue - costs
-    airline.cash += profit
+    airline.cash += profit - debtPayment
 
     // 7. Aging, hedge runoff, solvency, stats.
     for (const ac of airline.fleet) ac.ageQuarters++
@@ -204,6 +216,7 @@ export function endQuarter(prev: GameState): EngineResult {
       revenue,
       costs,
       profit,
+      debtPayment,
       pax: t.pax,
       netWorth: netWorth(airline),
       breakdown,
@@ -216,6 +229,7 @@ export function endQuarter(prev: GameState): EngineResult {
       revenue,
       costs,
       profit,
+      debtPayment,
       cash: airline.cash,
       netWorth: netWorth(airline),
       pax: t.pax,

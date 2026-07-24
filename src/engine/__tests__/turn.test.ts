@@ -15,9 +15,9 @@ describe('quarter resolution', () => {
     expect(events.filter((e) => e.type === 'quarter_report')).toHaveLength(3)
   })
 
-  it('the accounting reconciles: cash delta equals reported profit', () => {
-    // No planning commands → the only player cash movement during resolution
-    // is the quarterly P&L (PLAN.md §3.3 step 6).
+  it('the accounting reconciles: cash delta equals profit minus principal amortized', () => {
+    // No planning commands → the only player cash movements during resolution
+    // are the quarterly P&L and the loan amortization (PLAN.md §3.3 step 6).
     let state: GameState = newGame('jet_age', 'accounting-seed')
     state = applyCommand(state, {
       type: 'open_route',
@@ -29,18 +29,36 @@ describe('quarter resolution', () => {
     const routeId = state.airlines[0]!.routes[0]!.id
     state = applyCommand(state, { type: 'assign_aircraft', aircraftId: 2, routeId }).state
     state = applyCommand(state, { type: 'set_frequency', routeId, frequency: 44 }).state
+    state = applyCommand(state, { type: 'take_loan', amount: 8000 }).state
+    let lastPrincipal = 8000
     for (let q = 0; q < 8; q++) {
       const before = state.airlines[0]!.cash
       const { state: after, events } = applyCommand(state, { type: 'end_quarter' })
       const report = playerReport(events)
       expect(report.profit).toBe(report.revenue - report.costs)
-      expect(after.airlines[0]!.cash - before).toBe(report.profit)
+      expect(after.airlines[0]!.cash - before).toBe(report.profit - report.debtPayment)
       expect(report.cash).toBe(after.airlines[0]!.cash)
       // The breakdown IS the cost: buckets sum exactly to the total.
       const bucketSum = Object.values(report.breakdown).reduce((a, b) => a + b, 0)
       expect(bucketSum).toBe(report.costs)
+      // Debt is no longer perpetual: the balance shrinks every quarter by
+      // exactly what the report says was paid down.
+      const principal = after.airlines[0]!.loans.reduce((s, l) => s + l.principal, 0)
+      expect(report.debtPayment).toBeGreaterThan(0)
+      expect(principal).toBe(lastPrincipal - report.debtPayment)
+      lastPrincipal = principal
       state = after
     }
+  })
+
+  it('a tiny loan stub amortizes away entirely', () => {
+    let state: GameState = newGame('jet_age', 'stub-seed')
+    state = applyCommand(state, { type: 'take_loan', amount: 2000 }).state
+    state.airlines[0]!.loans[0]!.principal = 500 // $100k/q floor → gone in 5
+    for (let q = 0; q < 6; q++) {
+      state = applyCommand(state, { type: 'end_quarter' }).state
+    }
+    expect(state.airlines[0]!.loans).toHaveLength(0)
   })
 
   it('orders age and deliver on schedule', () => {

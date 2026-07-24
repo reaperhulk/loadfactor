@@ -35,7 +35,7 @@ export const SCENARIOS: readonly Scenario[] = [
     description:
       'New York, 1960. The jets are here, the Atlantic is the prize, and two ' +
       'rivals are racing you for every slot. Finish 1980 as the #1 airline by ' +
-      'net worth — and be worth at least $300M.',
+      'net worth — and be worth at least $500M.',
     startYear: 1960,
     quarters: 80,
     player: {
@@ -68,7 +68,7 @@ export const SCENARIOS: readonly Scenario[] = [
         personality: 'fortress',
       },
     ],
-    targetNetWorth: 300_000,
+    targetNetWorth: 500_000,
   },
   {
     id: 'oil_crisis',
@@ -76,7 +76,7 @@ export const SCENARIOS: readonly Scenario[] = [
     description:
       'London, 1972. Widebodies are landing just as the fuel bill explodes, ' +
       'and the discounters smell blood. Survive the shocks and finish 1987 ' +
-      'as the #1 airline, worth at least $250M.',
+      'as the #1 airline, worth at least $400M.',
     startYear: 1972,
     quarters: 60,
     player: {
@@ -107,7 +107,7 @@ export const SCENARIOS: readonly Scenario[] = [
         personality: 'fortress',
       },
     ],
-    targetNetWorth: 250_000,
+    targetNetWorth: 400_000,
     eventWeightMult: { oil_shock: 4, recession: 2, boom: 0.5 },
   },
   {
@@ -116,7 +116,7 @@ export const SCENARIOS: readonly Scenario[] = [
     description:
       'Los Angeles, 1985. The rules are gone, the twins are efficient, and ' +
       'three rivals want your gates. Out-fly a price war and finish 2000 as ' +
-      'the #1 airline, worth at least $400M.',
+      'the #1 airline, worth at least $600M.',
     startYear: 1985,
     quarters: 60,
     player: {
@@ -156,7 +156,7 @@ export const SCENARIOS: readonly Scenario[] = [
         personality: 'premium',
       },
     ],
-    targetNetWorth: 400_000,
+    targetNetWorth: 600_000,
     eventWeightMult: { boom: 2, tourism_wave: 2 },
   },
   {
@@ -165,7 +165,7 @@ export const SCENARIOS: readonly Scenario[] = [
     description:
       'Singapore, 1995. Borders open, the big twins fly anywhere, and every ' +
       'megahub wants your passengers. Finish 2010 as the #1 airline by net ' +
-      'worth — and be worth at least $500M.',
+      'worth — and be worth at least $750M.',
     startYear: 1995,
     quarters: 60,
     player: {
@@ -205,7 +205,7 @@ export const SCENARIOS: readonly Scenario[] = [
         personality: 'price_war',
       },
     ],
-    targetNetWorth: 500_000,
+    targetNetWorth: 750_000,
     eventWeightMult: { boom: 2, tourism_wave: 2, conflict: 1.5 },
   },
   {
@@ -214,7 +214,7 @@ export const SCENARIOS: readonly Scenario[] = [
     description:
       'Barcelona, 2005. Fuel spikes, slumps ground whole fleets, and every ' +
       'discounter is packing A320s nose to tail. Out-lean them all and ' +
-      'finish 2020 as the #1 airline, worth at least $600M.',
+      'finish 2020 as the #1 airline, worth at least $750M.',
     startYear: 2005,
     quarters: 60,
     player: {
@@ -254,7 +254,7 @@ export const SCENARIOS: readonly Scenario[] = [
         personality: 'premium',
       },
     ],
-    targetNetWorth: 600_000,
+    targetNetWorth: 750_000,
     eventWeightMult: { travel_slump: 3, oil_shock: 2, alliance_boom: 2, boom: 0.75 },
   },
 ]

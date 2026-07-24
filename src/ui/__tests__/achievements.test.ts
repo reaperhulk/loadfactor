@@ -62,6 +62,7 @@ describe('achievement predicates', () => {
       revenue: 100,
       costs: 50,
       profit: 50,
+      debtPayment: 0,
       cash: 0,
       netWorth: 0,
       pax: 0,
