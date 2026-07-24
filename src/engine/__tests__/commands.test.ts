@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyCommand, newGame, type GameEvent, type GameState } from '../index'
+import { applyPlanningCommand } from '../commands'
 import { currentLoanRateBp } from '../queries'
 import { resolveNegotiations } from '../negotiation'
 
@@ -251,6 +252,16 @@ describe('command validation', () => {
     // All ids stay unique within the acquirer.
     const ids = [...me.fleet.map((a) => a.id), ...me.routes.map((r) => r.id), ...me.loans.map((l) => l.id)]
     expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('acquire_rival: the player is never for sale, even when distressed', () => {
+    const state = fresh()
+    state.airlines[0]!.insolventQuarters = 2
+    state.airlines[0]!.cash = 0
+    state.airlines[1]!.cash = 999_999
+    const { events } = applyPlanningCommand(state, 1, { type: 'acquire_rival', target: 0 })
+    expectRejected(events, 'cannot be acquired')
+    expect(state.airlines[0]!.bankrupt).toBe(false)
   })
 
   it('same-city negotiations become a bidding war, biggest spend first', () => {

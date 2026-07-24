@@ -311,6 +311,8 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
     case 'acquire_rival': {
       const target = state.airlines[command.target]
       if (!target || command.target === airlineIdx) return reject(airlineIdx, command, 'no such rival')
+      if (target.controller === 'player')
+        return reject(airlineIdx, command, 'the player cannot be acquired — beat them in the race')
       if (target.bankrupt) return reject(airlineIdx, command, 'nothing left to buy — they liquidated')
       // Only DISTRESSED rivals sell: insolvent last quarter, or worth a
       // quarter of the acquirer or less. Healthy equals fight on.

@@ -5,7 +5,7 @@
 
 import { typesOnSale, getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey } from '../data/cities'
-import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND, ROUTE_MEMORY_QUARTERS, ROUTE_SPOOL_BP } from '../data/constants'
+import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND, ROUTE_MEMORY_QUARTERS, ROUTE_SPOOL_BP, TAKEOVER_BASE_K, TAKEOVER_PREMIUM_BP } from '../data/constants'
 import { applyPlanningCommand } from './commands'
 import { pairWeeklyDemand, routeSpoolBp } from './market'
 import { negotiationDifficulty } from './negotiation'
@@ -141,6 +141,21 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   const wantMarketing = airline.cash >= cashBuffer ? personality.marketing : 0
   if (airline.marketing !== wantMarketing) {
     apply(state, idx, { type: 'set_marketing', level: wantMarketing }, events)
+  }
+
+  // Consolidation: a healthy rival absorbs an INSOLVENT fellow rival when the
+  // deal leaves a double treasury buffer standing. Rescue-only on purpose —
+  // letting a leader gobble any 4x-smaller rival (the clause the engine
+  // grants the player) snowballs one rival into a runaway monster.
+  for (const other of state.airlines) {
+    if (other.id === idx || other.id === 0 || other.bankrupt) continue
+    if (other.insolventQuarters < 1 || other.routes.length < 2) continue
+    const worth = netWorth(other)
+    const price = Math.max(TAKEOVER_BASE_K, Math.floor((Math.max(0, worth) * TAKEOVER_PREMIUM_BP) / 10000))
+    if (airline.cash >= price + cashBuffer * 2) {
+      apply(state, idx, { type: 'acquire_rival', target: other.id }, events)
+      break // one deal a quarter
+    }
   }
 
   // Defensive play, same as the competent player bot: prune structurally
@@ -412,7 +427,19 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
     }
     if (target !== null) {
       const budget = Math.floor((negotiationDifficulty(target) * personality.negotiateBudgetBp) / 10000)
-      const spend = Math.max(NEG_MIN_SPEND, Math.min(budget, airline.cash - 3000))
+      // Bidding-war awareness: rivals act in resolution, AFTER the player
+      // committed — a pending attempt at the same authority is visible.
+      // Outbid the field by 20% when the treasury allows; being second in
+      // the auction costs 40% of the odds.
+      let pendingMax = 0
+      for (const other of state.airlines) {
+        if (other.id === idx) continue
+        for (const n of other.negotiations) {
+          if (n.city === target) pendingMax = Math.max(pendingMax, n.spend)
+        }
+      }
+      const counter = pendingMax > 0 ? Math.floor((pendingMax * 12) / 10) : 0
+      const spend = Math.max(NEG_MIN_SPEND, Math.min(Math.max(budget, counter), airline.cash - 3000))
       if (spend >= NEG_MIN_SPEND && spend <= airline.cash) {
         apply(state, idx, { type: 'negotiate_slots', city: target, spend }, events)
       }

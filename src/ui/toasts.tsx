@@ -123,13 +123,19 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
         break
       }
       case 'rival_acquired': {
-        if (e.airline !== 0) break
         const bought = state?.airlines[e.target]?.name ?? 'a rival'
-        out.push({
-          kind: 'victory',
-          icon: '💼',
-          text: `Acquired ${bought} — ${e.aircraft} aircraft, ${e.routes} routes, and their debt`,
-        })
+        if (e.airline === 0) {
+          out.push({
+            kind: 'victory',
+            icon: '💼',
+            text: `Acquired ${bought} — ${e.aircraft} aircraft, ${e.routes} routes, and their debt`,
+          })
+        } else {
+          // Consolidation among the rivals is market news the player should
+          // hear: one fewer competitor, one bigger one.
+          const buyer = state?.airlines[e.airline]?.name ?? 'A rival'
+          out.push({ kind: 'event', icon: '💼', text: `${buyer} absorbed ${bought} — the market consolidates` })
+        }
         break
       }
       case 'game_over':
