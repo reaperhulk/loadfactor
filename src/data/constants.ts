@@ -86,6 +86,10 @@ export const ROUTE_MEMORY_QUARTERS = 8
 // scales with the city's tourism rating — beach towns breathe, business
 // capitals barely notice.
 export const SEASON_TOUR_BP_PER_POINT = 60
+// Bidding wars: when several airlines court the same slot authority in one
+// quarter, every outbid attempt keeps only this share of its odds — the
+// authority is entertaining a richer suitor.
+export const NEG_OUTBID_MALUS_BP = 6000
 // Minutes of weekly block time one airframe can fly.
 export const WEEKLY_BLOCK_MINUTES = 6000
 export const MIN_ROUTE_KM = 300

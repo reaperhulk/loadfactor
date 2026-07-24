@@ -4,6 +4,7 @@
 
 import {
   NEG_BASE_CHANCE_BP,
+  NEG_OUTBID_MALUS_BP,
   NEG_DIFFICULTY_PER_POINT,
   NEG_MAX_CHANCE_BP,
   NEG_SPEND_CHANCE_BP,
@@ -33,25 +34,47 @@ export function scarcityChanceBp(state: GameState, cityId: string, spend: number
   return Math.floor((negotiationChanceBp(cityId, spend) * scarcity) / 10000)
 }
 
-// Mutates state (callers clone at the entry point). Airlines resolve in
-// ascending index, attempts in command order — both deterministic.
+// Mutates state (callers clone at the entry point). Attempts group by city:
+// when two or more airlines court the same authority in the same quarter it
+// becomes a BIDDING WAR — the biggest spender rolls first while slots
+// remain, and every outbid attempt keeps only part of its odds (the
+// authority is entertaining a richer suitor). Cities resolve in sorted
+// order, bidders by descending spend then ascending airline id — all
+// deterministic.
 export function resolveNegotiations(state: GameState, events: GameEvent[]): void {
   let rng = state.rng.negotiations
+  const byCity = new Map<string, { airline: (typeof state.airlines)[number]; spend: number }[]>()
   for (const airline of state.airlines) {
     for (const attempt of airline.negotiations) {
-      const roll = chanceBp(rng, scarcityChanceBp(state, attempt.city, attempt.spend))
+      const list = byCity.get(attempt.city) ?? []
+      list.push({ airline, spend: attempt.spend })
+      byCity.set(attempt.city, list)
+    }
+    airline.negotiations = []
+  }
+  for (const cityId of [...byCity.keys()].sort()) {
+    const bidders = byCity.get(cityId)!
+    bidders.sort((a, b) => b.spend - a.spend || a.airline.id - b.airline.id)
+    const contested = bidders.length > 1
+    if (contested) {
+      events.push({ type: 'bidding_war', city: cityId, airlines: bidders.map((b) => b.airline.id) })
+    }
+    for (let rank = 0; rank < bidders.length; rank++) {
+      const b = bidders[rank]!
+      let bp = scarcityChanceBp(state, cityId, b.spend)
+      if (contested && rank > 0) bp = Math.floor((bp * NEG_OUTBID_MALUS_BP) / 10000)
+      const roll = chanceBp(rng, bp)
       rng = roll.rng
-      const city = getCity(attempt.city)
+      const city = getCity(cityId)
       const remaining = city.slotPool - slotsAllocated(state, city.id)
       if (roll.value && remaining > 0) {
         const granted = Math.min(SLOTS_PER_GRANT, remaining)
-        airline.slots[city.id] = (airline.slots[city.id] ?? 0) + granted
-        events.push({ type: 'slots_granted', airline: airline.id, city: city.id, slots: granted })
+        b.airline.slots[city.id] = (b.airline.slots[city.id] ?? 0) + granted
+        events.push({ type: 'slots_granted', airline: b.airline.id, city: city.id, slots: granted })
       } else {
-        events.push({ type: 'negotiation_failed', airline: airline.id, city: city.id })
+        events.push({ type: 'negotiation_failed', airline: b.airline.id, city: city.id })
       }
     }
-    airline.negotiations = []
   }
   state.rng.negotiations = rng
 }

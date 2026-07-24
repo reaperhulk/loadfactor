@@ -102,6 +102,17 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
         if (e.airline === 0)
           out.push({ kind: 'error', icon: '🤝', text: `Slot negotiation at ${e.city} failed — the spend is gone` })
         break
+      case 'bidding_war': {
+        // Only the player's wars are news; airlines list descending by spend.
+        const myRank = e.airlines.indexOf(0)
+        if (myRank < 0) break
+        out.push(
+          myRank === 0
+            ? { kind: 'slots', icon: '⚖️', text: `Bidding war at ${e.city} — you lead the bidding` }
+            : { kind: 'error', icon: '⚖️', text: `Bidding war at ${e.city} — you were outbid (odds cut)` },
+        )
+        break
+      }
       case 'world_event_started': {
         const where = e.city ? ` — ${e.city}` : e.region ? ` — ${e.region.toUpperCase()}` : ''
         out.push({

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyCommand, newGame, type GameEvent, type GameState } from '../index'
 import { currentLoanRateBp } from '../queries'
+import { resolveNegotiations } from '../negotiation'
 
 function expectRejected(events: GameEvent[], reasonPart: string): void {
   const rejection = events.find((e) => e.type === 'command_rejected')
@@ -196,6 +197,26 @@ describe('command validation', () => {
     l = applyCommand(l.state, { type: 'cancel_order', orderId: leaseId })
     expect(l.events[0]).toMatchObject({ type: 'order_cancelled', refund: 0 })
     expect(l.state.airlines[0]!.cash).toBe(18000)
+  })
+
+  it('same-city negotiations become a bidding war, biggest spend first', () => {
+    const state = fresh()
+    state.airlines[0]!.negotiations.push({ city: 'LHR', spend: 1000 })
+    state.airlines[1]!.negotiations.push({ city: 'LHR', spend: 3000 })
+    state.airlines[2]!.negotiations.push({ city: 'FRA', spend: 500 }) // solo — no war
+    const events: GameEvent[] = []
+    resolveNegotiations(state, events)
+    const wars = events.filter((e) => e.type === 'bidding_war')
+    expect(wars).toHaveLength(1)
+    if (wars[0]?.type === 'bidding_war') {
+      expect(wars[0].city).toBe('LHR')
+      // Descending spend: the rival's 3000 outbids the player's 1000.
+      expect(wars[0].airlines).toEqual([1, 0])
+    }
+    // Every attempt resolved one way or the other, and none linger.
+    const outcomes = events.filter((e) => e.type === 'slots_granted' || e.type === 'negotiation_failed')
+    expect(outcomes).toHaveLength(3)
+    for (const a of state.airlines) expect(a.negotiations).toHaveLength(0)
   })
 
   it('loan rates follow the economy: booms borrow cheaper than busts', () => {
