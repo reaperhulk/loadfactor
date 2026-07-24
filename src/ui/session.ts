@@ -16,10 +16,17 @@ import {
 import { getScenario } from '../data/scenarios'
 import { checkAchievements, type AchievementDef } from './achievements'
 
+// One resolved quarter's full event batch — the newspaper archive's unit.
+export interface QuarterRecord {
+  turn: number // the turn that was resolved (pre-increment)
+  events: GameEvent[]
+}
+
 export interface Session {
   state: GameState
   lastEvents: GameEvent[] // events from the most recent engine call
   reportEvents: GameEvent[] // events from the most recent end_quarter
+  reportArchive: QuarterRecord[] // every resolved quarter, oldest first
   commandLog: Command[]
   lastUnlocks: AchievementDef[] // achievements unlocked by the latest engine call
   careerUnlocks: string[] // achievement ids earned during this career
@@ -130,7 +137,9 @@ export function clearSave(): void {
   clearSaveAt(activeSlot)
 }
 
-// Rebuild a session from a save by replaying it through the engine.
+// Rebuild a session from a save by replaying it through the engine — one
+// incremental pass that also reconstructs the full quarter archive (the
+// Report tab's newspaper morgue), since a save IS a replay.
 export function resumeSave(slot = 0): boolean {
   const save = loadSaveAt(slot)
   if (!save) return false
@@ -138,21 +147,25 @@ export function resumeSave(slot = 0): boolean {
   sessionPlayer = save.player ?? null
   playerColor = save.color ?? null
   challengeTarget = save.challenge ?? null
-  const { state } = runReplay(save)
-  // Recover the last quarter's report so the Report panel isn't empty on resume.
-  let lastEnd = -1
-  for (let i = save.commands.length - 1; i >= 0; i--) {
-    if (save.commands[i]!.type === 'end_quarter') {
-      lastEnd = i
-      break
+  let state = newGame(save.scenario, save.seed, save.player)
+  const reportArchive: QuarterRecord[] = []
+  for (const cmd of save.commands) {
+    const turnBefore = state.turn
+    const res = applyCommand(state, cmd)
+    state = res.state
+    if (cmd.type === 'end_quarter' && res.events.some((e) => e.type === 'quarter_report' || e.type === 'game_over')) {
+      reportArchive.push({ turn: turnBefore, events: res.events })
     }
   }
-  let reportEvents: GameEvent[] = []
-  if (lastEnd >= 0) {
-    const upTo = runReplay({ ...save, commands: save.commands.slice(0, lastEnd) })
-    reportEvents = applyCommand(upTo.state, { type: 'end_quarter' }).events
+  session = {
+    state,
+    lastEvents: [],
+    reportEvents: reportArchive[reportArchive.length - 1]?.events ?? [],
+    reportArchive,
+    commandLog: [...save.commands],
+    lastUnlocks: [],
+    careerUnlocks: [],
   }
-  session = { state, lastEvents: [], reportEvents, commandLog: [...save.commands], lastUnlocks: [], careerUnlocks: [] }
   notify()
   return true
 }
@@ -193,6 +206,7 @@ export function startGame(
     state: newGame(scenarioId, seed, player ?? undefined),
     lastEvents: [],
     reportEvents: [],
+    reportArchive: [],
     commandLog: [],
     lastUnlocks: [],
     careerUnlocks: [],
@@ -280,10 +294,16 @@ export function dispatch(command: Command): GameEvent[] {
   const { state, events } = applyCommand(session.state, command)
   if (wasPlanning && state.phase !== 'planning') recordFame(state)
   const unlocks = checkAchievements(state, events)
+  const resolved =
+    command.type === 'end_quarter' &&
+    events.some((e) => e.type === 'quarter_report' || e.type === 'game_over')
   session = {
     state,
     lastEvents: events,
     reportEvents: command.type === 'end_quarter' ? events : session.reportEvents,
+    reportArchive: resolved
+      ? [...session.reportArchive, { turn: session.state.turn, events }]
+      : session.reportArchive,
     commandLog: [...session.commandLog, command],
     lastUnlocks: unlocks,
     careerUnlocks: unlocks.length

@@ -826,7 +826,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         {tab === 'airports' && <AirportsPanel state={state} />}
         {tab === 'rivals' && <RivalsPanel state={state} />}
         {tab === 'finance' && <FinancePanel state={state} />}
-        {tab === 'report' && <ReportPanel state={state} events={session.reportEvents} />}
+        {tab === 'report' && <ReportPanel state={state} archive={session.reportArchive} />}
       </section>
       <footer className="standings">
         {state.airlines.map((a) => (

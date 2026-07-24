@@ -496,3 +496,26 @@ test('the late-game map stays within its structural render budget', async ({ pag
   const zoomed = await page.evaluate(() => document.querySelectorAll('svg.map *').length)
   expect(zoomed, 'zoomed element count').toBeLessThan(2600)
 })
+
+test('the report archive pages back through quarters and files an annual review', async ({ page }) => {
+  await startGame(page)
+  await page.evaluate(() => {
+    const snap = window.__harness.getState()!
+    const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
+    for (let i = 0; i < 5; i++) window.__harness.endQuarter()
+  })
+  await page.getByTestId('tab-report').click()
+  // Latest edition first; the arrows browse the morgue and 'latest' returns.
+  await expect(page.getByTestId('report-date')).toHaveText('1961 Q1')
+  await page.getByTestId('report-prev').click()
+  await expect(page.getByTestId('report-date')).toHaveText('1960 Q4')
+  await page.getByTestId('report-latest').click()
+  await expect(page.getByTestId('report-date')).toHaveText('1961 Q1')
+  // Filtering the wire narrows the log to one section.
+  await page.getByTestId('report-filter-money').click()
+  await expect(page.getByTestId('report')).toContainText('Quarter closed')
+  // The annual review sums 1960's four quarters.
+  await page.getByTestId('report-view-years').click()
+  await expect(page.getByTestId('annual-review')).toContainText('1960')
+})
