@@ -14,6 +14,13 @@
   box-sizing: border-box;
 }
 
+/* Keyboard navigation must be visible: every focusable element shows a clear
+   ring when reached by keyboard, without flashing on mouse clicks. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 body {
   margin: 0;
   background: var(--bg);

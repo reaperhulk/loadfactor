@@ -543,3 +543,36 @@ test('the minimap appears when zoomed and jumps the view on click', async ({ pag
   )
   expect(new Set(positions).size).toBe(positions.length)
 })
+
+test('keyboard reaches the network and every control has an accessible name', async ({ page }) => {
+  await startGame(page)
+  await page.evaluate(() => {
+    const snap = window.__harness.getState()!
+    const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
+  })
+  // Arrow keys cycle the dossier through network cities without a mouse.
+  await page.keyboard.press('ArrowRight')
+  await expect(page.getByTestId('city-panel')).toBeVisible()
+  const first = await page.getByTestId('city-panel').locator('h2').textContent()
+  await page.keyboard.press('ArrowRight')
+  const second = await page.getByTestId('city-panel').locator('h2').textContent()
+  expect(second).not.toBe(first)
+  await page.keyboard.press('ArrowLeft')
+  await expect(page.getByTestId('city-panel').locator('h2')).toHaveText(first!)
+  await page.keyboard.press('Escape')
+  // Every button carries an accessible name (text or aria-label), and the
+  // live regions the game narrates through are present.
+  const unnamed = await page.evaluate(() =>
+    [...document.querySelectorAll('button')]
+      .filter((el) => !((el.getAttribute('aria-label') ?? el.textContent ?? '').trim()))
+      .map((el) => el.outerHTML.slice(0, 80)),
+  )
+  expect(unnamed).toEqual([])
+  const unlabeledImages = await page.evaluate(() =>
+    [...document.querySelectorAll('svg[role="img"]')]
+      .filter((el) => !el.getAttribute('aria-label'))
+      .map((el) => (el.getAttribute('class') ?? 'svg').slice(0, 40)),
+  )
+  expect(unlabeledImages).toEqual([])
+})

@@ -2,7 +2,7 @@ import { useEffect, useReducer, useState, useSyncExternalStore } from 'react'
 import { CITIES } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { SCENARIOS, getScenario } from '../data/scenarios'
-import { netWorth, quarterOf, yearOf } from '../engine/queries'
+import { netWorth, networkCities, quarterOf, yearOf } from '../engine/queries'
 import { CityPanel } from './CityPanel'
 import { CoachMarks } from './CoachMarks'
 import { ConfirmButton } from './ConfirmButton'
@@ -552,6 +552,19 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           }
           return open
         })
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        // Cycle the dossier through the network's cities — the keyboard's
+        // answer to hunting for dots on a dense map.
+        const s = getSession()?.state
+        if (!s) return
+        const cities = [...networkCities(s.airlines[0]!)].sort()
+        if (cities.length === 0) return
+        e.preventDefault()
+        const step = e.key === 'ArrowRight' ? 1 : -1
+        setSelectedCity((cur) => {
+          const idx = cur !== null ? cities.indexOf(cur) : step > 0 ? -1 : 0
+          return cities[(idx + step + cities.length) % cities.length]!
+        })
       } else if (e.key >= '1' && e.key <= String(TABS.length)) {
         setTab(TABS[Number(e.key) - 1]!)
       } else if (e.key === '?') {
@@ -660,7 +673,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         if (hedgeExpiring) chips.push({ key: 'hedge', text: '⛽ fuel hedge expires next quarter', tab: 'finance' })
         if (chips.length === 0) return null
         return (
-          <div className="events-strip attention-strip" data-testid="attention-strip">
+          <div className="events-strip attention-strip" data-testid="attention-strip" aria-live="polite">
             {chips.map((c) => (
               <button key={c.key} className="event-chip attention-chip" onClick={() => setTab(c.tab)}>
                 {c.text}
@@ -718,6 +731,10 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
                 <tr>
                   <td>1–6</td>
                   <td>switch panels</td>
+                </tr>
+                <tr>
+                  <td>← / →</td>
+                  <td>cycle the dossier through your network's cities</td>
                 </tr>
                 <tr>
                   <td>Esc</td>
