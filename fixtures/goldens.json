@@ -86,19 +86,36 @@
   },
   "open-skies-greedy": {
     "checkpointHashes": {
-      "10": "6440598f",
-      "20": "873f59d9",
-      "30": "07e378c1",
-      "40": "87506e60"
+      "10": "4a4468b1",
+      "20": "ee5ecbe1",
+      "30": "4e59ae20",
+      "40": "2e49a247"
     },
     "summary": {
       "turn": 40,
       "phase": "planning",
-      "cash": 1191666,
-      "netWorth": 1521346,
-      "routes": 11,
+      "cash": 1355759,
+      "netWorth": 1639626,
+      "routes": 12,
       "fleet": 12,
-      "quarterlyProfit": -11552
+      "quarterlyProfit": 80220
+    }
+  },
+  "lcc-wars-greedy": {
+    "checkpointHashes": {
+      "10": "37da44b4",
+      "20": "eb74d74a",
+      "30": "a6f53205",
+      "40": "3ed07fb4"
+    },
+    "summary": {
+      "turn": 40,
+      "phase": "planning",
+      "cash": 2022360,
+      "netWorth": 2327711,
+      "routes": 15,
+      "fleet": 15,
+      "quarterlyProfit": 6887
     }
   }
 }

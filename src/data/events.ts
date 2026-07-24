@@ -92,6 +92,30 @@ export const WORLD_EVENTS: readonly WorldEventDef[] = [
     toYear: 2100,
     demandModBp: 12500,
   },
+  // Modern-era additions. Both start no earlier than the mid-90s so the
+  // earlier scenarios' event decks — and their pinned balance seeds — are
+  // untouched: eligibility is filtered by year before the draw.
+  {
+    id: 'travel_slump',
+    name: 'Travel slump',
+    target: 'global',
+    durationQuarters: 4,
+    weight: 7,
+    fromYear: 2000,
+    toYear: 2100,
+    economyModBp: 7600, // deeper than a recession — people simply stop flying
+    fuelModBp: 8600, // grounded fleets leave fuel cheap
+  },
+  {
+    id: 'alliance_boom',
+    name: 'Alliance boom',
+    target: 'global',
+    durationQuarters: 4,
+    weight: 10,
+    fromYear: 1995,
+    toYear: 2100,
+    economyModBp: 10900, // codeshares funnel connecting traffic everywhere
+  },
 ]
 
 const byId = new Map(WORLD_EVENTS.map((e) => [e.id, e]))

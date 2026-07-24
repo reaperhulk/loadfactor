@@ -78,6 +78,12 @@ test('every scenario starts from its menu card', async ({ page }) => {
   await expect(page.getByTestId('date')).toHaveText('1995 Q1')
   // The attention strip nudges toward the parked starter fleet.
   await expect(page.getByTestId('attention-strip')).toContainText('idle plane')
+  // The fifth era sits at the end of the same chain and starts the same way.
+  await page.goto('/')
+  await expect(page.getByTestId('locked-lcc_wars')).toBeVisible()
+  await page.getByTestId('start-lcc_wars').click()
+  await page.getByTestId('start-lcc_wars').click()
+  await expect(page.getByTestId('date')).toHaveText('2005 Q1')
 })
 
 test('a challenge link opens the same world for whoever follows it', async ({ page }) => {

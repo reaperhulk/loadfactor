@@ -27,6 +27,8 @@ export const EVENT_ICONS: Record<string, string> = {
   expo: '🎡',
   conflict: '⚠️',
   tourism_wave: '🏖️',
+  travel_slump: '😷',
+  alliance_boom: '🤝',
 }
 
 export const EVENT_NAMES: Record<string, string> = {
@@ -37,6 +39,8 @@ export const EVENT_NAMES: Record<string, string> = {
   expo: "World's Fair",
   conflict: 'Regional conflict',
   tourism_wave: 'Tourism wave',
+  travel_slump: 'Travel slump',
+  alliance_boom: 'Alliance boom',
 }
 
 // Which events earn a toast, and how they read. Player-only for the personal

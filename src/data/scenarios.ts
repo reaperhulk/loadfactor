@@ -208,6 +208,55 @@ export const SCENARIOS: readonly Scenario[] = [
     targetNetWorth: 500_000,
     eventWeightMult: { boom: 2, tourism_wave: 2, conflict: 1.5 },
   },
+  {
+    id: 'lcc_wars',
+    name: 'Low-Cost Wars',
+    description:
+      'Barcelona, 2005. Fuel spikes, slumps ground whole fleets, and every ' +
+      'discounter is packing A320s nose to tail. Out-lean them all and ' +
+      'finish 2020 as the #1 airline, worth at least $600M.',
+    startYear: 2005,
+    quarters: 60,
+    player: {
+      name: 'Sol Express',
+      hq: 'BCN',
+      cash: 40000,
+      hqSlots: 8,
+      extraSlots: { LHR: 2, FCO: 2, IST: 2 },
+      starterFleet: ['a320', 'a320'],
+    },
+    rivals: [
+      {
+        name: 'Vega Blue',
+        hq: 'LAS',
+        cash: 40000,
+        hqSlots: 8,
+        extraSlots: { PHX: 2, DEN: 2, SAN: 2 },
+        starterFleet: ['a320', 'a320'],
+        personality: 'price_war',
+      },
+      {
+        name: 'Archipelago Air',
+        hq: 'KUL',
+        cash: 40000,
+        hqSlots: 8,
+        extraSlots: { SIN: 2, BKK: 2, CGK: 2 },
+        starterFleet: ['a320', 'a320'],
+        personality: 'price_war',
+      },
+      {
+        name: 'Kaiser Luft',
+        hq: 'FRA',
+        cash: 40000,
+        hqSlots: 8,
+        extraSlots: { MUC: 2, VIE: 2, ZRH: 2 },
+        starterFleet: ['b777', 'a320'],
+        personality: 'premium',
+      },
+    ],
+    targetNetWorth: 600_000,
+    eventWeightMult: { travel_slump: 3, oil_shock: 2, alliance_boom: 2, boom: 0.75 },
+  },
 ]
 
 const byId = new Map(SCENARIOS.map((s) => [s.id, s]))

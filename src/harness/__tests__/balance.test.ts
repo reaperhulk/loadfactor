@@ -37,7 +37,10 @@ describe('balance envelope', () => {
   }[] = [
     { scenario: 'oil_crisis', quarters: 60, wins: ['alpha', 'beta'], competitive: ['theta'] },
     { scenario: 'deregulation', quarters: 60, wins: ['alpha'], competitive: ['beta', 'gamma'] },
-    { scenario: 'open_skies', quarters: 60, wins: ['theta'], competitive: ['beta', 'gamma'] },
+    // The modern-era event deck (travel_slump, alliance_boom) reshuffled the
+    // open_skies worlds in the bot's favor — beta graduated to a win pin.
+    { scenario: 'open_skies', quarters: 60, wins: ['beta', 'theta'], competitive: ['gamma'] },
+    { scenario: 'lcc_wars', quarters: 60, wins: ['alpha', 'beta'], competitive: ['gamma'] },
   ]
 
   for (const era of ERA_PINS) {
