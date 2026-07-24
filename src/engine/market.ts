@@ -163,9 +163,20 @@ export function routeShareWeight(airline: Airline, route: Route): number {
     cabinTripWeight += alloc.trips * CABIN_WEIGHT[alloc.cabin - 1]!
   }
   if (capacity === 0) return 0
+  return shareWeightFor(airline, cabinTripWeight, route.fareLevel, route.serviceLevel)
+}
+
+// The same weight from raw ingredients — lets a preview price a route that
+// does not exist yet (the launch dialog's prospective schedule) without
+// duplicating the formula it would drift from.
+export function shareWeightFor(
+  airline: Airline,
+  cabinTripWeight: number,
+  fareLevel: number,
+  serviceLevel: number,
+): number {
   const base = Math.floor(
-    (cabinTripWeight * FARE_LEVEL_WEIGHT[route.fareLevel + 2]! * SERVICE_LEVEL_WEIGHT[route.serviceLevel - 1]!) /
-      100,
+    (cabinTripWeight * FARE_LEVEL_WEIGHT[fareLevel + 2]! * SERVICE_LEVEL_WEIGHT[serviceLevel - 1]!) / 100,
   )
   // Brand: marketing spend buys pair appeal on every route the airline flies.
   return Math.floor((base * (10000 + airline.marketing * MARKETING_WEIGHT_BP_PER_LEVEL)) / 10000)

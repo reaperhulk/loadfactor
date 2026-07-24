@@ -19,6 +19,7 @@ import {
 import { ConfirmButton } from './ConfirmButton'
 import { Sparkline } from './Sparkline'
 import { assignAndSchedule } from './assign'
+import { estimateWeeklyPax } from './estimate'
 import { dispatch } from './session'
 import { money } from './format'
 
@@ -209,18 +210,14 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
       )}
 
       {(() => {
-        // Fare what-if: the engine's own share/elasticity math replayed at
-        // each posture, holding everyone else fixed. Direct traffic only —
-        // connections and cabin yield ride on top, so treat it as relative.
-        const othersWeight = contenders.filter((c) => !c.me).reduce((sum, c) => sum + c.weight, 0)
+        // Fare what-if: the shared estimator (share → elasticity → spool →
+        // cap, the engine's own order) at each posture, rivals held fixed.
+        // Direct traffic only — connections and cabin yield ride on top.
         const myCapacity = routeWeeklyCapacity(player, route)
         if (myCapacity === 0) return null
+        const spooling = routeSpoolBp(player, route, state.turn) < 10000
         const rows = [-2, -1, 0, 1, 2].map((level) => {
-          const weight = routeShareWeight(player, { ...route, fareLevel: level })
-          const total = weight + othersWeight
-          let pax = total > 0 ? Math.floor((demand * weight) / total) : 0
-          pax = Math.floor((pax * FARE_DEMAND_BP[level + 2]!) / 10000)
-          pax = Math.min(pax, myCapacity)
+          const { pax } = estimateWeeklyPax(state, { ...route, fareLevel: level })
           const fare = fareFor(km, level)
           return { level, fare, pax, revenueK: Math.floor((pax * fare) / 1000) }
         })
@@ -250,25 +247,21 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
               </tbody>
             </table>
             <p className="hint">
-              Direct traffic at today's demand, rivals held fixed. Costs barely move with fare — the
-              best revenue row is usually the best profit row.
+              Direct traffic at this quarter's demand (season included
+              {spooling ? ', ramp-up included' : ''}), rivals held fixed. Costs barely move with fare —
+              the best revenue row is usually the best profit row.
             </p>
           </details>
         )
       })()}
 
       {(() => {
-        // Service what-if: the same share replay along the soft-product
-        // axis, with the per-pax service cost shown against the pax gained.
-        const othersWeight = contenders.filter((c) => !c.me).reduce((sum, c) => sum + c.weight, 0)
+        // Service what-if: the same estimator along the soft-product axis,
+        // with the per-pax service cost shown against the pax gained.
         const myCapacity = routeWeeklyCapacity(player, route)
         if (myCapacity === 0) return null
         const rows = [1, 2, 3].map((level) => {
-          const weight = routeShareWeight(player, { ...route, serviceLevel: level })
-          const total = weight + othersWeight
-          let pax = total > 0 ? Math.floor((demand * weight) / total) : 0
-          pax = Math.floor((pax * FARE_DEMAND_BP[route.fareLevel + 2]!) / 10000)
-          pax = Math.min(pax, myCapacity)
+          const { pax } = estimateWeeklyPax(state, { ...route, serviceLevel: level })
           return { level, pax, costK: Math.floor((pax * SERVICE_COST_PER_PAX[level - 1]!) / 1000) }
         })
         return (

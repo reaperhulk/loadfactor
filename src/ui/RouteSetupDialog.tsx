@@ -6,8 +6,15 @@ import { useState } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm, pairKey } from '../data/cities'
 import type { GameState } from '../engine'
-import { FARE_DEMAND_BP, ROUTE_MEMORY_QUARTERS, ROUTE_SPOOL_BP } from '../data/constants'
-import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor, pairWeeklyDemand } from '../engine/market'
+import { CABIN_WEIGHT, FARE_DEMAND_BP, ROUTE_MEMORY_QUARTERS, ROUTE_SPOOL_BP } from '../data/constants'
+import {
+  estimateAircraftQuarterCost,
+  estimateWeeklySeats,
+  fareFor,
+  pairWeeklyDemand,
+  routeShareWeight,
+  shareWeightFor,
+} from '../engine/market'
 import { airlinesOnPair, roundTripsPerWeek } from '../engine/queries'
 import { dispatch } from './session'
 import { money } from './format'
@@ -120,12 +127,26 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
               </label>
             </div>
             {(() => {
-              // Honest preview: demand shaped by the chosen fare's elasticity
-              // and the first-quarter spool-up, capped by the seats actually
-              // flown, priced at the chosen fare.
-              const memoryTurn = player.servedUntil[pairKey(from, to)]
+              // Honest preview in the engine's own resolution order: split the
+              // pair by attractiveness against every incumbent (the prospective
+              // schedule priced by the same weight formula resolution uses),
+              // shape by the chosen fare's elasticity, attach the first-quarter
+              // spool-up, cap at the seats actually flown.
+              const key = pairKey(from, to)
+              let othersWeight = 0
+              for (const airline of state.airlines) {
+                if (airline.id === 0 || airline.bankrupt) continue
+                const theirs = airline.routes.find((r) => pairKey(r.from, r.to) === key)
+                if (theirs) othersWeight += routeShareWeight(airline, theirs)
+              }
+              const myWeight = chosen
+                ? shareWeightFor(player, clampedFreq * CABIN_WEIGHT[chosen.cabin - 1]!, fareLevel, serviceLevel)
+                : 0
+              const total = myWeight + othersWeight
+              let shaped = total > 0 ? Math.floor((demand * myWeight) / total) : 0
+              shaped = Math.floor((shaped * FARE_DEMAND_BP[fareLevel + 2]!) / 10000)
+              const memoryTurn = player.servedUntil[key]
               const remembered = memoryTurn !== undefined && state.turn - memoryTurn <= ROUTE_MEMORY_QUARTERS
-              let shaped = Math.floor((demand * FARE_DEMAND_BP[fareLevel + 2]!) / 10000)
               if (!remembered) shaped = Math.floor((shaped * ROUTE_SPOOL_BP[0]!) / 10000)
               const estPax = Math.min(shaped, seats)
               const estRev = Math.floor((estPax * fareFor(km, fareLevel) * 13) / 1000)
@@ -135,11 +156,15 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
                   First-quarter revenue{' '}
                   <strong className={estRev >= estCost ? 'pos' : 'neg'}>{money(estRev)}/q</strong> vs aircraft
                   cost {money(estCost)}/q at full schedule
+                  {rivalsHere > 0 && total > 0 && (
+                    <span className="neg">
+                      {' '}
+                      — contested: your schedule takes ~{Math.floor((myWeight * 100) / total)}% of the pair vs{' '}
+                      {rivalsHere} rival{rivalsHere > 1 ? 's' : ''}
+                    </span>
+                  )}
                   {!remembered && (
                     <span className="dim"> — new routes ramp to full demand over 3 quarters</span>
-                  )}
-                  {rivalsHere > 0 && (
-                    <span className="neg"> — before splitting the pair with {rivalsHere} rival{rivalsHere > 1 ? 's' : ''}</span>
                   )}
                 </p>
               )
