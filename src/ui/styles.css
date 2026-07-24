@@ -724,6 +724,43 @@ button.toast {
   animation: route-draw 900ms ease-out forwards;
 }
 
+/* Routes that just changed flags in a takeover: flash from deal-gold into
+   the player's own color — the map narrates the acquisition. */
+.route-acquired {
+  animation: acquired-flash 2.4s ease-out;
+}
+@keyframes acquired-flash {
+  0%,
+  55% {
+    stroke: #ffd166;
+    stroke-width: 3;
+  }
+  /* No 100% frame: the stroke eases back to the route's own computed color. */
+}
+
+/* Minimap inset: a world thumbnail with the live viewport rectangle. */
+.minimap {
+  position: absolute;
+  bottom: 12px;
+  left: 10px;
+  width: 148px;
+  height: auto;
+  border: 1px solid #35415d;
+  border-radius: 6px;
+  background: #0b111e;
+  opacity: 0.88;
+  cursor: pointer;
+}
+.minimap-land {
+  fill: #24334f;
+  stroke: none;
+}
+.minimap-viewport {
+  fill: #4fa3ff22;
+  stroke: var(--accent);
+  stroke-width: 4;
+}
+
 @keyframes route-draw {
   to {
     stroke-dashoffset: 0;
@@ -1319,6 +1356,7 @@ input[type='number'] {
 /* Accessibility: honor reduced-motion — rewards land instantly, nothing moves. */
 @media (prefers-reduced-motion: reduce) {
   .route-new,
+  .route-acquired,
   .endpoint-pulse,
   .toast,
   .event-halo,

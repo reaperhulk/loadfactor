@@ -519,3 +519,27 @@ test('the report archive pages back through quarters and files an annual review'
   await page.getByTestId('report-view-years').click()
   await expect(page.getByTestId('annual-review')).toContainText('1960')
 })
+
+test('the minimap appears when zoomed and jumps the view on click', async ({ page }) => {
+  await startGame(page)
+  await expect(page.getByTestId('minimap')).toHaveCount(0) // world view needs no minimap
+  await page.getByTestId('zoom-in').click()
+  await page.getByTestId('zoom-in').click()
+  await expect(page.getByTestId('minimap')).toBeVisible()
+  const before = await page.getByTestId('minimap-viewport').getAttribute('x')
+  // Clicking the far side of the thumbnail recenters the viewport there.
+  await page.getByTestId('minimap').click({ position: { x: 130, y: 40 } })
+  await expect
+    .poll(async () => page.getByTestId('minimap-viewport').getAttribute('x'))
+    .not.toBe(before)
+  // Zooming back out dismisses it.
+  await page.getByTestId('zoom-reset').click()
+  await expect(page.getByTestId('minimap')).toHaveCount(0)
+  // No two city labels share an anchor: the collision pass keeps them apart.
+  const positions = await page.evaluate(() =>
+    [...document.querySelectorAll('svg.map text.city-label')].map(
+      (t) => `${t.getAttribute('x')},${t.getAttribute('y')},${t.getAttribute('text-anchor')}`,
+    ),
+  )
+  expect(new Set(positions).size).toBe(positions.length)
+})

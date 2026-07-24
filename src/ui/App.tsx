@@ -772,6 +772,13 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
                 .map((e) => (e.type === 'slots_granted' ? e.city : '')),
             )
           }
+          acquiredRouteIds={(() => {
+            // A takeover appends the target's routes with fresh ids — the
+            // last `routes` entries are the ones that just changed flags.
+            const deal = session.lastEvents.find((e) => e.type === 'rival_acquired' && e.airline === 0)
+            if (!deal || deal.type !== 'rival_acquired' || deal.routes === 0) return new Set<number>()
+            return new Set(player.routes.slice(-deal.routes).map((r) => r.id))
+          })()}
         />
         {selectedCity !== null && (
           <CityPanel

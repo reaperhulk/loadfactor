@@ -378,6 +378,9 @@ interface MapViewProps {
   onRouteClick?: (routeId: number) => void
   newRouteIds: ReadonlySet<number>
   newSlotCities: ReadonlySet<string>
+  // Routes that just arrived via a takeover — they flash from rival gold
+  // into the player's color so the map narrates the acquisition.
+  acquiredRouteIds?: ReadonlySet<number>
 }
 
 export function MapView({
@@ -388,6 +391,7 @@ export function MapView({
   onRouteClick,
   newRouteIds,
   newSlotCities,
+  acquiredRouteIds,
 }: MapViewProps) {
   const [view, setView] = useState<ViewBox>(FULL_VIEW)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -561,6 +565,7 @@ export function MapView({
     return player.routes.map((r) => {
       const km = distanceKm(r.from, r.to)
       const isNew = newRouteIds.has(r.id)
+      const isAcquired = acquiredRouteIds?.has(r.id) ?? false
       const contested = rivalPairs.has(pairKey(r.from, r.to))
       const d = routePathFor(r.from, r.to)
       if (d === '') return null
@@ -569,7 +574,8 @@ export function MapView({
           <path
             d={d}
             pathLength={1}
-            className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
+            data-acquired={isAcquired || undefined}
+            className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}${isAcquired ? ' route-acquired' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
             style={{ '--cap-w': capWidth(player, r, false) } as React.CSSProperties}
             data-testid={isNew ? 'route-line-new' : undefined}
             onClick={() => {
@@ -590,7 +596,7 @@ export function MapView({
       )
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, isGlobe, globe, projKey, newRouteIds, lens, pulseUi, onRouteClick])
+  }, [state, isGlobe, globe, projKey, newRouteIds, acquiredRouteIds, lens, pulseUi, onRouteClick])
 
   const playerPlanesLayer = useMemo(() => {
     return flownRoutes.flatMap((r) => {
@@ -1058,25 +1064,55 @@ export function MapView({
           )
         })}
         {/* Labels draw in their own layer ABOVE every dot, with a halo — a
-            neighboring city's dot can never sit on top of a name. */}
-        {visible
-          .filter((c) => labeled.has(c.id))
-          .map((c) => {
+            neighboring city's dot can never sit on top of a name. Placement
+            runs a greedy collision pass in mass order: majors claim the
+            right-hand slot, and a label that would overlap one already
+            placed tries left, above, then below before giving in — dense
+            regions (Europe) stay readable instead of shingling. */}
+        {(() => {
+          const fs = 9 / uiScale
+          const placed: { x1: number; y1: number; x2: number; y2: number }[] = []
+          const order = visible
+            .filter((c) => labeled.has(c.id))
+            .sort((a, b) => cityMass(b) - cityMass(a) || (a.id < b.id ? -1 : 1))
+          return order.map((c) => {
             const p = pt(c.lon, c.lat)
             if (!p.vis) return null
             const r = (2 + cityMass(c) / 18) / Math.sqrt(uiScale)
+            const w = c.id.length * fs * 0.66
+            const gap = 3 / uiScale
+            // Candidate anchors: right (default), left, above, below.
+            const spots = [
+              { x: p.X + r + gap, y: p.Y + fs / 3, anchor: 'start' as const },
+              { x: p.X - r - gap, y: p.Y + fs / 3, anchor: 'end' as const },
+              { x: p.X, y: p.Y - r - gap, anchor: 'middle' as const },
+              { x: p.X, y: p.Y + r + fs, anchor: 'middle' as const },
+            ]
+            let pick = spots[0]!
+            for (const spot of spots) {
+              const x1 = spot.anchor === 'start' ? spot.x : spot.anchor === 'end' ? spot.x - w : spot.x - w / 2
+              const box = { x1, y1: spot.y - fs, x2: x1 + w, y2: spot.y }
+              if (!placed.some((b) => box.x1 < b.x2 && box.x2 > b.x1 && box.y1 < b.y2 && box.y2 > b.y1)) {
+                pick = spot
+                break
+              }
+            }
+            const px1 = pick.anchor === 'start' ? pick.x : pick.anchor === 'end' ? pick.x - w : pick.x - w / 2
+            placed.push({ x1: px1, y1: pick.y - fs, x2: px1 + w, y2: pick.y })
             return (
               <text
                 key={`label-${c.id}`}
-                x={p.X + r + 3 / uiScale}
-                y={p.Y + 3 / uiScale}
-                fontSize={9 / uiScale}
+                x={pick.x}
+                y={pick.y}
+                fontSize={fs}
+                textAnchor={pick.anchor}
                 className="city-label"
               >
                 {c.id}
               </text>
             )
-          })}
+          })
+        })()}
       </svg>
       <div className="map-controls">
         <button
@@ -1133,6 +1169,36 @@ export function MapView({
           {lens === 'profit' ? '$' : lens === 'season' ? '🌞' : '◐'}
         </button>
       </div>
+      {/* Minimap inset: once zoomed in, a world thumbnail shows where the
+          viewport sits — click (or drag) to jump the view there. Flat map
+          only; the globe orients itself. */}
+      {!isGlobe && view.w < W * 0.85 && (
+        <svg
+          className="minimap"
+          viewBox={`0 0 ${W} ${H}`}
+          data-testid="minimap"
+          role="img"
+          aria-label="Minimap — click to move the view"
+          onPointerDown={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect()
+            const mx = ((e.clientX - rect.left) / rect.width) * W
+            const my = ((e.clientY - rect.top) / rect.height) * H
+            const t = targetRef.current
+            applyView({ ...t, x: mx - t.w / 2, y: my - t.h / 2 }, true)
+          }}
+        >
+          <rect x={0} y={0} width={W} height={H} className="map-sea" />
+          <path d={WORLD_PATH} className="minimap-land" />
+          <rect
+            x={view.x}
+            y={view.y}
+            width={view.w}
+            height={view.h}
+            className="minimap-viewport"
+            data-testid="minimap-viewport"
+          />
+        </svg>
+      )}
     </div>
   )
 }
