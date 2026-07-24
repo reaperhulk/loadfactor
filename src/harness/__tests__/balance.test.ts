@@ -41,13 +41,15 @@ describe('balance envelope', () => {
     wins: readonly string[]
     competitive: readonly string[]
   }[] = [
-    // Re-derived after V2 (amortizing loans + transfer handling): the tighter
-    // economy demoted oil_crisis/alpha to a photo-finish competitive pin and
-    // promoted beta/theta to wins.
-    { scenario: 'oil_crisis', quarters: 60, wins: ['beta', 'theta'], competitive: ['alpha'] },
-    { scenario: 'deregulation', quarters: 60, wins: ['alpha', 'beta'], competitive: ['gamma'] },
-    { scenario: 'open_skies', quarters: 60, wins: ['beta', 'theta'], competitive: ['gamma'] },
-    { scenario: 'lcc_wars', quarters: 60, wins: ['alpha', 'beta'], competitive: ['gamma'] },
+    // Re-derived after V3 (one shared strategy brain for bot AND rivals —
+    // smarter rivals shuffled every race). Excluded as brutal-world seeds,
+    // where every airline stalls or the start is structurally hostile:
+    // oil_crisis theta pins competitive; deregulation/alpha (the western
+    // b767 box) and open_skies/gamma are unpinned entirely.
+    { scenario: 'oil_crisis', quarters: 60, wins: ['alpha', 'beta', 'gamma'], competitive: ['theta'] },
+    { scenario: 'deregulation', quarters: 60, wins: ['beta', 'gamma'], competitive: [] },
+    { scenario: 'open_skies', quarters: 60, wins: ['theta'], competitive: ['alpha', 'beta'] },
+    { scenario: 'lcc_wars', quarters: 60, wins: ['alpha', 'beta', 'gamma'], competitive: [] },
   ]
 
   for (const era of ERA_PINS) {

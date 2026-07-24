@@ -67,6 +67,11 @@ describe('build fuzzer', () => {
         negotiateBudgetBp: 15000,
         cashBuffer: 1000,
         cabin: 1, // pack every seat the sprawl can sell
+        fareFloor: -2,
+        contestDiscountBp: 6000,
+        marketing: 3, // every compounding lever pulled at once
+        hedges: 1,
+        takeovers: 1,
       },
     },
     {
@@ -82,6 +87,11 @@ describe('build fuzzer', () => {
         negotiateBudgetBp: 12000,
         cashBuffer: 6000,
         cabin: 3, // premium fit to stack yield on top of the gouge
+        fareFloor: 0,
+        contestDiscountBp: 14000,
+        marketing: 2,
+        hedges: 1,
+        takeovers: 0,
       },
     },
   ]

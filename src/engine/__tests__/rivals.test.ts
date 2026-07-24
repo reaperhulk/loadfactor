@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { CITIES } from '../../data/cities'
+import { CITIES, getCity } from '../../data/cities'
 import { applyCommand, newGame, type GameEvent } from '../index'
+import { negotiationCommands, yieldCommands } from '../policy'
 import { pairWeeklySeats, routeWeeklyCapacity } from '../queries'
 import { expansionScore, runRivalTurn } from '../rivals'
 
@@ -76,5 +77,43 @@ describe('rival intelligence', () => {
     const bid = rival.negotiations[0]
     expect(bid, 'the rival still entered a negotiation').toBeDefined()
     expect(bid!.spend, 'outbids the pending 20,000 by 20%').toBeGreaterThanOrEqual(24_000)
+  })
+
+  it('the dials genuinely differentiate the shared brain on identical state', () => {
+    // Fare floors: on the same slack route, a price warrior keeps cutting
+    // where a premium carrier holds the line.
+    const state = newGame('jet_age', 'dials-seed')
+    const me = state.airlines[0]!
+    const idle = me.fleet.find((a) => a.routeId === null)!
+    const opened = applyCommand(state, {
+      type: 'open_route',
+      from: 'JFK',
+      to: 'ORD',
+      aircraftId: idle.id,
+      frequency: 5,
+    }).state
+    const route = opened.airlines[0]!.routes[0]!
+    route.lastCapacity = 1000
+    route.lastLoadFactorBp = 4000 // slack — yield management wants a cut
+    route.fareLevel = 0
+    expect(yieldCommands(opened, 0, 0), 'premium floor holds the fare').toHaveLength(0)
+    expect(yieldCommands(opened, 0, -2), 'price-war floor keeps cutting').toMatchObject([
+      { type: 'set_fare', fareLevel: -1 },
+    ])
+
+    // Home-region discipline: with a fortress threshold the SAME airline
+    // negotiates inside its HQ region; without it, wherever the money is.
+    const dials = {
+      negotiateBudgetBp: 10000,
+      raidBonus: 0,
+      homeRegionUntil: 0,
+    }
+    const roam = negotiationCommands(opened, 0, dials)
+    const home = negotiationCommands(opened, 0, { ...dials, homeRegionUntil: 10 })
+    expect(home).toHaveLength(1)
+    if (home[0]!.type === 'negotiate_slots') {
+      expect(getCity(home[0]!.city).region).toBe(getCity(opened.airlines[0]!.hq).region)
+    }
+    expect(roam).toHaveLength(1)
   })
 })

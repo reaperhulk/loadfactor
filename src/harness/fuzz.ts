@@ -4,36 +4,44 @@
 // every push; `npm run fuzz:builds` runs the deep hunt; findings get pinned as
 // regression tests.
 
-import { typesOnSale } from '../data/aircraft'
-import { CITIES, distanceKm } from '../data/cities'
-import { AI_MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
 import { applyCommand, newGame } from '../engine'
-import { getAircraftType } from '../data/aircraft'
-import { negotiationDifficulty } from '../engine/negotiation'
 import {
-  debtCeiling,
-  netWorth,
-  slotCities,
-  slotsAllocated,
-  totalDebt,
-  yearOf,
-} from '../engine/queries'
+  assignmentCommands,
+  hedgeCommands,
+  launchCommands,
+  marketingCommands,
+  negotiationCommands,
+  orderCommands,
+  pruneCommands,
+  refitCommands,
+  renewalCommands,
+  scheduleCommands,
+  takeoverCommands,
+  treasuryCommands,
+  yieldCommands,
+  type PolicyDials,
+} from '../engine/policy'
+import { netWorth } from '../engine/queries'
 import { nextInt, rngFromSeed, type Rng } from '../engine/rng'
 import type { Command, GameState } from '../engine/types'
-import { assignmentCommands, launchCommands, pairScore } from './bots'
 
 // A strategy genome: every dial the greedy bot hard-codes, as a searchable
 // parameter. Ranges are inclusive and integer.
 export interface Genome {
-  expandThreshold: number // min competition-discounted pair score to open [50..1200]
+  expandThreshold: number // min market score (demand net of seats) to open [50..1200]
   buyLfBp: number // network-full threshold before buying [5000..9800]
   fareBias: number // fare level for new routes [-2..2]
   serviceLevel: number // service level for new routes [1..3]
+  fareFloor: number // yield management floor [-2..0]
   debtAppetite: number // expansion loan size $k [0..20000]
   renewAge: number // sell airframes at this age (quarters) [24..90]
   negotiateBudgetBp: number // spend as bp of city difficulty [3000..15000]
   cashBuffer: number // keep this much cash when buying [1000..12000]
   cabin: number // fleet cabin doctrine: 1 dense / 2 standard / 3 premium
+  contestDiscountBp: number // how heavily fielded seats discount a pair [6000..14000]
+  marketing: number // brand level held while liquid [0..3]
+  hedges: number // 1 = hedge cheap fuel
+  takeovers: number // 1 = reach for the acquisition lever (4x clause included)
 }
 
 export const GENOME_RANGES: Record<keyof Genome, readonly [number, number]> = {
@@ -41,122 +49,60 @@ export const GENOME_RANGES: Record<keyof Genome, readonly [number, number]> = {
   buyLfBp: [5000, 9800],
   fareBias: [-2, 2],
   serviceLevel: [1, 3],
+  fareFloor: [-2, 0],
   debtAppetite: [0, 20000],
   renewAge: [24, 90],
   negotiateBudgetBp: [3000, 15000],
   cashBuffer: [1000, 12000],
   cabin: [1, 3],
+  contestDiscountBp: [6000, 14000],
+  marketing: [0, 3],
+  hedges: [0, 1],
+  takeovers: [0, 1],
 }
 
 const GENOME_KEYS = Object.keys(GENOME_RANGES).sort() as (keyof Genome)[]
 
-// The generalized bot: greedyCommands with every constant swapped for a gene.
+// The generalized bot: the shared policy brain with every dial swapped for a
+// gene — including the compounding levers (marketing, hedging, takeovers)
+// the old genome couldn't reach, which are exactly the mechanics most likely
+// to break the curve.
 export function genomeCommands(state: GameState, g: Genome): Command[] {
-  const airline = state.airlines[0]!
+  const dials: PolicyDials = {
+    fareLevel: g.fareBias,
+    serviceLevel: g.serviceLevel,
+    fareFloor: g.fareFloor,
+    expandMinDemand: g.expandThreshold,
+    contestDiscountBp: g.contestDiscountBp,
+    negotiateBudgetBp: g.negotiateBudgetBp,
+    raidBonus: 0,
+    homeRegionUntil: 0,
+    marketing: g.marketing,
+  }
   const commands: Command[] = []
-
-  if (airline.cash < 3000) {
-    const room = debtCeiling(airline) - totalDebt(airline)
-    if (room >= 5000) commands.push({ type: 'take_loan', amount: Math.min(room, 8000) })
-  }
-
-  for (const route of airline.routes) {
-    if (route.lastCapacity > 0 && route.lastRevenue * 100 < route.lastCost * 85) {
-      commands.push({ type: 'close_route', routeId: route.id })
-    }
-  }
-
-  const geriatric = airline.fleet
-    .filter((a) => a.ageQuarters >= g.renewAge)
-    .sort((a, b) => b.ageQuarters - a.ageQuarters)
-    .slice(0, 2)
-  for (const ac of geriatric) commands.push({ type: 'sell_aircraft', aircraftId: ac.id })
-
-  // Cabin doctrine: refit the fleet toward the genome's fit, two a quarter
-  // (the validator rejects unaffordable refits — that is a genome's problem).
-  let refits = 0
-  for (const ac of airline.fleet) {
-    if (refits >= 2) break
-    if (ac.cabin !== g.cabin && !geriatric.some((old) => old.id === ac.id)) {
-      commands.push({ type: 'refit_cabin', aircraftId: ac.id, cabin: g.cabin })
-      refits++
-    }
-  }
-
-  const launch = launchCommands(state, g.expandThreshold, g.fareBias, g.serviceLevel)
+  commands.push(...treasuryCommands(state, 0))
+  if (g.hedges === 1) commands.push(...hedgeCommands(state, 0))
+  commands.push(...scheduleCommands(state, 0))
+  commands.push(...marketingCommands(state, 0, g.marketing))
+  commands.push(...pruneCommands(state, 0))
+  const renewal = renewalCommands(state, 0, g.renewAge)
+  commands.push(...renewal)
+  commands.push(...refitCommands(state, 0, g.cabin))
+  if (g.takeovers === 1) commands.push(...takeoverCommands(state, 0, false))
+  const launch = launchCommands(state, 0, dials)
   commands.push(...launch.commands)
-
-  let lastPax = 0
-  let lastCapacity = 0
-  for (const route of airline.routes) {
-    lastPax += route.lastPax
-    lastCapacity += route.lastCapacity
-  }
-  const networkFull = lastCapacity > 0 && lastPax * 10000 >= lastCapacity * g.buyLfBp
-  const bootstrapping = airline.fleet.length + airline.orders.length < 4
-  if ((networkFull || bootstrapping || geriatric.length > 0) && airline.orders.length === 0) {
-    const lastProfit = airline.history[airline.history.length - 1]?.profit ?? 0
-    let expectedCash = airline.cash
-    if (g.debtAppetite > 0 && airline.cash < g.cashBuffer + g.debtAppetite && lastProfit > 0) {
-      const room = debtCeiling(airline) - totalDebt(airline)
-      const amount = Math.min(room, g.debtAppetite)
-      if (amount >= 1000) {
-        commands.push({ type: 'take_loan', amount })
-        expectedCash += amount
-      }
-    }
-    const affordable = typesOnSale(yearOf(state)).filter((t) => t.price + g.cashBuffer <= expectedCash)
-    if (affordable.length > 0) {
-      let pick = affordable[0]!
-      for (const t of affordable) if (t.seats > pick.seats) pick = t
-      commands.push({ type: 'order_aircraft', aircraftType: pick.id })
-    }
-  }
-
-  if (airline.negotiations.length === 0 && airline.cash >= 4000) {
-    let reach = 0
-    for (const ac of airline.fleet) reach = Math.max(reach, getAircraftType(ac.type).rangeKm)
-    for (const t of typesOnSale(yearOf(state))) reach = Math.max(reach, t.rangeKm)
-    const held = slotCities(airline)
-    let target: string | null = null
-    let bestScore = 0
-    for (const c of CITIES) {
-      if ((airline.slots[c.id] ?? 0) > 0) continue
-      if (slotsAllocated(state, c.id) >= c.slotPool) continue
-      let cityScore = 0
-      for (const h of held) {
-        const km = distanceKm(c.id, h)
-        if (km < AI_MIN_ROUTE_KM || km > reach) continue
-        cityScore = Math.max(cityScore, pairScore(state, c.id, h))
-      }
-      if (cityScore > bestScore) {
-        bestScore = cityScore
-        target = c.id
-      }
-    }
-    if (target !== null) {
-      const spend = Math.max(
-        NEG_MIN_SPEND,
-        Math.min(Math.floor((negotiationDifficulty(target) * g.negotiateBudgetBp) / 10000), airline.cash - 3000),
-      )
-      if (spend >= NEG_MIN_SPEND && spend <= airline.cash) {
-        commands.push({ type: 'negotiate_slots', city: target, spend })
-      }
-    }
-  }
-
-  // Yield management with genome-neutral thresholds (same as greedy).
-  for (const route of airline.routes) {
-    if (route.lastCapacity === 0) continue
-    if (route.lastLoadFactorBp >= 9700 && route.fareLevel < 2) {
-      commands.push({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel + 1 })
-    } else if (route.lastLoadFactorBp < 5500 && route.fareLevel > -1) {
-      commands.push({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel - 1 })
-    }
-  }
-
+  commands.push(
+    ...orderCommands(state, 0, {
+      renewedThisQuarter: renewal.length > 0,
+      buyLfBp: g.buyLfBp,
+      debtAppetite: g.debtAppetite,
+      cashFloor: g.cashBuffer,
+    }),
+  )
+  commands.push(...negotiationCommands(state, 0, dials))
+  commands.push(...yieldCommands(state, 0, g.fareFloor))
   const skip = launch.usedAircraft !== null ? new Set([launch.usedAircraft]) : undefined
-  return [...commands, ...assignmentCommands(state, skip)]
+  return [...commands, ...assignmentCommands(state, 0, skip)]
 }
 
 export function runGenomeCareer(scenarioId: string, seed: string, genome: Genome, quarters: number): number {

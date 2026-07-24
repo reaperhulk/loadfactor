@@ -35,7 +35,7 @@ export const SCENARIOS: readonly Scenario[] = [
     description:
       'New York, 1960. The jets are here, the Atlantic is the prize, and two ' +
       'rivals are racing you for every slot. Finish 1980 as the #1 airline by ' +
-      'net worth — and be worth at least $500M.',
+      'net worth — and be worth at least $550M.',
     startYear: 1960,
     quarters: 80,
     player: {
@@ -68,7 +68,7 @@ export const SCENARIOS: readonly Scenario[] = [
         personality: 'fortress',
       },
     ],
-    targetNetWorth: 500_000,
+    targetNetWorth: 550_000,
   },
   {
     id: 'oil_crisis',

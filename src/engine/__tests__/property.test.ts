@@ -70,6 +70,10 @@ const commandArb: fc.Arbitrary<Command> = fc.oneof(
   fc.record({ type: fc.constant('negotiate_slots' as const), city: cityArb, spend: moneyArb }),
   fc.record({ type: fc.constant('take_loan' as const), amount: moneyArb }),
   fc.record({ type: fc.constant('repay_loan' as const), loanId: idArb, amount: moneyArb }),
+  // The largest state surgery in the engine: route/fleet/loan/slot transfer
+  // with id remapping. It belongs under random fire more than anything else.
+  fc.record({ type: fc.constant('acquire_rival' as const), target: fc.integer({ min: -1, max: 6 }) }),
+  fc.record({ type: fc.constant('set_marketing' as const), level: fc.integer({ min: -1, max: 5 }) }),
   fc.constant({ type: 'end_quarter' } as Command),
 )
 
@@ -78,9 +82,12 @@ describe('engine under random command fire', () => {
     fc.assert(
       fc.property(
         fc.string({ minLength: 1, maxLength: 8 }),
+        // Chaos must not be a jet_age-only guarantee — the modern eras have
+        // different starter fleets, rivals, and event decks.
+        fc.constantFrom('jet_age', 'lcc_wars'),
         fc.array(commandArb, { minLength: 1, maxLength: 80 }),
-        (seed, commands) => {
-          let state = newGame('jet_age', seed)
+        (seed, scenario, commands) => {
+          let state = newGame(scenario, seed)
           for (const command of commands) {
             state = applyCommand(state, command).state
             checkInvariants(state)
