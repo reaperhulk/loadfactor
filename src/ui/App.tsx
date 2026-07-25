@@ -527,6 +527,17 @@ function GameOverOverlay({
   )
 }
 
+// The objective as a bar, not just two numbers: how far along the era's own
+// scoring you are, read in one glance from the HUD.
+function ObjectiveBar({ value, target }: { value: number; target: number }) {
+  const pct = target > 0 ? Math.max(0, Math.min(100, Math.round((value * 100) / target))) : 0
+  return (
+    <span className="objective-bar" data-testid="objective-bar" aria-hidden="true">
+      <span className={`objective-fill${pct >= 100 ? ' met' : ''}`} style={{ width: `${pct}%` }} />
+    </span>
+  )
+}
+
 function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const session = getSession()!
   const [tab, setTab] = useState<Tab>('routes')
@@ -629,10 +640,15 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     <main className="game" style={livery ? ({ '--accent': livery } as React.CSSProperties) : undefined}>
       <header>
         <h1>Load Factor</h1>
-        <span data-testid="date">
+        <span className="hud-stat" data-label="Quarter" data-testid="date">
           {yearOf(state)} Q{quarterOf(state)}
         </span>
-        <span className="dim" data-testid="race-clock" title="quarters until the race is scored">
+        <span
+          className="hud-stat dim"
+          data-label="Remaining"
+          data-testid="race-clock"
+          title="quarters until the race is scored"
+        >
           {Math.max(0, scenario.quarters - state.turn)}q left
         </span>
         {(() => {
@@ -657,18 +673,28 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             ⚠ INSOLVENT — {player.insolventQuarters > 0 ? 'one more losing quarter folds the airline' : 'end the quarter in the red and the clock starts'}
           </span>
         )}
-        <span data-testid="cash">Cash {money(shownCash)}</span>
-        <span data-testid="networth">
+        <span className="hud-stat hud-figure" data-label="Cash" data-testid="cash">
+          {money(shownCash)}
+        </span>
+        <span className="hud-stat hud-figure hud-objective" data-label="Objective" data-testid="networth">
           {scenario.objective.kind === 'netWorth' ? (
-            <>Net worth {money(shownWorth)} / {money(scenario.objective.target)}</>
+            <>
+              {money(shownWorth)} <span className="hud-target">/ {money(scenario.objective.target)}</span>
+              <ObjectiveBar value={netWorth(player)} target={scenario.objective.target} />
+            </>
           ) : (
             <>
-              Net worth {money(shownWorth)} ·{' '}
               <span data-testid="objective-progress">
-                {scenario.objective.label} {objectiveValue(objectiveScore(player, scenario.objective.kind), scenario.objective.unit)}
-                {' / '}
-                {objectiveValue(scenario.objective.target, scenario.objective.unit)}
+                {objectiveValue(objectiveScore(player, scenario.objective.kind), scenario.objective.unit)}{' '}
+                <span className="hud-target">
+                  / {objectiveValue(scenario.objective.target, scenario.objective.unit)}{' '}
+                  {scenario.objective.label}
+                </span>
               </span>
+              <ObjectiveBar
+                value={objectiveScore(player, scenario.objective.kind)}
+                target={scenario.objective.target}
+              />
             </>
           )}
         </span>
@@ -682,7 +708,11 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           const me = netWorth(player)
           const gapTo = rank === 1 ? worths[1] : worths[rank - 2]
           return (
-            <span data-testid="rank" className={rank === 1 ? 'pos' : 'neg'}>
+            <span
+              data-testid="rank"
+              className={`hud-stat hud-figure ${rank === 1 ? 'pos' : 'neg'}`}
+              data-label="Position"
+            >
               #{rank}/{worths.length}
               {gapTo && (
                 <span className="dim">

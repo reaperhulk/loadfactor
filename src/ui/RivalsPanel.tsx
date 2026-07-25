@@ -184,19 +184,23 @@ export function RivalsPanel({ state }: { state: GameState }) {
 
   return (
     <div data-testid="rivals-panel">
-      <h3>
-        The race —{' '}
-        {RACE_METRICS.map((m) => (
-          <button
-            key={m.key}
-            className={`link-btn sort-btn${metric === m.key ? ' active' : ''}`}
-            data-testid={`race-metric-${m.key}`}
-            onClick={() => setMetric(m.key)}
-          >
-            {m.label}
-          </button>
-        ))}{' '}
-        by quarter
+      <h3 className="race-head">
+        <span>The race, by quarter</span>
+        {/* A segmented control: three link buttons in a row ran together into
+            one unreadable word ("net worthrevenuepassengers"). */}
+        <span className="segmented" role="group" aria-label="race metric">
+          {RACE_METRICS.map((m) => (
+            <button
+              key={m.key}
+              className={`segment${metric === m.key ? ' active' : ''}`}
+              data-testid={`race-metric-${m.key}`}
+              aria-pressed={metric === m.key}
+              onClick={() => setMetric(m.key)}
+            >
+              {m.label}
+            </button>
+          ))}
+        </span>
       </h3>
       <RaceChart
         series={series}
