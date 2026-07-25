@@ -112,7 +112,7 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
           out.push({ kind: 'slots', icon: '↩️', text: `Handed ${e.slots} slots back at ${e.city}` })
         break
       case 'airport_expanded':
-        out.push({ kind: 'slots', icon: '🏗', text: `${e.city} opened +${e.slots} slots` })
+        out.push({ kind: 'slots', icon: '⚙', text: `${e.city} opened +${e.slots} slots` })
         break
       case 'world_event_started': {
         const where = e.city ? ` — ${e.city}` : e.region ? ` — ${e.region.toUpperCase()}` : ''

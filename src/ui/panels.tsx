@@ -926,15 +926,14 @@ export function AirportsPanel({ state }: { state: GameState }) {
                 <td>
                   {held} / {used}
                   {idle && (
-                    <button
+                    <ConfirmButton
                       className="link-btn neg"
-                      title={`${held - used} unused — ${money((held - used) * slotRent(c.id))}/q of rent buying nothing`}
+                      label={`⚠ hand back ${held - used}`}
+                      confirmLabel="give them up?"
+                      title={`${held - used} unused — ${money((held - used) * slotRent(c.id))}/q of rent buying nothing. Released slots go back to the pool.`}
                       data-testid={`release-${c.id}`}
-                      onClick={() => dispatch({ type: 'release_slots', city: c.id, count: held - used })}
-                    >
-                      {' '}
-                      ⚠ hand back {held - used}
-                    </button>
+                      onConfirm={() => dispatch({ type: 'release_slots', city: c.id, count: held - used })}
+                    />
                   )}
                 </td>
                 <td className={remaining <= 0 ? 'neg' : 'dim'}>

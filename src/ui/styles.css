@@ -139,6 +139,15 @@ button {
   border-radius: 6px;
   padding: 4px 10px;
   cursor: pointer;
+  /* Centre the CONTENT BOX rather than sitting it on a text baseline. Glyphs
+     carry their own ascent/descent, so baseline layout left every icon button
+     ~0.8px high and pushed wide glyphs (🌐 was 5px out) off centre. Flex
+     centring costs nothing on ordinary text buttons and fixes all of them. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35em;
+  line-height: 1.15;
 }
 
 button:hover:not(:disabled) {
@@ -301,12 +310,23 @@ button:disabled {
   gap: 6px;
 }
 
+/* Square icon buttons: no padding to fight the centring, and a line box that
+   cannot add its own leading. */
 .map-controls button {
   width: 34px;
   height: 34px;
+  padding: 0;
   font-size: 1.1rem;
   line-height: 1;
   background: #1d2740e6;
+}
+
+/* Emoji render with their ink offset inside a wider advance, so even a
+   perfectly centred box looks pushed right. Trim the advance to the ink. */
+.map-controls button,
+.icon-btn {
+  font-family: 'Segoe UI Symbol', 'Noto Sans Symbols 2', system-ui, sans-serif;
+  text-indent: 0;
 }
 
 /* Narrow screens: the control column would outgrow the short map and blanket
@@ -1499,11 +1519,20 @@ input[type='number'] {
   font-size: 0.88rem;
 }
 
+/* A square icon button, so it lines up with the chip-shaped buttons beside it
+   instead of floating as a bare glyph on its own baseline. */
 .mute-toggle {
   background: none;
-  border: none;
+  border: 1px solid transparent;
   font-size: 1rem;
-  padding: 2px 4px;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+}
+
+.mute-toggle:hover:not(:disabled) {
+  border-color: #35415d;
+  background: #1d2740;
 }
 
 .toast-stack {

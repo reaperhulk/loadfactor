@@ -12,6 +12,7 @@ import { baseFare, pairWeeklyDemand, seasonalBp } from '../engine/market'
 import { cityPool, nextExpansion, slotFee, slotQueue, slotRent, slotsRemaining } from '../engine/slots'
 import { airlinesOnPair, networkCities, slotsAllocated, slotsFree, slotsHeld, slotsUsed } from '../engine/queries'
 import { cityMass, cityTier } from './MapView'
+import { ConfirmButton } from './ConfirmButton'
 import { dispatch } from './session'
 import { money } from './format'
 
@@ -175,19 +176,24 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
           planning around it is the point: a place in the line at a full
           airport is a bet on a date you can read right here. */}
       <div className="dim" data-testid="city-expansion">
-        🏗 {expansion.name} opens in {expansion.quartersAway}q (+{expansion.slots} slots)
+        <strong>Next build</strong> — {expansion.name} opens in {expansion.quartersAway}q (+
+        {expansion.slots} slots)
       </div>
 
       {cityId !== player.hq && held - used > 0 && (
         <div className="neg" data-testid="slot-rent-warning">
           ⚠ {held - used} unused slot{held - used > 1 ? 's' : ''} — {money((held - used) * slotRent(cityId))}/q of
           rent buying nothing{' '}
-          <button
+          {/* Handing capacity back is not undoable: the slots go to the pool,
+              anyone in the queue can take them, and getting them again means
+              the fee and the wait. Two steps, like closing a route. */}
+          <ConfirmButton
+            label="hand back"
+            confirmLabel="give them up?"
             data-testid="panel-release"
-            onClick={() => dispatch({ type: 'release_slots', city: cityId, count: held - used })}
-          >
-            hand back
-          </button>
+            title="the slots return to the pool — winning them back costs the fee and the wait"
+            onConfirm={() => dispatch({ type: 'release_slots', city: cityId, count: held - used })}
+          />
         </div>
       )}
 

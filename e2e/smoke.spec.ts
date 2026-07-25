@@ -156,7 +156,17 @@ test('slots are rented: unused capacity bills, and handing it back stops the bil
     const touched = new Set(me.routes.flatMap((r) => [r.from, r.to]))
     return Object.keys(me.slots).sort().find((c) => c !== me.hq && !touched.has(c))!
   })
-  await page.getByTestId(`release-${idleCity}`).click()
+  // Handing capacity back is a two-step confirm: the slots go to the pool and
+  // buying them again costs the fee and the wait, so one stray click must not
+  // do it.
+  const release = page.getByTestId(`release-${idleCity}`)
+  await release.click()
+  await expect(release).toContainText('give them up?')
+  expect(
+    await page.evaluate((c) => window.__harness.getState()!.airlines[0]!.slots[c] ?? 0, idleCity),
+    'still held after the first click',
+  ).toBeGreaterThan(0)
+  await release.click()
   expect(
     await page.evaluate((c) => window.__harness.getState()!.airlines[0]!.slots[c] ?? 0, idleCity),
   ).toBe(0)
