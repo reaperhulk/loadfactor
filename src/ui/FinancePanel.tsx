@@ -134,8 +134,129 @@ export function FinancePanel({ state }: { state: GameState }) {
   const [amount, setAmount] = useState(5000)
   const ceiling = debtCeiling(player)
   const debt = totalDebt(player)
+  // Unit economics: the airline industry's own way of comparing a network to
+  // itself over time. Totals alone hide whether growth is earning or just
+  // getting bigger.
+  const last = player.history[player.history.length - 1]
+  const prev = player.history[player.history.length - 2]
+  const unit = (h: (typeof player.history)[number] | undefined) => {
+    if (!h) return null
+    const seats = h.capacity ?? 0
+    return {
+      revPerPax: h.pax > 0 ? Math.floor((h.revenue * 1000) / h.pax) : 0,
+      costPerPax: h.pax > 0 ? Math.floor((h.costs * 1000) / h.pax) : 0,
+      costPerSeat: seats > 0 ? Math.floor((h.costs * 1000) / seats) : 0,
+      loadBp: seats > 0 ? Math.floor((h.pax * 10000) / seats) : 0,
+      marginBp: h.revenue > 0 ? Math.floor((h.profit * 10000) / h.revenue) : 0,
+    }
+  }
+  const u = unit(last)
+  const up = unit(prev)
+  const delta = (now: number, before: number | undefined): string => {
+    if (before === undefined || before === 0) return ''
+    const d = now - before
+    if (d === 0) return ''
+    return ` ${d > 0 ? '▲' : '▼'}`
+  }
   return (
     <div>
+      {u && (
+        <div data-testid="unit-economics">
+          <h3>Unit economics — last quarter</h3>
+          <table className="unit-table">
+            <tbody>
+              <tr>
+                <td className="dim" title="revenue per passenger carried">
+                  Revenue / pax
+                </td>
+                <td>
+                  ${u.revPerPax}
+                  <span className={u.revPerPax >= (up?.revPerPax ?? 0) ? 'pos' : 'neg'}>
+                    {delta(u.revPerPax, up?.revPerPax)}
+                  </span>
+                </td>
+                <td className="dim" title="all costs divided by passengers carried">
+                  Cost / pax
+                </td>
+                <td>
+                  ${u.costPerPax}
+                  <span className={u.costPerPax <= (up?.costPerPax ?? 0) ? 'pos' : 'neg'}>
+                    {delta(u.costPerPax, up?.costPerPax)}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td className="dim" title="cost per seat flown, filled or not">
+                  Cost / seat
+                </td>
+                <td>
+                  ${u.costPerSeat}
+                  <span className={u.costPerSeat <= (up?.costPerSeat ?? 0) ? 'pos' : 'neg'}>
+                    {delta(u.costPerSeat, up?.costPerSeat)}
+                  </span>
+                </td>
+                <td className="dim" title="passengers carried against seats flown">
+                  Load factor
+                </td>
+                <td>
+                  {(u.loadBp / 100).toFixed(0)}%
+                  <span className={u.loadBp >= (up?.loadBp ?? 0) ? 'pos' : 'neg'}>
+                    {delta(u.loadBp, up?.loadBp)}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td className="dim">Margin</td>
+                <td className={u.marginBp >= 0 ? 'pos' : 'neg'}>{(u.marginBp / 100).toFixed(1)}%</td>
+                <td className="dim" title="every passenger you carried, including connections">
+                  Passengers
+                </td>
+                <td>{(last?.pax ?? 0).toLocaleString('en-US')}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="hint">
+            Revenue per passenger is what you sell a seat for; cost per seat is what it costs to fly
+            one whether it sells or not. The gap between them, times load factor, is the airline.
+          </p>
+        </div>
+      )}
+      {player.history.length >= 2 && (
+        <details className="dossier-history" data-testid="quarter-ledger">
+          <summary className="dim">Quarter by quarter ({Math.min(12, player.history.length)}q)</summary>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr className="dim">
+                  <th>q</th>
+                  <th>revenue</th>
+                  <th>costs</th>
+                  <th>profit</th>
+                  <th>margin</th>
+                  <th>pax</th>
+                  <th>net worth</th>
+                </tr>
+              </thead>
+              <tbody>
+                {player.history.slice(-12).map((h) => {
+                  const m = h.revenue > 0 ? Math.floor((h.profit * 10000) / h.revenue) : 0
+                  return (
+                    <tr key={h.turn}>
+                      <td className="dim">t{h.turn}</td>
+                      <td>{money(h.revenue)}</td>
+                      <td className="dim">{money(h.costs)}</td>
+                      <td className={h.profit >= 0 ? 'pos' : 'neg'}>{money(h.profit)}</td>
+                      <td className={m >= 0 ? 'pos' : 'neg'}>{(m / 100).toFixed(0)}%</td>
+                      <td>{h.pax.toLocaleString('en-US')}</td>
+                      <td>{money(h.netWorth)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
       {player.history.length >= 2 && (
         <div className="finance-trends">
           <div className="trend-row">

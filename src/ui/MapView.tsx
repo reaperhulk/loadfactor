@@ -618,7 +618,17 @@ export function MapView({
             pathLength={1}
             data-acquired={isAcquired || undefined}
             className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}${isAcquired ? ' route-acquired' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
-            style={{ '--cap-w': capWidth(player, r, false) } as React.CSSProperties}
+            style={
+              {
+                '--cap-w': capWidth(player, r, false),
+                // Two more facts ride the same line: how full it flies (opacity
+                // — a limp route is literally faint) and whether it earns (a
+                // losing arc goes red). Width was already seats/wk, so an arc
+                // now says size, fullness and health at once.
+                '--load-o': (0.34 + (0.62 * r.lastLoadFactorBp) / 10000).toFixed(3),
+              } as React.CSSProperties
+            }
+            data-losing={r.lastCapacity > 0 && r.lastRevenue < r.lastCost ? '' : undefined}
             data-testid={isNew ? 'route-line-new' : undefined}
             onClick={(e) => {
               e.stopPropagation() // an arc click must not select a nearby city

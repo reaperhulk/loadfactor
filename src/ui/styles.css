@@ -700,11 +700,18 @@ button.toast {
   stroke: var(--accent);
   /* Width carries data: scheduled seats/wk, set per-arc as --cap-w. */
   stroke-width: var(--cap-w, 1.6);
-  opacity: 0.9;
+  /* Opacity carries load factor: a route flying half empty looks half there. */
+  opacity: var(--load-o, 0.9);
   fill: none;
   pointer-events: stroke;
   vector-effect: non-scaling-stroke;
-  transition: stroke-width 150ms ease-out, opacity 150ms ease-out;
+  transition: stroke-width 150ms ease-out, opacity 150ms ease-out, stroke 400ms ease;
+}
+
+/* A route that lost money last quarter reads red on the board, so the network
+   shows its own problems without opening a table. */
+.route-player[data-losing] {
+  stroke: #d0636e;
 }
 
 .route-player:hover {
@@ -1675,10 +1682,22 @@ input[type='number'] {
 
 /* A world offer is a question, not a notification: it gets card weight and a
    gold edge so it reads as something awaiting an answer. */
+/* A timed decision must be noticeable without rearranging the board. In the
+   document flow this card shoved the map, the tabs and the tables down the
+   page the moment an offer arrived — so it floats over the bottom-right
+   instead, like the dossier does over the map. */
 .offer-card {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: min(420px, calc(100vw - 32px));
+  z-index: 40;
   border-left: 3px solid #ffd166;
-  background: linear-gradient(100deg, #2b2313, var(--panel) 60%);
+  background: linear-gradient(100deg, #2b2313, #131b2b 60%);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 20px 44px #00000080;
   max-width: none;
+  animation: panel-in 240ms ease-out;
 }
 .offer-card h2 {
   font-size: 1.05rem;
@@ -1737,4 +1756,75 @@ input[type='number'] {
   background: var(--accent);
   color: #06101f;
   font-weight: 600;
+}
+
+
+/* --- Filter bar ----------------------------------------------------------
+   Segmented control plus a free-text find, above any table long enough that
+   scanning it is work. */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 8px 0 6px;
+}
+
+.filter-input {
+  background: #131c2e;
+  border: 1px solid var(--rule, #1c2740);
+  border-radius: 7px;
+  color: var(--ink);
+  padding: 3px 9px;
+  font-size: 0.82rem;
+  min-width: 150px;
+}
+
+/* Totals sit under the data they aggregate, on their own rule. */
+tfoot td {
+  border-top: 2px solid var(--rule, #2a3550);
+  padding-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Money and counts line up column-wise wherever they appear in a table. */
+td, th {
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* Unit economics: label/value pairs in a compact grid, values aligned. */
+.unit-table {
+  width: 100%;
+  max-width: 560px;
+}
+.unit-table td {
+  padding: 3px 10px 3px 0;
+}
+.unit-table td:nth-child(2),
+.unit-table td:nth-child(4) {
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+
+/* A rival's identity colour, inline with its name. */
+.rival-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  vertical-align: baseline;
+}
+
+
+/* Narrow screens: the offer becomes a bottom sheet rather than a floating
+   card, so it never crowds the map controls. */
+@media (max-width: 720px) {
+  .offer-card {
+    right: 8px;
+    left: 8px;
+    bottom: 8px;
+    width: auto;
+  }
 }

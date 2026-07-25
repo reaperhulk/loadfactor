@@ -6,7 +6,7 @@ import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, pairKey } from '../data/cities'
 import { MIN_ROUTE_KM } from '../data/constants'
 import type { GameState } from '../engine'
-import { baseFare, fareFor, pairWeeklyDemand, seasonalBp } from '../engine/market'
+import { baseFare, fareFor, pairWeeklyDemand, routeSpoolBp, seasonalBp } from '../engine/market'
 import {
   GROUNDING_AGE_QUARTERS,
   ROUTE_MEMORY_QUARTERS,
@@ -51,7 +51,28 @@ import {
 
 // Sort keys for the routes comparison table. Each computes from the same row
 // model the cells render, so what you sort is exactly what you see.
-type RouteSortKey = 'name' | 'km' | 'load' | 'revenue' | 'profit' | 'margin' | 'rivals'
+type RouteSortKey =
+  | 'name'
+  | 'km'
+  | 'load'
+  | 'revenue'
+  | 'profit'
+  | 'margin'
+  | 'rivals'
+  | 'pax'
+  | 'yield'
+  | 'unit'
+  | 'cost'
+
+// The questions this table gets asked, as one control.
+type RouteFilter = 'all' | 'losing' | 'contested' | 'ramping' | 'long'
+const ROUTE_FILTERS: { key: RouteFilter; label: string; title: string }[] = [
+  { key: 'all', label: 'all', title: 'every route' },
+  { key: 'losing', label: 'losing', title: 'routes that lost money last quarter' },
+  { key: 'contested', label: 'contested', title: 'pairs a rival also flies' },
+  { key: 'ramping', label: 'ramping', title: 'new markets still attaching their share' },
+  { key: 'long', label: 'long-haul', title: '4,500km and up' },
+]
 
 export function RoutesPanel({
   state,
@@ -65,6 +86,8 @@ export function RoutesPanel({
   const player = state.airlines[0]!
   const [sortKey, setSortKey] = useState<RouteSortKey>('profit')
   const [sortAsc, setSortAsc] = useState(false)
+  const [filter, setFilter] = useState<RouteFilter>('all')
+  const [routeQuery, setRouteQuery] = useState('')
   if (player.routes.length === 0) {
     // Even before the first route, the opportunities list is the guidance
     // that matters most.
@@ -78,19 +101,65 @@ export function RoutesPanel({
   const networkOverhead = Math.floor(
     (ROUTE_OVERHEAD_QUAD * player.routes.length * player.routes.length * inflationBp(state.turn)) / 10000,
   )
-  const rows = player.routes.map((r) => {
+  const allRows = player.routes.map((r) => {
     const prev = r.history.length >= 2 ? r.history[r.history.length - 2] : undefined
     const profit = r.lastRevenue - r.lastCost
+    const km = distanceKm(r.from, r.to)
+    const seats = routeWeeklyCapacity(player, r)
+    // lastCapacity is seats flown across the QUARTER; weekly capacity is what
+    // the schedule offers now. Mixing the two is how a load factor comes out
+    // at 1300%.
+    const seatsFlown = r.lastCapacity
     return {
       route: r,
-      km: distanceKm(r.from, r.to),
+      km,
       planes: player.fleet.filter((a) => a.routeId === r.id).length,
       rivals: airlinesOnPair(state, r.from, r.to, 0),
       profit,
+      cost: r.lastCost,
+      pax: r.lastPax,
+      transfer: r.lastTransferPax,
+      seats,
+      // Yield: revenue per passenger carried. The number that says whether a
+      // route is cheap-and-full or dear-and-empty — load factor alone cannot.
+      yieldPerPax: r.lastPax > 0 ? Math.floor((r.lastRevenue * 1000) / r.lastPax) : 0,
+      // Unit cost per seat flown, the airline industry's own comparison across
+      // stage lengths (cost per available seat, in dollars).
+      seatsFlown,
+      costPerSeat: seatsFlown > 0 ? Math.floor((r.lastCost * 1000) / seatsFlown) : 0,
       marginBp: r.lastRevenue > 0 ? Math.floor((profit * 10000) / r.lastRevenue) : 0,
       profitTrend: prev === undefined ? 0 : profit - (prev.revenue - prev.cost),
+      ramping: routeSpoolBp(player, r, state.turn) < 10000,
     }
   })
+  // Filters answer the questions actually asked of this table: what is losing
+  // money, where am I being fought, what is still ramping, what is long-haul.
+  const rows = allRows.filter((x) => {
+    if (filter === 'losing' && x.profit >= 0) return false
+    if (filter === 'contested' && x.rivals === 0) return false
+    if (filter === 'ramping' && !x.ramping) return false
+    if (filter === 'long' && x.km < 4500) return false
+    const q = routeQuery.trim().toUpperCase()
+    if (q !== '' && !`${x.route.from}-${x.route.to}`.includes(q)) return false
+    return true
+  })
+  // Aggregates over what is ON SCREEN: filter to the losers and the totals
+  // tell you what the losers cost, not what the whole network earns.
+  const totals = rows.reduce(
+    (acc, x) => ({
+      revenue: acc.revenue + x.route.lastRevenue,
+      cost: acc.cost + x.cost,
+      profit: acc.profit + x.profit,
+      pax: acc.pax + x.pax,
+      transfer: acc.transfer + x.transfer,
+      seats: acc.seats + x.seats,
+      seatsFlown: acc.seatsFlown + x.seatsFlown,
+    }),
+    { revenue: 0, cost: 0, profit: 0, pax: 0, transfer: 0, seats: 0, seatsFlown: 0 },
+  )
+  const totalLoadBp =
+    totals.seatsFlown > 0 ? Math.floor((totals.pax * 10000) / totals.seatsFlown) : 0
+  const totalMarginBp = totals.revenue > 0 ? Math.floor((totals.profit * 10000) / totals.revenue) : 0
   const dir = sortAsc ? 1 : -1
   rows.sort((a, b) => {
     switch (sortKey) {
@@ -106,6 +175,14 @@ export function RoutesPanel({
         return dir * (a.marginBp - b.marginBp)
       case 'rivals':
         return dir * (a.rivals - b.rivals)
+      case 'pax':
+        return dir * (a.pax - b.pax)
+      case 'yield':
+        return dir * (a.yieldPerPax - b.yieldPerPax)
+      case 'unit':
+        return dir * (a.costPerSeat - b.costPerSeat)
+      case 'cost':
+        return dir * (a.cost - b.cost)
       default:
         return dir * (a.profit - b.profit)
     }
@@ -115,7 +192,7 @@ export function RoutesPanel({
     asc: sortAsc,
     setKey: setSortKey,
     setAsc: setSortAsc,
-    defaultAscFor: (k) => k === 'name' || k === 'km',
+    defaultAscFor: (k) => k === 'name' || k === 'km' || k === 'unit',
     testPrefix: 'sort-',
   })
   return (
@@ -149,6 +226,46 @@ export function RoutesPanel({
         ⎘ copy as spreadsheet
       </button>
     </p>
+    <div className="filter-bar">
+      <span className="segmented" role="group" aria-label="route filter">
+        {ROUTE_FILTERS.map((f) => (
+          <button
+            key={f.key}
+            className={`segment${filter === f.key ? ' active' : ''}`}
+            data-testid={`route-filter-${f.key}`}
+            aria-pressed={filter === f.key}
+            title={f.title}
+            onClick={() => setFilter(f.key)}
+          >
+            {f.label}
+            {f.key !== 'all' && (
+              <span className="dim">
+                {' '}
+                {
+                  allRows.filter((x) =>
+                    f.key === 'losing'
+                      ? x.profit < 0
+                      : f.key === 'contested'
+                        ? x.rivals > 0
+                        : f.key === 'ramping'
+                          ? x.ramping
+                          : x.km >= 4500,
+                  ).length
+                }
+              </span>
+            )}
+          </button>
+        ))}
+      </span>
+      <input
+        className="filter-input"
+        placeholder="find a route…"
+        value={routeQuery}
+        onChange={(e) => setRouteQuery(e.target.value)}
+        data-testid="route-search"
+        aria-label="filter routes by city code"
+      />
+    </div>
     <div className="table-scroll"><table>
       <thead>
         <tr>
@@ -160,14 +277,18 @@ export function RoutesPanel({
           <th>Freq/wk</th>
           {header('rivals', 'Rivals')}
           {header('load', 'Load')}
+          {header('pax', 'Pax/q', 'passengers carried last quarter')}
+          {header('yield', 'Yield', 'revenue per passenger carried')}
+          {header('unit', 'Cost/seat', 'cost per seat flown — comparable across stage lengths')}
           {header('revenue', 'Rev')}
+          {header('cost', 'Cost')}
           {header('margin', 'Margin')}
           {header('profit', 'P&L')}
           <th />
         </tr>
       </thead>
       <tbody>
-        {rows.map(({ route: r, km, planes, rivals: rivalsHere, profit, marginBp, profitTrend }) => {
+        {rows.map(({ route: r, km, planes, rivals: rivalsHere, profit, marginBp, profitTrend, pax, transfer, yieldPerPax, costPerSeat, cost, ramping }) => {
           const freq = `${effectiveFrequency(player, r)}/${maxRouteFrequency(player, r)}`
           return (
             <tr key={r.id} data-testid={`route-${r.from}-${r.to}`}>
@@ -221,7 +342,25 @@ export function RoutesPanel({
                 </span>
                 {(r.lastLoadFactorBp / 100).toFixed(0)}%
               </td>
+              <td>
+                {pax.toLocaleString('en-US')}
+                {transfer > 0 && (
+                  <span className="dim" title="of which connecting over your hubs">
+                    {' '}
+                    ({transfer.toLocaleString('en-US')} conn)
+                  </span>
+                )}
+                {ramping && (
+                  <span className="neg" title="new market, still attaching its share">
+                    {' '}
+                    ⏳
+                  </span>
+                )}
+              </td>
+              <td>{yieldPerPax > 0 ? `$${yieldPerPax}` : '—'}</td>
+              <td className="dim">{costPerSeat > 0 ? `$${costPerSeat}` : '—'}</td>
               <td>{money(r.lastRevenue)}</td>
+              <td className="dim">{money(cost)}</td>
               <td className={marginBp >= 0 ? 'pos' : 'neg'}>{(marginBp / 100).toFixed(0)}%</td>
               <td className={profit >= 0 ? 'pos' : 'neg'}>
                 {money(profit)}
@@ -243,6 +382,40 @@ export function RoutesPanel({
           )
         })}
       </tbody>
+      {/* The aggregate of what is on screen: filter to the losers and this row
+          tells you what the losers cost, not what the network earns. */}
+      <tfoot>
+        <tr data-testid="routes-totals">
+          <td>
+            <strong>{rows.length === allRows.length ? 'Network' : `${rows.length} shown`}</strong>
+          </td>
+          <td colSpan={5} className="dim">
+            {totals.seats.toLocaleString('en-US')} seats/wk
+          </td>
+          <td>{(totalLoadBp / 100).toFixed(0)}%</td>
+          <td>
+            {totals.pax.toLocaleString('en-US')}
+            {totals.transfer > 0 && (
+              <span className="dim"> ({totals.transfer.toLocaleString('en-US')} conn)</span>
+            )}
+          </td>
+          <td className="dim">
+            {totals.pax > 0 ? `$${Math.floor((totals.revenue * 1000) / totals.pax)}` : '—'}
+          </td>
+          <td className="dim">
+            {totals.seatsFlown > 0 ? `$${Math.floor((totals.cost * 1000) / totals.seatsFlown)}` : '—'}
+          </td>
+          <td>
+            <strong>{money(totals.revenue)}</strong>
+          </td>
+          <td className="dim">{money(totals.cost)}</td>
+          <td className={totalMarginBp >= 0 ? 'pos' : 'neg'}>{(totalMarginBp / 100).toFixed(0)}%</td>
+          <td className={totals.profit >= 0 ? 'pos' : 'neg'}>
+            <strong>{money(totals.profit)}</strong>
+          </td>
+          <td />
+        </tr>
+      </tfoot>
     </table></div>
     <ServiceLegend />
     <Opportunities state={state} onPlan={onPlan} />

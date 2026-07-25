@@ -315,6 +315,58 @@ test('previews report bands, opportunities carry risks, rival intent is visible'
   await expect(page.getByTestId('rival-negotiating-note')).toContainText('announced a campaign')
 })
 
+test('the books open: per-route economics, network totals, filters, head-to-head', async ({ page }) => {
+  await startGame(page)
+  await page.evaluate(() => {
+    for (const to of ['ORD', 'MIA', 'YYZ']) {
+      const me = window.__harness.getState()!.airlines[0]!
+      const idle = me.fleet.find((ac) => ac.routeId === null)
+      if (!idle) break
+      window.__harness.dispatch({ type: 'open_route', from: me.hq, to, aircraftId: idle.id, frequency: 6 })
+    }
+    for (let q = 0; q < 4; q++) window.__harness.endQuarter()
+  })
+  await page.getByTestId('tab-routes').click()
+
+  // Every route carries its own unit economics, not just a P&L.
+  const routes = page.getByTestId('routes-panel-table').or(page.locator('table').first())
+  await expect(routes).toContainText('Pax/q')
+  await expect(routes).toContainText('Yield')
+  await expect(routes).toContainText('Cost/seat')
+
+  // The totals row aggregates what is on screen, and its load factor is a
+  // real percentage — quarterly pax over quarterly seats, not a unit mix-up.
+  const totals = page.getByTestId('routes-totals')
+  await expect(totals).toContainText('Network')
+  const loadText = (await totals.innerText()).match(/(\d+)%/)
+  expect(Number(loadText?.[1])).toBeGreaterThan(0)
+  expect(Number(loadText?.[1])).toBeLessThanOrEqual(100)
+
+  // Filters narrow the table AND the totals with it.
+  const before = await page.locator('[data-testid^="route-JFK-"], [data-testid^="route-MIA-"]').count()
+  await page.getByTestId('route-filter-contested').click()
+  await expect(page.getByTestId('routes-totals')).toContainText('shown')
+  await page.getByTestId('route-filter-all').click()
+  await page.getByTestId('route-search').fill('ORD')
+  const filtered = await page.locator('tbody tr[data-testid^="route-"]').count()
+  expect(filtered).toBeLessThan(before + 1)
+  await page.getByTestId('route-search').fill('')
+
+  // Unit economics on the finance tab: what a seat costs against what a
+  // passenger pays.
+  await page.getByTestId('tab-finance').click()
+  await expect(page.getByTestId('unit-economics')).toContainText('Revenue / pax')
+  await expect(page.getByTestId('unit-economics')).toContainText('Cost / seat')
+  await page.getByTestId('quarter-ledger').locator('summary').click()
+  await expect(page.getByTestId('quarter-ledger')).toContainText('net worth')
+
+  // Competitor intelligence: the standings say who is bigger, head-to-head
+  // says who is taking your passengers.
+  await page.getByTestId('tab-rivals').click()
+  const h2h = page.getByTestId('head-to-head').or(page.getByTestId('head-to-head-empty'))
+  await expect(h2h).toBeVisible()
+})
+
 test('airline identity: name, livery, and a custom HQ with derived footholds', async ({ page }) => {
   await page.goto('/')
   await page.getByTestId('airline-name').fill('Pan Galactic')

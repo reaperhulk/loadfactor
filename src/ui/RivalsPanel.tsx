@@ -164,6 +164,92 @@ const RACE_METRICS = [
   { key: 'pax', label: 'passengers' },
 ] as const
 
+// Where the fighting actually happens. Standings say who is bigger; this says
+// who is taking YOUR passengers, on which pairs, and whether you are winning
+// there — the difference between a league table and intelligence.
+function HeadToHead({ state }: { state: GameState }) {
+  const player = state.airlines[0]!
+  const myPairs = new Map(player.routes.map((r) => [pairKey(r.from, r.to), r]))
+  const rows = state.airlines
+    .filter((a) => a.id !== 0 && !a.bankrupt)
+    .map((a) => {
+      let pairs = 0
+      let minePax = 0
+      let theirsPax = 0
+      let biggest: { pair: string; mine: number; theirs: number } | null = null
+      for (const their of a.routes) {
+        const key = pairKey(their.from, their.to)
+        const mine = myPairs.get(key)
+        if (!mine) continue
+        pairs++
+        minePax += mine.lastPax
+        theirsPax += their.lastPax
+        const total = mine.lastPax + their.lastPax
+        if (biggest === null || total > biggest.mine + biggest.theirs) {
+          biggest = { pair: `${mine.from}–${mine.to}`, mine: mine.lastPax, theirs: their.lastPax }
+        }
+      }
+      return { id: a.id, name: a.name, pairs, minePax, theirsPax, biggest }
+    })
+    .filter((r) => r.pairs > 0)
+  if (rows.length === 0) {
+    return (
+      <p className="hint" data-testid="head-to-head-empty">
+        No rival flies a pair you fly — every route you hold is a monopoly today.
+      </p>
+    )
+  }
+  return (
+    <div data-testid="head-to-head">
+      <h3>Where you meet</h3>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr className="dim">
+              <th>rival</th>
+              <th title="pairs you both fly">contested</th>
+              <th>your pax</th>
+              <th>their pax</th>
+              <th title="your share of the traffic on those pairs">your share</th>
+              <th>biggest fight</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const total = r.minePax + r.theirsPax
+              const sharePct = total > 0 ? Math.round((r.minePax * 100) / total) : 0
+              return (
+                <tr key={r.id} data-testid={`h2h-${r.id}`}>
+                  <td>
+                    <span
+                      className="rival-swatch"
+                      style={{ background: RIVAL_COLORS[(r.id - 1) % RIVAL_COLORS.length] }}
+                    />{' '}
+                    {r.name}
+                  </td>
+                  <td>{r.pairs}</td>
+                  <td>{r.minePax.toLocaleString('en-US')}</td>
+                  <td>{r.theirsPax.toLocaleString('en-US')}</td>
+                  <td className={sharePct >= 50 ? 'pos' : 'neg'}>{sharePct}%</td>
+                  <td className="dim">
+                    {r.biggest
+                      ? `${r.biggest.pair} — ${r.biggest.mine.toLocaleString('en-US')} v ${r.biggest.theirs.toLocaleString('en-US')}`
+                      : '—'}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="hint">
+        Share on a contested pair is set by appeal — schedule, cabin, fare posture, service, brand.
+        Losing one badly is a signal to out-schedule, undercut, or leave.
+      </p>
+    </div>
+  )
+}
+
 export function RivalsPanel({ state }: { state: GameState }) {
   const [metric, setMetric] = useState<(typeof RACE_METRICS)[number]['key']>('netWorth')
   // Late entrants have shorter histories than the founders. The chart spaces
@@ -240,6 +326,7 @@ export function RivalsPanel({ state }: { state: GameState }) {
         )
       })()}
       <StandingsTable state={state} />
+      <HeadToHead state={state} />
       <div className="race-legend">
         {state.airlines.map((a, i) => (
           <span key={a.id} className={i === 0 ? 'race-key me' : `race-key rival-${i}`}>
