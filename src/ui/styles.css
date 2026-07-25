@@ -140,6 +140,16 @@ button:disabled {
   transition: fill 1200ms ease;
 }
 
+/* Ocean depth, driven by the same era variables as the flat fill: the shelves
+   near the middle of the frame sit lighter than the abyssal corners, so the
+   sea has a floor instead of being a flat backdrop. */
+.sea-stop-shallow {
+  stop-color: var(--sea-shallow, #16233a);
+}
+.sea-stop-deep {
+  stop-color: var(--sea, #0e1522);
+}
+
 .map-land {
   fill: var(--land, #1c2739);
   stroke: var(--coast, #2c3a54);
@@ -148,33 +158,79 @@ button:disabled {
   transition: fill 1200ms ease, stroke 1200ms ease;
 }
 
+/* Political borders: a hairline INSIDE the landmass. Deliberately weaker than
+   the coast — the shape of the world is the story, borders are context. */
+.map-border {
+  fill: none;
+  stroke: var(--border-line, #2c3a54);
+  stroke-width: 0.5;
+  stroke-opacity: 0.5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+/* Meridians and parallels: barely there, but they turn a silhouette into a
+   projection of a sphere. */
+.map-graticule {
+  fill: none;
+  stroke: var(--graticule, #23324d);
+  stroke-width: 0.4;
+  stroke-opacity: 0.45;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.map-vignette {
+  pointer-events: none;
+}
+
 /* The promise is "sepia-warm sixties through a cool, neon-tinged 2000s" —
    these are real hue shifts, not three near-identical blues. Landmasses stay
    darker than every arc and dot so the network always reads on top. */
 .map.era-1960 {
-  --sea: #191410;
-  --land: #383021;
-  --coast: #57472e;
+  --sea: #14100c;
+  --sea-shallow: #241d14;
+  --land: #3d3423;
+  --coast: #6b5738;
+  --coast-glow: #8a6f45;
+  --border-line: #574728;
+  --graticule: #2e2718;
 }
 .map.era-1970 {
-  --sea: #16130f;
-  --land: #302b1f;
-  --coast: #4a412b;
+  --sea: #120f0b;
+  --sea-shallow: #221c14;
+  --land: #352e21;
+  --coast: #5f5133;
+  --coast-glow: #7d6a41;
+  --border-line: #4a412b;
+  --graticule: #2a2418;
 }
 .map.era-1980 {
-  --sea: #0e1522;
-  --land: #1c2739;
-  --coast: #2c3a54;
+  --sea: #080d16;
+  --sea-shallow: #14203a;
+  --land: #202c41;
+  --coast: #3c5077;
+  --coast-glow: #4a6b93;
+  --border-line: #2c3a54;
+  --graticule: #1b2740;
 }
 .map.era-1990 {
-  --sea: #0a1526;
-  --land: #152a46;
-  --coast: #21406b;
+  --sea: #061020;
+  --sea-shallow: #10243f;
+  --land: #172f4e;
+  --coast: #2c568c;
+  --coast-glow: #3b76bd;
+  --border-line: #21406b;
+  --graticule: #142744;
 }
 .map.era-2000 {
-  --sea: #061223;
-  --land: #0e2547;
-  --coast: #17417c;
+  --sea: #040d1c;
+  --sea-shallow: #0b2447;
+  --land: #102a52;
+  --coast: #1e5296;
+  --coast-glow: #2f74d0;
+  --border-line: #17417c;
+  --graticule: #0f2340;
 }
 
 .map-controls {
@@ -216,8 +272,31 @@ button:disabled {
   cursor: pointer;
 }
 
+/* City markers carry three facts at a glance: how big the market is (radius,
+   set in MapView), whether you are there (fill), and how full the airport is
+   (rim). Everything else on the map is drawn relative to these. */
 .city-dot {
   fill: #55627a;
+  stroke: #0b0f16;
+  stroke-width: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Majors get a rim of their own so a hub reads as a hub even at world view. */
+.city-dot.tier-1 {
+  stroke: #8ea4c4;
+  stroke-width: 0.9;
+}
+
+/* Capacity pressure, from the slot pool: an airport running out of room is
+   somewhere you have to plan around, so it says so before you click it. */
+.city-dot.tight {
+  stroke: #d8a052;
+  stroke-width: 1.1;
+}
+.city-dot.full {
+  stroke: #d0636e;
+  stroke-width: 1.3;
 }
 
 .city-dot.slotted {

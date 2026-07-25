@@ -9,9 +9,29 @@ import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { seasonalBp } from '../engine/market'
-import { WORLD_PATH, WORLD_RINGS } from '../data/worldmap.gen'
+import {
+  BORDERS_PATH,
+  ISLETS_PATH,
+  MAP_H,
+  MAP_LAT_MAX,
+  MAP_LAT_MIN,
+  MAP_W,
+  WORLD_PATH,
+  WORLD_PATH_FINE,
+  WORLD_RINGS,
+  projectLat,
+  projectLon,
+} from '../data/worldmap.gen'
 import type { GameState, Route } from '../engine'
-import { effectiveFrequency, networkCities, routeWeeklyCapacity, slotsHeld, yearOf } from '../engine/queries'
+import {
+  effectiveFrequency,
+  networkCities,
+  routeWeeklyCapacity,
+  slotsAllocated,
+  slotsHeld,
+  yearOf,
+} from '../engine/queries'
+import { cityPool } from '../engine/slots'
 import type { Airline } from '../engine'
 
 // Arc weight tells capacity: seats/wk drive stroke width, so the map itself
@@ -29,16 +49,14 @@ function slotsUsedAt(routes: readonly Route[], city: string): number {
   return used
 }
 
-const W = 960
-const H = 420
+// The projection comes FROM the generated geometry (tools/gen-worldmap.mjs),
+// not a copy of it: cities and coastlines are placed by the same functions, so
+// an airport can never drift off its own continent.
+const W = MAP_W
+const H = MAP_H
 
-function x(lon: number): number {
-  return ((lon + 180) / 360) * W
-}
-
-function y(lat: number): number {
-  return ((90 - lat) / 180) * ((H * 175) / 180) // clip Antarctica, keep aspect
-}
+const x = projectLon
+const y = projectLat
 
 export function cityMass(c: City): number {
   return c.pop * 4 + c.biz * 3 + c.tour * 2
@@ -110,6 +128,24 @@ function roundTripPath(fromId: string, toId: string): string {
   return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2} Q ${mx} ${my} ${x1} ${y1}`
 }
 
+// Meridians and parallels on the flat map. Baked once — the flat projection
+// never moves — and drawn faintly: enough to say "this is a globe unrolled",
+// not enough to compete with the network drawn on top.
+const GRATICULE_PATH = (() => {
+  const parts: string[] = []
+  for (let lon = -180; lon <= 180; lon += 30) {
+    parts.push(`M${x(lon).toFixed(1)},0L${x(lon).toFixed(1)},${H}`)
+  }
+  for (let lat = -40; lat <= 70; lat += 20) {
+    parts.push(`M0,${y(lat).toFixed(1)}L${W},${y(lat).toFixed(1)}`)
+  }
+  return parts.join('')
+})()
+
+function graticulePath(): string {
+  return GRATICULE_PATH
+}
+
 // Short hops, medium stages, and long-haul trunks each get their own line
 // language (width/dash), on top of the arc lift that grows with distance.
 function haulClass(km: number): string {
@@ -165,7 +201,7 @@ interface GlobeView {
 }
 
 const GLOBE_HOME: GlobeView = { cLon: -40, cLat: 30, s: 1 } // the Atlantic, gently tilted north
-const GLOBE_R = 195 // disc radius at s = 1, sized for the 960×420 viewport
+const GLOBE_R = 160 // disc radius at s = 1, sized to the cropped viewport
 
 interface GlobePoint {
   X: number
@@ -496,6 +532,12 @@ export function MapView({
     cachedTripPath(projKey, isGlobe ? globe : null, fromId, toId)
   const flownRoutes = player.routes.filter((r) => player.fleet.some((a) => a.routeId === r.id))
   const network = networkCities(player)
+  // How full each airport is, 0..1 — the slot model's scarcity, made visible
+  // on the board where expansion decisions are actually taken.
+  const pressure = (cityId: string): number => {
+    const pool = cityPool(state, cityId)
+    return pool <= 0 ? 1 : slotsAllocated(state, cityId) / pool
+  }
   // Launching needs an idle airframe with the legs — targets beyond every
   // idle aircraft's range shouldn't light up at all.
   let idleReachKm = 0
@@ -923,7 +965,26 @@ export function MapView({
         onPointerCancel={onPointerUp}
         onClick={handleMapTap}
       >
-        <rect x={0} y={0} width={W} height={H} className="map-sea" />
+        <defs>
+          {/* Ocean depth: the abyssal plain is darker than the shelves, so the
+              continents sit ON something instead of floating in flat black. */}
+          <radialGradient id="seaDepth" cx="50%" cy="42%" r="78%">
+            <stop offset="0%" className="sea-stop-shallow" />
+            <stop offset="100%" className="sea-stop-deep" />
+          </radialGradient>
+          {/* A hair of light along every coast, so land reads as raised. */}
+          <filter id="coastGlow" x="-4%" y="-4%" width="108%" height="108%">
+            <feDropShadow dx="0" dy="0" stdDeviation="1.4" floodColor="var(--coast-glow, #4a6b93)" floodOpacity="0.55" />
+          </filter>
+          {/* Vignette: the frame darkens at the edges and the eye goes to the
+              middle of the world rather than the corners of a rectangle. */}
+          <radialGradient id="mapVignette" cx="50%" cy="50%" r="72%">
+            <stop offset="55%" stopColor="#000" stopOpacity="0" />
+            <stop offset="100%" stopColor="#000" stopOpacity="0.55" />
+          </radialGradient>
+        </defs>
+        <rect x={0} y={0} width={W} height={H} className="map-sea" fill="url(#seaDepth)" />
+        {!isGlobe && <path d={graticulePath()} className="graticule map-graticule" />}
         {isGlobe ? (
           <>
             <defs>
@@ -940,7 +1001,22 @@ export function MapView({
             <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} className="globe-limb" />
           </>
         ) : (
-          <path d={WORLD_PATH} className="map-land" />
+          <>
+            {/* Detail that resolves: the coarse coastline is a smear at 3x, and
+                the fine one is wasted bytes of curve at world view. */}
+            <path
+              d={scale >= 1.8 ? WORLD_PATH_FINE : WORLD_PATH}
+              className="map-land"
+              filter="url(#coastGlow)"
+            />
+            {/* Country borders come from a separate mesh, so they are the
+                borders themselves and never a second copy of the coast. */}
+            {scale >= 1.35 && <path d={BORDERS_PATH} className="map-border" />}
+            {/* Islands with an airport but too small to survive 1:50m
+                generalisation — without these, Guam is an airport in open
+                ocean. */}
+            <path d={ISLETS_PATH} className="map-land map-islet" />
+          </>
         )}
         {/* Transfer hubs glow in proportion to the connecting pax flowing
             over them last quarter. */}
@@ -1024,7 +1100,7 @@ export function MapView({
             // Local px-per-km at the origin's latitude (equirectangular).
             const kmPerLonDeg = 111.32 * Math.max(0.2, Math.cos((origin.lat * Math.PI) / 180))
             const rx = (idleReachKm / kmPerLonDeg) * (W / 360)
-            const ry = (idleReachKm / 111.32) * (((H * 175) / 180) / 180) // px per lat degree, mirrors y()
+            const ry = (idleReachKm / 111.32) * (H / (MAP_LAT_MAX - MAP_LAT_MIN)) // px per lat degree, mirrors y()
             return (
               <ellipse
                 cx={p.X}
@@ -1053,7 +1129,7 @@ export function MapView({
             )
           const p = pt(c.lon, c.lat)
           if (!p.vis) return null
-          const r = (2 + cityMass(c) / 18) / Math.sqrt(uiScale)
+          const r = (1.7 + cityMass(c) / 13) / Math.sqrt(uiScale)
           return (
             <g
               key={c.id}
@@ -1106,13 +1182,18 @@ export function MapView({
                 cy={p.Y}
                 r={r}
                 className={
-                  selected === c.id
+                  (selected === c.id
                     ? 'city-dot selected'
                     : isTarget
                       ? 'city-dot target'
                       : held > 0
                         ? 'city-dot slotted'
-                        : 'city-dot'
+                        : 'city-dot') +
+                  ` tier-${cityTier(c)}` +
+                  // Capacity pressure, straight from the slot model: an airport
+                  // filling up is a place you have to move on, and the map is
+                  // where that decision starts.
+                  (pressure(c.id) >= 1 ? ' full' : pressure(c.id) >= 0.75 ? ' tight' : '')
                 }
               />
             </g>
@@ -1133,7 +1214,7 @@ export function MapView({
           return order.map((c) => {
             const p = pt(c.lon, c.lat)
             if (!p.vis) return null
-            const r = (2 + cityMass(c) / 18) / Math.sqrt(uiScale)
+            const r = (1.7 + cityMass(c) / 13) / Math.sqrt(uiScale)
             const w = c.id.length * fs * 0.66
             const gap = 3 / uiScale
             // Candidate anchors: right (default), left, above, below.
@@ -1168,6 +1249,16 @@ export function MapView({
             )
           })
         })()}
+        {/* Last, so it sits over everything: the frame falls off into the
+            dark and the middle of the world holds the eye. */}
+        <rect
+          x={view.x}
+          y={view.y}
+          width={isGlobe ? W : view.w}
+          height={isGlobe ? H : view.h}
+          fill="url(#mapVignette)"
+          className="map-vignette"
+        />
       </svg>
       <div className="map-controls">
         <button
