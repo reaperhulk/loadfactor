@@ -314,16 +314,27 @@ button:disabled {
    grow to finger size, and the minimap lifts above the control row so the
    two never stack on the same corner. */
 @media (max-width: 640px) {
+  /* The control row used to lie across the whole bottom edge of a map that is
+     only ~140px tall on a phone, covering a third of the world. Cluster it
+     into the bottom-RIGHT corner — the minimap owns bottom-left, and stacking
+     the two put the minimap's click target over the zoom buttons. */
   .map-controls {
     flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 140px;
     top: auto;
-    bottom: 10px;
+    bottom: 8px;
+    left: auto;
+    right: 8px;
+    gap: 4px;
   }
 
   .map-controls button {
-    width: 42px;
-    height: 42px;
-    font-size: 1.1rem;
+    width: 40px;
+    height: 40px;
+    font-size: 1.05rem;
+    opacity: 0.92;
   }
 }
 
