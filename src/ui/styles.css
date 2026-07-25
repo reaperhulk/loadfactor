@@ -1839,3 +1839,115 @@ td, th {
     width: auto;
   }
 }
+
+
+/* --- The quarterly report ------------------------------------------------
+   The quarter's result is the headline; the ledger is the detail underneath.
+   It used to open with a table and no hierarchy at all. */
+.report-hero {
+  text-align: center;
+  padding: 4px 0 14px;
+  border-bottom: 1px solid var(--rule, #1c2740);
+  margin-bottom: 12px;
+}
+
+.report-hero-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.report-hero-figure {
+  font-size: 2.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  margin: 2px 0;
+}
+
+.report-hero-sub {
+  font-size: 0.85rem;
+  color: var(--dim);
+}
+
+.report-hero-spark {
+  margin-top: 8px;
+  opacity: 0.8;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .report-hero-figure {
+    animation: hero-rise 340ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  }
+}
+
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+}
+
+
+/* --- Era identity --------------------------------------------------------
+   The decade already tinted the map; it now reaches the shell the map sits
+   in. Surfaces, rules and headings shift with the calendar, so a 1962 career
+   and a 2007 career do not look like the same screen with different numbers.
+   Text colours stay put — legibility is not a period detail. */
+.game.era-1960 {
+  --bg: #14110c;
+  --panel: #211c14;
+  --rule: #382f20;
+  --era-heading: #d9b779;
+}
+.game.era-1970 {
+  --bg: #17120c;
+  --panel: #241c13;
+  --rule: #3d3020;
+  --era-heading: #d9a05b;
+}
+.game.era-1980 {
+  --bg: #10141c;
+  --panel: #1a2130;
+  --rule: #2a3550;
+  --era-heading: #7fb2ff;
+}
+.game.era-1990 {
+  --bg: #0c121d;
+  --panel: #151f31;
+  --rule: #24344f;
+  --era-heading: #63c6e0;
+}
+.game.era-2000 {
+  --bg: #0a1017;
+  --panel: #121b26;
+  --rule: #1f2f40;
+  --era-heading: #59d6c4;
+}
+
+.game {
+  background: var(--bg);
+  transition: background 1200ms ease;
+}
+
+.game h3,
+.game .report-hero-figure.pos {
+  color: var(--era-heading, var(--ink));
+}
+
+.game h3 {
+  letter-spacing: 0.01em;
+}
+
+
+/* Charts get an axis, not just floating lines. */
+.chart-axis line {
+  stroke: var(--rule, #2a3550);
+  stroke-width: 1;
+}
+.chart-axis-label {
+  fill: var(--dim);
+  font-size: 8px;
+  opacity: 0.8;
+}

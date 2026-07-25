@@ -637,7 +637,10 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   // bars, chips — via the CSS custom property the whole UI already uses.
   const livery = getPlayerColor()
   return (
-    <main className="game" style={livery ? ({ '--accent': livery } as React.CSSProperties) : undefined}>
+    <main
+      className={`game era-${Math.min(2000, Math.max(1960, Math.floor(yearOf(state) / 10) * 10))}`}
+      style={livery ? ({ '--accent': livery } as React.CSSProperties) : undefined}
+    >
       <header>
         <h1>Load Factor</h1>
         <span className="hud-stat" data-label="Quarter" data-testid="date">

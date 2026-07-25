@@ -8,6 +8,7 @@ import { getEventDef } from '../data/events'
 import type { GameEvent, GameState } from '../engine'
 import { quarterOf, yearOf } from '../engine/queries'
 import { COST_LABELS, money } from './format'
+import { Sparkline } from './Sparkline'
 
 function delta(now: number, prev: number | undefined): string {
   if (prev === undefined) return ''
@@ -72,9 +73,28 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
   return (
     <div className="gameover-overlay report-overlay" data-testid="report-card" onClick={onClose}>
       <div className="gameover-card report-card" onClick={(e) => e.stopPropagation()}>
-        <h2>
-          {yearOf(state)} Q{quarterOf(state)} report
-        </h2>
+        {/* The quarter's headline, not its ledger. A profit figure the size of
+            a poster, its direction, and the margin behind it — the table below
+            is the supporting detail, which is the order a reader wants it in. */}
+        <div className="report-hero" data-testid="report-hero">
+          <div className="report-hero-label">
+            {yearOf(state)} Q{quarterOf(state)} · {now.profit >= 0 ? 'profit' : 'loss'}
+          </div>
+          <div className={`report-hero-figure ${now.profit >= 0 ? 'pos' : 'neg'}`}>
+            {money(Math.abs(now.profit))}
+          </div>
+          <div className="report-hero-sub">
+            {now.revenue > 0 ? `${((now.profit * 100) / now.revenue).toFixed(1)}% margin` : 'no revenue'}
+            {prev && ` · ${delta(now.profit, prev.profit)} on last quarter`}
+          </div>
+          {player.history.length >= 3 && (
+            <Sparkline
+              points={player.history.slice(-12).map((h) => h.profit)}
+              width={220}
+              className="sparkline spark-profit report-hero-spark"
+            />
+          )}
+        </div>
         <table className="report-lines">
           <tbody>
             <tr>

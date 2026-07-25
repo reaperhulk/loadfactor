@@ -146,6 +146,16 @@ function graticulePath(): string {
   return GRATICULE_PATH
 }
 
+// The SVG covers its box (preserveAspectRatio="slice"), so viewBox units map
+// to CSS pixels by the LARGER of the two ratios with the surplus split either
+// side. Every pointer conversion — tap, drag, pinch, zoom-to-cursor — must use
+// this, or input lands in the wrong place the moment the element's box stops
+// carrying the viewBox's aspect (which is what a phone-height map does).
+function viewToCss(rect: { width: number; height: number }, w: number, h: number) {
+  const k = Math.max(rect.width / w, rect.height / h)
+  return { k, offX: (rect.width - w * k) / 2, offY: (rect.height - h * k) / 2 }
+}
+
 // Short hops, medium stages, and long-haul trunks each get their own line
 // language (width/dash), on top of the arc lift that grows with distance.
 function haulClass(km: number): string {
@@ -763,8 +773,9 @@ export function MapView({
     let my = t.y + t.h / 2
     if (clientX !== null && clientY !== null && svgRef.current) {
       const rect = svgRef.current.getBoundingClientRect()
-      mx = t.x + ((clientX - rect.left) / rect.width) * t.w
-      my = t.y + ((clientY - rect.top) / rect.height) * t.h
+      const m = viewToCss(rect, t.w, t.h)
+      mx = t.x + (clientX - rect.left - m.offX) / m.k
+      my = t.y + (clientY - rect.top - m.offY) / m.k
     }
     // Clamp the scale BEFORE anchoring: at the zoom limit the width stops
     // changing, and anchoring with an unclamped width would keep shifting
@@ -875,8 +886,8 @@ export function MapView({
       applyView(
         {
           ...t,
-          x: t.x - ((now.midX - pinch.current.midX) / rect.width) * t.w,
-          y: t.y - ((now.midY - pinch.current.midY) / rect.height) * t.h,
+          x: t.x - (now.midX - pinch.current.midX) / viewToCss(rect, t.w, t.h).k,
+          y: t.y - (now.midY - pinch.current.midY) / viewToCss(rect, t.w, t.h).k,
         },
         true,
       )
@@ -903,7 +914,8 @@ export function MapView({
       })
     } else {
       const t = targetRef.current
-      applyView({ ...t, x: t.x - (dx / rect.width) * t.w, y: t.y - (dy / rect.height) * t.h }, true)
+      const m = viewToCss(rect, t.w, t.h)
+      applyView({ ...t, x: t.x - dx / m.k, y: t.y - dy / m.k }, true)
     }
     drag.current.px = e.clientX
     drag.current.py = e.clientY
@@ -941,10 +953,21 @@ export function MapView({
     const cssX = e.clientX - rect.left
     const cssY = e.clientY - rect.top
     // viewBox → CSS pixel mapping for the active projection.
-    const toCss = (p: GlobePoint): { x: number; y: number } =>
-      isGlobe
-        ? { x: (p.X / W) * rect.width, y: (p.Y / H) * rect.height }
-        : { x: ((p.X - view.x) / view.w) * rect.width, y: ((p.Y - view.y) / view.h) * rect.height }
+    // viewBox → CSS px under preserveAspectRatio="slice": the SVG scales to
+    // COVER its box, so the factor is the LARGER of the two ratios and the
+    // surplus is split either side. Assuming the width ratio (what "meet"
+    // would do) put every tap in the wrong place the moment the map's box
+    // stopped matching the viewBox aspect — which is exactly what giving the
+    // phone map a real height does.
+    const vw = isGlobe ? W : view.w
+    const vh = isGlobe ? H : view.h
+    const vx = isGlobe ? 0 : view.x
+    const vy = isGlobe ? 0 : view.y
+    const { k, offX, offY } = viewToCss(rect, vw, vh)
+    const toCss = (p: GlobePoint): { x: number; y: number } => ({
+      x: (p.X - vx) * k + offX,
+      y: (p.Y - vy) * k + offY,
+    })
     let best: string | null = null
     let bestD = 28 // max reach in CSS px — a comfortable fingertip
     for (const c of visible) {

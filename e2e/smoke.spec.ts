@@ -367,6 +367,35 @@ test('the books open: per-route economics, network totals, filters, head-to-head
   await expect(h2h).toBeVisible()
 })
 
+test('the quarter lands as a headline, and the era colours the whole shell', async ({ page }) => {
+  await startGame(page)
+  // 1960s: the shell wears the era, not just the map.
+  await expect(page.locator('main.game')).toHaveClass(/era-1960/)
+  // Fly something first — a quarter with no routes has no margin to report.
+  await page.evaluate(() => {
+    const me = window.__harness.getState()!.airlines[0]!
+    const idle = me.fleet.find((ac) => ac.routeId === null)!
+    window.__harness.dispatch({ type: 'open_route', from: me.hq, to: 'ORD', aircraftId: idle.id, frequency: 6 })
+    window.__harness.endQuarter()
+  })
+  await page.getByTestId('end-quarter').click()
+  // The report leads with the quarter's result at poster size, with its
+  // margin and direction — the ledger is the detail underneath it.
+  const hero = page.getByTestId('report-hero')
+  await expect(hero).toBeVisible()
+  await expect(hero).toContainText(/profit|loss/)
+  await expect(hero).toContainText('margin')
+  await expect(page.getByTestId('report-card')).toContainText('Revenue')
+  await page.getByTestId('report-card-close').click()
+
+  // A later era is a different palette on the same screen.
+  await page.goto('/')
+  await page.getByTestId('seed-input').fill('era-seed')
+  await page.getByTestId('start-lcc_wars').click()
+  await page.getByTestId('start-lcc_wars').click()
+  await expect(page.locator('main.game')).toHaveClass(/era-2000/)
+})
+
 test('airline identity: name, livery, and a custom HQ with derived footholds', async ({ page }) => {
   await page.goto('/')
   await page.getByTestId('airline-name').fill('Pan Galactic')

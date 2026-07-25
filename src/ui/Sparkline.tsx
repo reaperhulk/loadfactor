@@ -92,6 +92,26 @@ export function RaceChart({
           </text>
         </g>
       )}
+      {/* A time axis. The chart had a y-scale but nothing saying the x was
+          quarters at all, so a rising line carried no sense of HOW LONG. */}
+      <g className="chart-axis">
+        <line x1={0} x2={plotW} y1={height - 0.5} y2={height - 0.5} />
+        {[0, 0.5, 1].map((f) => {
+          const q = Math.max(1, Math.round(f * (all.length / series.length || 1)))
+          const qx = f * plotW
+          return (
+            <text
+              key={f}
+              x={Math.min(plotW - 12, Math.max(2, qx))}
+              y={height - 3}
+              className="chart-axis-label"
+              textAnchor={f === 0 ? 'start' : f === 1 ? 'end' : 'middle'}
+            >
+              {f === 0 ? 'q1' : `q${q}`}
+            </text>
+          )
+        })}
+      </g>
       {series.map((s) =>
         s.points.length >= 2 ? (
           <g key={s.label}>
