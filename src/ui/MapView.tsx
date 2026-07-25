@@ -439,7 +439,25 @@ export function MapView({
   newSlotCities,
   acquiredRouteIds,
 }: MapViewProps) {
-  const [view, setView] = useState<ViewBox>(FULL_VIEW)
+  // A phone's map box is nearly square; the world is 2.7:1. Covering that box
+  // with the WHOLE world would crop 60% of its width — measured, Chicago
+  // rendered at x = -45. So on a narrow screen "home" is the player's own
+  // region, not the whole planet: the crop then shows the network you fly.
+  // Desktop keeps the full world, where the box already carries the viewBox's
+  // aspect and nothing is cropped at all.
+  const homeView = (): ViewBox => {
+    if (typeof window === 'undefined' || window.innerWidth > 640) return FULL_VIEW
+    const hq = getCity(state.airlines[0]!.hq)
+    const w = W / 2.2
+    const h = (w * H) / W
+    return {
+      x: Math.max(0, Math.min(W - w, x(hq.lon) - w / 2)),
+      y: Math.max(0, Math.min(H - h, y(hq.lat) - h / 2)),
+      w,
+      h,
+    }
+  }
+  const [view, setView] = useState<ViewBox>(homeView)
   const svgRef = useRef<SVGSVGElement>(null)
   const drag = useRef<{ px: number; py: number; moved: boolean } | null>(null)
   // Zoom eases toward targetRef via exponential smoothing in a rAF loop;
@@ -988,6 +1006,7 @@ export function MapView({
       <svg
         ref={svgRef}
         viewBox={isGlobe ? `0 0 ${W} ${H}` : `${view.x} ${view.y} ${view.w} ${view.h}`}
+        preserveAspectRatio="xMidYMid slice"
         className={`map era-${Math.min(2000, Math.max(1960, Math.floor(yearOf(state) / 10) * 10))}`}
         role="img"
         aria-label="World route map"
@@ -1313,7 +1332,7 @@ export function MapView({
         <button
           data-testid="zoom-reset"
           aria-label="reset zoom"
-          onClick={() => (isGlobe ? setGlobe(GLOBE_HOME) : applyView(FULL_VIEW, false))}
+          onClick={() => (isGlobe ? setGlobe(GLOBE_HOME) : applyView(homeView(), false))}
         >
           ⤢
         </button>

@@ -121,17 +121,38 @@ test('mobile: fat-finger taps select cities and the chrome stays usable', async 
     expect(box!.height, `${id} height`).toBeGreaterThanOrEqual(40)
   }
 
-  // Zoomed in, the minimap must not sit under the control row.
+  // The phone map opens on the player's home region rather than the whole
+  // world, so the minimap — a second map laid over the first — is not shown
+  // at this size at all. Zooming must not conjure it back.
   await page.getByTestId('zoom-in').click()
   await page.getByTestId('zoom-in').click()
-  const mini = await page.getByTestId('minimap').boundingBox()
-  const controls = await page.locator('.map-controls').boundingBox()
-  const overlap =
-    mini!.x < controls!.x + controls!.width &&
-    mini!.x + mini!.width > controls!.x &&
-    mini!.y < controls!.y + controls!.height &&
-    mini!.y + mini!.height > controls!.y
-  expect(overlap, 'minimap clear of the control row').toBe(false)
+  await expect(page.getByTestId('minimap')).toBeHidden()
+
+  // And the map itself is a map, not a strip: it must claim real height.
+  const mapBox = await page.getByTestId('map').boundingBox()
+  expect(mapBox!.height, 'map height on a phone').toBeGreaterThan(190)
+})
+
+test('mobile: the map opens on the home region, with the network on screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByTestId('seed-input').fill('home-view')
+  await page.getByTestId('start-jet_age').click()
+  await expect(page.getByTestId('date')).toHaveText('1960 Q1')
+  // Covering a near-square phone box with a 2.7:1 world would crop 60% of its
+  // width — measured, that put Chicago at x = -45. Opening on the home region
+  // instead means the cities you actually fly from are on screen.
+  const box = await page.getByTestId('map').boundingBox()
+  for (const id of ['JFK', 'ORD', 'MIA']) {
+    const dot = await page.getByTestId(`city-${id}`).boundingBox()
+    expect(dot, `${id} rendered`).not.toBeNull()
+    expect(dot!.x, `${id} left of the map's right edge`).toBeLessThan(box!.x + box!.width)
+    expect(dot!.x + dot!.width, `${id} right of the map's left edge`).toBeGreaterThan(box!.x)
+  }
+  // Tapping one still opens its dossier — the pointer maths has to follow the
+  // same cover-scaling the render uses.
+  await page.getByTestId('city-ORD').click()
+  await expect(page.getByTestId('city-panel')).toContainText('Chicago')
 })
 
 test('mobile: the game-over card scrolls its buttons into reach', async ({ page }) => {

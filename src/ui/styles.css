@@ -314,6 +314,21 @@ button:disabled {
    grow to finger size, and the minimap lifts above the control row so the
    two never stack on the same corner. */
 @media (max-width: 640px) {
+  /* The phone map opens on the home region, so the minimap would be showing
+     permanently — a second map covering the first on the screen with the least
+     room for it. Panning and zoom-reset do its job here. */
+  .minimap {
+    display: none;
+  }
+
+  /* Tall enough to be a map rather than a strip, shallow enough that covering
+     it still shows a whole region around the home base. */
+  .map {
+    height: 34vh;
+    min-height: 210px;
+    max-height: 300px;
+  }
+
   /* The control row used to lie across the whole bottom edge of a map that is
      only ~140px tall on a phone, covering a third of the world. Cluster it
      into the bottom-RIGHT corner — the minimap owns bottom-left, and stacking
