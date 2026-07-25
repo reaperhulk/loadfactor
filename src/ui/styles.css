@@ -1533,3 +1533,14 @@ input[type='number'] {
   font-size: 1.05rem;
   margin: 0 0 6px;
 }
+
+/* A rival is courting this authority too — an outer red ring warns before
+   you commit, rather than after the auction. */
+.rival-negotiating-ring {
+  fill: none;
+  stroke: #d0636e;
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  opacity: 0.85;
+  pointer-events: none;
+}

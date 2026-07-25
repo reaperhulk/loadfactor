@@ -155,6 +155,11 @@ export interface Airline {
   reputationBp?: number
   restructures?: number // rivals only: chapter-11 rounds used (see RESTRUCTURE_MAX)
   enteredTurn?: number // set on late entrants; absent for founding airlines
+  // Rivals only: the authority this carrier has announced it will court next
+  // quarter. Slot campaigns are declared a quarter ahead so the player can see
+  // a bidding war coming and decide whether to join it — the alternative is an
+  // ambush resolved inside a pass nobody can watch.
+  slotInterest?: string
 }
 
 export interface ActiveEvent {

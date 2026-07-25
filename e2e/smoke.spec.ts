@@ -238,6 +238,54 @@ test('the opportunities list plans a route in one click', async ({ page }) => {
   await expect(page.getByTestId('route-setup')).toHaveCount(0)
 })
 
+test('previews report bands, opportunities carry risks, rival intent is visible', async ({ page }) => {
+  await startGame(page)
+  await page.evaluate(() => {
+    const snap = window.__harness.getState()!
+    const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
+    window.__harness.endQuarter()
+  })
+
+  // The what-if table quotes ranges, and says out loud whether the spread is
+  // wide enough to hide the answer — it never silently crowns a winner that
+  // demand noise could overturn.
+  await page.getByTestId('tab-routes').click()
+  await page.getByTestId('inspect-JFK-ORD').click()
+  await page.getByTestId('fare-whatif').locator('summary').click()
+  await expect(page.getByTestId('fare-whatif').locator('tbody')).toContainText(/[\d,]+–[\d,]+/)
+  await expect(page.getByTestId('fare-whatif-verdict')).toContainText(/Clear call|Too close to call/)
+  await page.getByTestId('route-dossier-close').click()
+
+  // Every opportunity row states what the headline market number omits.
+  await expect(page.getByTestId('opportunities').locator('[data-testid^="risk-"]').first()).not.toBeEmpty()
+
+  // Rival slot campaigns are announced a quarter ahead, so during planning
+  // there is always someone's declared target to find. The seed is fixed, so
+  // this either always finds one or always doesn't — the assertion is a real
+  // claim about rival behavior, not a coin flip.
+  const target = await page.evaluate(() => {
+    for (let q = 0; q < 8; q++) {
+      const s = window.__harness.getState()!
+      for (const a of s.airlines) {
+        if (a.id === 0 || a.bankrupt || a.slotInterest === undefined) continue
+        return { city: a.slotInterest, name: a.name }
+      }
+      window.__harness.endQuarter()
+    }
+    return null
+  })
+  expect(target).not.toBeNull()
+  // The map rings the courted airport wherever that airport is drawn — small
+  // fields only appear once zoomed in, so check the ring on a city that is on
+  // screen at world view, then open its panel for the named warning.
+  const ring = page.locator('[data-testid^="rival-negotiating-"]').first()
+  await expect(ring).toHaveCount(1)
+  const ringed = (await ring.getAttribute('data-testid'))!.replace('rival-negotiating-', '')
+  await page.getByTestId(`city-${ringed}`).click()
+  await expect(page.getByTestId('rival-negotiating-note')).toContainText('announced a campaign')
+})
+
 test('airline identity: name, livery, and a custom HQ with derived footholds', async ({ page }) => {
   await page.goto('/')
   await page.getByTestId('airline-name').fill('Pan Galactic')

@@ -57,6 +57,11 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
   const allocated = slotsAllocated(state, cityId)
   const rivalsHeld = allocated - held
   const negotiating = player.negotiations.some((n) => n.city === cityId)
+  // Rival intent is public: a carrier announces the authority it will court a
+  // quarter ahead, and that bid lands in the same pass as yours. Knowing
+  // someone else is coming for a shrinking pool is the whole reason to spend
+  // more than the minimum — or to spend it somewhere else entirely.
+  const rivalNegotiators = state.airlines.filter((a) => a.id !== 0 && !a.bankrupt && a.slotInterest === cityId)
   const poolFull = allocated >= city.slotPool
   const difficulty = negotiationDifficulty(cityId)
 
@@ -180,6 +185,15 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
         >
           {routeFrom === cityId ? 'Click a destination…' : '✈ Open route from here'}
         </button>
+      )}
+
+      {rivalNegotiators.length > 0 && (
+        <div className="neg" data-testid="rival-negotiating-note">
+          ⚠ {rivalNegotiators.map((a) => a.name).join(' · ')}{' '}
+          {rivalNegotiators.length > 1 ? 'have' : 'has'} announced a campaign for slots here — bidding next
+          quarter, resolving in the same pass as yours
+          {poolFull ? '' : `, against the ${city.slotPool - allocated} left in the pool`}.
+        </div>
       )}
 
       <div className="city-negotiate">

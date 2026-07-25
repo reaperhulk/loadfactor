@@ -1075,6 +1075,18 @@ export function MapView({
                   data-testid={`negotiating-${c.id}`}
                 />
               )}
+              {/* A rival has announced it will court this authority next
+                  quarter. Knowing BEFORE you commit is the difference between
+                  a bidding war and an ambush. */}
+              {state.airlines.some((a) => a.id !== 0 && !a.bankrupt && a.slotInterest === c.id) && (
+                <circle
+                  cx={p.X}
+                  cy={p.Y}
+                  r={r + 6.5 / uiScale}
+                  className="rival-negotiating-ring"
+                  data-testid={`rival-negotiating-${c.id}`}
+                />
+              )}
               {inNetwork && <circle cx={p.X} cy={p.Y} r={r + 2.5 / uiScale} className="city-network-ring" />}
               {c.id === player.hq && (
                 <text

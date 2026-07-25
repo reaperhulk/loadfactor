@@ -4,13 +4,16 @@
 // player (PLAN.md §3.3 step 1), and they run the exact same strategy brain as
 // the reference bot (policy.ts) — personalities are dials, not forks.
 
+import { getCity } from '../data/cities'
 import { applyPlanningCommand } from './commands'
+import { slotsAllocated } from './queries'
 import {
   assignmentCommands,
   hedgeCommands,
   launchCommands,
   marketingCommands,
   negotiationCommands,
+  negotiationTarget,
   orderCommands,
   pruneCommands,
   refitCommands,
@@ -140,7 +143,29 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
     applyAll(state, idx, orderCommands(state, idx), events)
   }
 
-  applyAll(state, idx, negotiationCommands(state, idx, personality), events)
+  // Slot campaigns run on a declared clock. A rival bids on the authority it
+  // named LAST quarter — which the player saw on the map and in the city
+  // panel during planning, and could have outbid — then names the authority
+  // it will court next. Nothing about the odds changes; what changes is that
+  // a bidding war becomes a decision instead of an ambush.
+  const announced = airline.slotInterest ?? null
+  applyAll(state, idx, negotiationCommands(state, idx, personality, announced), events)
+  // A campaign runs until it lands. Re-picking the richest target every
+  // quarter looks smarter and is much worse: the authority you courted last
+  // quarter is abandoned the moment a marginally better one appears, and
+  // nothing is ever won. Only when the announced city is taken — slots held,
+  // or the pool closed behind them — does the next campaign begin, and it
+  // bids the same quarter so the declared clock costs no tempo.
+  const settled =
+    announced === null ||
+    (airline.slots[announced] ?? 0) > 0 ||
+    slotsAllocated(state, announced) >= getCity(announced).slotPool
+  if (settled) {
+    const next = negotiationTarget(state, idx, personality)
+    if (next === null) delete airline.slotInterest
+    else airline.slotInterest = next
+    applyAll(state, idx, negotiationCommands(state, idx, personality, next), events)
+  }
 }
 
 // Distress sale, rival-flavored: keep at least a two-frame core but shed the

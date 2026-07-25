@@ -417,13 +417,16 @@ export function orderCommands(
 // map. A fortress builds out its home region first; raiders bias toward
 // cities the current leader is entrenched in. Bidding-war aware: a pending
 // attempt at the same authority is outbid by 20% when the treasury allows.
-export function negotiationCommands(
+// Which authority to court. Split out from the command so a rival can
+// ANNOUNCE a target one quarter and bid on it the next (see rivals.ts): the
+// scoring is the intent, the command is the follow-through.
+export function negotiationTarget(
   state: GameState,
   idx: number,
   dials: Pick<PolicyDials, 'negotiateBudgetBp' | 'raidBonus' | 'homeRegionUntil'>,
-): Command[] {
+): string | null {
   const airline = state.airlines[idx]!
-  if (airline.negotiations.length > 0 || airline.cash < 4000) return []
+  if (airline.cash < 4000) return null
   let reach = 0
   for (const ac of airline.fleet) reach = Math.max(reach, getAircraftType(ac.type).rangeKm)
   for (const t of typesOnSale(yearOf(state))) reach = Math.max(reach, t.rangeKm)
@@ -441,6 +444,10 @@ export function negotiationCommands(
     if ((airline.slots[c.id] ?? 0) > 0) continue
     if (slotsAllocated(state, c.id) >= c.slotPool) continue
     if (stayHome && c.region !== homeRegion) continue
+    // Never announce the authority you are already bidding at: the next
+    // campaign should be the NEXT city, so one bid a quarter keeps flowing
+    // whether this one lands or not.
+    if (airline.negotiations.some((n) => n.city === c.id)) continue
     let cityScore = 0
     for (const h of anchors) {
       // A takeover can put a route endpoint in the network with no slots
@@ -460,7 +467,24 @@ export function negotiationCommands(
       target = c.id
     }
   }
+  return target
+}
+
+// The bid itself. `target` defaults to a fresh pick (the reference bot and the
+// fuzzer choose in the moment, like a player); rivals pass the city they
+// announced last quarter, and a stale announcement — slots since won, pool
+// since closed, treasury since spent — simply lapses.
+export function negotiationCommands(
+  state: GameState,
+  idx: number,
+  dials: Pick<PolicyDials, 'negotiateBudgetBp' | 'raidBonus' | 'homeRegionUntil'>,
+  target: string | null = negotiationTarget(state, idx, dials),
+): Command[] {
+  const airline = state.airlines[idx]!
+  if (airline.negotiations.length > 0 || airline.cash < 4000) return []
   if (target === null) return []
+  if ((airline.slots[target] ?? 0) > 0) return []
+  if (slotsAllocated(state, target) >= getCity(target).slotPool) return []
   const budget = Math.floor((negotiationDifficulty(target) * dials.negotiateBudgetBp) / 10000)
   let pendingMax = 0
   for (const other of state.airlines) {

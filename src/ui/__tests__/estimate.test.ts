@@ -4,10 +4,10 @@
 // that breaks the mirror shows up here.
 
 import { describe, expect, it } from 'vitest'
-import { ROUTE_SPOOL_BP } from '../../data/constants'
+import { DEMAND_NOISE_SPREAD_BP, ROUTE_SPOOL_BP } from '../../data/constants'
 import { applyCommand, newGame } from '../../engine'
 import { routeWeeklyCapacity } from '../../engine/queries'
-import { estimateWeeklyPax } from '../estimate'
+import { estimateWeeklyPax, tooCloseToCall } from '../estimate'
 
 function withRoute() {
   const fresh = newGame('jet_age', 'estimate-seed')
@@ -77,5 +77,52 @@ describe('estimateWeeklyPax', () => {
       history: [{}, {}, {}] as typeof route.history,
     })
     expect(discounted.pax).toBeGreaterThan(contested.pax)
+  })
+
+  // The band is the honest part of the estimate: demand noise is per-pair and
+  // unknowable in advance, so every preview reports a range the midpoint sits
+  // inside, and no preview may promise more than the schedule can carry.
+  it('brackets the midpoint with the demand-noise band, still capped by capacity', () => {
+    const state = withRoute()
+    const route = state.airlines[0]!.routes[0]!
+    const cap = routeWeeklyCapacity(state.airlines[0]!, route)
+    for (const fareLevel of [-2, -1, 0, 1, 2]) {
+      const est = estimateWeeklyPax(state, { ...route, fareLevel })
+      expect(est.low).toBeLessThanOrEqual(est.pax)
+      expect(est.pax).toBeLessThanOrEqual(est.high)
+      expect(est.high).toBeLessThanOrEqual(cap)
+      // Clear of the cap, the band is exactly the noise spread either side.
+      // Against the cap it flattens on the upside only — a lucky quarter can't
+      // fill seats that were never scheduled, but an unlucky one still empties
+      // them — so the exact form is only claimed when nothing is clipped.
+      if (est.high < cap) {
+        expect(est.high).toBe(Math.floor((est.pax * (10000 + DEMAND_NOISE_SPREAD_BP)) / 10000))
+        expect(est.low).toBe(Math.floor((est.pax * (10000 - DEMAND_NOISE_SPREAD_BP)) / 10000))
+      }
+    }
+  })
+
+  it('calls a contest too close when the bands overlap and decisive when they do not', () => {
+    const state = withRoute()
+    const route = state.airlines[0]!.routes[0]!
+    // Plant a rival so the player's share sits well below the capacity cap —
+    // against the cap every fare posture reads the same number and there is
+    // nothing to distinguish.
+    const rival = state.airlines[1]!
+    const rivalRoute = { ...route, id: rival.nextId++, fareLevel: 0, frequency: 20 }
+    rival.routes.push(rivalRoute)
+    for (const plane of rival.fleet) plane.routeId = rivalRoute.id
+    const established = { ...route, history: [{}, {}, {}] as typeof route.history }
+    const here = estimateWeeklyPax(state, established)
+    // A posture is never distinguishable from itself.
+    expect(tooCloseToCall(here, here)).toBe(true)
+    // Two fare levels apart clears the noise band in either direction, so the
+    // table is entitled to name a winner.
+    const cheap = estimateWeeklyPax(state, { ...established, fareLevel: -2 })
+    const dear = estimateWeeklyPax(state, { ...established, fareLevel: 2 })
+    expect(cheap.pax).toBeGreaterThan(dear.pax)
+    expect(tooCloseToCall(cheap, dear)).toBe(cheap.low <= dear.high)
+    // And the relation is symmetric whichever way it lands.
+    expect(tooCloseToCall(dear, cheap)).toBe(tooCloseToCall(cheap, dear))
   })
 })

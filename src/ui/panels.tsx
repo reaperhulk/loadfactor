@@ -9,6 +9,8 @@ import type { GameState } from '../engine'
 import { baseFare, fareFor, pairWeeklyDemand, seasonalBp } from '../engine/market'
 import {
   GROUNDING_AGE_QUARTERS,
+  ROUTE_MEMORY_QUARTERS,
+  ROUTE_SPOOL_BP,
   CABIN_REFIT_COST_BP,
   MAINT_AGE_BP_PER_QUARTER,
   ORDER_CANCEL_REFUND_BP,
@@ -260,7 +262,15 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
   for (const a of player.fleet) {
     if (a.routeId === null) idleReach = Math.max(idleReach, getAircraftType(a.type).rangeKm)
   }
-  const rows: { from: string; to: string; km: number; demand: number; marketK: number; rivals: number }[] = []
+  const rows: {
+    from: string
+    to: string
+    km: number
+    demand: number
+    marketK: number
+    rivals: number
+    risks: string[]
+  }[] = []
   for (let i = 0; i < cities.length; i++) {
     for (let j = i + 1; j < cities.length; j++) {
       const a = cities[i]!
@@ -271,13 +281,27 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
       const km = distanceKm(a, b)
       if (km < MIN_ROUTE_KM) continue
       const demand = pairWeeklyDemand(state, a, b)
+      const rivals = airlinesOnPair(state, a, b, 0)
+      // What the headline number does not say. A ranked list with no risk
+      // column makes the top row automatically right; these are the reasons
+      // it might not be.
+      const risks: string[] = []
+      if (rivals > 0) risks.push(`${rivals} incumbent${rivals > 1 ? 's' : ''}`)
+      const seasonBp = Math.floor((seasonalBp(a, state.turn) * seasonalBp(b, state.turn)) / 10000)
+      if (seasonBp > 10250) risks.push('peak season now — it will fall back')
+      else if (seasonBp < 9750) risks.push('off season now — it will recover')
+      const mem = player.servedUntil[pairKey(a, b)]
+      const remembered = mem !== undefined && state.turn - mem <= ROUTE_MEMORY_QUARTERS
+      if (!remembered) risks.push(`ramps from ${ROUTE_SPOOL_BP[0]! / 100}%`)
+      if (km > idleReach) risks.push('no idle plane in range')
       rows.push({
         from: a,
         to: b,
         km,
         demand,
         marketK: Math.floor((demand * baseFare(km)) / 1000),
-        rivals: airlinesOnPair(state, a, b, 0),
+        rivals,
+        risks,
       })
     }
   }
@@ -286,7 +310,7 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
   // Where to expand next: the richest markets from your network you have NO
   // slots for yet — negotiation targets, ranked by the same market dollars.
   const networkList = [...network].sort()
-  const negotiable: { from: string; to: string; marketK: number }[] = []
+  const negotiable: { from: string; to: string; marketK: number; courted: string[] }[] = []
   for (const c of CITIES) {
     if (slotsHeld(player, c.id) > 0) continue
     if (slotsAllocated(state, c.id) >= c.slotPool) continue
@@ -301,7 +325,17 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
         bestFrom = a
       }
     }
-    if (bestFrom !== '') negotiable.push({ from: bestFrom, to: c.id, marketK: bestMarket })
+    if (bestFrom !== '')
+      negotiable.push({
+        from: bestFrom,
+        to: c.id,
+        marketK: bestMarket,
+        // Announced rival campaigns: the richest target is a different
+        // decision when someone else is already walking toward it.
+        courted: state.airlines
+          .filter((a) => a.id !== 0 && !a.bankrupt && a.slotInterest === c.id)
+          .map((a) => a.name),
+      })
   }
   negotiable.sort((x, y) => y.marketK - x.marketK)
   if (top.length === 0 && negotiable.length === 0) return null
@@ -334,7 +368,9 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
                 <td className={r.rivals > 0 ? 'neg' : 'pos'}>
                   {r.rivals > 0 ? `⚔ ${r.rivals} rival${r.rivals > 1 ? 's' : ''}` : 'open market'}
                 </td>
-                <td className="dim">{r.km > idleReach ? 'needs an idle aircraft with range' : 'launchable now'}</td>
+                <td className={r.risks.length === 0 ? 'pos' : 'dim'} data-testid={`risk-${r.from}-${r.to}`}>
+                  {r.risks.length === 0 ? 'clean shot' : r.risks.join(' · ')}
+                </td>
                 <td>
                   {onPlan && r.km <= idleReach && (
                     <button data-testid={`plan-${r.from}-${r.to}`} onClick={() => onPlan(r.from, r.to)}>
@@ -352,7 +388,10 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
           Worth negotiating:{' '}
           {negotiable
             .slice(0, 3)
-            .map((n) => `${n.to} (${money(n.marketK)}/wk vs ${n.from})`)
+            .map(
+              (n) =>
+                `${n.to} (${money(n.marketK)}/wk vs ${n.from})${n.courted.length > 0 ? ` ⚠ ${n.courted.join(', ')} bidding` : ''}`,
+            )
             .join(' · ')}{' '}
           — win slots there from the airports tab or the city panel.
         </p>

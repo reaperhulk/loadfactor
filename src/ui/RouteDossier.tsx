@@ -4,7 +4,7 @@
 
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm, pairKey } from '../data/cities'
-import { FARE_DEMAND_BP, ROUTE_MEMORY_QUARTERS, SERVICE_COST_PER_PAX } from '../data/constants'
+import { DEMAND_NOISE_SPREAD_BP, FARE_DEMAND_BP, ROUTE_MEMORY_QUARTERS, SERVICE_COST_PER_PAX } from '../data/constants'
 import type { GameState } from '../engine'
 import { fareFor, fuelInflationBp, pairWeeklyDemand, routeShareWeight, routeSpoolBp, seasonalBp } from '../engine/market'
 import { effFuelBp } from '../engine/worldEvents'
@@ -218,11 +218,24 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
         if (myCapacity === 0) return null
         const spooling = routeSpoolBp(player, route, state.turn) < 10000
         const rows = [-2, -1, 0, 1, 2].map((level) => {
-          const { pax } = estimateWeeklyPax(state, { ...route, fareLevel: level })
+          const est = estimateWeeklyPax(state, { ...route, fareLevel: level })
           const fare = fareFor(km, level)
-          return { level, fare, pax, revenueK: Math.floor((pax * fare) / 1000) }
+          return {
+            level,
+            fare,
+            est,
+            revenueK: Math.floor((est.pax * fare) / 1000),
+            lowK: Math.floor((est.low * fare) / 1000),
+            highK: Math.floor((est.high * fare) / 1000),
+          }
         })
         const best = Math.max(...rows.map((r) => r.revenueK))
+        const leader = rows.find((r) => r.revenueK === best)!
+        // Only crown a winner when it actually wins: if the runner-up's band
+        // overlaps the leader's, the difference is smaller than the demand
+        // noise nobody can see in advance, and the table says so.
+        const contenders = rows.filter((r) => r.level !== leader.level && r.highK >= leader.lowK)
+        const decisive = contenders.length === 0
         return (
           <details className="dossier-history" data-testid="fare-whatif">
             <summary className="dim">What-if: fare posture</summary>
@@ -241,16 +254,22 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
                       ${r.fare}
                       {r.level === route.fareLevel && <span className="dim"> (now)</span>}
                     </td>
-                    <td>{r.pax.toLocaleString('en-US')}</td>
-                    <td className={r.revenueK === best ? 'pos' : ''}>{money(r.revenueK)}</td>
+                    <td>
+                      {r.est.low.toLocaleString('en-US')}–{r.est.high.toLocaleString('en-US')}
+                    </td>
+                    <td className={decisive && r.revenueK === best ? 'pos' : ''}>
+                      {money(r.lowK)}–{money(r.highK)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <p className="hint">
-              Direct traffic at this quarter's demand (season included
-              {spooling ? ', ramp-up included' : ''}), rivals held fixed. Costs barely move with fare —
-              the best revenue row is usually the best profit row.
+            <p className="hint" data-testid="fare-whatif-verdict">
+              {decisive
+                ? `Clear call: $${leader.fare} beats every alternative by more than demand noise can explain.`
+                : `Too close to call — ${contenders.length + 1} fare levels sit inside the same band. Demand noise (±${(DEMAND_NOISE_SPREAD_BP / 100).toFixed(0)}%) will decide it, not the table.`}{' '}
+              Ranges are direct traffic at this quarter's demand (season included
+              {spooling ? ', ramp-up included' : ''}), rivals held fixed.
             </p>
           </details>
         )
@@ -262,8 +281,8 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
         const myCapacity = routeWeeklyCapacity(player, route)
         if (myCapacity === 0) return null
         const rows = [1, 2, 3].map((level) => {
-          const { pax } = estimateWeeklyPax(state, { ...route, serviceLevel: level })
-          return { level, pax, costK: Math.floor((pax * SERVICE_COST_PER_PAX[level - 1]!) / 1000) }
+          const est = estimateWeeklyPax(state, { ...route, serviceLevel: level })
+          return { level, est, costK: Math.floor((est.pax * SERVICE_COST_PER_PAX[level - 1]!) / 1000) }
         })
         return (
           <details className="dossier-history" data-testid="service-whatif">
@@ -283,7 +302,9 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
                       {['', 'basic', 'standard', 'premium'][r.level]}
                       {r.level === route.serviceLevel && <span className="dim"> (now)</span>}
                     </td>
-                    <td>{r.pax.toLocaleString('en-US')}</td>
+                    <td>
+                      {r.est.low.toLocaleString('en-US')}–{r.est.high.toLocaleString('en-US')}
+                    </td>
                     <td>{money(r.costK)}</td>
                   </tr>
                 ))}

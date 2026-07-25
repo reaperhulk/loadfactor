@@ -137,7 +137,12 @@ points where precision matters).
   cash and resolve with a seeded roll whose odds scale with spend and slot
   scarcity. Rivals compete for the same pools. Slots are use-it-or-lose-it:
   a city where an airline leaves 2+ slots unused for 4 consecutive quarters
-  hands one back to the authority (the HQ is exempt).
+  hands one back to the authority (the HQ is exempt). Rival campaigns are
+  **declared**: a carrier names the authority it will court (`slotInterest`)
+  a quarter before it bids there, and holds that target until it wins it. The
+  map rings the city and the city panel names the suitor, so entering a
+  bidding war is a decision the player makes with the field in view rather
+  than an outcome discovered in the report.
 
 ### 2.4 Scenarios & difficulty
 

@@ -74,7 +74,11 @@ describe('balance envelope', () => {
     // field comfortably but finishes just under the qualifying bar, and alpha
     // drops out of the competitive band entirely.
     { scenario: 'jet_age', quarters: 80, wins: ['beta', 'gamma', 'delta'], competitive: ['epsilon'] },
-    { scenario: 'oil_crisis', quarters: 60, wins: ['alpha', 'beta', 'gamma', 'theta'], competitive: [] },
+    // F4 moved theta out of the win column: rivals now declare their slot
+    // campaigns a quarter ahead and stick to them until they land, so the
+    // carriers that used to scatter their bids across the map hold a target
+    // long enough to win it. theta finishes at ~73% of the leader.
+    { scenario: 'oil_crisis', quarters: 60, wins: ['alpha', 'beta', 'gamma'], competitive: ['theta'] },
     // deregulation/beta is now a 3% photo finish rather than a 1% win.
     { scenario: 'deregulation', quarters: 60, wins: ['gamma'], competitive: ['alpha', 'beta'] },
     // open_skies alpha/gamma stay unpinned: hub-building on those worlds

@@ -223,6 +223,11 @@ export function SlotLegend() {
         {SLOT_IDLE_THRESHOLD} idle slots at a city for {SLOT_IDLE_QUARTERS_TO_LOSE} straight quarters
         forfeits one.
       </p>
+      <p className="dim">
+        Rivals announce a campaign a quarter before they bid: a red dashed ring on the map, and a
+        line in the city panel naming who is coming. They hold that target until they win it, so you
+        can outbid them, get there first, or spend the money where nobody is looking.
+      </p>
       <p className="hint">Failed talks burn the spend — bid credibly or wait a quarter.</p>
     </details>
   )

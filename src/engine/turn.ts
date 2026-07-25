@@ -74,6 +74,7 @@ function liquidate(airline: Airline): void {
   airline.fleet = []
   airline.orders = []
   airline.negotiations = []
+  delete airline.slotInterest
   airline.loans = []
   airline.slots = {}
   airline.cash = 0
@@ -92,6 +93,7 @@ function restructure(airline: Airline, turn: number): GameEvent {
   const debtWiped = debtBefore - totalDebt(airline)
   airline.orders = []
   airline.negotiations = []
+  delete airline.slotInterest
   // Keep the best routes by last quarter's profit; the rest close.
   const ranked = [...airline.routes].sort(
     (a, b) => b.lastRevenue - b.lastCost - (a.lastRevenue - a.lastCost) || a.id - b.id,

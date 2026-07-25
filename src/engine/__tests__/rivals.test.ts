@@ -5,7 +5,7 @@ import {
   INSOLVENCY_QUARTERS_TO_FAIL,
   RESTRUCTURE_MAX,
 } from '../../data/constants'
-import { applyCommand, newGame, type GameEvent } from '../index'
+import { applyCommand, endQuarter, newGame, type GameEvent } from '../index'
 import { negotiationCommands, yieldCommands } from '../policy'
 import { pairWeeklySeats, routeWeeklyCapacity } from '../queries'
 import { expansionScore, runRivalTurn } from '../rivals'
@@ -120,6 +120,55 @@ describe('rival intelligence', () => {
       expect(getCity(home[0]!.city).region).toBe(getCity(opened.airlines[0]!.hq).region)
     }
     expect(roam).toHaveLength(1)
+  })
+
+  // F4: a rival's slot campaign is declared state, not a decision taken
+  // inside a pass nobody can watch. The player reads `slotInterest` during
+  // planning and can outbid it — so it has to be honest about what the rival
+  // will actually do.
+  it('a rival announces the authority it will court, then bids exactly there', () => {
+    const state = newGame('jet_age', 'intent-seed')
+    const rival = state.airlines[1]!
+    const events: GameEvent[] = []
+    runRivalTurn(state, 1, events)
+    const announced = rival.slotInterest
+    expect(announced).toBeDefined()
+    expect(rival.negotiations.map((n) => n.city)).toEqual([announced])
+
+    // The campaign is binding across quarters: clear the pending bid as the
+    // authority would when it says no, and the rival returns to the SAME city
+    // rather than chasing whatever now scores highest.
+    rival.negotiations = []
+    runRivalTurn(state, 1, events)
+    expect(rival.negotiations.map((n) => n.city)).toEqual([announced])
+    expect(rival.slotInterest).toBe(announced)
+
+    // Once the slots are won the campaign is over and the next one is named.
+    rival.negotiations = []
+    rival.slots[announced!] = 2
+    runRivalTurn(state, 1, events)
+    expect(rival.slotInterest).not.toBe(announced)
+  })
+
+  it('bankruptcy and restructuring both retire the announced campaign', () => {
+    const state = newGame('jet_age', 'intent-clear-seed')
+    const events: GameEvent[] = []
+    runRivalTurn(state, 1, events)
+    expect(state.airlines[1]!.slotInterest).toBeDefined()
+    // Drive the rival under: the seat is liquidated, and a dead carrier must
+    // not keep a ring on the map.
+    const doomed = state.airlines[1]!
+    doomed.cash = -50_000_000
+    doomed.insolventQuarters = INSOLVENCY_QUARTERS_TO_FAIL - 1
+    doomed.restructures = RESTRUCTURE_MAX
+    let s = state
+    for (let i = 0; i < 3 && !s.airlines[1]!.bankrupt; i++) {
+      s.airlines[1]!.cash = -50_000_000
+      s.airlines[1]!.insolventQuarters = INSOLVENCY_QUARTERS_TO_FAIL - 1
+      s = endQuarter(s).state
+    }
+    expect(s.airlines[1]!.bankrupt).toBe(true)
+    expect(s.airlines[1]!.slotInterest).toBeUndefined()
   })
 })
 

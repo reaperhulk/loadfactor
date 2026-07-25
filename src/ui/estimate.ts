@@ -6,13 +6,15 @@
 // the spill pass ride on top, so estimates read slightly conservative.
 
 import { pairKey } from '../data/cities'
-import { FARE_DEMAND_BP } from '../data/constants'
+import { DEMAND_NOISE_SPREAD_BP, FARE_DEMAND_BP } from '../data/constants'
 import type { GameState, Route } from '../engine'
 import { pairWeeklyDemand, routeShareWeight, routeSpoolBp } from '../engine/market'
 import { routeWeeklyCapacity } from '../engine/queries'
 
 export interface PaxEstimate {
-  pax: number // weekly, capacity-capped
+  pax: number // weekly, capacity-capped — the midpoint, not a promise
+  low: number // the same estimate at the unlucky end of demand noise
+  high: number // and at the lucky end
   spoolBp: number // attach share this quarter (10000 = fully established)
   sharePct: number // my slice of the pair's attractiveness, 0..100
 }
@@ -35,9 +37,24 @@ export function estimateWeeklyPax(state: GameState, variant: Route): PaxEstimate
   pax = Math.floor((pax * FARE_DEMAND_BP[variant.fareLevel + 2]!) / 10000)
   const spoolBp = routeSpoolBp(player, variant, state.turn)
   pax = Math.floor((pax * spoolBp) / 10000)
+  // Demand carries per-pair noise the estimate cannot know in advance, so
+  // report the BAND rather than a number that will always be slightly wrong.
+  // This is also what stops a what-if table from naming a single winner when
+  // two postures are within noise of each other.
+  const cap = routeWeeklyCapacity(player, variant)
+  const band = (bp: number): number =>
+    Math.min(cap, Math.floor((pax * (10000 + bp)) / 10000))
   return {
-    pax: Math.min(pax, routeWeeklyCapacity(player, variant)),
+    pax: Math.min(pax, cap),
+    low: band(-DEMAND_NOISE_SPREAD_BP),
+    high: band(DEMAND_NOISE_SPREAD_BP),
     spoolBp,
     sharePct: total > 0 ? Math.floor((weight * 100) / total) : 0,
   }
+}
+
+// Two estimates are too close to call when their noise bands overlap: the
+// difference is smaller than the thing the estimate cannot see.
+export function tooCloseToCall(a: PaxEstimate, b: PaxEstimate): boolean {
+  return a.low <= b.high && b.low <= a.high
 }
