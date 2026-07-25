@@ -97,26 +97,23 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
           out.push({ kind: 'delivery', icon: '🛬', text: `${getAircraftType(e.aircraftType).name} delivered` })
         break
       case 'slots_granted':
-        if (e.airline === 0) out.push({ kind: 'slots', icon: '🤝', text: `Won ${e.slots} slots at ${e.city}` })
-        break
-      case 'slot_lost':
-        if (e.airline === 0) out.push({ kind: 'error', icon: '🕳️', text: `Idle slot at ${e.city} was forfeited` })
-        break
-      case 'negotiation_failed':
         if (e.airline === 0)
-          out.push({ kind: 'error', icon: '🤝', text: `Slot negotiation at ${e.city} failed — the spend is gone` })
+          out.push({
+            kind: 'slots',
+            icon: '🛬',
+            text:
+              e.waited > 1
+                ? `${e.slots} slots at ${e.city} — ${e.waited}q in line`
+                : `${e.slots} slots at ${e.city}`,
+          })
         break
-      case 'bidding_war': {
-        // Only the player's wars are news; airlines list descending by spend.
-        const myRank = e.airlines.indexOf(0)
-        if (myRank < 0) break
-        out.push(
-          myRank === 0
-            ? { kind: 'slots', icon: '⚖️', text: `Bidding war at ${e.city} — you lead the bidding` }
-            : { kind: 'error', icon: '⚖️', text: `Bidding war at ${e.city} — you were outbid (odds cut)` },
-        )
+      case 'slots_released':
+        if (e.airline === 0)
+          out.push({ kind: 'slots', icon: '↩️', text: `Handed ${e.slots} slots back at ${e.city}` })
         break
-      }
+      case 'airport_expanded':
+        out.push({ kind: 'slots', icon: '🏗', text: `${e.city} opened +${e.slots} slots` })
+        break
       case 'world_event_started': {
         const where = e.city ? ` — ${e.city}` : e.region ? ` — ${e.region.toUpperCase()}` : ''
         out.push({

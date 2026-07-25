@@ -21,8 +21,8 @@ function nextHint(state: GameState): string | null {
   if (state.turn === 0) {
     return 'Ready? End the quarter (space) to fly the schedule and see your first report.'
   }
-  if (state.turn <= 4 && player.negotiations.length === 0 && slotCities(player).length <= 4) {
-    return 'Growth needs gates: open a city dossier and negotiate for slots at a new airport.'
+  if (state.turn <= 4 && player.slotRequests.length === 0 && slotCities(player).length <= 4) {
+    return 'Growth needs gates: open a city dossier and take a place in the line for slots at a new airport.'
   }
   // A rival is on one of your pairs and you're not fighting back with brand.
   const myPairs = new Set(player.routes.map((r) => pairKey(r.from, r.to)))

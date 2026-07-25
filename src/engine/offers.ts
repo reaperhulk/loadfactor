@@ -72,7 +72,7 @@ export function maybeOfferDeal(state: GameState, events: GameEvent[]): void {
   } else if (kindDraw.value === 1) {
     // The authority hands over gates — and bills you for the public-service
     // obligations that come attached.
-    const candidates = CITIES.filter((c) => (player.slots[c.id] ?? 0) === 0 && c.slotPool >= 16)
+    const candidates = CITIES.filter((c) => (player.slots[c.id] ?? 0) === 0 && c.slotPool >= 10)
     if (candidates.length === 0) return
     const pick = nextInt(state.rng.offers, 0, Math.min(9, candidates.length - 1))
     state.rng.offers = pick.rng

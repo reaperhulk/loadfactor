@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { CITIES, getCity } from '../../data/cities'
+import { getCity } from '../../data/cities'
 import {
   ENTRANT_EVERY_QUARTERS,
   INSOLVENCY_QUARTERS_TO_FAIL,
   RESTRUCTURE_MAX,
 } from '../../data/constants'
 import { applyCommand, endQuarter, newGame, type GameEvent } from '../index'
-import { negotiationCommands, yieldCommands } from '../policy'
+import { slotRequestCommands, yieldCommands } from '../policy'
+import { slotFee } from '../slots'
 import { pairWeeklySeats, routeWeeklyCapacity } from '../queries'
 import { expansionScore, runRivalTurn } from '../rivals'
 
@@ -70,18 +71,21 @@ describe('rival intelligence', () => {
     expect(state.airlines[0]!.bankrupt).toBe(false) // the player seat survives
   })
 
-  it('rivals counter-bid a pending negotiation instead of lowballing it', () => {
-    const state = newGame('jet_age', 'counterbid-seed')
-    // Give the player a pending bid at every authority: whichever city the
-    // rival targets, it walks into a war in progress and must top the field.
-    for (const c of CITIES) state.airlines[0]!.negotiations.push({ city: c.id, spend: 20_000 })
+  it('a rival takes a place in the line and waits there rather than re-shopping', () => {
+    const state = newGame('jet_age', 'queue-seed')
     const rival = state.airlines[1]!
     rival.cash = 500_000
     const events: GameEvent[] = []
+    runRivalTurn(state, 1, events) // announces
+    runRivalTurn(state, 1, events) // joins the list it announced
+    const req = rival.slotRequests[0]
+    expect(req, 'the rival is on a waiting list').toBeDefined()
+    expect(req!.city).toBe(rival.slotInterest)
+    expect(req!.fee).toBe(slotFee(req!.city))
+    // Another quarter without capacity must not shuffle it to a new airport:
+    // the place in line IS the investment.
     runRivalTurn(state, 1, events)
-    const bid = rival.negotiations[0]
-    expect(bid, 'the rival still entered a negotiation').toBeDefined()
-    expect(bid!.spend, 'outbids the pending 20,000 by 20%').toBeGreaterThanOrEqual(24_000)
+    expect(rival.slotRequests.map((r) => r.city)).toEqual([req!.city])
   })
 
   it('the dials genuinely differentiate the shared brain on identical state', () => {
@@ -109,14 +113,14 @@ describe('rival intelligence', () => {
     // Home-region discipline: with a fortress threshold the SAME airline
     // negotiates inside its HQ region; without it, wherever the money is.
     const dials = {
-      negotiateBudgetBp: 10000,
+      slotBudgetBp: 10000,
       raidBonus: 0,
       homeRegionUntil: 0,
     }
-    const roam = negotiationCommands(opened, 0, dials)
-    const home = negotiationCommands(opened, 0, { ...dials, homeRegionUntil: 10 })
+    const roam = slotRequestCommands(opened, 0, dials)
+    const home = slotRequestCommands(opened, 0, { ...dials, homeRegionUntil: 10 })
     expect(home).toHaveLength(1)
-    if (home[0]!.type === 'negotiate_slots') {
+    if (home[0]!.type === 'request_slots') {
       expect(getCity(home[0]!.city).region).toBe(getCity(opened.airlines[0]!.hq).region)
     }
     expect(roam).toHaveLength(1)
@@ -124,27 +128,27 @@ describe('rival intelligence', () => {
 
   // F4: a rival's slot campaign is declared state, not a decision taken
   // inside a pass nobody can watch. The player reads `slotInterest` during
-  // planning and can outbid it — so it has to be honest about what the rival
-  // will actually do.
-  it('a rival announces the authority it will court, then bids exactly there', () => {
+  // planning and can take a place in that line first — so it has to be
+  // honest about what the rival will actually do.
+  it('a rival announces the authority it will court, then queues exactly there', () => {
     const state = newGame('jet_age', 'intent-seed')
     const rival = state.airlines[1]!
     const events: GameEvent[] = []
     runRivalTurn(state, 1, events)
     const announced = rival.slotInterest
     expect(announced).toBeDefined()
-    expect(rival.negotiations.map((n) => n.city)).toEqual([announced])
+    expect(rival.slotRequests.map((r) => r.city)).toEqual([announced])
 
-    // The campaign is binding across quarters: clear the pending bid as the
-    // authority would when it says no, and the rival returns to the SAME city
-    // rather than chasing whatever now scores highest.
-    rival.negotiations = []
+    // The campaign is binding across quarters: drop the request as if the
+    // list had moved on, and the rival returns to the SAME city rather than
+    // chasing whatever now scores highest.
+    rival.slotRequests = []
     runRivalTurn(state, 1, events)
-    expect(rival.negotiations.map((n) => n.city)).toEqual([announced])
+    expect(rival.slotRequests.map((r) => r.city)).toEqual([announced])
     expect(rival.slotInterest).toBe(announced)
 
-    // Once the slots are won the campaign is over and the next one is named.
-    rival.negotiations = []
+    // Once the slots are held the campaign is over and the next one is named.
+    rival.slotRequests = []
     rival.slots[announced!] = 2
     runRivalTurn(state, 1, events)
     expect(rival.slotInterest).not.toBe(announced)

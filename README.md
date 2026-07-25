@@ -24,10 +24,10 @@ npm run dev     # then open http://localhost:5173
 
 - **Found**: name your airline, pick its livery color, and choose any city as
   HQ — footholds derive from the geography around your home.
-- **Expand**: negotiate for slots at new airports, then grow a CONNECTED
+- **Expand**: take a place in the waiting list for slots at new airports, then grow a CONNECTED
   network — every new route must touch your HQ or a city you already serve.
   Use-it-or-lose-it: idle slots go back to the authority. The Opportunities
-  list ranks the richest unserved pairs and negotiation targets by market
+  list ranks the richest unserved pairs and slot targets by market
   dollars.
 - **Equip**: order or lease aircraft (they deliver quarters later), buy used,
   fit cabins dense or premium, assign airframes to schedules, and retire the
@@ -72,10 +72,10 @@ enabled for the repository (Settings → Pages → Source: GitHub Actions).
 ## Status
 
 **In continuous iteration.** Deterministic engine (quarterly turns, route
-economics with era cost inflation, slot negotiations, world events, loans),
+economics with era cost inflation, rented airport capacity, world events, loans),
 route spool-up with market memory, hemisphere seasonality, brand/marketing,
 real cities on a real landmass map (flat or globe projection) with zoom +
-level-of-detail, city dossier panels with in-context negotiation, four race
+level-of-detail, city dossier panels with in-context slot queueing, four race
 scenarios (Jet Age 1960, Oil Crisis 1972, Deregulation 1985, Open Skies
 1995) against rival archetypes (price-war / premium / fortress / balanced),
 a real-airframe catalog from the Convair 240 through Concorde to the 777,

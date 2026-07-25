@@ -11,7 +11,6 @@ export type Phase = 'planning' | 'won' | 'lost'
 export interface RngStreams {
   economy: Rng
   events: Rng
-  negotiations: Rng
   rivals: Rng
   offers: Rng
 }
@@ -89,9 +88,13 @@ export interface Route {
   history: RouteQuarter[]
 }
 
-export interface PendingNegotiation {
+// A place on an airport's waiting list. The fee is paid at command time and
+// refunded in full on cancellation; the queue is served in (queuedTurn,
+// airline id) order, and a request holds its place until capacity exists.
+export interface PendingSlotRequest {
   city: string
-  spend: number // $k, already paid at command time
+  fee: number // $k, already paid at command time
+  queuedTurn: number
 }
 
 // Where the quarter's money went, $k. Sums exactly to QuarterStats.costs —
@@ -105,6 +108,7 @@ export interface CostBreakdown {
   ownership: number // depreciation+insurance on owned, lease payments on leased
   maintenance: number
   admin: number // per-airframe administration
+  slots: number // quarterly rent on every airport slot held
   overhead: number // airline overhead + quadratic route-count complexity
   marketing: number // brand spend (level × network size)
   interest: number
@@ -136,9 +140,7 @@ export interface Airline {
   orders: AircraftOrder[]
   routes: Route[]
   slots: Record<string, number> // city id → slots held (read via sorted keys only)
-  negotiations: PendingNegotiation[]
-  // Consecutive quarters each city's slots sat ≥2 unused (use it or lose it).
-  slotIdle: Record<string, number>
+  slotRequests: PendingSlotRequest[]
   // Market memory: pair key → last turn the airline flew it (stamped when a
   // route closes). Re-entry within ROUTE_MEMORY_QUARTERS skips the spool-up.
   servedUntil: Record<string, number>
@@ -155,10 +157,10 @@ export interface Airline {
   reputationBp?: number
   restructures?: number // rivals only: chapter-11 rounds used (see RESTRUCTURE_MAX)
   enteredTurn?: number // set on late entrants; absent for founding airlines
-  // Rivals only: the authority this carrier has announced it will court next
-  // quarter. Slot campaigns are declared a quarter ahead so the player can see
-  // a bidding war coming and decide whether to join it — the alternative is an
-  // ambush resolved inside a pass nobody can watch.
+  // Rivals only: the authority this carrier has announced it will queue at
+  // next quarter. Campaigns are declared ahead so the player can get to the
+  // waiting list first — the alternative is an ambush resolved inside a pass
+  // nobody can watch.
   slotInterest?: string
 }
 
@@ -251,7 +253,9 @@ export type Command =
   | { type: 'acquire_rival'; target: number }
   | { type: 'accept_offer'; offerId: number }
   | { type: 'decline_offer'; offerId: number }
-  | { type: 'negotiate_slots'; city: string; spend: number }
+  | { type: 'request_slots'; city: string }
+  | { type: 'cancel_slot_request'; city: string }
+  | { type: 'release_slots'; city: string; count: number }
   | { type: 'take_loan'; amount: number }
   | { type: 'repay_loan'; loanId: number; amount: number }
   | { type: 'end_quarter' }
@@ -275,12 +279,12 @@ export type GameEvent =
   | { type: 'aircraft_delivered'; airline: number; aircraftId: number; aircraftType: string }
   | { type: 'aircraft_sold'; airline: number; aircraftId: number; proceeds: number }
   | { type: 'marketing_set'; airline: number; level: number }
-  | { type: 'negotiation_started'; airline: number; city: string; spend: number }
-  | { type: 'bidding_war'; city: string; airlines: number[] } // descending spend order
+  | { type: 'slot_requested'; airline: number; city: string; fee: number; queuePosition: number }
+  | { type: 'airport_expanded'; city: string; slots: number }
   | { type: 'rival_acquired'; airline: number; target: number; price: number; aircraft: number; routes: number }
-  | { type: 'negotiation_failed'; airline: number; city: string }
-  | { type: 'slots_granted'; airline: number; city: string; slots: number }
-  | { type: 'slot_lost'; airline: number; city: string }
+  | { type: 'slot_request_cancelled'; airline: number; city: string; refund: number }
+  | { type: 'slots_released'; airline: number; city: string; slots: number }
+  | { type: 'slots_granted'; airline: number; city: string; slots: number; waited: number }
   | { type: 'loan_taken'; airline: number; loanId: number; amount: number; annualRateBp: number }
   | { type: 'loan_repaid'; airline: number; loanId: number; amount: number; remaining: number }
   | { type: 'world_event_started'; eventId: string; city: string | null; region: Region | null }

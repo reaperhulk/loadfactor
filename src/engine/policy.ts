@@ -13,7 +13,7 @@ import { getAircraftType, typesOnSale } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey } from '../data/cities'
 import {
   AI_MIN_ROUTE_KM,
-  NEG_MIN_SPEND,
+  SLOT_WAIT_PATIENCE,
   ROUTE_MEMORY_QUARTERS,
   ROUTE_SPOOL_BP,
   ENTRANT_GRACE_QUARTERS,
@@ -21,7 +21,7 @@ import {
   TAKEOVER_PREMIUM_BP,
 } from '../data/constants'
 import { pairWeeklyDemand, routeSpoolBp } from './market'
-import { negotiationDifficulty } from './negotiation'
+import { nextExpansion, slotFee, slotsRemaining } from './slots'
 import {
   airlinesOnPair,
   debtCeiling,
@@ -32,7 +32,6 @@ import {
   roundTripsPerWeek,
   routeWeeklyCapacity,
   slotCities,
-  slotsAllocated,
   slotsFree,
   totalDebt,
   yearOf,
@@ -49,7 +48,7 @@ export interface PolicyDials {
   fareFloor: number // yield management never cuts below this
   expandMinDemand: number // min market score before opening a new pair
   contestDiscountBp: number // how heavily fielded seats discount a pair
-  negotiateBudgetBp: number // slot spend as bp of city difficulty
+  slotBudgetBp: number // treasury buffer kept back from slot fees, in bp
   raidBonus: number // appetite for cities the leader is entrenched in
   homeRegionUntil: number // build this many slot cities at home first
   marketing: number // brand level held while liquid
@@ -411,19 +410,21 @@ export function orderCommands(
   return commands
 }
 
-// Slot negotiation: target the city whose best pair with the NETWORK is
-// richest (competition-discounted, within a reach that includes what could
-// be bought today, since slots outlive fleets) — not the biggest city on the
+// Which airport to queue at: the city whose best pair with the NETWORK is
+// richest (competition-discounted, within a reach that includes what could be
+// bought today, since slots outlive fleets) — not the biggest city on the
 // map. A fortress builds out its home region first; raiders bias toward
-// cities the current leader is entrenched in. Bidding-war aware: a pending
-// attempt at the same authority is outbid by 20% when the treasury allows.
-// Which authority to court. Split out from the command so a rival can
-// ANNOUNCE a target one quarter and bid on it the next (see rivals.ts): the
-// scoring is the intent, the command is the follow-through.
-export function negotiationTarget(
+// cities the current leader is entrenched in. Split out from the command so a
+// rival can ANNOUNCE a target one quarter and join the list the next
+// (rivals.ts): the scoring is the intent, the command is the follow-through.
+//
+// Capacity-aware: a city whose pool is full AND whose next building programme
+// is a long way off is not worth a place in the line, however rich the market
+// — that queue is a dead treasury for years.
+export function slotTarget(
   state: GameState,
   idx: number,
-  dials: Pick<PolicyDials, 'negotiateBudgetBp' | 'raidBonus' | 'homeRegionUntil'>,
+  dials: Pick<PolicyDials, 'slotBudgetBp' | 'raidBonus' | 'homeRegionUntil'>,
 ): string | null {
   const airline = state.airlines[idx]!
   if (airline.cash < 4000) return null
@@ -442,12 +443,10 @@ export function negotiationTarget(
   let bestScore = 0
   for (const c of CITIES) {
     if ((airline.slots[c.id] ?? 0) > 0) continue
-    if (slotsAllocated(state, c.id) >= c.slotPool) continue
     if (stayHome && c.region !== homeRegion) continue
-    // Never announce the authority you are already bidding at: the next
-    // campaign should be the NEXT city, so one bid a quarter keeps flowing
-    // whether this one lands or not.
-    if (airline.negotiations.some((n) => n.city === c.id)) continue
+    if (airline.slotRequests.some((r) => r.city === c.id)) continue
+    // A full pool is only worth queueing for if the builders are close.
+    if (slotsRemaining(state, c.id) <= 0 && nextExpansion(state, c.id).quartersAway > SLOT_WAIT_PATIENCE) continue
     let cityScore = 0
     for (const h of anchors) {
       // A takeover can put a route endpoint in the network with no slots
@@ -470,39 +469,57 @@ export function negotiationTarget(
   return target
 }
 
-// The bid itself. `target` defaults to a fresh pick (the reference bot and the
-// fuzzer choose in the moment, like a player); rivals pass the city they
-// announced last quarter, and a stale announcement — slots since won, pool
-// since closed, treasury since spent — simply lapses.
-export function negotiationCommands(
+// Joining the list. `target` defaults to a fresh pick (the reference bot and
+// the fuzzer choose in the moment, like a player); rivals pass the city they
+// announced last quarter, and a stale announcement — slots since granted,
+// treasury since spent — simply lapses.
+//
+// One place in one line at a time. The fee is real money committed a quarter
+// or more ahead of any revenue, so an operator that queues everywhere at once
+// starves the fleet that was supposed to use the slots.
+export function slotRequestCommands(
   state: GameState,
   idx: number,
-  dials: Pick<PolicyDials, 'negotiateBudgetBp' | 'raidBonus' | 'homeRegionUntil'>,
-  target: string | null = negotiationTarget(state, idx, dials),
+  dials: Pick<PolicyDials, 'slotBudgetBp' | 'raidBonus' | 'homeRegionUntil'>,
+  target: string | null = slotTarget(state, idx, dials),
 ): Command[] {
   const airline = state.airlines[idx]!
-  if (airline.negotiations.length > 0 || airline.cash < 4000) return []
+  if (airline.slotRequests.length > 0) return []
   if (target === null) return []
   if ((airline.slots[target] ?? 0) > 0) return []
-  if (slotsAllocated(state, target) >= getCity(target).slotPool) return []
-  const budget = Math.floor((negotiationDifficulty(target) * dials.negotiateBudgetBp) / 10000)
-  let pendingMax = 0
-  for (const other of state.airlines) {
-    if (other.id === idx) continue
-    for (const n of other.negotiations) {
-      if (n.city === target) pendingMax = Math.max(pendingMax, n.spend)
-    }
+  const fee = slotFee(target)
+  // Never spend the last of the treasury on a position that cannot fly for a
+  // quarter: keep a working buffer, scaled by the operator's appetite.
+  const buffer = Math.floor((cashBufferFor(airline) * dials.slotBudgetBp) / 10000)
+  if (airline.cash - fee < buffer) return []
+  return [{ type: 'request_slots', city: target }]
+}
+
+// Rent discipline: hand back capacity that is not carrying anything. Slots
+// bill every quarter, so a position at a city no route touches is a standing
+// charge for nothing — and holding it also denies the pool to everyone else.
+// A city the network actually uses keeps its spare slots: that is headroom
+// for the next airframe, not waste.
+export function slotReleaseCommands(state: GameState, idx: number): Command[] {
+  const airline = state.airlines[idx]!
+  const commands: Command[] = []
+  const touched = new Set<string>()
+  for (const r of airline.routes) {
+    touched.add(r.from)
+    touched.add(r.to)
   }
-  const counter = pendingMax > 0 ? Math.floor((pendingMax * 12) / 10) : 0
-  const spend = Math.max(NEG_MIN_SPEND, Math.min(Math.max(budget, counter), airline.cash - 3000))
-  // Only bid what can WIN: a thin treasury dribbling sub-scale spends into
-  // hard cities loses them all and bleeds out one failed negotiation at a
-  // time. Below ~60% of the city's difficulty, keep the cash and wait.
-  if (spend * 10 < negotiationDifficulty(target) * 6) return []
-  if (spend >= NEG_MIN_SPEND && spend <= airline.cash) {
-    return [{ type: 'negotiate_slots', city: target, spend }]
+  // Metal on the way means the positions have a purpose: an idle airframe or
+  // an outstanding order is a route about to open. Shedding capacity in that
+  // window would just buy it back next quarter, fee and all.
+  if (airline.fleet.some((a) => a.routeId === null) || airline.orders.length > 0) return []
+  for (const city of slotCities(airline)) {
+    if (city === airline.hq || touched.has(city)) continue
+    if (city === airline.slotInterest) continue // the declared plan
+    const free = slotsFree(airline, city)
+    if (free <= 0) continue
+    commands.push({ type: 'release_slots', city, count: free })
   }
-  return []
+  return commands
 }
 
 // Demand discounted by incumbent competition: a monopoly pair is worth far

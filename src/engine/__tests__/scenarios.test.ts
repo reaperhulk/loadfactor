@@ -53,7 +53,7 @@ describe('era objectives (F3)', () => {
     const a = state.airlines[0]!
     const zero = {
       fuel: 0, fees: 0, flightPay: 0, service: 0, salaries: 0, ownership: 0,
-      maintenance: 0, admin: 0, overhead: 0, marketing: 0, interest: 0,
+      maintenance: 0, admin: 0, slots: 0, overhead: 0, marketing: 0, interest: 0,
     }
     a.history.push(
       { turn: 0, cash: 0, revenue: 300, costs: 100, profit: 200, pax: 1000, transferPax: 400, capacity: 2000, netWorth: 50, breakdown: zero },

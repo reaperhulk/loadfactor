@@ -1066,7 +1066,7 @@ export function MapView({
               {selected === c.id && (
                 <circle cx={p.X} cy={p.Y} r={r + 5 / uiScale} className="selection-ring" />
               )}
-              {player.negotiations.some((n) => n.city === c.id) && (
+              {player.slotRequests.some((r) => r.city === c.id) && (
                 <circle
                   cx={p.X}
                   cy={p.Y}

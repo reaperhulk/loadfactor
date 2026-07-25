@@ -11,7 +11,8 @@ import {
   hedgeCommands,
   launchCommands as policyLaunch,
   marketingCommands,
-  negotiationCommands,
+  slotReleaseCommands,
+  slotRequestCommands,
   orderCommands,
   pruneCommands,
   refitCommands,
@@ -41,7 +42,7 @@ export const GREEDY_DIALS: PolicyDials = {
   // starts (the deregulation western box) of the route count they live on.
   expandMinDemand: 250,
   contestDiscountBp: 10000,
-  negotiateBudgetBp: 10000,
+  slotBudgetBp: 10000,
   raidBonus: 0,
   homeRegionUntil: 0,
   marketing: 1,
@@ -132,7 +133,8 @@ function greedyCommands(state: GameState): Command[] {
   const launch = policyLaunch(state, 0, dials)
   commands.push(...launch.commands)
   commands.push(...orderCommands(state, 0, { renewedThisQuarter: renewal.length > 0 }))
-  commands.push(...negotiationCommands(state, 0, dials))
+  commands.push(...slotReleaseCommands(state, 0))
+  commands.push(...slotRequestCommands(state, 0, dials))
   commands.push(...yieldCommands(state, 0, dials.fareFloor))
   const skip = launch.usedAircraft !== null ? new Set([launch.usedAircraft]) : undefined
   commands.push(...assignmentCommands(state, skip))

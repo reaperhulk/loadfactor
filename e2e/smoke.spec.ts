@@ -114,23 +114,52 @@ test('a challenge link opens the same world for whoever follows it', async ({ pa
   expect(link).toContain('by=')
 })
 
-test('the city panel shows stats and negotiates in context', async ({ page }) => {
+test('the city panel shows stats and joins the slot queue in context', async ({ page }) => {
   await startGame(page)
   await page.getByTestId('city-LAX').click()
   const panel = page.getByTestId('city-panel')
   await expect(panel).toBeVisible()
   await expect(panel).toContainText('Los Angeles')
-  await expect(page.getByTestId('city-slots')).toContainText('pool 30')
+  await expect(page.getByTestId('city-slots')).toContainText('pool 10')
   await expect(panel).toContainText('Top markets from here')
-  // Negotiate for slots straight from the dossier.
-  await page.getByTestId('negotiate-spend').fill('1500')
-  await page.getByTestId('panel-negotiate').click()
-  await expect(page.getByTestId('negotiating-note')).toBeVisible()
-  // The pending negotiation also marks the city on the map.
+  // The authority's building programme is published years ahead — a full
+  // airport is a date, not a wall.
+  await expect(page.getByTestId('city-expansion')).toContainText(/opens in \d+q \(\+\d+ slots\)/)
+  // Take a place in the line straight from the dossier.
+  await page.getByTestId('panel-request-slots').click()
+  await expect(page.getByTestId('queued-note')).toContainText('#1 in line')
+  await expect(page.getByTestId('city-slot-queue')).toContainText('You')
+  // A pending request also marks the city on the map.
   await expect(page.getByTestId('negotiating-LAX')).toBeVisible()
-  // Rejected commands surface as toasts (no free slots at an unheld city).
+  // Leaving the list refunds in full: the cost of a queue is the quarters.
+  const before = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)
+  await page.getByTestId('panel-cancel-request').click()
+  const after = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)
+  expect(after).toBeGreaterThan(before)
+  await expect(page.getByTestId('panel-request-slots')).toBeVisible()
   await page.getByTestId('city-panel-close').click()
   await expect(page.getByTestId('city-panel')).toHaveCount(0)
+})
+
+test('slots are rented: unused capacity bills, and handing it back stops the bill', async ({ page }) => {
+  await startGame(page)
+  // The airports board prices every position and publishes every programme.
+  await page.getByTestId('tab-airports').click()
+  const board = page.getByTestId('airports-panel')
+  await expect(board).toContainText('Rent/q')
+  await expect(board).toContainText('Next build')
+  // A foothold city with no routes is pure rent — hand it back and the
+  // quarterly slot bill falls.
+  const idleCity = await page.evaluate(() => {
+    const s = window.__harness.getState()!
+    const me = s.airlines[0]!
+    const touched = new Set(me.routes.flatMap((r) => [r.from, r.to]))
+    return Object.keys(me.slots).sort().find((c) => c !== me.hq && !touched.has(c))!
+  })
+  await page.getByTestId(`release-${idleCity}`).click()
+  expect(
+    await page.evaluate((c) => window.__harness.getState()!.airlines[0]!.slots[c] ?? 0, idleCity),
+  ).toBe(0)
 })
 
 test('the quarterly report reflects the resolved quarter', async ({ page }) => {
@@ -230,7 +259,7 @@ test('the opportunities list plans a route in one click', async ({ page }) => {
   await startGame(page)
   await page.getByTestId('tab-routes').click()
   await expect(page.getByTestId('opportunities')).toContainText('JFK–ORD')
-  await expect(page.getByTestId('negotiation-targets')).toContainText('Worth negotiating')
+  await expect(page.getByTestId('negotiation-targets')).toContainText('Worth queueing for')
   await page.getByTestId('plan-JFK-ORD').click()
   await expect(page.getByTestId('route-setup')).toBeVisible()
   await expect(page.getByTestId('route-setup')).toContainText('Open JFK–ORD')
@@ -526,17 +555,27 @@ test('an aircraft order cancels for the partial refund', async ({ page }) => {
 test('the late-game map stays within its structural render budget', async ({ page }) => {
   await startGame(page)
   // A working network keeps the player solvent while rivals expand for four
-  // years — a busy mid/late-game map without the game-over overlay.
+  // years — a busy mid/late-game map without the game-over overlay. Three
+  // routes out of the hub, the fleet spread across them: piling every
+  // airframe onto one pair just flies empty seats at full rent.
   await page.evaluate(() => {
-    const snap = window.__harness.getState()!
-    const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
-    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
-    const s = window.__harness.getState()!
-    const routeId = s.airlines[0]!.routes[0]!.id
-    for (const aircraft of s.airlines[0]!.fleet) {
-      window.__harness.dispatch({ type: 'assign_aircraft', aircraftId: aircraft.id, routeId })
+    for (const to of ['ORD', 'MIA', 'YYZ']) {
+      const idle = window.__harness.getState()!.airlines[0]!.fleet.find((ac) => ac.routeId === null)
+      if (!idle) break
+      window.__harness.dispatch({ type: 'open_route', from: 'JFK', to, aircraftId: idle.id, frequency: 6 })
     }
-    for (let i = 0; i < 16; i++) window.__harness.endQuarter()
+    const s = window.__harness.getState()!
+    const routes = s.airlines[0]!.routes
+    let i = 0
+    for (const aircraft of s.airlines[0]!.fleet) {
+      if (aircraft.routeId !== null) continue
+      window.__harness.dispatch({
+        type: 'assign_aircraft',
+        aircraftId: aircraft.id,
+        routeId: routes[i++ % routes.length]!.id,
+      })
+    }
+    for (let q = 0; q < 16; q++) window.__harness.endQuarter()
   })
   expect(await page.evaluate(() => window.__harness.getState()!.phase)).toBe('planning')
   // Decorative traffic is hard-capped by design: at most 12 rival planes.

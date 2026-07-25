@@ -10,7 +10,8 @@ import {
   hedgeCommands,
   launchCommands,
   marketingCommands,
-  negotiationCommands,
+  slotReleaseCommands,
+  slotRequestCommands,
   orderCommands,
   pruneCommands,
   refitCommands,
@@ -35,7 +36,7 @@ export interface Genome {
   fareFloor: number // yield management floor [-2..0]
   debtAppetite: number // expansion loan size $k [0..20000]
   renewAge: number // sell airframes at this age (quarters) [24..90]
-  negotiateBudgetBp: number // spend as bp of city difficulty [3000..15000]
+  slotBudgetBp: number // treasury buffer kept back from slot fees [3000..15000]
   cashBuffer: number // keep this much cash when buying [1000..12000]
   cabin: number // fleet cabin doctrine: 1 dense / 2 standard / 3 premium
   contestDiscountBp: number // how heavily fielded seats discount a pair [6000..14000]
@@ -52,7 +53,7 @@ export const GENOME_RANGES: Record<keyof Genome, readonly [number, number]> = {
   fareFloor: [-2, 0],
   debtAppetite: [0, 20000],
   renewAge: [24, 90],
-  negotiateBudgetBp: [3000, 15000],
+  slotBudgetBp: [3000, 15000],
   cashBuffer: [1000, 12000],
   cabin: [1, 3],
   contestDiscountBp: [6000, 14000],
@@ -74,7 +75,7 @@ export function genomeCommands(state: GameState, g: Genome): Command[] {
     fareFloor: g.fareFloor,
     expandMinDemand: g.expandThreshold,
     contestDiscountBp: g.contestDiscountBp,
-    negotiateBudgetBp: g.negotiateBudgetBp,
+    slotBudgetBp: g.slotBudgetBp,
     raidBonus: 0,
     homeRegionUntil: 0,
     marketing: g.marketing,
@@ -99,7 +100,8 @@ export function genomeCommands(state: GameState, g: Genome): Command[] {
       cashFloor: g.cashBuffer,
     }),
   )
-  commands.push(...negotiationCommands(state, 0, dials))
+  commands.push(...slotReleaseCommands(state, 0))
+  commands.push(...slotRequestCommands(state, 0, dials))
   commands.push(...yieldCommands(state, 0, g.fareFloor))
   const skip = launch.usedAircraft !== null ? new Set([launch.usedAircraft]) : undefined
   return [...commands, ...assignmentCommands(state, 0, skip)]

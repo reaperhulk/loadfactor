@@ -8,7 +8,7 @@
     "pop": 10,
     "biz": 10,
     "tour": 8,
-    "slotPool": 36
+    "slotPool": 13
   },
   {
     "id": "ORD",
@@ -19,7 +19,7 @@
     "pop": 8,
     "biz": 8,
     "tour": 5,
-    "slotPool": 28
+    "slotPool": 10
   },
   {
     "id": "LAX",
@@ -30,7 +30,7 @@
     "pop": 9,
     "biz": 8,
     "tour": 8,
-    "slotPool": 30
+    "slotPool": 10
   },
   {
     "id": "SFO",
@@ -41,7 +41,7 @@
     "pop": 6,
     "biz": 7,
     "tour": 7,
-    "slotPool": 24
+    "slotPool": 10
   },
   {
     "id": "MIA",
@@ -52,7 +52,7 @@
     "pop": 5,
     "biz": 5,
     "tour": 8,
-    "slotPool": 22
+    "slotPool": 9
   },
   {
     "id": "YYZ",
@@ -63,7 +63,7 @@
     "pop": 6,
     "biz": 6,
     "tour": 5,
-    "slotPool": 22
+    "slotPool": 9
   },
   {
     "id": "MEX",
@@ -74,7 +74,7 @@
     "pop": 8,
     "biz": 5,
     "tour": 6,
-    "slotPool": 22
+    "slotPool": 9
   },
   {
     "id": "ATL",
@@ -85,7 +85,7 @@
     "pop": 6,
     "biz": 6,
     "tour": 4,
-    "slotPool": 24
+    "slotPool": 10
   },
   {
     "id": "DEN",
@@ -96,7 +96,7 @@
     "pop": 5,
     "biz": 5,
     "tour": 5,
-    "slotPool": 20
+    "slotPool": 8
   },
   {
     "id": "IAH",
@@ -107,7 +107,7 @@
     "pop": 5,
     "biz": 6,
     "tour": 3,
-    "slotPool": 20
+    "slotPool": 8
   },
   {
     "id": "SEA",
@@ -118,7 +118,7 @@
     "pop": 5,
     "biz": 5,
     "tour": 4,
-    "slotPool": 18
+    "slotPool": 8
   },
   {
     "id": "BOS",
@@ -129,7 +129,7 @@
     "pop": 5,
     "biz": 6,
     "tour": 5,
-    "slotPool": 20
+    "slotPool": 8
   },
   {
     "id": "YVR",
@@ -140,7 +140,7 @@
     "pop": 4,
     "biz": 4,
     "tour": 5,
-    "slotPool": 16
+    "slotPool": 7
   },
   {
     "id": "HAV",
@@ -151,7 +151,7 @@
     "pop": 4,
     "biz": 3,
     "tour": 6,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "PTY",
@@ -162,7 +162,7 @@
     "pop": 3,
     "biz": 4,
     "tour": 4,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "GRU",
@@ -173,7 +173,7 @@
     "pop": 8,
     "biz": 6,
     "tour": 5,
-    "slotPool": 22
+    "slotPool": 10
   },
   {
     "id": "GIG",
@@ -184,7 +184,7 @@
     "pop": 6,
     "biz": 4,
     "tour": 8,
-    "slotPool": 18
+    "slotPool": 8
   },
   {
     "id": "EZE",
@@ -195,7 +195,7 @@
     "pop": 7,
     "biz": 5,
     "tour": 6,
-    "slotPool": 20
+    "slotPool": 8
   },
   {
     "id": "BOG",
@@ -206,7 +206,7 @@
     "pop": 5,
     "biz": 4,
     "tour": 4,
-    "slotPool": 16
+    "slotPool": 7
   },
   {
     "id": "LIM",
@@ -217,7 +217,7 @@
     "pop": 5,
     "biz": 4,
     "tour": 5,
-    "slotPool": 16
+    "slotPool": 7
   },
   {
     "id": "SCL",
@@ -228,7 +228,7 @@
     "pop": 4,
     "biz": 4,
     "tour": 4,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "CCS",
@@ -239,7 +239,7 @@
     "pop": 4,
     "biz": 4,
     "tour": 3,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "LHR",
@@ -250,7 +250,7 @@
     "pop": 9,
     "biz": 10,
     "tour": 9,
-    "slotPool": 34
+    "slotPool": 12
   },
   {
     "id": "CDG",
@@ -261,7 +261,7 @@
     "pop": 8,
     "biz": 8,
     "tour": 10,
-    "slotPool": 30
+    "slotPool": 10
   },
   {
     "id": "FRA",
@@ -272,7 +272,7 @@
     "pop": 5,
     "biz": 9,
     "tour": 5,
-    "slotPool": 28
+    "slotPool": 10
   },
   {
     "id": "AMS",
@@ -283,7 +283,7 @@
     "pop": 4,
     "biz": 7,
     "tour": 7,
-    "slotPool": 24
+    "slotPool": 10
   },
   {
     "id": "MAD",
@@ -294,7 +294,7 @@
     "pop": 6,
     "biz": 6,
     "tour": 7,
-    "slotPool": 22
+    "slotPool": 9
   },
   {
     "id": "BCN",
@@ -305,7 +305,7 @@
     "pop": 5,
     "biz": 5,
     "tour": 8,
-    "slotPool": 18
+    "slotPool": 10
   },
   {
     "id": "FCO",
@@ -316,7 +316,7 @@
     "pop": 6,
     "biz": 5,
     "tour": 9,
-    "slotPool": 22
+    "slotPool": 9
   },
   {
     "id": "MXP",
@@ -327,7 +327,7 @@
     "pop": 5,
     "biz": 7,
     "tour": 5,
-    "slotPool": 20
+    "slotPool": 8
   },
   {
     "id": "ZRH",
@@ -338,7 +338,7 @@
     "pop": 3,
     "biz": 7,
     "tour": 5,
-    "slotPool": 18
+    "slotPool": 8
   },
   {
     "id": "VIE",
@@ -349,7 +349,7 @@
     "pop": 4,
     "biz": 5,
     "tour": 6,
-    "slotPool": 16
+    "slotPool": 7
   },
   {
     "id": "MUC",
@@ -360,7 +360,7 @@
     "pop": 4,
     "biz": 6,
     "tour": 5,
-    "slotPool": 18
+    "slotPool": 8
   },
   {
     "id": "TXL",
@@ -371,7 +371,7 @@
     "pop": 5,
     "biz": 5,
     "tour": 5,
-    "slotPool": 18
+    "slotPool": 8
   },
   {
     "id": "CPH",
@@ -382,7 +382,7 @@
     "pop": 4,
     "biz": 5,
     "tour": 5,
-    "slotPool": 16
+    "slotPool": 7
   },
   {
     "id": "ARN",
@@ -393,7 +393,7 @@
     "pop": 4,
     "biz": 5,
     "tour": 4,
-    "slotPool": 16
+    "slotPool": 7
   },
   {
     "id": "DUB",
@@ -404,7 +404,7 @@
     "pop": 3,
     "biz": 4,
     "tour": 5,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "LIS",
@@ -415,7 +415,7 @@
     "pop": 4,
     "biz": 4,
     "tour": 6,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "ATH",
@@ -426,7 +426,7 @@
     "pop": 4,
     "biz": 4,
     "tour": 7,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "WAW",
@@ -437,7 +437,7 @@
     "pop": 4,
     "biz": 3,
     "tour": 3,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "BUD",
@@ -448,7 +448,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 5,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "SVO",
@@ -459,7 +459,7 @@
     "pop": 8,
     "biz": 6,
     "tour": 5,
-    "slotPool": 20
+    "slotPool": 8
   },
   {
     "id": "IST",
@@ -470,7 +470,7 @@
     "pop": 7,
     "biz": 5,
     "tour": 7,
-    "slotPool": 18
+    "slotPool": 8
   },
   {
     "id": "CAI",
@@ -481,7 +481,7 @@
     "pop": 7,
     "biz": 4,
     "tour": 7,
-    "slotPool": 18
+    "slotPool": 8
   },
   {
     "id": "DXB",
@@ -492,7 +492,7 @@
     "pop": 4,
     "biz": 6,
     "tour": 5,
-    "slotPool": 20
+    "slotPool": 10
   },
   {
     "id": "TLV",
@@ -503,7 +503,7 @@
     "pop": 3,
     "biz": 4,
     "tour": 5,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "RUH",
@@ -514,7 +514,7 @@
     "pop": 4,
     "biz": 5,
     "tour": 2,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "DOH",
@@ -525,7 +525,7 @@
     "pop": 2,
     "biz": 4,
     "tour": 2,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "THR",
@@ -536,7 +536,7 @@
     "pop": 6,
     "biz": 4,
     "tour": 3,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "JNB",
@@ -547,7 +547,7 @@
     "pop": 5,
     "biz": 5,
     "tour": 5,
-    "slotPool": 16
+    "slotPool": 7
   },
   {
     "id": "LOS",
@@ -558,7 +558,7 @@
     "pop": 6,
     "biz": 4,
     "tour": 3,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "NBO",
@@ -569,7 +569,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 5,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "ADD",
@@ -580,7 +580,7 @@
     "pop": 3,
     "biz": 2,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "ACC",
@@ -591,7 +591,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "CMN",
@@ -602,7 +602,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 4,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "HND",
@@ -613,7 +613,7 @@
     "pop": 10,
     "biz": 9,
     "tour": 7,
-    "slotPool": 32
+    "slotPool": 11
   },
   {
     "id": "KIX",
@@ -624,7 +624,7 @@
     "pop": 7,
     "biz": 6,
     "tour": 5,
-    "slotPool": 22
+    "slotPool": 9
   },
   {
     "id": "SEL",
@@ -635,7 +635,7 @@
     "pop": 7,
     "biz": 6,
     "tour": 5,
-    "slotPool": 22
+    "slotPool": 9
   },
   {
     "id": "PEK",
@@ -646,7 +646,7 @@
     "pop": 9,
     "biz": 5,
     "tour": 6,
-    "slotPool": 22
+    "slotPool": 9
   },
   {
     "id": "SHA",
@@ -657,7 +657,7 @@
     "pop": 8,
     "biz": 6,
     "tour": 5,
-    "slotPool": 22
+    "slotPool": 9
   },
   {
     "id": "CAN",
@@ -668,7 +668,7 @@
     "pop": 6,
     "biz": 4,
     "tour": 3,
-    "slotPool": 16
+    "slotPool": 7
   },
   {
     "id": "HKG",
@@ -679,7 +679,7 @@
     "pop": 6,
     "biz": 8,
     "tour": 7,
-    "slotPool": 24
+    "slotPool": 10
   },
   {
     "id": "TPE",
@@ -690,7 +690,7 @@
     "pop": 5,
     "biz": 5,
     "tour": 4,
-    "slotPool": 18
+    "slotPool": 8
   },
   {
     "id": "MNL",
@@ -701,7 +701,7 @@
     "pop": 5,
     "biz": 4,
     "tour": 4,
-    "slotPool": 16
+    "slotPool": 7
   },
   {
     "id": "BKK",
@@ -712,7 +712,7 @@
     "pop": 6,
     "biz": 5,
     "tour": 8,
-    "slotPool": 20
+    "slotPool": 8
   },
   {
     "id": "SGN",
@@ -723,7 +723,7 @@
     "pop": 5,
     "biz": 3,
     "tour": 3,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "KUL",
@@ -734,7 +734,7 @@
     "pop": 4,
     "biz": 4,
     "tour": 4,
-    "slotPool": 14
+    "slotPool": 10
   },
   {
     "id": "SIN",
@@ -745,7 +745,7 @@
     "pop": 5,
     "biz": 8,
     "tour": 6,
-    "slotPool": 22
+    "slotPool": 10
   },
   {
     "id": "CGK",
@@ -756,7 +756,7 @@
     "pop": 7,
     "biz": 4,
     "tour": 4,
-    "slotPool": 16
+    "slotPool": 7
   },
   {
     "id": "DEL",
@@ -767,7 +767,7 @@
     "pop": 8,
     "biz": 5,
     "tour": 6,
-    "slotPool": 18
+    "slotPool": 8
   },
   {
     "id": "BOM",
@@ -778,7 +778,7 @@
     "pop": 8,
     "biz": 6,
     "tour": 5,
-    "slotPool": 18
+    "slotPool": 8
   },
   {
     "id": "MAA",
@@ -789,7 +789,7 @@
     "pop": 5,
     "biz": 3,
     "tour": 3,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "CCU",
@@ -800,7 +800,7 @@
     "pop": 6,
     "biz": 3,
     "tour": 3,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "KHI",
@@ -811,7 +811,7 @@
     "pop": 5,
     "biz": 3,
     "tour": 2,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "DAC",
@@ -822,7 +822,7 @@
     "pop": 5,
     "biz": 2,
     "tour": 2,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "SYD",
@@ -833,7 +833,7 @@
     "pop": 6,
     "biz": 6,
     "tour": 7,
-    "slotPool": 20
+    "slotPool": 8
   },
   {
     "id": "MEL",
@@ -844,7 +844,7 @@
     "pop": 5,
     "biz": 5,
     "tour": 5,
-    "slotPool": 18
+    "slotPool": 8
   },
   {
     "id": "BNE",
@@ -855,7 +855,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 4,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "PER",
@@ -866,7 +866,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "AKL",
@@ -877,7 +877,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 4,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "HNL",
@@ -888,7 +888,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 9,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "PHL",
@@ -899,7 +899,7 @@
     "pop": 5,
     "biz": 5,
     "tour": 4,
-    "slotPool": 18
+    "slotPool": 8
   },
   {
     "id": "DCA",
@@ -910,7 +910,7 @@
     "pop": 5,
     "biz": 7,
     "tour": 6,
-    "slotPool": 20
+    "slotPool": 8
   },
   {
     "id": "DTW",
@@ -921,7 +921,7 @@
     "pop": 5,
     "biz": 5,
     "tour": 2,
-    "slotPool": 16
+    "slotPool": 7
   },
   {
     "id": "MSP",
@@ -932,7 +932,7 @@
     "pop": 4,
     "biz": 5,
     "tour": 3,
-    "slotPool": 16
+    "slotPool": 7
   },
   {
     "id": "STL",
@@ -943,7 +943,7 @@
     "pop": 4,
     "biz": 4,
     "tour": 3,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "MCO",
@@ -954,7 +954,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 8,
-    "slotPool": 16
+    "slotPool": 7
   },
   {
     "id": "LAS",
@@ -965,7 +965,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 8,
-    "slotPool": 16
+    "slotPool": 10
   },
   {
     "id": "PHX",
@@ -976,7 +976,7 @@
     "pop": 4,
     "biz": 4,
     "tour": 4,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "SAN",
@@ -987,7 +987,7 @@
     "pop": 4,
     "biz": 3,
     "tour": 5,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "SLC",
@@ -998,7 +998,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 3,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "YUL",
@@ -1009,7 +1009,7 @@
     "pop": 5,
     "biz": 5,
     "tour": 5,
-    "slotPool": 18
+    "slotPool": 8
   },
   {
     "id": "YYC",
@@ -1020,7 +1020,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 3,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "CUN",
@@ -1031,7 +1031,7 @@
     "pop": 2,
     "biz": 2,
     "tour": 8,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "GDL",
@@ -1042,7 +1042,7 @@
     "pop": 4,
     "biz": 3,
     "tour": 3,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "MTY",
@@ -1053,7 +1053,7 @@
     "pop": 4,
     "biz": 4,
     "tour": 2,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "SJU",
@@ -1064,7 +1064,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 6,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "MDE",
@@ -1075,7 +1075,7 @@
     "pop": 4,
     "biz": 3,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "UIO",
@@ -1086,7 +1086,7 @@
     "pop": 3,
     "biz": 2,
     "tour": 4,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "ASU",
@@ -1097,7 +1097,7 @@
     "pop": 2,
     "biz": 2,
     "tour": 2,
-    "slotPool": 8
+    "slotPool": 6
   },
   {
     "id": "MVD",
@@ -1108,7 +1108,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "BSB",
@@ -1119,7 +1119,7 @@
     "pop": 4,
     "biz": 4,
     "tour": 2,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "REC",
@@ -1130,7 +1130,7 @@
     "pop": 3,
     "biz": 2,
     "tour": 4,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "SSA",
@@ -1141,7 +1141,7 @@
     "pop": 3,
     "biz": 2,
     "tour": 5,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "FOR",
@@ -1152,7 +1152,7 @@
     "pop": 3,
     "biz": 2,
     "tour": 4,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "BRU",
@@ -1163,7 +1163,7 @@
     "pop": 4,
     "biz": 6,
     "tour": 5,
-    "slotPool": 16
+    "slotPool": 7
   },
   {
     "id": "GVA",
@@ -1174,7 +1174,7 @@
     "pop": 2,
     "biz": 6,
     "tour": 5,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "NCE",
@@ -1185,7 +1185,7 @@
     "pop": 2,
     "biz": 3,
     "tour": 7,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "MAN",
@@ -1196,7 +1196,7 @@
     "pop": 4,
     "biz": 4,
     "tour": 3,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "EDI",
@@ -1207,7 +1207,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 5,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "HAM",
@@ -1218,7 +1218,7 @@
     "pop": 4,
     "biz": 5,
     "tour": 3,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "DUS",
@@ -1229,7 +1229,7 @@
     "pop": 4,
     "biz": 5,
     "tour": 3,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "STR",
@@ -1240,7 +1240,7 @@
     "pop": 3,
     "biz": 5,
     "tour": 3,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "GOT",
@@ -1251,7 +1251,7 @@
     "pop": 2,
     "biz": 3,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "OSL",
@@ -1262,7 +1262,7 @@
     "pop": 3,
     "biz": 4,
     "tour": 4,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "HEL",
@@ -1273,7 +1273,7 @@
     "pop": 3,
     "biz": 4,
     "tour": 4,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "KRK",
@@ -1284,7 +1284,7 @@
     "pop": 3,
     "biz": 2,
     "tour": 5,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "BEG",
@@ -1295,7 +1295,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "ZAG",
@@ -1306,7 +1306,7 @@
     "pop": 2,
     "biz": 2,
     "tour": 4,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "SOF",
@@ -1317,7 +1317,7 @@
     "pop": 3,
     "biz": 2,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "OTP",
@@ -1328,7 +1328,7 @@
     "pop": 4,
     "biz": 3,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "KBP",
@@ -1339,7 +1339,7 @@
     "pop": 5,
     "biz": 3,
     "tour": 3,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "LED",
@@ -1350,7 +1350,7 @@
     "pop": 6,
     "biz": 4,
     "tour": 5,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "PRG",
@@ -1361,7 +1361,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 6,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "AMM",
@@ -1372,7 +1372,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 4,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "BEY",
@@ -1383,7 +1383,7 @@
     "pop": 3,
     "biz": 4,
     "tour": 5,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "BGW",
@@ -1394,7 +1394,7 @@
     "pop": 5,
     "biz": 3,
     "tour": 2,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "KWI",
@@ -1405,7 +1405,7 @@
     "pop": 3,
     "biz": 4,
     "tour": 2,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "BAH",
@@ -1416,7 +1416,7 @@
     "pop": 2,
     "biz": 4,
     "tour": 2,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "MCT",
@@ -1427,7 +1427,7 @@
     "pop": 2,
     "biz": 3,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "ALG",
@@ -1438,7 +1438,7 @@
     "pop": 4,
     "biz": 3,
     "tour": 3,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "TUN",
@@ -1449,7 +1449,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 4,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "TIP",
@@ -1460,7 +1460,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 2,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "DKR",
@@ -1471,7 +1471,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "ABJ",
@@ -1482,7 +1482,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 2,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "EBB",
@@ -1493,7 +1493,7 @@
     "pop": 2,
     "biz": 2,
     "tour": 3,
-    "slotPool": 8
+    "slotPool": 6
   },
   {
     "id": "DAR",
@@ -1504,7 +1504,7 @@
     "pop": 3,
     "biz": 2,
     "tour": 3,
-    "slotPool": 8
+    "slotPool": 6
   },
   {
     "id": "HRE",
@@ -1515,7 +1515,7 @@
     "pop": 2,
     "biz": 2,
     "tour": 3,
-    "slotPool": 8
+    "slotPool": 6
   },
   {
     "id": "CPT",
@@ -1526,7 +1526,7 @@
     "pop": 4,
     "biz": 4,
     "tour": 6,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "LAD",
@@ -1537,7 +1537,7 @@
     "pop": 3,
     "biz": 2,
     "tour": 2,
-    "slotPool": 8
+    "slotPool": 6
   },
   {
     "id": "PUS",
@@ -1548,7 +1548,7 @@
     "pop": 4,
     "biz": 3,
     "tour": 3,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "NGO",
@@ -1559,7 +1559,7 @@
     "pop": 5,
     "biz": 5,
     "tour": 3,
-    "slotPool": 14
+    "slotPool": 6
   },
   {
     "id": "FUK",
@@ -1570,7 +1570,7 @@
     "pop": 4,
     "biz": 4,
     "tour": 3,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "CTS",
@@ -1581,7 +1581,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 4,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "CTU",
@@ -1592,7 +1592,7 @@
     "pop": 5,
     "biz": 3,
     "tour": 3,
-    "slotPool": 12
+    "slotPool": 6
   },
   {
     "id": "XIY",
@@ -1603,7 +1603,7 @@
     "pop": 4,
     "biz": 2,
     "tour": 4,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "WUH",
@@ -1614,7 +1614,7 @@
     "pop": 5,
     "biz": 3,
     "tour": 2,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "SHE",
@@ -1625,7 +1625,7 @@
     "pop": 4,
     "biz": 3,
     "tour": 2,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "KMG",
@@ -1636,7 +1636,7 @@
     "pop": 3,
     "biz": 2,
     "tour": 3,
-    "slotPool": 8
+    "slotPool": 6
   },
   {
     "id": "HAN",
@@ -1647,7 +1647,7 @@
     "pop": 4,
     "biz": 2,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "PNH",
@@ -1658,7 +1658,7 @@
     "pop": 2,
     "biz": 2,
     "tour": 3,
-    "slotPool": 8
+    "slotPool": 6
   },
   {
     "id": "RGN",
@@ -1669,7 +1669,7 @@
     "pop": 3,
     "biz": 2,
     "tour": 3,
-    "slotPool": 8
+    "slotPool": 6
   },
   {
     "id": "DPS",
@@ -1680,7 +1680,7 @@
     "pop": 2,
     "biz": 2,
     "tour": 7,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "SUB",
@@ -1691,7 +1691,7 @@
     "pop": 4,
     "biz": 2,
     "tour": 2,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "CEB",
@@ -1702,7 +1702,7 @@
     "pop": 3,
     "biz": 2,
     "tour": 4,
-    "slotPool": 8
+    "slotPool": 6
   },
   {
     "id": "HYD",
@@ -1713,7 +1713,7 @@
     "pop": 5,
     "biz": 3,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "BLR",
@@ -1724,7 +1724,7 @@
     "pop": 5,
     "biz": 4,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "LHE",
@@ -1735,7 +1735,7 @@
     "pop": 5,
     "biz": 2,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "ADL",
@@ -1746,7 +1746,7 @@
     "pop": 3,
     "biz": 3,
     "tour": 3,
-    "slotPool": 10
+    "slotPool": 6
   },
   {
     "id": "WLG",
@@ -1757,7 +1757,7 @@
     "pop": 2,
     "biz": 3,
     "tour": 3,
-    "slotPool": 8
+    "slotPool": 6
   },
   {
     "id": "CHC",
@@ -1768,7 +1768,7 @@
     "pop": 2,
     "biz": 2,
     "tour": 4,
-    "slotPool": 8
+    "slotPool": 6
   },
   {
     "id": "NAN",
@@ -1779,7 +1779,7 @@
     "pop": 1,
     "biz": 1,
     "tour": 6,
-    "slotPool": 8
+    "slotPool": 6
   },
   {
     "id": "PPT",
@@ -1790,7 +1790,7 @@
     "pop": 1,
     "biz": 1,
     "tour": 6,
-    "slotPool": 8
+    "slotPool": 6
   },
   {
     "id": "GUM",
@@ -1801,6 +1801,6 @@
     "pop": 1,
     "biz": 2,
     "tour": 4,
-    "slotPool": 8
+    "slotPool": 6
   }
 ]

@@ -25,7 +25,9 @@ describe('data integrity', () => {
         expect(rating).toBeGreaterThanOrEqual(1)
         expect(rating).toBeLessThanOrEqual(10)
       }
-      expect(c.slotPool).toBeGreaterThanOrEqual(8)
+      // Authored capacity is deliberately tight — scarcity is the point, and
+      // airport building programmes (engine/slots.ts) add to it over an era.
+      expect(c.slotPool).toBeGreaterThanOrEqual(6)
     }
   })
 

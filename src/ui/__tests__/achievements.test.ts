@@ -21,6 +21,7 @@ const zeroBreakdown = {
   ownership: 0,
   maintenance: 0,
   admin: 0,
+      slots: 0,
   overhead: 0,
   marketing: 0,
   interest: 0,
@@ -41,17 +42,22 @@ function withQuarter(state: GameState, profit: number): GameState {
 }
 
 describe('achievement predicates', () => {
-  it('spoils of war: a bidding war you were in, ended with the slots granted', () => {
+  it('jumped the queue: slots taken at an airport a rival had declared for', () => {
     const state = newGame('jet_age', 'ach-test')
-    const war: GameEvent = { type: 'bidding_war', city: 'LHR', airlines: [0, 1] }
-    const grant: GameEvent = { type: 'slots_granted', airline: 0, city: 'LHR', slots: 2 }
-    expect(def('war_winner').test(state, [war, grant])).toBe(true)
-    // Losing the war (no grant), or a grant with no war, earns nothing.
-    expect(def('war_winner').test(state, [war])).toBe(false)
+    const rivalQueued: GameEvent = {
+      type: 'slot_requested',
+      airline: 1,
+      city: 'LHR',
+      fee: 2000,
+      queuePosition: 1,
+    }
+    const grant: GameEvent = { type: 'slots_granted', airline: 0, city: 'LHR', slots: 2, waited: 2 }
+    expect(def('war_winner').test(state, [rivalQueued, grant])).toBe(true)
+    // A grant nobody else wanted, or a rival queue you never beat, earns nothing.
     expect(def('war_winner').test(state, [grant])).toBe(false)
-    // A rival's war at some other city does not count either.
-    const otherWar: GameEvent = { type: 'bidding_war', city: 'CDG', airlines: [1, 2] }
-    expect(def('war_winner').test(state, [otherWar, grant])).toBe(false)
+    expect(def('war_winner').test(state, [rivalQueued])).toBe(false)
+    const elsewhere: GameEvent = { ...rivalQueued, city: 'CDG' }
+    expect(def('war_winner').test(state, [elsewhere, grant])).toBe(false)
   })
 
   it('shockproof: a profitable quarter flown while the oil shock burns', () => {

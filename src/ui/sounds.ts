@@ -120,8 +120,7 @@ function soundFor(events: GameEvent[]): string | null {
     }
   }
   for (const e of events) {
-    if (e.type === 'slot_lost' && e.airline === 0) return 'loss'
-    if (e.type === 'negotiation_failed' && e.airline === 0) return 'loss'
+    if (e.type === 'slots_released' && e.airline === 0) return 'loss'
   }
   for (const e of events) {
     if (e.type === 'quarter_report' && e.airline === 0) return 'quarter'

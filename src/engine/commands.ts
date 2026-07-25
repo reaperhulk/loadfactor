@@ -16,9 +16,9 @@ import {
   MIN_ROUTE_KM,
   TAKEOVER_BASE_K,
   TAKEOVER_PREMIUM_BP,
-  NEG_MIN_SPEND,
   OFFER_FUEL_PREMIUM_BP,
 } from '../data/constants'
+import { slotFee, slotQueue } from './slots'
 import { effFuelBp } from './worldEvents'
 import {
   currentLoanRateBp,
@@ -29,7 +29,6 @@ import {
   networkCities,
   resaleValue,
   roundTripsPerWeek,
-  slotsAllocated,
   slotsFree,
   totalDebt,
   yearOf,
@@ -334,7 +333,13 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       // Slots land immediately; a fuel contract becomes the running hedge.
       if (offer.slots > 0 && offer.city !== null) {
         airline.slots[offer.city] = (airline.slots[offer.city] ?? 0) + offer.slots
-        events.push({ type: 'slots_granted', airline: airlineIdx, city: offer.city, slots: offer.slots })
+        events.push({
+          type: 'slots_granted',
+          airline: airlineIdx,
+          city: offer.city,
+          slots: offer.slots,
+          waited: 0,
+        })
       }
       if (offer.kind === 'fuel_contract') {
         airline.fuelHedge = {
@@ -417,8 +422,8 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       target.orders = []
       target.loans = []
       target.slots = {}
-      target.negotiations = []
-      target.slotIdle = {}
+      target.slotRequests = []
+      delete target.slotInterest
       target.fuelHedge = null
       target.cash = 0
       return {
@@ -435,19 +440,62 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       }
     }
 
-    case 'negotiate_slots': {
+    // Join a city's waiting list. The fee is committed now; the place is
+    // served no earlier than next quarter, and only when capacity exists —
+    // so joining a list that is longer than the pool is a legal, and
+    // sometimes correct, bet on the airport's building programme.
+    case 'request_slots': {
       if (!isCity(command.city)) return reject(airlineIdx, command, 'unknown city')
-      if (!Number.isInteger(command.spend) || command.spend < NEG_MIN_SPEND)
-        return reject(airlineIdx, command, `spend must be at least ${NEG_MIN_SPEND}`)
-      if (airline.cash < command.spend) return reject(airlineIdx, command, 'insufficient cash')
-      if (airline.negotiations.some((n) => n.city === command.city))
-        return reject(airlineIdx, command, 'already negotiating at this city')
       const city = getCity(command.city)
-      if (slotsAllocated(state, city.id) >= city.slotPool)
-        return reject(airlineIdx, command, 'no slots left in the pool')
-      airline.cash -= command.spend
-      airline.negotiations.push({ city: city.id, spend: command.spend })
-      return { events: [{ type: 'negotiation_started', airline: airlineIdx, city: city.id, spend: command.spend }] }
+      const fee = slotFee(city.id)
+      if (airline.cash < fee) return reject(airlineIdx, command, 'insufficient cash')
+      if (airline.slotRequests.some((r) => r.city === city.id))
+        return reject(airlineIdx, command, 'already queued at this city')
+      airline.cash -= fee
+      airline.slotRequests.push({ city: city.id, fee, queuedTurn: state.turn })
+      return {
+        events: [
+          {
+            type: 'slot_requested',
+            airline: airlineIdx,
+            city: city.id,
+            fee,
+            queuePosition: slotQueue(state, city.id).findIndex((q) => q.airline === airlineIdx) + 1,
+          },
+        ],
+      }
+    }
+
+    // Hand capacity back to the authority. No refund — the fee bought a
+    // place in a line, not a deposit — but the quarterly rent stops, which
+    // is the whole reason to do it. Slots in use by a route stay put.
+    case 'release_slots': {
+      if (!isCity(command.city)) return reject(airlineIdx, command, 'unknown city')
+      if (!Number.isInteger(command.count) || command.count < 1)
+        return reject(airlineIdx, command, 'invalid count')
+      if (command.city === airline.hq) return reject(airlineIdx, command, 'the home base is not releasable')
+      if (slotsFree(airline, command.city) < command.count)
+        return reject(airlineIdx, command, 'those slots are in use')
+      airline.slots[command.city] = (airline.slots[command.city] ?? 0) - command.count
+      if (airline.slots[command.city] === 0) delete airline.slots[command.city]
+      return {
+        events: [{ type: 'slots_released', airline: airlineIdx, city: command.city, slots: command.count }],
+      }
+    }
+
+    // Leave the list and take the fee back. The way out of a queue that is
+    // going nowhere — the cost of the detour was the quarters, not the money.
+    case 'cancel_slot_request': {
+      if (!isCity(command.city)) return reject(airlineIdx, command, 'unknown city')
+      const idx = airline.slotRequests.findIndex((r) => r.city === command.city)
+      if (idx < 0) return reject(airlineIdx, command, 'not queued at this city')
+      const [req] = airline.slotRequests.splice(idx, 1)
+      airline.cash += req!.fee
+      return {
+        events: [
+          { type: 'slot_request_cancelled', airline: airlineIdx, city: command.city, refund: req!.fee },
+        ],
+      }
     }
 
     case 'take_loan': {

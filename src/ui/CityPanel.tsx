@@ -2,14 +2,14 @@
 // context — ratings, slots, active events, the richest pairs from here, your
 // presence, and slot negotiations. Opens when a city is clicked on the map.
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { SeasonLegend } from './legends'
 import { CITIES, distanceKm, getCity } from '../data/cities'
-import { NEG_MIN_SPEND, SEASON_TOUR_BP_PER_POINT, SLOT_IDLE_QUARTERS_TO_LOSE, SLOT_IDLE_THRESHOLD } from '../data/constants'
+import { SEASON_TOUR_BP_PER_POINT, SLOTS_PER_GRANT } from '../data/constants'
 import { getEventDef } from '../data/events'
 import type { GameState } from '../engine'
 import { baseFare, pairWeeklyDemand, seasonalBp } from '../engine/market'
-import { negotiationDifficulty, scarcityChanceBp } from '../engine/negotiation'
+import { cityPool, nextExpansion, slotFee, slotQueue, slotRent, slotsRemaining } from '../engine/slots'
 import { airlinesOnPair, networkCities, slotsAllocated, slotsFree, slotsHeld, slotsUsed } from '../engine/queries'
 import { cityMass, cityTier } from './MapView'
 import { dispatch } from './session'
@@ -50,20 +50,22 @@ interface CityPanelProps {
 export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, onClose }: CityPanelProps) {
   const city = getCity(cityId)
   const player = state.airlines[0]!
-  const [spend, setSpend] = useState(1000)
 
   const held = slotsHeld(player, cityId)
   const used = slotsUsed(player, cityId)
   const allocated = slotsAllocated(state, cityId)
   const rivalsHeld = allocated - held
-  const negotiating = player.negotiations.some((n) => n.city === cityId)
-  // Rival intent is public: a carrier announces the authority it will court a
-  // quarter ahead, and that bid lands in the same pass as yours. Knowing
-  // someone else is coming for a shrinking pool is the whole reason to spend
-  // more than the minimum — or to spend it somewhere else entirely.
+  const pool = cityPool(state, cityId)
+  const remaining = slotsRemaining(state, cityId)
+  const queue = slotQueue(state, cityId)
+  const myPlace = queue.findIndex((q) => q.airline === 0)
+  const queued = myPlace >= 0
+  const expansion = nextExpansion(state, cityId)
+  const fee = slotFee(cityId)
+  // Rival intent is public: a carrier announces the authority it will queue at
+  // a quarter ahead. Knowing someone is about to take a place in a line you
+  // want is the whole reason to take yours first — or to go elsewhere.
   const rivalNegotiators = state.airlines.filter((a) => a.id !== 0 && !a.bankrupt && a.slotInterest === cityId)
-  const poolFull = allocated >= city.slotPool
-  const difficulty = negotiationDifficulty(cityId)
 
   const activeEvents = state.world.events.filter((e) => {
     const def = getEventDef(e.id)
@@ -152,7 +154,8 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
       )}
 
       <div className="city-slots" data-testid="city-slots">
-        <strong>Slots</strong> — pool {city.slotPool} · rivals hold {rivalsHeld} · you hold {held} (using {used})
+        <strong>Slots</strong> — pool {pool} ({remaining} free) · rivals hold {rivalsHeld} · you hold {held}{' '}
+        (using {used})
         {rivalsHeld > 0 && (
           <span className="dim" data-testid="slot-holders">
             {' '}
@@ -168,10 +171,23 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
         )}
       </div>
 
-      {cityId !== player.hq && held - used >= SLOT_IDLE_THRESHOLD && (
-        <div className="neg" data-testid="slot-idle-warning">
-          ⚠ {held - used} slots idle — the authority reclaims one after {SLOT_IDLE_QUARTERS_TO_LOSE} idle quarters (
-          {SLOT_IDLE_QUARTERS_TO_LOSE - (player.slotIdle[cityId] ?? 0)}q left)
+      {/* The airport's building programme. Published years ahead, because
+          planning around it is the point: a place in the line at a full
+          airport is a bet on a date you can read right here. */}
+      <div className="dim" data-testid="city-expansion">
+        🏗 {expansion.name} opens in {expansion.quartersAway}q (+{expansion.slots} slots)
+      </div>
+
+      {cityId !== player.hq && held - used > 0 && (
+        <div className="neg" data-testid="slot-rent-warning">
+          ⚠ {held - used} unused slot{held - used > 1 ? 's' : ''} — {money((held - used) * slotRent(cityId))}/q of
+          rent buying nothing{' '}
+          <button
+            data-testid="panel-release"
+            onClick={() => dispatch({ type: 'release_slots', city: cityId, count: held - used })}
+          >
+            hand back
+          </button>
         </div>
       )}
 
@@ -190,40 +206,57 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
       {rivalNegotiators.length > 0 && (
         <div className="neg" data-testid="rival-negotiating-note">
           ⚠ {rivalNegotiators.map((a) => a.name).join(' · ')}{' '}
-          {rivalNegotiators.length > 1 ? 'have' : 'has'} announced a campaign for slots here — bidding next
-          quarter, resolving in the same pass as yours
-          {poolFull ? '' : `, against the ${city.slotPool - allocated} left in the pool`}.
+          {rivalNegotiators.length > 1 ? 'have' : 'has'} announced a campaign for slots here — joining the list
+          next quarter{remaining > 0 ? `, against the ${remaining} still free` : ', behind whoever is already in it'}.
         </div>
       )}
 
-      <div className="city-negotiate">
-        {negotiating ? (
-          <span className="dim" data-testid="negotiating-note">
-            Negotiating for slots…
-          </span>
-        ) : poolFull ? (
-          <span className="dim">Slot pool is full.</span>
+      <div className="city-negotiate" data-testid="city-slot-queue">
+        {queue.length > 0 && (
+          <ol className="slot-queue">
+            {queue.map((q, i) => {
+              const name = q.airline === 0 ? 'You' : state.airlines[q.airline]!.name
+              // Capacity is promised in queue order: everyone ahead takes
+              // their grant first, so this says whether the line reaches this
+              // place at today's pool, or waits for the builders.
+              const served = remaining >= (i + 1) * SLOTS_PER_GRANT
+              return (
+                <li key={`${q.airline}-${q.city}`} className={q.airline === 0 ? 'me' : ''}>
+                  {name} <span className="dim">queued t{q.queuedTurn}</span>{' '}
+                  {served ? (
+                    <span className="pos">capacity waiting</span>
+                  ) : (
+                    <span className="neg">needs the {expansion.quartersAway}q expansion</span>
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+        )}
+        {queued ? (
+          <>
+            <span className="dim" data-testid="queued-note">
+              You are #{myPlace + 1} in line — served when capacity reaches you.
+            </span>{' '}
+            <button
+              data-testid="panel-cancel-request"
+              onClick={() => dispatch({ type: 'cancel_slot_request', city: cityId })}
+            >
+              leave the list ({money(fee)} back)
+            </button>
+          </>
         ) : (
           <>
-            <label>
-              $k:{' '}
-              <input
-                type="number"
-                value={spend}
-                min={NEG_MIN_SPEND}
-                step={100}
-                onChange={(e) => setSpend(Number(e.target.value))}
-                data-testid="negotiate-spend"
-              />
-            </label>
             <button
-              data-testid="panel-negotiate"
-              disabled={player.cash < spend || spend < NEG_MIN_SPEND}
-              onClick={() => dispatch({ type: 'negotiate_slots', city: cityId, spend })}
+              data-testid="panel-request-slots"
+              disabled={player.cash < fee}
+              onClick={() => dispatch({ type: 'request_slots', city: cityId })}
             >
-              Negotiate ({(scarcityChanceBp(state, cityId, spend) / 100).toFixed(0)}%)
-            </button>
-            <span className="dim">difficulty {money(difficulty)}</span>
+              Request {SLOTS_PER_GRANT} slots — {money(fee)}
+            </button>{' '}
+            <span className="dim">
+              then {money(slotRent(cityId))}/q each to hold · the earliest place in line is served first
+            </span>
           </>
         )}
       </div>

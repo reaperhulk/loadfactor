@@ -67,24 +67,18 @@ describe('balance envelope', () => {
     wins: readonly string[]
     competitive: readonly string[]
   }[] = [
-    // Re-derived after F1 (a field that fights back) and F3 (each era scores
-    // its OWN objective). Every era has seeds the competent bot wins and
-    // seeds it loses close — that spread is the product, not a defect.
-    // F2's reliability costs are a permanent new drag: epsilon now leads its
-    // field comfortably but finishes just under the qualifying bar, and alpha
-    // drops out of the competitive band entirely.
-    { scenario: 'jet_age', quarters: 80, wins: ['beta', 'gamma', 'delta'], competitive: ['epsilon'] },
-    // F4 moved theta out of the win column: rivals now declare their slot
-    // campaigns a quarter ahead and stick to them until they land, so the
-    // carriers that used to scatter their bids across the map hold a target
-    // long enough to win it. theta finishes at ~73% of the leader.
-    { scenario: 'oil_crisis', quarters: 60, wins: ['alpha', 'beta', 'gamma'], competitive: ['theta'] },
-    // deregulation/beta is now a 3% photo finish rather than a 1% win.
-    { scenario: 'deregulation', quarters: 60, wins: ['gamma'], competitive: ['alpha', 'beta'] },
-    // open_skies alpha/gamma stay unpinned: hub-building on those worlds
-    // never reaches the connecting volume the leaders find.
-    { scenario: 'open_skies', quarters: 60, wins: ['beta', 'theta'], competitive: [] },
-    { scenario: 'lcc_wars', quarters: 60, wins: ['alpha'], competitive: ['beta', 'gamma'] },
+    // Re-derived for S (airport capacity): pools are tight, slots are rented
+    // rather than auctioned, and airports build on a published schedule. The
+    // curve moved everywhere — capacity now paces how fast a network can grow,
+    // and the top hubs run 60-100% full deep into an era. The home base is
+    // rent-free, so the pressure lands on sprawl rather than on existing.
+    { scenario: 'jet_age', quarters: 80, wins: ['alpha', 'beta', 'delta'], competitive: ['theta'] },
+    { scenario: 'oil_crisis', quarters: 60, wins: ['beta', 'gamma', 'delta'], competitive: ['alpha', 'omega'] },
+    { scenario: 'deregulation', quarters: 60, wins: ['alpha', 'beta', 'delta'], competitive: ['kappa'] },
+    // open_skies scores connecting volume, which needs capacity at exactly the
+    // hubs everyone else wants — the era where scarcity bites hardest.
+    { scenario: 'open_skies', quarters: 60, wins: ['theta', 'lambda'], competitive: ['iota', 'kappa', 'omega'] },
+    { scenario: 'lcc_wars', quarters: 60, wins: ['alpha', 'gamma', 'theta'], competitive: ['beta', 'delta'] },
   ]
 
   for (const era of ERA_PINS) {

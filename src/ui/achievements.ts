@@ -52,15 +52,15 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   {
     id: 'war_winner',
     icon: '⚖️',
-    name: 'Spoils of war',
-    desc: 'Win a bidding war and take the slots',
-    // A bidding war you were party to, resolved with the slots in your hands.
+    name: 'Jumped the queue',
+    desc: 'Take slots at an airport a rival had already declared for',
+    // You saw the campaign announced and got your name on the list first.
     test: (_s, events) =>
       events.some(
-        (war) =>
-          war.type === 'bidding_war' &&
-          war.airlines.includes(0) &&
-          events.some((e) => e.type === 'slots_granted' && e.airline === 0 && e.city === war.city),
+        (e) =>
+          e.type === 'slots_granted' &&
+          e.airline === 0 &&
+          events.some((r) => r.type === 'slot_requested' && r.airline !== 0 && r.city === e.city),
       ),
   },
   {

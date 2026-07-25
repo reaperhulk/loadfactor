@@ -2,7 +2,7 @@
 
 A web-based airline business simulation inspired by Aerobiz Supersonic (SNES),
 with the emphasis shifted further toward route building, fleet strategy, and
-business management. The player runs an airline across decades: negotiate for
+business management. The player runs an airline across decades: queue for
 airport slots, open routes, buy and assign aircraft, set fares and service
 levels, survive fuel shocks and recessions, and out-grow rival airlines to hit
 a scenario objective before the clock runs out.
@@ -47,17 +47,17 @@ One turn = one calendar quarter. A scenario spans decades (e.g. 1960–1980 =
 - Open/close routes between cities where the airline holds slots. A new
   route must touch the airline's network — its HQ or a city it already
   serves. Airlines build networks, never disconnected cherry-picked pairs;
-  slot negotiation is therefore a directional expansion decision.
+  slot request is therefore a directional expansion decision.
 - Set each route's fare level (±2 steps around a distance-based base fare) and
   service level (1–3: no-frills → premium).
 - Assign/unassign owned aircraft to routes; order new aircraft (delivered
   after a lag of 2–4 quarters) or cancel an order (the maker keeps a
   deposit); lease, buy used, refit cabins; sell old ones.
-- Start slot negotiations at new airports (spend cash for a chance at slots).
+- Join an airport's waiting list for slots, leave it, or hand capacity back.
 - Take or repay loans.
 
 **Resolution phase** (`endQuarter`, fixed deterministic order — see §3.3):
-rival AI turns, deliveries, negotiations, world economy and events, route
+waiting lists, rival AI turns, deliveries, world economy and events, route
 economics for every airline, financials, victory/defeat check. The quarter's
 outcomes stream back as `GameEvent`s and land in the quarterly report: per
 route pax, load factor, revenue, costs, profit; fleet utilization; market
@@ -133,16 +133,24 @@ points where precision matters).
   windows (piston twins → early jets → widebodies → efficient twins). Old
   types stop being sold, keep flying, and age into maintenance hogs — fleet
   renewal is a strategic drumbeat.
-- **Slots.** Airports have finite slot pools by city size. Negotiations cost
-  cash and resolve with a seeded roll whose odds scale with spend and slot
-  scarcity. Rivals compete for the same pools. Slots are use-it-or-lose-it:
-  a city where an airline leaves 2+ slots unused for 4 consecutive quarters
-  hands one back to the authority (the HQ is exempt). Rival campaigns are
-  **declared**: a carrier names the authority it will court (`slotInterest`)
-  a quarter before it bids there, and holds that target until it wins it. The
-  map rings the city and the city panel names the suitor, so entering a
-  bidding war is a decision the player makes with the field in view rather
-  than an outcome discovered in the report.
+- **Slots.** Airports have genuinely tight capacity, and slots are **rented,
+  not auctioned** (`engine/slots.ts`). You pay a one-off fee to join a city's
+  waiting list; lists are served in the order they were joined, two slots at a
+  time, no earlier than the following quarter. There is no bid, so the decision
+  is WHEN to commit rather than how much to spend — and nobody is ever thrown
+  off a list: being behind costs time, and leaving refunds the fee in full.
+  Every slot held bills every quarter (the home base is exempt), so capacity
+  you cannot fly is a standing cost rather than the silent confiscation
+  use-it-or-lose-it used to perform; `release_slots` hands it back.
+  Rival campaigns are **declared**: a carrier names the authority it will
+  court (`slotInterest`) a quarter before it queues there and holds that target
+  until it lands, so the map can ring the city and the player can get to the
+  list first.
+- **Airport building programmes.** Every airport expands on a published
+  schedule — a per-city phase over a fixed cadence, derived from a stateless
+  hash so the UI can read the calendar arbitrarily far ahead. A full airport is
+  therefore a date to plan around, not a wall: wait for the new terminal, or go
+  where nobody is queuing.
 
 ### 2.4 Scenarios & difficulty
 
@@ -186,7 +194,7 @@ The difficulty contract (asserted by balance tests, tuned over milestones):
 
 1. All randomness flows from seeded xoshiro128** streams stored **in**
    `GameState` (`src/engine/rng.ts`), one substream per subsystem (economy,
-   events, negotiations, rivals) so adding a draw to one never reshuffles
+   events, rivals, offers) so adding a draw to one never reshuffles
    another. Draws return the next RNG state; nothing mutates.
 2. Where per-entity noise would make draw order fragile (route demand noise),
    use stateless hashing of `(seed, turn, key)` instead of a stream.
@@ -206,7 +214,8 @@ The difficulty contract (asserted by balance tests, tuned over milestones):
    (deterministic, `rivals` stream for tie-breaks) and applies them through
    the same `applyCommand` validator as the player.
 2. Aircraft deliveries arrive; orders age.
-3. Slot negotiations resolve (`negotiations` stream).
+3. Airport waiting lists are served in queue order while capacity lasts
+   (deterministic — no RNG stream).
 4. World update: economy index walk, fuel walk, event expiry, new event draw
    (`economy`/`events` streams).
 5. Route economics for every airline (pure arithmetic + stateless noise):
@@ -233,7 +242,7 @@ Because the engine is a pure function of `(scenario, seed, commands)`:
 ## 5. The test harness
 
 - **Unit (Vitest)** — `src/engine/__tests__/`: rng streams, distance data
-  integrity, demand model shape, command validation, negotiation odds, turn
+  integrity, demand model shape, command validation, slot queueing, turn
   resolution accounting (cash deltas reconcile with reported P&L).
 - **Determinism (keystone)** — same seed+commands twice ⇒ identical state
   hash; JSON round-trip mid-career ⇒ identical continuation; different seeds
@@ -268,8 +277,8 @@ React shell over the headless engine; the UI never mutates state — it calls
   (Cities carry lat/lon for presentation; the engine only ever sees the
   precomputed distance table.)
 - **Panels**: Routes (fares/service/assignments + last quarter's load
-  factors), Fleet (orders, ages, utilization), Airports (slots,
-  negotiations), Finance (P&L, loans), Report (event log).
+  factors), Fleet (orders, ages, utilization), Airports (slots, rent,
+  waiting lists, build schedule), Finance (P&L, loans), Report (event log).
 - **End Quarter** button resolves and presents the quarterly report.
 - `window.__harness` (dev/e2e): `getState()`, `dispatch(cmd)`,
   `endQuarter()`, `newGame(scenario, seed)`, `getReplay()`, `reset()`.
@@ -280,7 +289,7 @@ React shell over the headless engine; the UI never mutates state — it calls
 
 ```
 src/engine/       pure sim: rng, types, newGame, commands, turn, market,
-                  negotiation, worldEvents, rivals, invariants
+                  slots, worldEvents, rivals, invariants
 src/engine/__tests__/
 src/data/         content as data: cities, distances.gen (generated),
                   aircraft, scenarios, events, constants

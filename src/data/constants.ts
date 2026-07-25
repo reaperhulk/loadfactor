@@ -93,7 +93,6 @@ export const SEASON_TOUR_BP_PER_POINT = 60
 // Bidding wars: when several airlines court the same slot authority in one
 // quarter, every outbid attempt keeps only this share of its odds — the
 // authority is entertaining a richer suitor.
-export const NEG_OUTBID_MALUS_BP = 6000
 
 // --- Takeovers (M3 endgame) ---
 // A DISTRESSED rival (insolvent last quarter, or worth a quarter of you or
@@ -203,19 +202,27 @@ export const DOMINANCE_SCRUTINY_BP = 5000
 // uncapped version reads as pure punishment in the balance envelope.
 export const DOMINANCE_SCRUTINY_MAX_BP = 600
 
-// --- Slots & negotiations ---
-// Base negotiation difficulty scales with how attractive the city is:
-// difficulty $k = NEG_DIFFICULTY_PER_POINT * (pop + biz).
-export const NEG_DIFFICULTY_PER_POINT = 100
-export const NEG_MIN_SPEND = 200 // $k
-export const NEG_BASE_CHANCE_BP = 2000
-export const NEG_SPEND_CHANCE_BP = 6000 // added at spend == difficulty, pro rata
-export const NEG_MAX_CHANCE_BP = 8500
+// --- Airport capacity (see engine/slots.ts) ---
+// Slots are rented from an airport authority, not auctioned. Both prices
+// scale with (pop + biz) — capacity at a great airport is dear to take and
+// dear to keep.
 export const SLOTS_PER_GRANT = 2
-// Use it or lose it: a city with this many (or more) unused slots for this
-// many consecutive quarters hands one back to the authority. The HQ is exempt.
-export const SLOT_IDLE_THRESHOLD = 2
-export const SLOT_IDLE_QUARTERS_TO_LOSE = 4
+// One-off fee to join a city's waiting list, per (pop + biz) point. Sized so
+// a foothold at a major hub is a real capital decision next to an airframe,
+// not the rounding error the old bidding spend had become.
+export const SLOT_FEE_PER_POINT = 150 // $k
+// Quarterly rent per slot held, per point. This is what makes hoarding
+// positions you cannot fly a visible bill instead of the silent confiscation
+// use-it-or-lose-it performed.
+export const SLOT_RENT_PER_POINT = 3 // $k
+// Airport building programmes: every city expands on this cadence, with a
+// per-city phase so the world's openings are spread across the calendar.
+export const EXPANSION_EVERY_QUARTERS = 24
+export const EXPANSION_SIZE_BASE = 1
+export const EXPANSION_SIZE_PER_POINT = 10 // +1 slot per this many (pop + biz)
+// How long an operator will wait for capacity that does not exist yet: queue
+// at a full airport only if the builders arrive within this many quarters.
+export const SLOT_WAIT_PATIENCE = 12
 
 // --- World walks (PLAN.md §2.3) ---
 export const ECONOMY_MIN_BP = 7000

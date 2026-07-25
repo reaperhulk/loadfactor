@@ -52,12 +52,8 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
   const slotWins = events.filter(
     (e): e is Extract<GameEvent, { type: 'slots_granted' }> => e.type === 'slots_granted' && e.airline === 0,
   )
-  const slotLosses = events.filter(
-    (e): e is Extract<GameEvent, { type: 'slot_lost' }> => e.type === 'slot_lost' && e.airline === 0,
-  )
-  const negotiationFails = events.filter(
-    (e): e is Extract<GameEvent, { type: 'negotiation_failed' }> =>
-      e.type === 'negotiation_failed' && e.airline === 0,
+  const expansions = events.filter(
+    (e): e is Extract<GameEvent, { type: 'airport_expanded' }> => e.type === 'airport_expanded',
   )
   // Rivals moving onto pairs the player serves — the quarter's declarations
   // of war belong on the front page.
@@ -208,13 +204,12 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
           </p>
         )}
 
-        {(deliveries.length > 0 || slotWins.length > 0 || slotLosses.length > 0 || negotiationFails.length > 0) && (
+        {(deliveries.length > 0 || slotWins.length > 0 || expansions.length > 0) && (
           <p>
             {[
               ...deliveries.map((d) => `${getAircraftType(d.aircraftType).name} delivered`),
-              ...slotWins.map((s) => `${s.slots} slots won at ${s.city}`),
-              ...slotLosses.map((s) => `idle slot forfeited at ${s.city}`),
-              ...negotiationFails.map((n) => `negotiation failed at ${n.city}`),
+              ...slotWins.map((s) => `${s.slots} slots at ${s.city}`),
+              ...expansions.map((e) => `${e.city} built +${e.slots} slots`),
             ].join(' · ')}
           </p>
         )}

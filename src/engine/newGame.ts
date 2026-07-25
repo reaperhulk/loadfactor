@@ -46,8 +46,7 @@ function makeAirline(id: number, setup: AirlineSetup, controller: 'player' | 'ri
     orders: [],
     routes: [],
     slots: { [setup.hq]: setup.hqSlots, ...setup.extraSlots },
-    negotiations: [],
-    slotIdle: {},
+    slotRequests: [],
     servedUntil: {},
     fuelHedge: null,
     marketing: 0,
@@ -85,10 +84,9 @@ export function newGame(scenarioId: string, seed: string, player?: PlayerSetup):
     rng: {
       economy: deriveStream(seed, 'economy'),
       events: deriveStream(seed, 'events'),
-      negotiations: deriveStream(seed, 'negotiations'),
       rivals: deriveStream(seed, 'rivals'),
       // Offers get their own stream so adding them cannot perturb the
-      // world-event or negotiation draws the balance envelope is pinned to.
+      // world-event or rival draws the balance envelope is pinned to.
       offers: deriveStream(seed, 'offers'),
     },
     world: {

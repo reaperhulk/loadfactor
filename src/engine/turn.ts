@@ -12,8 +12,6 @@ import {
   LEASE_BP_PER_QUARTER,
   MARKETING_BASE_PER_LEVEL,
   MARKETING_PER_ROUTE_PER_LEVEL,
-  SLOT_IDLE_QUARTERS_TO_LOSE,
-  SLOT_IDLE_THRESHOLD,
   MAINT_AGE_BP_PER_QUARTER,
   OWNERSHIP_BP_PER_QUARTER,
   ROUTE_OVERHEAD_QUAD,
@@ -42,8 +40,8 @@ import {
 import { fnv1a, nextInt } from './rng'
 import { getScenario } from '../data/scenarios'
 import { inflationBp, resolveMarket } from './market'
-import { resaleValue, routeWeeklyCapacity, slotCities, slotsFree, totalDebt } from './queries'
-import { resolveNegotiations } from './negotiation'
+import { resaleValue, routeWeeklyCapacity, totalDebt } from './queries'
+import { expansionEvents, resolveSlotRequests, slotRentTotal, slotsRemaining } from './slots'
 import { isGrounded, netWorth, objectiveBeats, objectiveMet, objectiveScore, objectiveScoreAt, yearOf } from './queries'
 import { dealUpkeep, expireOffersAndDeals, maybeOfferDeal } from './offers'
 import { deriveFootholds } from './newGame'
@@ -73,7 +71,7 @@ function liquidate(airline: Airline): void {
   airline.routes = []
   airline.fleet = []
   airline.orders = []
-  airline.negotiations = []
+  airline.slotRequests = []
   delete airline.slotInterest
   airline.loans = []
   airline.slots = {}
@@ -92,7 +90,7 @@ function restructure(airline: Airline, turn: number): GameEvent {
   airline.loans = airline.loans.filter((l) => l.principal > 0)
   const debtWiped = debtBefore - totalDebt(airline)
   airline.orders = []
-  airline.negotiations = []
+  airline.slotRequests = []
   delete airline.slotInterest
   // Keep the best routes by last quarter's profit; the rest close.
   const ranked = [...airline.routes].sort(
@@ -126,6 +124,16 @@ function fieldedSeats(airline: Airline): number {
   return seats
 }
 
+// Clamp a starting endowment to the capacity actually free at each airport.
+function grantWithinPools(state: GameState, wanted: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const city of Object.keys(wanted).sort()) {
+    const n = Math.min(wanted[city]!, slotsRemaining(state, city))
+    if (n > 0) out[city] = n
+  }
+  return out
+}
+
 // A late entrant takes an empty seat: era-appropriate capital and metal, a
 // home the incumbents have not claimed, and a personality drawn from the
 // rivals stream. Ids equal the index, so entrants append.
@@ -133,7 +141,7 @@ function admitEntrant(state: GameState, events: GameEvent[]): void {
   const scenario = getScenario(state.scenario)
   const taken = new Set(state.airlines.filter((a) => !a.bankrupt).map((a) => a.hq))
   const home = [...CITIES]
-    .filter((c) => !taken.has(c.id) && c.slotPool >= 14)
+    .filter((c) => !taken.has(c.id) && c.slotPool >= 10 && slotsRemaining(state, c.id) >= 6)
     .sort((a, b) => b.pop * 4 + b.biz * 3 + b.tour * 2 - (a.pop * 4 + a.biz * 3 + a.tour * 2) || (a.id < b.id ? -1 : 1))
   if (home.length === 0) return
   const pick = nextInt(state.rng.rivals, 0, Math.min(5, home.length - 1))
@@ -171,9 +179,11 @@ function admitEntrant(state: GameState, events: GameEvent[]): void {
     fleet: [],
     orders: [],
     routes: [],
-    slots: { [hq]: 8, ...deriveFootholds(hq) },
-    negotiations: [],
-    slotIdle: {},
+    // The regulator grants a home and a few footholds — but only capacity
+    // that exists. An entrant handed slots the airport does not have would
+    // put every pool display over 100% and quietly break the queue's promise.
+    slots: grantWithinPools(state, { [hq]: 8, ...deriveFootholds(hq) }),
+    slotRequests: [],
     servedUntil: {},
     fuelHedge: null,
     marketing: 0,
@@ -243,8 +253,9 @@ export function endQuarter(prev: GameState): EngineResult {
     airline.orders = remaining
   }
 
-  // 3. Slot negotiations.
-  resolveNegotiations(state, events)
+  // 3. The airport waiting lists: places queued at least a quarter ago are
+  // served in order while capacity lasts (engine/slots.ts).
+  resolveSlotRequests(state, events)
 
   // 4. World economy and events, plus this quarter's used-aircraft market
   // (stateless hash picks — deterministic, order-independent).
@@ -265,6 +276,7 @@ export function endQuarter(prev: GameState): EngineResult {
     ownership: 0,
     maintenance: 0,
     admin: 0,
+    slots: 0,
     overhead: 0,
     marketing: 0,
     interest: 0,
@@ -357,6 +369,10 @@ export function endQuarter(prev: GameState): EngineResult {
       debtPayment += due
     }
     airline.loans = airline.loans.filter((l) => l.principal > 0)
+    // Airport rent: every slot held bills every quarter, whether an aircraft
+    // uses it or not. Capacity is leased from the authority, and a position
+    // you are not flying is a position you are paying to deny to someone else.
+    const slotRent = slotRentTotal(airline)
     const breakdown = {
       fuel: t.fuel,
       fees: t.fees,
@@ -366,13 +382,14 @@ export function endQuarter(prev: GameState): EngineResult {
       ownership,
       maintenance,
       admin,
+      slots: slotRent,
       overhead,
       marketing,
       interest,
     }
     const revenue = t.revenue
     const costs =
-      t.cost + salaries + ownership + maintenance + admin + overhead + marketing + interest
+      t.cost + salaries + ownership + maintenance + admin + slotRent + overhead + marketing + interest
     const profit = revenue - costs
     airline.cash += profit - debtPayment
 
@@ -455,33 +472,6 @@ export function endQuarter(prev: GameState): EngineResult {
     }
   }
 
-  // 8. Use it or lose it: slots that sit idle too long go back to the
-  // authority. The HQ is exempt — a home base is never confiscated.
-  for (const airline of state.airlines) {
-    if (airline.bankrupt) {
-      airline.slotIdle = {}
-      continue
-    }
-    for (const city of slotCities(airline)) {
-      if (city === airline.hq || slotsFree(airline, city) < SLOT_IDLE_THRESHOLD) {
-        delete airline.slotIdle[city]
-        continue
-      }
-      const idle = (airline.slotIdle[city] ?? 0) + 1
-      if (idle >= SLOT_IDLE_QUARTERS_TO_LOSE) {
-        airline.slots[city] = (airline.slots[city] ?? 0) - 1
-        delete airline.slotIdle[city]
-        events.push({ type: 'slot_lost', airline: airline.id, city })
-      } else {
-        airline.slotIdle[city] = idle
-      }
-    }
-    // Drop counters for cities the airline no longer holds slots at.
-    for (const city of Object.keys(airline.slotIdle).sort()) {
-      if ((airline.slots[city] ?? 0) <= 0) delete airline.slotIdle[city]
-    }
-  }
-
   // 9. Milestones on the era's objective: the back half needs a ladder to
   // climb, not just a deadline to wait for.
   {
@@ -556,6 +546,10 @@ export function endQuarter(prev: GameState): EngineResult {
       events.push({ type: 'game_over', result: 'won', reason: `finished #1 on ${obj.label}` })
     }
   }
+  // Airport building programmes open as the calendar rolls. The schedule is
+  // public and computable arbitrarily far ahead (slots.ts) — this only files
+  // the report line for airports the player actually has a stake in.
+  events.push(...expansionEvents(state, state.turn + 1))
   state.turn++
 
   return { state, events }

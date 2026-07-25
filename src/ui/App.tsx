@@ -3,6 +3,7 @@ import { CITIES } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { SCENARIOS, getScenario } from '../data/scenarios'
 import { netWorth, networkCities, objectiveScore, quarterOf, yearOf } from '../engine/queries'
+import { idleSlotRent } from '../engine/slots'
 import { CityPanel } from './CityPanel'
 import { CoachMarks } from './CoachMarks'
 import { ConfirmButton } from './ConfirmButton'
@@ -723,15 +724,15 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         // Needs attention: money leaking or about to. Each chip jumps to the
         // tab where the fix lives.
         const idlePlanes = player.fleet.filter((a) => a.routeId === null).length
-        const atRiskCities = Object.keys(player.slotIdle)
-          .sort()
-          .filter((c) => (player.slotIdle[c] ?? 0) > 0).length
+        // Rent on capacity nothing flies: the bill that quietly grows when a
+        // network of positions outruns the fleet that was meant to use them.
+        const idleRent = idleSlotRent(player)
         const hedgeExpiring = player.fuelHedge !== null && player.fuelHedge.quartersLeft === 1
         const chips: { key: string; text: string; tab: Tab }[] = []
         if (idlePlanes > 0)
           chips.push({ key: 'idle', text: `🛩 ${idlePlanes} idle plane${idlePlanes > 1 ? 's' : ''}`, tab: 'fleet' })
-        if (atRiskCities > 0)
-          chips.push({ key: 'slots', text: `🕳 slots at risk in ${atRiskCities} cit${atRiskCities > 1 ? 'ies' : 'y'}`, tab: 'airports' })
+        if (idleRent > 0)
+          chips.push({ key: 'slots', text: `🕳 ${money(idleRent)}/q rent on unused slots`, tab: 'airports' })
         if (hedgeExpiring) chips.push({ key: 'hedge', text: '⛽ fuel hedge expires next quarter', tab: 'finance' })
         if (chips.length === 0) return null
         return (
@@ -788,7 +789,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             <h2>Handbook</h2>
             <p className="dim" data-testid="handbook-intro">
               The game is a race: finish the era as the #1 airline by net worth AND clear the
-              scenario's floor. Each quarter you plan (open routes, assign jets, set fares, negotiate
+              scenario's floor. Each quarter you plan (open routes, assign jets, set fares, queue for
               slots), then end the quarter — everyone flies, demand splits by appeal (schedule × cabin
               × fare × service × brand), and the world moves. Every system below is explained where
               you use it too.

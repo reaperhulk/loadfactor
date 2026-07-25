@@ -29,14 +29,13 @@ import {
   MARKETING_BASE_PER_LEVEL,
   MARKETING_PER_ROUTE_PER_LEVEL,
   MARKETING_WEIGHT_BP_PER_LEVEL,
-  NEG_OUTBID_MALUS_BP,
   ROUTE_MEMORY_QUARTERS,
   ROUTE_SPOOL_BP,
   SEASON_TOUR_BP_PER_POINT,
   SERVICE_COST_PER_PAX,
   SERVICE_LEVEL_WEIGHT,
-  SLOT_IDLE_QUARTERS_TO_LOSE,
-  SLOT_IDLE_THRESHOLD,
+  SLOTS_PER_GRANT,
+  EXPANSION_EVERY_QUARTERS,
   TAKEOVER_PREMIUM_BP,
   TRANSFER_HANDLING_PER_PAX,
 } from '../data/constants'
@@ -214,21 +213,24 @@ export function HedgeLegend() {
 export function SlotLegend() {
   return (
     <details className="game-legend" data-testid="slot-legend">
-      <summary className="dim">How do slots and bidding wars work?</summary>
+      <summary className="dim">How do airport slots work?</summary>
       <p className="dim">
-        Routes need a slot at both endpoints, won by negotiation — spend more against a city's
-        difficulty for better odds. When several airlines court the same city in the same quarter it
-        becomes an auction: the top spender bids at full strength, everyone below keeps only{' '}
-        {(10000 - NEG_OUTBID_MALUS_BP) / 100}% of their odds. Use them or lose them: holding more than{' '}
-        {SLOT_IDLE_THRESHOLD} idle slots at a city for {SLOT_IDLE_QUARTERS_TO_LOSE} straight quarters
-        forfeits one.
+        Routes need a slot at both endpoints, and airports are full. Capacity is not auctioned — you
+        join the authority's waiting list for a fee, and lists are served in the order they were
+        joined, {SLOTS_PER_GRANT} slots at a time, starting the quarter after you commit. Being early
+        is the whole game: there is no bid that jumps a queue.
       </p>
       <p className="dim">
-        Rivals announce a campaign a quarter before they bid: a red dashed ring on the map, and a
-        line in the city panel naming who is coming. They hold that target until they win it, so you
-        can outbid them, get there first, or spend the money where nobody is looking.
+        Slots are rented, not owned. Every slot bills every quarter whether an aircraft uses it or
+        not, so capacity you cannot fly is a standing cost — hand it back and the rent stops. Leaving
+        a waiting list refunds the fee in full: the price of a queue that went nowhere is the
+        quarters you spent in it.
       </p>
-      <p className="hint">Failed talks burn the spend — bid credibly or wait a quarter.</p>
+      <p className="hint">
+        Airports build. Every field runs a programme roughly every {EXPANSION_EVERY_QUARTERS}{' '}
+        quarters, and the date is published years ahead in the city dossier and the airports board —
+        so a full airport is a schedule to plan around, not a wall.
+      </p>
     </details>
   )
 }

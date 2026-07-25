@@ -64,7 +64,7 @@ describe('build fuzzer', () => {
         serviceLevel: 2,
         debtAppetite: 20000,
         renewAge: 90,
-        negotiateBudgetBp: 15000,
+        slotBudgetBp: 15000,
         cashBuffer: 1000,
         cabin: 1, // pack every seat the sprawl can sell
         fareFloor: -2,
@@ -84,7 +84,7 @@ describe('build fuzzer', () => {
         serviceLevel: 3,
         debtAppetite: 8000,
         renewAge: 48,
-        negotiateBudgetBp: 12000,
+        slotBudgetBp: 12000,
         cashBuffer: 6000,
         cabin: 3, // premium fit to stack yield on top of the gouge
         fareFloor: 0,

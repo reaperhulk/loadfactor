@@ -67,7 +67,13 @@ const commandArb: fc.Arbitrary<Command> = fc.oneof(
     cabin: fc.integer({ min: -1, max: 5 }),
   }),
   fc.record({ type: fc.constant('sell_aircraft' as const), aircraftId: idArb }),
-  fc.record({ type: fc.constant('negotiate_slots' as const), city: cityArb, spend: moneyArb }),
+  fc.record({ type: fc.constant('request_slots' as const), city: cityArb }),
+  fc.record({ type: fc.constant('cancel_slot_request' as const), city: cityArb }),
+  fc.record({
+    type: fc.constant('release_slots' as const),
+    city: cityArb,
+    count: fc.integer({ min: -2, max: 4 }),
+  }),
   fc.record({ type: fc.constant('take_loan' as const), amount: moneyArb }),
   fc.record({ type: fc.constant('repay_loan' as const), loanId: idArb, amount: moneyArb }),
   // The largest state surgery in the engine: route/fleet/loan/slot transfer

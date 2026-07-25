@@ -4,7 +4,7 @@
 import { useState } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, pairKey } from '../data/cities'
-import { MIN_ROUTE_KM, NEG_MIN_SPEND } from '../data/constants'
+import { MIN_ROUTE_KM } from '../data/constants'
 import type { GameState } from '../engine'
 import { baseFare, fareFor, pairWeeklyDemand, seasonalBp } from '../engine/market'
 import {
@@ -14,12 +14,11 @@ import {
   CABIN_REFIT_COST_BP,
   MAINT_AGE_BP_PER_QUARTER,
   ORDER_CANCEL_REFUND_BP,
-  SLOT_IDLE_QUARTERS_TO_LOSE,
-  SLOT_IDLE_THRESHOLD,
+  SLOTS_PER_GRANT,
   ROUTE_OVERHEAD_QUAD,
 } from '../data/constants'
 import { inflationBp } from '../engine/market'
-import { negotiationDifficulty, scarcityChanceBp } from '../engine/negotiation'
+import { cityPool, nextExpansion, slotFee, slotQueue, slotRent, slotsRemaining } from '../engine/slots'
 import {
   airlinesOnPair,
   allocateTrips,
@@ -313,7 +312,7 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
   const negotiable: { from: string; to: string; marketK: number; courted: string[] }[] = []
   for (const c of CITIES) {
     if (slotsHeld(player, c.id) > 0) continue
-    if (slotsAllocated(state, c.id) >= c.slotPool) continue
+    if (slotsRemaining(state, c.id) <= 0 && nextExpansion(state, c.id).quartersAway > 8) continue
     let bestFrom = ''
     let bestMarket = 0
     for (const a of networkList) {
@@ -385,7 +384,7 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
       </div>
       {negotiable.length > 0 && (
         <p className="dim" data-testid="negotiation-targets">
-          Worth negotiating:{' '}
+          Worth queueing for:{' '}
           {negotiable
             .slice(0, 3)
             .map(
@@ -393,7 +392,7 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
                 `${n.to} (${money(n.marketK)}/wk vs ${n.from})${n.courted.length > 0 ? ` ⚠ ${n.courted.join(', ')} bidding` : ''}`,
             )
             .join(' · ')}{' '}
-          — win slots there from the airports tab or the city panel.
+          — join the list from the airports tab or the city panel.
         </p>
       )}
     </div>
@@ -670,7 +669,6 @@ export function FleetPanel({ state }: { state: GameState }) {
 
 export function AirportsPanel({ state }: { state: GameState }) {
   const player = state.airlines[0]!
-  const [spend, setSpend] = useState(1000)
   const [onlyMine, setOnlyMine] = useState(true)
   const [query, setQuery] = useState('')
   // Your airports first (held slots, then usage), the rest of the world by
@@ -683,7 +681,7 @@ export function AirportsPanel({ state }: { state: GameState }) {
         q !== '' || // a search overrides the only-mine filter — you searched for a reason
         !onlyMine ||
         slotsHeld(player, c.id) > 0 ||
-        player.negotiations.some((n) => n.city === c.id),
+        player.slotRequests.some((r) => r.city === c.id),
     )
     .sort((a, b) => {
       const ha = slotsHeld(player, a.id)
@@ -694,18 +692,7 @@ export function AirportsPanel({ state }: { state: GameState }) {
       return mb - ma
     })
   return (
-    <div>
-      <label>
-        Negotiation budget:{' '}
-        <input
-          type="number"
-          value={spend}
-          min={NEG_MIN_SPEND}
-          step={100}
-          onChange={(e) => setSpend(Number(e.target.value))}
-        />{' '}
-        $k
-      </label>{' '}
+    <div data-testid="airports-panel">
       <label className="dim">
         <input
           type="checkbox"
@@ -727,10 +714,11 @@ export function AirportsPanel({ state }: { state: GameState }) {
           <tr>
             <th>City</th>
             <th>Slots held / used</th>
-            <th title="slots allocated across all airlines vs the city's pool">Pool</th>
+            <th title="allocated across all airlines vs the city's pool, and who is waiting">Pool</th>
+            <th title="quarterly rent on the slots you hold here">Rent/q</th>
             <th title="last quarter's passengers on your routes touching this city">Pax/q</th>
             <th title="last quarter's route P&L attributed here (half to each endpoint)">P&L/q</th>
-            <th>Difficulty</th>
+            <th title="the authority's next building programme">Next build</th>
             <th />
           </tr>
         </thead>
@@ -739,7 +727,12 @@ export function AirportsPanel({ state }: { state: GameState }) {
             const held = slotsHeld(player, c.id)
             const used = slotsUsed(player, c.id)
             const allocated = slotsAllocated(state, c.id)
-            const negotiating = player.negotiations.some((n) => n.city === c.id)
+            const pool = cityPool(state, c.id)
+            const remaining = slotsRemaining(state, c.id)
+            const queue = slotQueue(state, c.id)
+            const myPlace = queue.findIndex((entry) => entry.airline === 0)
+            const expansion = nextExpansion(state, c.id)
+            const fee = slotFee(c.id)
             // The city as a business: traffic and P&L across every route
             // touching it (each route splits evenly between its endpoints).
             let cityPax = 0
@@ -750,8 +743,8 @@ export function AirportsPanel({ state }: { state: GameState }) {
               cityProfitHalves += r.lastRevenue - r.lastCost
             }
             const cityProfit = Math.floor(cityProfitHalves / 2)
-            // Use it or lose it: idle slots (HQ exempt) are on a countdown.
-            const atRisk = c.id !== player.hq && held - used >= SLOT_IDLE_THRESHOLD
+            // Capacity held with nothing flying it still bills every quarter.
+            const idle = c.id !== player.hq && held - used > 0
             return (
               <tr key={c.id}>
                 <td>
@@ -759,42 +752,51 @@ export function AirportsPanel({ state }: { state: GameState }) {
                 </td>
                 <td>
                   {held} / {used}
-                  {atRisk && (
-                    <span className="neg" title="idle slots are reclaimed — open routes or lose one">
+                  {idle && (
+                    <button
+                      className="link-btn neg"
+                      title={`${held - used} unused — ${money((held - used) * slotRent(c.id))}/q of rent buying nothing`}
+                      data-testid={`release-${c.id}`}
+                      onClick={() => dispatch({ type: 'release_slots', city: c.id, count: held - used })}
+                    >
                       {' '}
-                      ⚠ {SLOT_IDLE_QUARTERS_TO_LOSE - (player.slotIdle[c.id] ?? 0)}q
-                    </span>
+                      ⚠ hand back {held - used}
+                    </button>
                   )}
                 </td>
-                <td className={allocated >= c.slotPool ? 'neg' : 'dim'}>
-                  {allocated}/{c.slotPool}
+                <td className={remaining <= 0 ? 'neg' : 'dim'}>
+                  {allocated}/{pool}
+                  {queue.length > 0 && <span className="dim"> · {queue.length} in line</span>}
                 </td>
+                <td className={held > 0 ? '' : 'dim'}>{held > 0 ? money(held * slotRent(c.id)) : '—'}</td>
                 <td className="dim">{cityPax > 0 ? cityPax.toLocaleString('en-US') : '—'}</td>
                 <td className={cityPax === 0 ? 'dim' : cityProfit >= 0 ? 'pos' : 'neg'}>
                   {cityPax > 0 ? money(cityProfit) : '—'}
                 </td>
-                <td>
-                  <button
-                    className="link-btn"
-                    title="set the negotiation budget to this city's difficulty"
-                    data-testid={`suggest-budget-${c.id}`}
-                    onClick={() => setSpend(negotiationDifficulty(c.id))}
-                  >
-                    {money(negotiationDifficulty(c.id))}
-                  </button>
+                <td className="dim" data-testid={`expansion-${c.id}`} title={expansion.name}>
+                  +{expansion.slots} in {expansion.quartersAway}q
                 </td>
                 <td>
-                  {negotiating ? (
-                    <span className="dim" title="resolves at quarter end">
-                      🤝 negotiating…
-                    </span>
+                  {myPlace >= 0 ? (
+                    <button
+                      data-testid={`cancel-${c.id}`}
+                      title={`#${myPlace + 1} in line — ${money(fee)} refunded if you leave`}
+                      onClick={() => dispatch({ type: 'cancel_slot_request', city: c.id })}
+                    >
+                      #{myPlace + 1} in line — leave
+                    </button>
                   ) : (
                     <button
-                      disabled={player.cash < spend || allocated >= c.slotPool}
-                      title={allocated >= c.slotPool ? 'slot pool is full' : 'chance at this budget'}
-                      onClick={() => dispatch({ type: 'negotiate_slots', city: c.id, spend })}
+                      disabled={player.cash < fee}
+                      data-testid={`request-${c.id}`}
+                      title={
+                        remaining > 0
+                          ? `${SLOTS_PER_GRANT} slots, served from next quarter`
+                          : `full — the list moves when ${expansion.name} opens in ${expansion.quartersAway}q`
+                      }
+                      onClick={() => dispatch({ type: 'request_slots', city: c.id })}
                     >
-                      negotiate ({(scarcityChanceBp(state, c.id, spend) / 100).toFixed(0)}%)
+                      request {money(fee)}
                     </button>
                   )}
                 </td>

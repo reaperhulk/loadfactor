@@ -40,7 +40,7 @@ export function rngFromSeed(seed: string): Rng {
   return rng
 }
 
-// Independent substreams (economy, events, negotiations, rivals) derived from one
+// Independent substreams (economy, events, rivals, offers) derived from one
 // game seed, so adding a draw to one subsystem never reshuffles another.
 // See PLAN.md §3.2.
 export function deriveStream(seed: string, stream: string): Rng {

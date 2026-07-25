@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { applyCommand, newGame } from '../index'
-import { GROUNDING_AGE_QUARTERS, REPUTATION_MIN_BP } from '../../data/constants'
-import { reputationAppealBp, routeWeeklyCapacity } from '../queries'
+import { EXPANSION_EVERY_QUARTERS, GROUNDING_AGE_QUARTERS, REPUTATION_MIN_BP } from '../../data/constants'
+import { reputationAppealBp, routeWeeklyCapacity, slotCities, slotsFree } from '../queries'
+import { cityPool, expansionSize, nextExpansion, slotRent, slotRentTotal } from '../slots'
 import type { GameEvent, GameState } from '../types'
 
 function playerReport(events: GameEvent[]) {
@@ -114,48 +115,46 @@ describe('quarter resolution', () => {
     expect(rejected.events[0]).toMatchObject({ type: 'command_rejected' })
   })
 
-  it('idle slots are reclaimed after four consecutive idle quarters, HQ exempt', () => {
-    let state: GameState = newGame('jet_age', 'slot-decay-seed')
-    // ORD starts with 4 slots and no routes: ≥2 free every quarter. The HQ
-    // (JFK, 8 free) is exempt no matter how idle it sits.
-    const hq = state.airlines[0]!.hq
-    const hqSlotsBefore = state.airlines[0]!.slots[hq]!
-    let lost: string[] = []
-    for (let q = 0; q < 4; q++) {
-      const r = applyCommand(state, { type: 'end_quarter' })
-      state = r.state
-      lost = lost.concat(
-        r.events.filter((e) => e.type === 'slot_lost' && e.airline === 0).map((e) => (e.type === 'slot_lost' ? e.city : '')),
-      )
-    }
-    expect(lost).toContain('ORD')
-    expect(lost).not.toContain(hq)
-    expect(state.airlines[0]!.slots['ORD']).toBe(3)
-    expect(state.airlines[0]!.slots[hq]).toBe(hqSlotsBefore)
-    // The counter resets after a loss — nothing else goes for another 3 quarters.
-    expect(state.airlines[0]!.slotIdle['ORD']).toBeUndefined()
+  it('every slot held bills rent every quarter, and the bucket sums into costs', () => {
+    let state: GameState = newGame('jet_age', 'slot-rent-seed')
+    const player = state.airlines[0]!
+    const expected = slotRentTotal(player)
+    expect(expected).toBeGreaterThan(0)
+    state = applyCommand(state, { type: 'end_quarter' }).state
+    const stats = state.airlines[0]!.history[0]!
+    expect(stats.breakdown.slots).toBe(expected)
+    // The breakdown is the total, never a separate number.
+    const summed = Object.values(stats.breakdown).reduce((a, b) => a + b, 0)
+    expect(summed).toBe(stats.costs)
   })
 
-  it('using slots resets the idle counter', () => {
-    let state: GameState = newGame('jet_age', 'slot-use-seed')
-    // Two idle quarters at MIA (2 slots, none used), then a route drops the
-    // free count below the threshold — the counter clears and stays clear.
-    for (let q = 0; q < 2; q++) state = applyCommand(state, { type: 'end_quarter' }).state
-    expect(state.airlines[0]!.slotIdle['MIA']).toBe(2)
-    state = applyCommand(state, {
-      type: 'open_route',
-      from: 'JFK',
-      to: 'MIA',
-      aircraftId: 1,
-      frequency: 10,
-    }).state
-    for (let q = 0; q < 4; q++) {
-      const r = applyCommand(state, { type: 'end_quarter' })
-      state = r.state
-      expect(r.events.some((e) => e.type === 'slot_lost' && e.airline === 0 && e.city === 'MIA')).toBe(false)
-    }
-    expect(state.airlines[0]!.slotIdle['MIA']).toBeUndefined()
-    expect(state.airlines[0]!.slots['MIA']).toBe(2)
+  it('handing back unused capacity stops the rent', () => {
+    let state: GameState = newGame('jet_age', 'slot-release-seed')
+    const before = slotRentTotal(state.airlines[0]!)
+    const idleCity = slotCities(state.airlines[0]!).find(
+      (c) => c !== state.airlines[0]!.hq && slotsFree(state.airlines[0]!, c) > 0,
+    )!
+    const freed = slotsFree(state.airlines[0]!, idleCity)
+    state = applyCommand(state, { type: 'release_slots', city: idleCity, count: freed }).state
+    expect(slotRentTotal(state.airlines[0]!)).toBe(before - freed * slotRent(idleCity))
+  })
+
+  // Airport building programmes: the schedule is deterministic and readable
+  // arbitrarily far ahead, which is what makes a full airport a date rather
+  // than a wall.
+  it('airports expand on a published schedule that the pool actually follows', () => {
+    const state: GameState = newGame('jet_age', 'expansion-seed')
+    const due = nextExpansion(state, 'LHR')
+    expect(due.quartersAway).toBeGreaterThan(0)
+    expect(due.slots).toBe(expansionSize('LHR'))
+    // The pool is flat until the programme opens, then steps by exactly the
+    // programme's size — and the prediction made at turn 0 holds.
+    const at = (turn: number): number => cityPool({ ...state, turn }, 'LHR')
+    expect(at(due.turn - 1)).toBe(at(0))
+    expect(at(due.turn)).toBe(at(0) + due.slots)
+    // The next one is a full cadence later.
+    const after = nextExpansion({ ...state, turn: due.turn }, 'LHR')
+    expect(after.turn).toBe(due.turn + EXPANSION_EVERY_QUARTERS)
   })
 
   it('rivals act: they open routes and expand without touching player state', () => {

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { SLOTS_PER_GRANT } from '../../data/constants'
 import { applyCommand, newGame, type GameEvent, type GameState } from '../index'
 import { applyPlanningCommand } from '../commands'
 import { currentLoanRateBp } from '../queries'
-import { resolveNegotiations } from '../negotiation'
+import { cityPool, resolveSlotRequests, slotFee, slotQueue } from '../slots'
 
 function expectRejected(events: GameEvent[], reasonPart: string): void {
   const rejection = events.find((e) => e.type === 'command_rejected')
@@ -152,15 +153,42 @@ describe('command validation', () => {
     expect(r.state.airlines[0]!.cash).toBe(18000)
   })
 
-  it('validates negotiation spend and prevents doubling up', () => {
+  it('a slot request charges the fee once and cannot be doubled up', () => {
+    const start = fresh().airlines[0]!.cash
+    const r = applyCommand(fresh(), { type: 'request_slots', city: 'LHR' })
+    expect(r.state.airlines[0]!.cash).toBe(start - slotFee('LHR'))
+    expect(r.state.airlines[0]!.slotRequests).toMatchObject([{ city: 'LHR', queuedTurn: 0 }])
+    const again = applyCommand(r.state, { type: 'request_slots', city: 'LHR' })
+    expectRejected(again.events, 'already queued')
+    // Leaving the list returns the fee in full — the cost of a queue that
+    // went nowhere is the quarters, never the money.
+    const out = applyCommand(r.state, { type: 'cancel_slot_request', city: 'LHR' })
+    expect(out.state.airlines[0]!.cash).toBe(start)
+    expect(out.state.airlines[0]!.slotRequests).toHaveLength(0)
+    expectRejected(applyCommand(out.state, { type: 'cancel_slot_request', city: 'LHR' }).events, 'not queued')
+  })
+
+  it('releasing slots stops the rent but never takes slots a route is flying', () => {
+    const state = fresh()
+    const idle = state.airlines[0]!.fleet.find((a) => a.routeId === null)!
+    const flying = applyCommand(state, {
+      type: 'open_route',
+      from: 'JFK',
+      to: 'ORD',
+      aircraftId: idle.id,
+      frequency: 5,
+    }).state
+    const held = flying.airlines[0]!.slots['ORD']!
     expectRejected(
-      applyCommand(fresh(), { type: 'negotiate_slots', city: 'LHR', spend: 50 }).events,
-      'at least',
+      applyCommand(flying, { type: 'release_slots', city: 'ORD', count: held }).events,
+      'in use',
     )
-    const r = applyCommand(fresh(), { type: 'negotiate_slots', city: 'LHR', spend: 1000 })
-    expect(r.state.airlines[0]!.cash).toBe(17000)
-    const again = applyCommand(r.state, { type: 'negotiate_slots', city: 'LHR', spend: 1000 })
-    expectRejected(again.events, 'already negotiating')
+    expectRejected(
+      applyCommand(flying, { type: 'release_slots', city: flying.airlines[0]!.hq, count: 1 }).events,
+      'home base',
+    )
+    const freed = applyCommand(flying, { type: 'release_slots', city: 'ORD', count: held - 1 })
+    expect(freed.state.airlines[0]!.slots['ORD']).toBe(1)
   })
 
   it('selling an aircraft returns its depreciated resale value', () => {
@@ -264,24 +292,39 @@ describe('command validation', () => {
     expect(state.airlines[0]!.bankrupt).toBe(false)
   })
 
-  it('same-city negotiations become a bidding war, biggest spend first', () => {
+  it('the waiting list is served in order, and holds its place when the pool is full', () => {
     const state = fresh()
-    state.airlines[0]!.negotiations.push({ city: 'LHR', spend: 1000 })
-    state.airlines[1]!.negotiations.push({ city: 'LHR', spend: 3000 })
-    state.airlines[2]!.negotiations.push({ city: 'FRA', spend: 500 }) // solo — no war
+    // Fill LHR to the brim, then queue three carriers behind it.
+    const pool = cityPool(state, 'LHR')
+    state.airlines[1]!.slots['LHR'] = pool - (state.airlines[0]!.slots['LHR'] ?? 0)
+    state.airlines[0]!.slotRequests.push({ city: 'LHR', fee: slotFee('LHR'), queuedTurn: 0 })
+    state.airlines[2]!.slotRequests.push({ city: 'LHR', fee: slotFee('LHR'), queuedTurn: 0 })
+    state.turn = 2
     const events: GameEvent[] = []
-    resolveNegotiations(state, events)
-    const wars = events.filter((e) => e.type === 'bidding_war')
-    expect(wars).toHaveLength(1)
-    if (wars[0]?.type === 'bidding_war') {
-      expect(wars[0].city).toBe('LHR')
-      // Descending spend: the rival's 3000 outbids the player's 1000.
-      expect(wars[0].airlines).toEqual([1, 0])
-    }
-    // Every attempt resolved one way or the other, and none linger.
-    const outcomes = events.filter((e) => e.type === 'slots_granted' || e.type === 'negotiation_failed')
-    expect(outcomes).toHaveLength(3)
-    for (const a of state.airlines) expect(a.negotiations).toHaveLength(0)
+    resolveSlotRequests(state, events)
+    // Nobody is served and nobody is thrown off: capacity simply is not there.
+    expect(events).toHaveLength(0)
+    expect(state.airlines[0]!.slotRequests).toHaveLength(1)
+    expect(slotQueue(state, 'LHR').map((q) => q.airline)).toEqual([0, 2])
+
+    // The authority builds. The earliest place in line takes the capacity.
+    state.airlines[1]!.slots['LHR'] -= SLOTS_PER_GRANT
+    resolveSlotRequests(state, events)
+    expect(events.filter((e) => e.type === 'slots_granted')).toMatchObject([
+      { airline: 0, city: 'LHR', slots: SLOTS_PER_GRANT, waited: 2 },
+    ])
+    expect(slotQueue(state, 'LHR').map((q) => q.airline)).toEqual([2])
+  })
+
+  it('a request waits a full quarter before the list will look at it', () => {
+    const state = fresh()
+    state.airlines[0]!.slotRequests.push({ city: 'LHR', fee: slotFee('LHR'), queuedTurn: 0 })
+    const events: GameEvent[] = []
+    resolveSlotRequests(state, events) // same quarter it was placed
+    expect(events).toHaveLength(0)
+    state.turn = 1
+    resolveSlotRequests(state, events)
+    expect(events).toMatchObject([{ type: 'slots_granted', airline: 0, city: 'LHR' }])
   })
 
   it('loan rates follow the economy: booms borrow cheaper than busts', () => {

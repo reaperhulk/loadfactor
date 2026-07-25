@@ -24,7 +24,7 @@ import { COST_LABELS, money } from './format'
 // The cost buckets in a stable presentation order, labelled from the shared
 // format module so every surface names them identically.
 const COST_BUCKETS: readonly { key: keyof CostBreakdown; label: string }[] = (
-  ['fuel', 'salaries', 'ownership', 'maintenance', 'fees', 'service', 'flightPay', 'overhead', 'admin', 'marketing', 'interest'] as const
+  ['fuel', 'salaries', 'ownership', 'maintenance', 'fees', 'service', 'flightPay', 'overhead', 'admin', 'slots', 'marketing', 'interest'] as const
 ).map((key) => ({ key, label: COST_LABELS[key] }))
 
 // One color per bucket, shared by the mix bands and the structure table so
@@ -39,6 +39,7 @@ const BUCKET_COLORS: Record<keyof CostBreakdown, string> = {
   flightPay: '#c9b458',
   overhead: '#5b6b8c',
   admin: '#7a8fb3',
+  slots: '#b38f7a',
   marketing: '#e07ab8',
   interest: '#b3564f',
 }

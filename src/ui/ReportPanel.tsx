@@ -20,13 +20,15 @@ function describeEvent(state: GameState, e: GameEvent): string | null {
     case 'aircraft_delivered':
       return `${name(e.airline)} took delivery of a ${getAircraftType(e.aircraftType).name}`
     case 'slots_granted':
-      return `${name(e.airline)} won ${e.slots} slots at ${e.city}`
-    case 'negotiation_failed':
-      return e.airline === 0 ? `Slot talks at ${e.city} failed` : null
-    case 'slot_lost':
-      return e.airline === 0 ? `Idle slot at ${e.city} forfeited` : null
-    case 'bidding_war':
-      return `Bidding war at ${e.city} — ${e.airlines.map((a) => name(a)).join(' vs ')}`
+      return `${name(e.airline)} took ${e.slots} slots at ${e.city}${e.waited > 1 ? ` after ${e.waited}q in line` : ''}`
+    case 'slot_requested':
+      return e.airline === 0 ? `Joined the list at ${e.city} — #${e.queuePosition} (${money(e.fee)})` : null
+    case 'slot_request_cancelled':
+      return e.airline === 0 ? `Left the list at ${e.city} — ${money(e.refund)} back` : null
+    case 'slots_released':
+      return e.airline === 0 ? `Handed ${e.slots} slots back at ${e.city}` : null
+    case 'airport_expanded':
+      return `${e.city} opened capacity — +${e.slots} slots`
     case 'rival_acquired':
       return `${name(e.airline)} acquired ${name(e.target)} for ${money(e.price)} (${e.routes} routes, ${e.aircraft} aircraft)`
     case 'world_event_started':
@@ -83,10 +85,10 @@ function eventSection(e: GameEvent): LogFilter {
     case 'route_closed':
       return 'network'
     case 'slots_granted':
-    case 'slot_lost':
-    case 'negotiation_failed':
-    case 'negotiation_started':
-    case 'bidding_war':
+    case 'slot_requested':
+    case 'slot_request_cancelled':
+    case 'slots_released':
+    case 'airport_expanded':
       return 'airports'
     case 'aircraft_delivered':
     case 'order_cancelled':
