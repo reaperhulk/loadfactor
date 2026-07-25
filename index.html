@@ -5,6 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Load Factor — an airline business simulation. Build routes, buy planes, beat your rivals." />
     <meta name="theme-color" content="#10141c" />
+
+    <!-- Link previews. iMessage, Slack, Discord and Twitter all resolve these
+         against the ABSOLUTE url — a relative og:image (which is what the
+         app's own `base: './'` would give) is silently dropped by every one of
+         them, so the canonical origin is spelled out. The card itself is a
+         real 1200x630 PNG (public/social-card.png, built by
+         `npm run gen:social`): SVG og:images are ignored across the board.
+         Regenerate and re-commit it when the card changes. -->
+    <link rel="canonical" href="https://langui.sh/loadfactor/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Load Factor" />
+    <meta property="og:title" content="Load Factor — an airline business simulation" />
+    <meta
+      property="og:description"
+      content="Run an airline across five decades: win airport slots, open routes, buy jets, set fares, and finish the era ahead of rivals who fight back."
+    />
+    <meta property="og:url" content="https://langui.sh/loadfactor/" />
+    <meta property="og:image" content="https://langui.sh/loadfactor/social-card.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Load Factor — a world map with airline routes arcing between major hubs" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Load Factor — an airline business simulation" />
+    <meta
+      name="twitter:description"
+      content="Run an airline across five decades: win airport slots, open routes, buy jets, set fares, and finish the era ahead of rivals who fight back."
+    />
+    <meta name="twitter:image" content="https://langui.sh/loadfactor/social-card.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <title>Load Factor</title>

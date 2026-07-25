@@ -939,6 +939,17 @@ export function MapView({
     drag.current.py = e.clientY
   }
 
+  // Double click / double tap zooms one level toward the point you aimed at —
+  // the same 1.5x step the + button applies, so the two agree.
+  const zoomInAt = (clientX: number, clientY: number): void => {
+    if (isGlobe) setGlobe((g) => clampGlobe({ ...g, s: g.s * 1.5 }))
+    else zoomAt(clientX, clientY, 1.5)
+  }
+
+  // Touch has no dblclick, so the second tap is detected by hand: close in
+  // time AND in space, or a quick pan-and-tap would zoom by accident.
+  const lastTap = useRef<{ t: number; x: number; y: number } | null>(null)
+
   const onPointerUp = (e: PointerEvent<SVGSVGElement>): void => {
     pointers.current.delete(e.pointerId)
     if (pointers.current.size < 2) pinch.current = null
@@ -946,9 +957,22 @@ export function MapView({
     const wasDrag = drag.current?.moved ?? false
     drag.current = null
     if (wasDrag) suppressClick.current = true
+    if (e.pointerType === 'touch' && !wasDrag && pointers.current.size === 0) {
+      const prev = lastTap.current
+      const now = e.timeStamp
+      if (prev !== null && now - prev.t < 320 && Math.hypot(e.clientX - prev.x, e.clientY - prev.y) < 32) {
+        lastTap.current = null
+        // The second tap zooms instead of re-toggling whatever it landed on.
+        suppressClick.current = true
+        zoomInAt(e.clientX, e.clientY)
+        return
+      }
+      lastTap.current = { t: now, x: e.clientX, y: e.clientY }
+    }
   }
 
-  const handleCityClick = (cityId: string): void => {
+  const handleCityClick = (cityId: string, detail = 1): void => {
+    if (detail >= 2) return // the dblclick handler is zooming
     if (suppressClick.current) {
       suppressClick.current = false
       return
@@ -962,6 +986,7 @@ export function MapView({
   // game's primary verb is mouse-only. Precise dot/arc clicks stopPropagation
   // so they keep their exact behavior.
   const handleMapTap = (e: ReactMouseEvent<SVGSVGElement>): void => {
+    if (e.detail >= 2) return // the second click of a double-click zooms
     if (suppressClick.current) {
       suppressClick.current = false
       return
@@ -1016,6 +1041,7 @@ export function MapView({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onClick={handleMapTap}
+        onDoubleClick={(e) => zoomInAt(e.clientX, e.clientY)}
       >
         <defs>
           {/* Ocean depth: the abyssal plain is darker than the shelves, so the
@@ -1187,7 +1213,7 @@ export function MapView({
               key={c.id}
               onClick={(e) => {
                 e.stopPropagation() // precise hit — don't also run the nearest-city resolver
-                handleCityClick(c.id)
+                handleCityClick(c.id, e.detail)
               }}
               className="city"
             >

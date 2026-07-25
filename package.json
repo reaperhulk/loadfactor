@@ -17,7 +17,8 @@
     "fuzz:builds": "FUZZ_POP=16 FUZZ_GENS=5 FUZZ_SEEDS=alpha,beta,gamma FUZZ_SEARCH_SEEDS=hunt-1,hunt-2,hunt-3 vitest --run src/harness/__tests__/fuzz.test.ts",
     "test:e2e": "playwright test",
     "check": "npm run lint && npm run typecheck && npm run test:unit && npm run build",
-    "ci": "npm run check && npm run test:e2e"
+    "ci": "npm run check && npm run test:e2e",
+    "gen:social": "node tools/gen-social-card.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",
