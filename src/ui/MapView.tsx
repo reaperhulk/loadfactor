@@ -463,7 +463,7 @@ export function MapView({
   // Zoom eases toward targetRef via exponential smoothing in a rAF loop;
   // panning writes through immediately. Wheel/button handlers mutate the
   // TARGET, so rapid inputs compound smoothly instead of stacking jumps.
-  const targetRef = useRef<ViewBox>(FULL_VIEW)
+  const targetRef = useRef<ViewBox>(homeView())
   const rafRef = useRef(0)
 
   const settleView = (): void => {
@@ -514,6 +514,53 @@ export function MapView({
   )
   const isGlobe = projection === 'globe'
   const [globe, setGlobe] = useState<GlobeView>(GLOBE_HOME)
+  // The globe used to write every zoom straight to state. Continuous inputs
+  // (wheel, pinch) hide that — they arrive as many small deltas — but a
+  // discrete 1.5x step from a button or a double click landed in one frame
+  // while the flat map eased. Same treatment for both now: discrete steps
+  // ease toward a target, continuous gestures still write through so they
+  // cannot lag a finger.
+  const globeTarget = useRef<GlobeView>(GLOBE_HOME)
+  const globeRaf = useRef(0)
+
+  const settleGlobe = (): void => {
+    setGlobe((g) => {
+      const t = globeTarget.current
+      const k = 0.25
+      // Longitude wraps: ease the SHORT way round, or spinning past the
+      // antimeridian takes the scenic route.
+      let dLon = t.cLon - g.cLon
+      while (dLon > 180) dLon -= 360
+      while (dLon < -180) dLon += 360
+      const next = {
+        cLon: g.cLon + dLon * k,
+        cLat: g.cLat + (t.cLat - g.cLat) * k,
+        s: g.s + (t.s - g.s) * k,
+      }
+      const done =
+        Math.abs(next.s - t.s) < 0.002 && Math.abs(dLon) < 0.15 && Math.abs(t.cLat - next.cLat) < 0.15
+      if (done) {
+        globeRaf.current = 0
+        return t
+      }
+      globeRaf.current = requestAnimationFrame(settleGlobe)
+      return next
+    })
+  }
+
+  const applyGlobe = (next: GlobeView, immediate: boolean): void => {
+    globeTarget.current = clampGlobe(next)
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (immediate || reduced) {
+      if (globeRaf.current) {
+        cancelAnimationFrame(globeRaf.current)
+        globeRaf.current = 0
+      }
+      setGlobe(globeTarget.current)
+      return
+    }
+    if (!globeRaf.current) globeRaf.current = requestAnimationFrame(settleGlobe)
+  }
   // 'g' flips the projection from anywhere (except form fields).
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -820,23 +867,22 @@ export function MapView({
         // share of the way to the cursor's geo point as the scale grows, so
         // what you point at is what you approach.
         const rect = svgRef.current?.getBoundingClientRect()
-        setGlobe((g) => {
-          const next = { ...g, s: g.s * factor }
-          if (rect && factor > 1) {
-            const sx = ((e.clientX - rect.left) / rect.width) * W
-            const sy = ((e.clientY - rect.top) / rect.height) * H
-            const geo = globeUnproject(g, sx, sy)
-            if (geo) {
-              const t = 1 - 1 / factor
-              let dLon = geo.lon - g.cLon
-              while (dLon > 180) dLon -= 360
-              while (dLon < -180) dLon += 360
-              next.cLon = g.cLon + dLon * t
-              next.cLat = g.cLat + (geo.lat - g.cLat) * t
-            }
+        const g = globeTarget.current
+        const next = { ...g, s: g.s * factor }
+        if (rect && factor > 1) {
+          const sx = ((e.clientX - rect.left) / rect.width) * W
+          const sy = ((e.clientY - rect.top) / rect.height) * H
+          const geo = globeUnproject(g, sx, sy)
+          if (geo) {
+            const t = 1 - 1 / factor
+            let dLon = geo.lon - g.cLon
+            while (dLon > 180) dLon -= 360
+            while (dLon < -180) dLon += 360
+            next.cLon = g.cLon + dLon * t
+            next.cLat = g.cLat + (geo.lat - g.cLat) * t
           }
-          return clampGlobe(next)
-        })
+        }
+        applyGlobe(next, true)
       } else zoomAt(e.clientX, e.clientY, factor)
     }
   })
@@ -891,10 +937,9 @@ export function MapView({
         const ratio = now.dist / pinch.current.dist
         const dmx = now.midX - pinch.current.midX
         const dmy = now.midY - pinch.current.midY
-        setGlobe((g) => {
-          const deg = 57.3 / (GLOBE_R * g.s * (rect.width / W))
-          return clampGlobe({ cLon: g.cLon - dmx * deg, cLat: g.cLat + dmy * deg, s: g.s * ratio })
-        })
+        const g = globeTarget.current
+        const deg = 57.3 / (GLOBE_R * g.s * (rect.width / W))
+        applyGlobe({ cLon: g.cLon - dmx * deg, cLat: g.cLat + dmy * deg, s: g.s * ratio }, true)
         pinch.current = now
         return
       }
@@ -926,10 +971,9 @@ export function MapView({
     if (isGlobe) {
       // Trackball: the terrain follows the pointer. Degrees per pixel shrink
       // as the globe grows.
-      setGlobe((g) => {
-        const deg = 57.3 / (GLOBE_R * g.s * (rect.width / W))
-        return clampGlobe({ ...g, cLon: g.cLon - dx * deg, cLat: g.cLat + dy * deg })
-      })
+      const g = globeTarget.current
+      const deg = 57.3 / (GLOBE_R * g.s * (rect.width / W))
+      applyGlobe({ ...g, cLon: g.cLon - dx * deg, cLat: g.cLat + dy * deg }, true)
     } else {
       const t = targetRef.current
       const m = viewToCss(rect, t.w, t.h)
@@ -942,7 +986,7 @@ export function MapView({
   // Double click / double tap zooms one level toward the point you aimed at —
   // the same 1.5x step the + button applies, so the two agree.
   const zoomInAt = (clientX: number, clientY: number): void => {
-    if (isGlobe) setGlobe((g) => clampGlobe({ ...g, s: g.s * 1.5 }))
+    if (isGlobe) applyGlobe({ ...globeTarget.current, s: globeTarget.current.s * 1.5 }, false)
     else zoomAt(clientX, clientY, 1.5)
   }
 
@@ -1342,7 +1386,11 @@ export function MapView({
         <button
           data-testid="zoom-in"
           aria-label="zoom in"
-          onClick={() => (isGlobe ? setGlobe((g) => clampGlobe({ ...g, s: g.s * 1.5 })) : zoomAt(null, null, 1.5))}
+          onClick={() =>
+            isGlobe
+              ? applyGlobe({ ...globeTarget.current, s: globeTarget.current.s * 1.5 }, false)
+              : zoomAt(null, null, 1.5)
+          }
         >
           +
         </button>
@@ -1350,7 +1398,9 @@ export function MapView({
           data-testid="zoom-out"
           aria-label="zoom out"
           onClick={() =>
-            isGlobe ? setGlobe((g) => clampGlobe({ ...g, s: g.s / 1.5 })) : zoomAt(null, null, 1 / 1.5)
+            isGlobe
+              ? applyGlobe({ ...globeTarget.current, s: globeTarget.current.s / 1.5 }, false)
+              : zoomAt(null, null, 1 / 1.5)
           }
         >
           −
@@ -1358,7 +1408,7 @@ export function MapView({
         <button
           data-testid="zoom-reset"
           aria-label="reset zoom"
-          onClick={() => (isGlobe ? setGlobe(GLOBE_HOME) : applyView(homeView(), false))}
+          onClick={() => (isGlobe ? applyGlobe(GLOBE_HOME, false) : applyView(homeView(), false))}
         >
           ⤢
         </button>

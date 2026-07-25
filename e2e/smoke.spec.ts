@@ -460,6 +460,60 @@ test('the globe projection renders, culls the far side, and spins', async ({ pag
   await expect(page.getByTestId('city-JFK')).toHaveCount(1)
 })
 
+test('every zoom eases — buttons and double-click, flat map and globe', async ({ page }) => {
+  await startGame(page)
+  // Sample a geometry attribute once per frame while the zoom runs. A step
+  // that lands in one frame yields two distinct values; an eased one yields
+  // a dozen. Continuous inputs (wheel, pinch) always looked smooth because
+  // they arrive as many small deltas — the discrete steps did not.
+  const frames = (selector: string, attr: string) =>
+    page.evaluate(
+      ([sel, at]) =>
+        new Promise<string[]>((res) => {
+          const out: string[] = []
+          let n = 0
+          const tick = () => {
+            const el = document.querySelector(sel!)
+            out.push(el?.getAttribute(at!) ?? '')
+            if (++n < 20) requestAnimationFrame(tick)
+            else res(out)
+          }
+          requestAnimationFrame(tick)
+        }),
+      [selector, attr] as const,
+    )
+
+  const centreOfMap = async () => {
+    const b = (await page.getByTestId('map').boundingBox())!
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
+  }
+
+  // Flat map: the viewBox width is the zoom.
+  let collect = frames('svg.map', 'viewBox')
+  await page.getByTestId('zoom-in').click()
+  expect(new Set(await collect).size, 'flat zoom button eases').toBeGreaterThan(5)
+
+  await page.getByTestId('zoom-reset').click()
+  await page.waitForTimeout(400)
+  collect = frames('svg.map', 'viewBox')
+  const c = await centreOfMap()
+  await page.mouse.dblclick(c.x, c.y)
+  expect(new Set(await collect).size, 'flat double-click eases').toBeGreaterThan(5)
+
+  // Globe: the viewBox is fixed, so the disc radius carries the zoom.
+  await page.getByTestId('map-projection').click()
+  await page.waitForTimeout(400)
+  collect = frames('.globe-disc', 'r')
+  await page.getByTestId('zoom-in').click()
+  expect(new Set(await collect).size, 'globe zoom button eases').toBeGreaterThan(5)
+
+  await page.waitForTimeout(400)
+  collect = frames('.globe-disc', 'r')
+  const g = await centreOfMap()
+  await page.mouse.dblclick(g.x, g.y)
+  expect(new Set(await collect).size, 'globe double-click eases').toBeGreaterThan(5)
+})
+
 test('zoom reveals small cities that are hidden at world view', async ({ page }) => {
   await startGame(page)
   // Doha is a tier-3 field with no player stake: invisible at world zoom.
