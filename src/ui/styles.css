@@ -206,10 +206,12 @@ button:disabled {
    exactly the frame that must not stall. `contain: paint` is what makes it a
    self-contained layer the compositor can cache and reuse.
 
-   It overhangs the frame by 25% on each side (150% of the box, offset -25%),
-   so a drag slides painted world into view instead of a blank edge. The
-   overhang is bounded on purpose: rendering the whole world at high zoom
-   would be a texture tens of times the size of the screen. */
+   It overhangs the frame so a drag slides painted world into view instead of
+   a blank edge. How far is set per-render from the zoom (see layerSpan): wide
+   enough to hold the whole world where that is affordable, so a drag never
+   has to re-centre, and capped where it is not — the whole world at max zoom
+   would be a texture tens of times the size of the screen. The values here
+   are the fallback the inline style overrides. */
 .map-layer {
   position: absolute;
   left: -25%;
@@ -232,6 +234,7 @@ button:disabled {
   width: 66.6667%;
   height: 66.6667%;
   overflow: visible;
+  /* Sized inline alongside the layer, so the two always agree. */
   display: block;
   touch-action: none; /* the map handles its own panning */
   cursor: grab;
@@ -266,15 +269,18 @@ button:disabled {
   transition: fill 1200ms ease, stroke 1200ms ease;
 }
 
-/* The one thing a moving map still has to give up. Everything else — the
-   coastline's glow, the fine detail, the border mesh — is rastered into the
-   layer once and carried by the compositor, so it costs nothing to keep. The
-   ambient planes are different: they animate, and content that changes inside
-   a composited layer invalidates it, which would drag a full re-raster back
-   into every frame. Pausing beats hiding, because hiding relayouts. */
-.map.gesturing .plane {
-  animation-play-state: paused;
-}
+/* Anything that MOVES on its own has to hold still while the map moves:
+   content that changes inside a composited layer invalidates it, dragging a
+   full re-raster back into every frame — the one thing this layer exists to
+   avoid. Everything static (the coastline's glow, the fine detail, the border
+   mesh) is rastered once and carried by the compositor, so it costs nothing
+   to keep and none of it is given up.
+
+   There is no CSS for it, deliberately. MapView pauses the two animation
+   systems through their own APIs — pauseAnimations() for the planes' SMIL,
+   the Web Animations API for the CSS ones — because a class toggle here meant
+   a descendant restyle across the whole map to reach two elements that are
+   usually not even present. */
 
 /* Political borders: a hairline INSIDE the landmass. Deliberately weaker than
    the coast — the shape of the world is the story, borders are context. */
@@ -393,7 +399,7 @@ button:disabled {
   /* The phone map opens on the home region, so the minimap would be showing
      permanently — a second map covering the first on the screen with the least
      room for it. Panning and zoom-reset do its job here. */
-  .minimap {
+  .minimap-wrap {
     display: none;
   }
 
@@ -1013,33 +1019,45 @@ button.toast {
 }
 
 /* Minimap inset: a world thumbnail with the live viewport rectangle. */
-.minimap {
+/* The inset sits in a wrapper so the viewport marker can be a sibling div
+   rather than a rect inside the SVG — see minimap-viewport. */
+.minimap-wrap {
   position: absolute;
   bottom: 12px;
   left: 10px;
   width: 148px;
-  height: auto;
   border: 1px solid #35415d;
   border-radius: 6px;
   background: #0b111e;
   opacity: 0.88;
   cursor: pointer;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.minimap {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 .minimap-land {
   fill: #24334f;
   stroke: none;
 }
+/* An HTML div on its own layer, so tracking a drag is a compositor move.
+   As a rect inside the SVG this repainted every frame — writing a transform
+   onto an SVG element re-runs SVG layout, whether or not the transform is a
+   pure translate. The border also stays 1.5px here for free, where a scaled
+   rect needed vector-effect to hold its outline. */
 .minimap-viewport {
-  fill: #4fa3ff22;
-  stroke: var(--accent);
-  /* The rect is a 1x1 unit box scaled into place, so the stroke has to opt out
-     of the scale or the outline would stretch with the viewport it marks. */
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
-  /* Place the CSS transform in the viewBox's coordinates, from its origin —
-     without these it would resolve against the rect's own 1x1 bounding box. */
-  transform-box: view-box;
-  transform-origin: 0 0;
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  background: #4fa3ff22;
+  border: 1.5px solid var(--accent);
+  pointer-events: none;
+  will-change: transform;
 }
 
 @keyframes route-draw {
@@ -1783,7 +1801,7 @@ input[type='number'] {
    purpose: media queries add no specificity, so these must come after the
    base rules they override or the cascade quietly ignores them. */
 @media (max-width: 640px) {
-  .minimap {
+  .minimap-wrap {
     bottom: 62px; /* above the control row, never under it */
   }
 

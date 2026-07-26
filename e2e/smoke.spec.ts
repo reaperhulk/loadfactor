@@ -709,6 +709,93 @@ test.describe('touch', () => {
 // already placed. That is ~54k rectangle intersections to position a dozen
 // labels, paid again on every re-centre mid-drag. Off-screen cities cannot be
 // seen, so they are not drawn.
+// The stutter you feel while dragging is a re-centre: the layer runs out of
+// painted world, the viewBox is rewritten, and the whole cached texture is
+// thrown away mid-gesture. Zoomed out, the world is only a couple of frames
+// across — so the layer holds ALL of it and a drag of any length re-centres
+// zero times, however far it goes.
+test('a drag at low zoom never rewrites the viewBox, however long', async ({ page }) => {
+  await startGame(page)
+  for (let i = 0; i < 2; i++) {
+    await page.getByTestId('zoom-in').click()
+    await page.waitForTimeout(350)
+  }
+  await page.waitForTimeout(700)
+
+  await page.evaluate(() => {
+    const w = window as unknown as { __vb: number }
+    w.__vb = 0
+    new MutationObserver((recs) => {
+      w.__vb += recs.length
+    }).observe(document.querySelector('svg.map')!, {
+      attributes: true,
+      attributeFilter: ['viewBox'],
+    })
+  })
+
+  // Far enough to have crossed the old quarter-frame overhang several times.
+  const b = (await page.getByTestId('map-wrap').boundingBox())!
+  const y = b.y + b.height / 2
+  let x = b.x + b.width * 0.9
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  for (let i = 0; i < 40; i++) {
+    x -= b.width * 0.02
+    await page.mouse.move(x, y)
+  }
+  const during = await page.evaluate(() => (window as unknown as { __vb: number }).__vb)
+  await page.mouse.up()
+  await page.waitForTimeout(500)
+
+  expect(during, `the viewBox was rewritten ${during} times mid-drag`).toBe(0)
+  // It still has to land: the gesture folds into the viewBox on release.
+  const after = await page.evaluate(() => (window as unknown as { __vb: number }).__vb)
+  expect(after, 'the drag committed when the finger lifted').toBeGreaterThan(0)
+  await expect
+    .poll(() => page.getByTestId('map-pan').evaluate((el) => (el as HTMLElement).style.transform))
+    .toBe('')
+})
+
+// Two animation systems live inside the composited layer, and content that
+// changes inside one invalidates it — which puts a full re-raster back into
+// every frame of a drag. The planes are SMIL, which ignores
+// `animation-play-state` entirely, so this has to be checked rather than
+// assumed: it silently regressed once already.
+test('a drag stops everything that animates inside the map', async ({ page }) => {
+  await startGame(page)
+  // A career with planes in the air.
+  await page.evaluate(() => {
+    const h = window.__harness
+    for (let q = 0; q < 4; q++) {
+      const s = h.getState()!
+      const idle = s.airlines[0]!.fleet.filter((a) => a.routeId === null)
+      const to = ['ORD', 'LAX', 'MIA', 'YYZ']
+      if (idle[0]) {
+        h.dispatch({ type: 'open_route', from: 'JFK', to: to[q]!, aircraftId: idle[0].id, frequency: 4 })
+      }
+      h.endQuarter()
+    }
+  })
+  await page.getByTestId('zoom-in').click()
+  await page.waitForTimeout(800)
+  await expect(page.locator('svg.map .plane').first()).toBeAttached()
+
+  const smilPaused = async (): Promise<boolean> =>
+    page.evaluate(() => (document.querySelector('svg.map') as SVGSVGElement).animationsPaused())
+
+  expect(await smilPaused(), 'animations run when the map is still').toBe(false)
+
+  const b = (await page.getByTestId('map-wrap').boundingBox())!
+  const y = b.y + b.height / 2
+  await page.mouse.move(b.x + b.width / 2, y)
+  await page.mouse.down()
+  await page.mouse.move(b.x + b.width / 2 - 30, y)
+  await page.mouse.move(b.x + b.width / 2 - 60, y)
+  expect(await smilPaused(), 'the planes hold still while the map moves').toBe(true)
+  await page.mouse.up()
+  await expect.poll(smilPaused, { timeout: 3000 }).toBe(false)
+})
+
 test('max zoom draws the cities on screen, not all of them', async ({ page }) => {
   await startGame(page)
   for (let i = 0; i < 7; i++) {
