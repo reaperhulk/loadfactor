@@ -466,32 +466,55 @@ export function MapView({
   const targetRef = useRef<ViewBox>(homeView())
   const rafRef = useRef(0)
 
-  // A finger drag must track the finger, and on a phone a React re-render of
-  // the whole board per frame does not. While a gesture is in flight the pan
-  // is written STRAIGHT to the DOM — the viewBox and the two rects that follow
-  // it — and React state is synced once, when the finger lifts. Nothing else
-  // in the tree depends on where the view sits (visibility and labels key off
-  // the zoom LEVEL, which a pan does not change), so the skipped renders would
-  // have produced identical nodes anyway.
+  // A finger drag must track the finger, and moving the map by rewriting the
+  // SVG's viewBox does not — not on WebKit. A viewBox change re-resolves the
+  // root's coordinate system, so the entire SVG subtree (a couple of thousand
+  // nodes here) re-lays-out; do that on every touchmove and the main thread
+  // never reaches a paint. It renders when you pause, which is exactly what
+  // "it only moves when I stop or let go" is. Chromium optimises the case
+  // away, which is why it measures clean on a desktop at 8x CPU throttle.
+  //
+  // So while a gesture is in flight the viewBox is FROZEN and the world is
+  // moved by a transform on one group instead — a paint-time property that
+  // does not invalidate layout on any engine. React state is synced once,
+  // when the finger lifts, and the transform folds back into the viewBox.
   const gesturing = useRef(false)
-  const vignetteRef = useRef<SVGRectElement>(null)
+  const panRef = useRef<SVGGElement>(null)
   const minimapRef = useRef<SVGRectElement>(null)
+  // The viewBox actually in the DOM. The transform maps it to the live view.
+  const baseRef = useRef<ViewBox>(homeView())
 
   const paintView = (v: ViewBox): void => {
-    svgRef.current?.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`)
-    for (const el of [vignetteRef.current, minimapRef.current]) {
-      if (el === null) continue
-      el.setAttribute('x', String(v.x))
-      el.setAttribute('y', String(v.y))
-      el.setAttribute('width', String(v.w))
-      el.setAttribute('height', String(v.h))
+    const g = panRef.current
+    if (g !== null) {
+      const b = baseRef.current
+      const k = b.w / v.w
+      const tx = b.x - v.x * k
+      const ty = b.y - v.y * k
+      if (Math.abs(k - 1) < 1e-9 && Math.abs(tx) < 1e-9 && Math.abs(ty) < 1e-9) {
+        g.removeAttribute('transform')
+      } else {
+        g.setAttribute('transform', `translate(${tx} ${ty}) scale(${k})`)
+      }
+    }
+    // The minimap is its own small SVG, so its rect is cheap to keep live.
+    const mm = minimapRef.current
+    if (mm !== null) {
+      mm.setAttribute('x', String(v.x))
+      mm.setAttribute('y', String(v.y))
+      mm.setAttribute('width', String(v.w))
+      mm.setAttribute('height', String(v.h))
     }
   }
 
-  // Any render triggered mid-gesture (an ambient timer, a hover) would paint
-  // the stale state back over the live pan. Re-assert it after every commit.
+  // React has just written `view` as the viewBox, so that is the new base.
+  // Re-derive the transform against it: mid-gesture that re-asserts the live
+  // pan over a render triggered by something else, and at the end of one it
+  // resolves to identity and the attribute comes off — before paint, so the
+  // handoff from transform to viewBox never shows a frame of either alone.
   useLayoutEffect(() => {
-    if (gesturing.current) paintView(targetRef.current)
+    baseRef.current = view
+    paintView(gesturing.current ? targetRef.current : view)
   })
 
   // The SVG's box cannot change while a finger is down, so measure it once per
@@ -1208,276 +1231,282 @@ export function MapView({
             <stop offset="100%" stopColor="#000" stopOpacity="0.55" />
           </radialGradient>
         </defs>
-        <rect x={0} y={0} width={W} height={H} className="map-sea" fill="url(#seaDepth)" />
-        {!isGlobe && <path d={graticulePath()} className="graticule map-graticule" />}
-        {isGlobe ? (
-          <>
-            <defs>
-              {/* A soft key light up-left: the disc reads as a sphere. */}
-              <radialGradient id="globeShade" cx="38%" cy="32%" r="80%">
-                <stop offset="0%" stopColor="#1b2a45" />
-                <stop offset="70%" stopColor="#111b2e" />
-                <stop offset="100%" stopColor="#0b111e" />
-              </radialGradient>
-            </defs>
-            <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} fill="url(#globeShade)" className="globe-disc" />
-            <path d={globeGraticule(globe)} className="graticule" />
-            <path d={globeLandPath(globe)} className="map-land" data-testid="globe-land" />
-            <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} className="globe-limb" />
-          </>
-        ) : (
-          <>
-            {/* Detail that resolves: the coarse coastline is a smear at 3x, and
-                the fine one is wasted bytes of curve at world view. */}
-            <path
-              d={scale >= 1.8 ? WORLD_PATH_FINE : WORLD_PATH}
-              className="map-land"
-              filter="url(#coastGlow)"
-            />
-            {/* Country borders come from a separate mesh, so they are the
-                borders themselves and never a second copy of the coast. */}
-            {scale >= 1.35 && <path d={BORDERS_PATH} className="map-border" />}
-            {/* Islands with an airport but too small to survive 1:50m
-                generalisation — without these, Guam is an airport in open
-                ocean. */}
-            <path d={ISLETS_PATH} className="map-land map-islet" />
-          </>
-        )}
-        {/* Transfer hubs glow in proportion to the connecting pax flowing
-            over them last quarter. */}
-        {[...hubVolume.entries()]
-          .filter(([, v]) => v >= 500)
-          .map(([cityId, v]) => {
+        {/* Everything that pans lives in one group so a gesture can move it
+            with a transform instead of a viewBox — see paintView. The
+            vignette stays outside, pinned to the frame. */}
+        <g ref={panRef} data-testid="map-pan">
+          <rect x={0} y={0} width={W} height={H} className="map-sea" fill="url(#seaDepth)" />
+          {!isGlobe && <path d={graticulePath()} className="graticule map-graticule" />}
+          {isGlobe ? (
+            <>
+              <defs>
+                {/* A soft key light up-left: the disc reads as a sphere. */}
+                <radialGradient id="globeShade" cx="38%" cy="32%" r="80%">
+                  <stop offset="0%" stopColor="#1b2a45" />
+                  <stop offset="70%" stopColor="#111b2e" />
+                  <stop offset="100%" stopColor="#0b111e" />
+                </radialGradient>
+              </defs>
+              <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} fill="url(#globeShade)" className="globe-disc" />
+              <path d={globeGraticule(globe)} className="graticule" />
+              <path d={globeLandPath(globe)} className="map-land" data-testid="globe-land" />
+              <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} className="globe-limb" />
+            </>
+          ) : (
+            <>
+              {/* Detail that resolves: the coarse coastline is a smear at 3x, and
+                  the fine one is wasted bytes of curve at world view. */}
+              <path
+                d={scale >= 1.8 ? WORLD_PATH_FINE : WORLD_PATH}
+                className="map-land"
+                filter="url(#coastGlow)"
+              />
+              {/* Country borders come from a separate mesh, so they are the
+                  borders themselves and never a second copy of the coast. */}
+              {scale >= 1.35 && <path d={BORDERS_PATH} className="map-border" />}
+              {/* Islands with an airport but too small to survive 1:50m
+                  generalisation — without these, Guam is an airport in open
+                  ocean. */}
+              <path d={ISLETS_PATH} className="map-land map-islet" />
+            </>
+          )}
+          {/* Transfer hubs glow in proportion to the connecting pax flowing
+              over them last quarter. */}
+          {[...hubVolume.entries()]
+            .filter(([, v]) => v >= 500)
+            .map(([cityId, v]) => {
+              const p = cityPt(cityId)
+              if (!p.vis) return null
+              return (
+                <circle
+                  key={`hub-${cityId}`}
+                  cx={p.X}
+                  cy={p.Y}
+                  r={(5 + Math.min(14, Math.sqrt(v) / 6)) / uiScale}
+                  className="hub-glow"
+                  data-testid={`hub-glow-${cityId}`}
+                >
+                  <title>{`${cityId}: ${v.toLocaleString('en-US')} connecting pax last quarter`}</title>
+                </circle>
+              )
+            })}
+          {/* Rival networks, thin and color-coded per airline, under the
+              player's arcs. Toggleable for decluttering. */}
+          {rivalArcsLayer}
+          {playerArcsLayer}
+          {/* Constant traffic: planes shuttle back and forth on every served
+              route — more of them the busier the schedule, and long-haul takes
+              visibly longer than a hop. */}
+          {playerPlanesLayer}
+          {/* Rival traffic: one small plane per rival route (capped) so their
+              networks read as alive, in the rival's own color. */}
+          {rivalPlanesLayer}
+          {/* Fresh slot wins ping gold at the airport. */}
+          {[...newSlotCities].sort().map((cityId) => {
             const p = cityPt(cityId)
             if (!p.vis) return null
             return (
               <circle
-                key={`hub-${cityId}`}
+                key={`slots-${cityId}`}
                 cx={p.X}
                 cy={p.Y}
-                r={(5 + Math.min(14, Math.sqrt(v) / 6)) / uiScale}
-                className="hub-glow"
-                data-testid={`hub-glow-${cityId}`}
-              >
-                <title>{`${cityId}: ${v.toLocaleString('en-US')} connecting pax last quarter`}</title>
-              </circle>
+                r={11 / uiScale}
+                className="slots-ping"
+                data-testid={`slots-ping-${cityId}`}
+              />
             )
           })}
-        {/* Rival networks, thin and color-coded per airline, under the
-            player's arcs. Toggleable for decluttering. */}
-        {rivalArcsLayer}
-        {playerArcsLayer}
-        {/* Constant traffic: planes shuttle back and forth on every served
-            route — more of them the busier the schedule, and long-haul takes
-            visibly longer than a hop. */}
-        {playerPlanesLayer}
-        {/* Rival traffic: one small plane per rival route (capped) so their
-            networks read as alive, in the rival's own color. */}
-        {rivalPlanesLayer}
-        {/* Fresh slot wins ping gold at the airport. */}
-        {[...newSlotCities].sort().map((cityId) => {
-          const p = cityPt(cityId)
-          if (!p.vis) return null
-          return (
-            <circle
-              key={`slots-${cityId}`}
-              cx={p.X}
-              cy={p.Y}
-              r={11 / uiScale}
-              className="slots-ping"
-              data-testid={`slots-ping-${cityId}`}
-            />
-          )
-        })}
-        {/* Active world events glow on the map: gold halo on boosted cities and
-            regions (Olympics, fairs, tourism waves), red on conflict zones. */}
-        {state.world.events.map((e) => {
-          const def = getEventDef(e.id)
-          if (def.demandModBp === undefined) return null
-          const good = def.demandModBp >= 10000
-          const cities = e.city !== null ? [getCity(e.city)] : CITIES.filter((c) => c.region === e.region)
-          return cities.map((c) => {
-            const p = pt(c.lon, c.lat)
-            if (!p.vis) return null
-            return (
-              <circle
-                key={`${e.id}-${c.id}`}
-                cx={p.X}
-                cy={p.Y}
-                r={12 / uiScale}
-                className={good ? 'event-halo halo-boom' : 'event-halo halo-bust'}
-                data-testid={`event-halo-${c.id}`}
-              />
-            )
-          })
-        })}
-        {/* Planning a route: a dashed ring shows how far the longest-legged
-            idle airframe can fly from the origin — why a target is (or isn't)
-            reachable, drawn instead of guessed. Flat map only; the globe's
-            great-circle disc would lie near the poles. */}
-        {!isGlobe &&
-          routeFrom !== null &&
-          idleReachKm > 0 &&
-          (() => {
-            const origin = getCity(routeFrom)
-            const p = pt(origin.lon, origin.lat)
-            if (!p.vis) return null
-            // Local px-per-km at the origin's latitude (equirectangular).
-            const kmPerLonDeg = 111.32 * Math.max(0.2, Math.cos((origin.lat * Math.PI) / 180))
-            const rx = (idleReachKm / kmPerLonDeg) * (W / 360)
-            const ry = (idleReachKm / 111.32) * (H / (MAP_LAT_MAX - MAP_LAT_MIN)) // px per lat degree, mirrors y()
-            return (
-              <ellipse
-                cx={p.X}
-                cy={p.Y}
-                rx={rx}
-                ry={ry}
-                className="range-ring"
-                data-testid="range-ring"
-              />
-            )
-          })()}
-        {visible.map((c) => {
-          const held = slotsHeld(player, c.id)
-          // In route-planning mode, legal destinations light up as targets —
-          // and a route must touch the network (HQ or a served city).
-          const inNetwork = network.has(c.id)
-          const isTarget =
+          {/* Active world events glow on the map: gold halo on boosted cities and
+              regions (Olympics, fairs, tourism waves), red on conflict zones. */}
+          {state.world.events.map((e) => {
+            const def = getEventDef(e.id)
+            if (def.demandModBp === undefined) return null
+            const good = def.demandModBp >= 10000
+            const cities = e.city !== null ? [getCity(e.city)] : CITIES.filter((c) => c.region === e.region)
+            return cities.map((c) => {
+              const p = pt(c.lon, c.lat)
+              if (!p.vis) return null
+              return (
+                <circle
+                  key={`${e.id}-${c.id}`}
+                  cx={p.X}
+                  cy={p.Y}
+                  r={12 / uiScale}
+                  className={good ? 'event-halo halo-boom' : 'event-halo halo-bust'}
+                  data-testid={`event-halo-${c.id}`}
+                />
+              )
+            })
+          })}
+          {/* Planning a route: a dashed ring shows how far the longest-legged
+              idle airframe can fly from the origin — why a target is (or isn't)
+              reachable, drawn instead of guessed. Flat map only; the globe's
+              great-circle disc would lie near the poles. */}
+          {!isGlobe &&
             routeFrom !== null &&
-            routeFrom !== c.id &&
-            (network.has(routeFrom) || inNetwork) &&
-            held > slotsUsedAt(player.routes, c.id) &&
-            distanceKm(routeFrom, c.id) <= idleReachKm &&
-            !player.routes.some(
-              (r) =>
-                (r.from === c.id && r.to === routeFrom) || (r.from === routeFrom && r.to === c.id),
-            )
-          const p = pt(c.lon, c.lat)
-          if (!p.vis) return null
-          const r = (1.7 + cityMass(c) / 13) / Math.sqrt(uiScale)
-          return (
-            <g
-              key={c.id}
-              onClick={(e) => {
-                e.stopPropagation() // precise hit — don't also run the nearest-city resolver
-                handleCityClick(c.id, e.detail)
-              }}
-              className="city"
-            >
-              {selected === c.id && (
-                <circle cx={p.X} cy={p.Y} r={r + 5 / uiScale} className="selection-ring" />
-              )}
-              {player.slotRequests.some((r) => r.city === c.id) && (
-                <circle
+            idleReachKm > 0 &&
+            (() => {
+              const origin = getCity(routeFrom)
+              const p = pt(origin.lon, origin.lat)
+              if (!p.vis) return null
+              // Local px-per-km at the origin's latitude (equirectangular).
+              const kmPerLonDeg = 111.32 * Math.max(0.2, Math.cos((origin.lat * Math.PI) / 180))
+              const rx = (idleReachKm / kmPerLonDeg) * (W / 360)
+              const ry = (idleReachKm / 111.32) * (H / (MAP_LAT_MAX - MAP_LAT_MIN)) // px per lat degree, mirrors y()
+              return (
+                <ellipse
                   cx={p.X}
                   cy={p.Y}
-                  r={r + 4 / uiScale}
-                  className="negotiating-ring"
-                  data-testid={`negotiating-${c.id}`}
+                  rx={rx}
+                  ry={ry}
+                  className="range-ring"
+                  data-testid="range-ring"
                 />
-              )}
-              {/* A rival has announced it will court this authority next
-                  quarter. Knowing BEFORE you commit is the difference between
-                  a bidding war and an ambush. */}
-              {state.airlines.some((a) => a.id !== 0 && !a.bankrupt && a.slotInterest === c.id) && (
-                <circle
-                  cx={p.X}
-                  cy={p.Y}
-                  r={r + 6.5 / uiScale}
-                  className="rival-negotiating-ring"
-                  data-testid={`rival-negotiating-${c.id}`}
-                />
-              )}
-              {inNetwork && <circle cx={p.X} cy={p.Y} r={r + 2.5 / uiScale} className="city-network-ring" />}
-              {c.id === player.hq && (
-                <text
-                  x={p.X}
-                  y={p.Y - r - 4 / uiScale}
-                  className="hq-marker"
-                  fontSize={9 / uiScale}
-                  textAnchor="middle"
-                  data-testid="hq-marker"
-                >
-                  ★
-                </text>
-              )}
-              <circle
-                data-testid={`city-${c.id}`}
-                cx={p.X}
-                cy={p.Y}
-                r={r}
-                className={
-                  (selected === c.id
-                    ? 'city-dot selected'
-                    : isTarget
-                      ? 'city-dot target'
-                      : held > 0
-                        ? 'city-dot slotted'
-                        : 'city-dot') +
-                  ` tier-${cityTier(c)}` +
-                  // Capacity pressure, straight from the slot model: an airport
-                  // filling up is a place you have to move on, and the map is
-                  // where that decision starts.
-                  (pressure(c.id) >= 1 ? ' full' : pressure(c.id) >= 0.75 ? ' tight' : '')
-                }
-              />
-            </g>
-          )
-        })}
-        {/* Labels draw in their own layer ABOVE every dot, with a halo — a
-            neighboring city's dot can never sit on top of a name. Placement
-            runs a greedy collision pass in mass order: majors claim the
-            right-hand slot, and a label that would overlap one already
-            placed tries left, above, then below before giving in — dense
-            regions (Europe) stay readable instead of shingling. */}
-        {(() => {
-          const fs = 9 / uiScale
-          const placed: { x1: number; y1: number; x2: number; y2: number }[] = []
-          const order = visible
-            .filter((c) => labeled.has(c.id))
-            .sort((a, b) => cityMass(b) - cityMass(a) || (a.id < b.id ? -1 : 1))
-          return order.map((c) => {
+              )
+            })()}
+          {visible.map((c) => {
+            const held = slotsHeld(player, c.id)
+            // In route-planning mode, legal destinations light up as targets —
+            // and a route must touch the network (HQ or a served city).
+            const inNetwork = network.has(c.id)
+            const isTarget =
+              routeFrom !== null &&
+              routeFrom !== c.id &&
+              (network.has(routeFrom) || inNetwork) &&
+              held > slotsUsedAt(player.routes, c.id) &&
+              distanceKm(routeFrom, c.id) <= idleReachKm &&
+              !player.routes.some(
+                (r) =>
+                  (r.from === c.id && r.to === routeFrom) || (r.from === routeFrom && r.to === c.id),
+              )
             const p = pt(c.lon, c.lat)
             if (!p.vis) return null
             const r = (1.7 + cityMass(c) / 13) / Math.sqrt(uiScale)
-            const w = c.id.length * fs * 0.66
-            const gap = 3 / uiScale
-            // Candidate anchors: right (default), left, above, below.
-            const spots = [
-              { x: p.X + r + gap, y: p.Y + fs / 3, anchor: 'start' as const },
-              { x: p.X - r - gap, y: p.Y + fs / 3, anchor: 'end' as const },
-              { x: p.X, y: p.Y - r - gap, anchor: 'middle' as const },
-              { x: p.X, y: p.Y + r + fs, anchor: 'middle' as const },
-            ]
-            let pick = spots[0]!
-            for (const spot of spots) {
-              const x1 = spot.anchor === 'start' ? spot.x : spot.anchor === 'end' ? spot.x - w : spot.x - w / 2
-              const box = { x1, y1: spot.y - fs, x2: x1 + w, y2: spot.y }
-              if (!placed.some((b) => box.x1 < b.x2 && box.x2 > b.x1 && box.y1 < b.y2 && box.y2 > b.y1)) {
-                pick = spot
-                break
-              }
-            }
-            const px1 = pick.anchor === 'start' ? pick.x : pick.anchor === 'end' ? pick.x - w : pick.x - w / 2
-            placed.push({ x1: px1, y1: pick.y - fs, x2: px1 + w, y2: pick.y })
             return (
-              <text
-                key={`label-${c.id}`}
-                x={pick.x}
-                y={pick.y}
-                fontSize={fs}
-                textAnchor={pick.anchor}
-                className="city-label"
+              <g
+                key={c.id}
+                onClick={(e) => {
+                  e.stopPropagation() // precise hit — don't also run the nearest-city resolver
+                  handleCityClick(c.id, e.detail)
+                }}
+                className="city"
               >
-                {c.id}
-              </text>
+                {selected === c.id && (
+                  <circle cx={p.X} cy={p.Y} r={r + 5 / uiScale} className="selection-ring" />
+                )}
+                {player.slotRequests.some((r) => r.city === c.id) && (
+                  <circle
+                    cx={p.X}
+                    cy={p.Y}
+                    r={r + 4 / uiScale}
+                    className="negotiating-ring"
+                    data-testid={`negotiating-${c.id}`}
+                  />
+                )}
+                {/* A rival has announced it will court this authority next
+                    quarter. Knowing BEFORE you commit is the difference between
+                    a bidding war and an ambush. */}
+                {state.airlines.some((a) => a.id !== 0 && !a.bankrupt && a.slotInterest === c.id) && (
+                  <circle
+                    cx={p.X}
+                    cy={p.Y}
+                    r={r + 6.5 / uiScale}
+                    className="rival-negotiating-ring"
+                    data-testid={`rival-negotiating-${c.id}`}
+                  />
+                )}
+                {inNetwork && <circle cx={p.X} cy={p.Y} r={r + 2.5 / uiScale} className="city-network-ring" />}
+                {c.id === player.hq && (
+                  <text
+                    x={p.X}
+                    y={p.Y - r - 4 / uiScale}
+                    className="hq-marker"
+                    fontSize={9 / uiScale}
+                    textAnchor="middle"
+                    data-testid="hq-marker"
+                  >
+                    ★
+                  </text>
+                )}
+                <circle
+                  data-testid={`city-${c.id}`}
+                  cx={p.X}
+                  cy={p.Y}
+                  r={r}
+                  className={
+                    (selected === c.id
+                      ? 'city-dot selected'
+                      : isTarget
+                        ? 'city-dot target'
+                        : held > 0
+                          ? 'city-dot slotted'
+                          : 'city-dot') +
+                    ` tier-${cityTier(c)}` +
+                    // Capacity pressure, straight from the slot model: an airport
+                    // filling up is a place you have to move on, and the map is
+                    // where that decision starts.
+                    (pressure(c.id) >= 1 ? ' full' : pressure(c.id) >= 0.75 ? ' tight' : '')
+                  }
+                />
+              </g>
             )
-          })
-        })()}
+          })}
+          {/* Labels draw in their own layer ABOVE every dot, with a halo — a
+              neighboring city's dot can never sit on top of a name. Placement
+              runs a greedy collision pass in mass order: majors claim the
+              right-hand slot, and a label that would overlap one already
+              placed tries left, above, then below before giving in — dense
+              regions (Europe) stay readable instead of shingling. */}
+          {(() => {
+            const fs = 9 / uiScale
+            const placed: { x1: number; y1: number; x2: number; y2: number }[] = []
+            const order = visible
+              .filter((c) => labeled.has(c.id))
+              .sort((a, b) => cityMass(b) - cityMass(a) || (a.id < b.id ? -1 : 1))
+            return order.map((c) => {
+              const p = pt(c.lon, c.lat)
+              if (!p.vis) return null
+              const r = (1.7 + cityMass(c) / 13) / Math.sqrt(uiScale)
+              const w = c.id.length * fs * 0.66
+              const gap = 3 / uiScale
+              // Candidate anchors: right (default), left, above, below.
+              const spots = [
+                { x: p.X + r + gap, y: p.Y + fs / 3, anchor: 'start' as const },
+                { x: p.X - r - gap, y: p.Y + fs / 3, anchor: 'end' as const },
+                { x: p.X, y: p.Y - r - gap, anchor: 'middle' as const },
+                { x: p.X, y: p.Y + r + fs, anchor: 'middle' as const },
+              ]
+              let pick = spots[0]!
+              for (const spot of spots) {
+                const x1 = spot.anchor === 'start' ? spot.x : spot.anchor === 'end' ? spot.x - w : spot.x - w / 2
+                const box = { x1, y1: spot.y - fs, x2: x1 + w, y2: spot.y }
+                if (!placed.some((b) => box.x1 < b.x2 && box.x2 > b.x1 && box.y1 < b.y2 && box.y2 > b.y1)) {
+                  pick = spot
+                  break
+                }
+              }
+              const px1 = pick.anchor === 'start' ? pick.x : pick.anchor === 'end' ? pick.x - w : pick.x - w / 2
+              placed.push({ x1: px1, y1: pick.y - fs, x2: px1 + w, y2: pick.y })
+              return (
+                <text
+                  key={`label-${c.id}`}
+                  x={pick.x}
+                  y={pick.y}
+                  fontSize={fs}
+                  textAnchor={pick.anchor}
+                  className="city-label"
+                >
+                  {c.id}
+                </text>
+              )
+            })
+          })()}
+        </g>
         {/* Last, so it sits over everything: the frame falls off into the
-            dark and the middle of the world holds the eye. */}
+            dark and the middle of the world holds the eye. Outside the pan
+            group — it is the frame, not the world, so a gesture must not
+            drag it around, and it never needs repainting mid-drag. */}
         <rect
-          ref={vignetteRef}
           x={view.x}
           y={view.y}
           width={isGlobe ? W : view.w}

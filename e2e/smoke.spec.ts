@@ -514,30 +514,33 @@ test('every zoom eases — buttons and double-click, flat map and globe', async 
   expect(new Set(await collect).size, 'globe double-click eases').toBeGreaterThan(5)
 })
 
-// A touch drag has to move the map WHILE the finger moves. It used to be
-// reported as only updating on release, so this samples the viewBox halfway
-// through the gesture, not just at the end — a map that catches up on release
-// passes an end-state assertion and fails a player.
+// A touch drag has to move the map WHILE the finger moves — and it has to do
+// it without touching the viewBox, which is what made this unusable on
+// WebKit. So this samples per frame through the gesture rather than checking
+// where the map ended up: a map that catches up on release passes an
+// end-state assertion and fails a player.
 test.describe('touch', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })
 
-  test('the map pans with the finger, not on release', async ({ page, context }) => {
+  test('the map pans with the finger, without rewriting the viewBox', async ({ page, context }) => {
     await startGame(page)
     const box = (await page.getByTestId('map').boundingBox())!
 
     await page.evaluate(() => {
-      const w = window as unknown as { __pan: string[] }
-      w.__pan = []
+      const w = window as unknown as { __f: { t: string; vb: string }[] }
+      w.__f = []
       const svg = document.querySelector('svg.map')!
+      const pan = document.querySelector('[data-testid="map-pan"]')!
       const tick = (): void => {
-        w.__pan.push(svg.getAttribute('viewBox') ?? '')
+        w.__f.push({ t: pan.getAttribute('transform') ?? '', vb: svg.getAttribute('viewBox') ?? '' })
         requestAnimationFrame(tick)
       }
       requestAnimationFrame(tick)
     })
-    const sampled = async (): Promise<string[]> =>
-      page.evaluate(() => (window as unknown as { __pan: string[] }).__pan.slice())
-    const yOf = (vb: string): number => Number(vb.split(' ')[1])
+    const sampled = async (): Promise<{ t: string; vb: string }[]> =>
+      page.evaluate(() => (window as unknown as { __f: { t: string; vb: string }[] }).__f.slice())
+    // translate(tx ty) scale(k) — ty is how far the world has been shifted.
+    const shiftOf = (t: string): number => Number(/translate\([-\d.]+ ([-\d.]+)\)/.exec(t)?.[1] ?? 0)
 
     // Playwright's touchscreen only taps, so the drag goes through CDP — the
     // same input path a real finger takes.
@@ -554,31 +557,43 @@ test.describe('touch', () => {
       })
     }
 
-    const before = (await sampled()).at(-1)!
+    const startVb = (await sampled()).at(-1)!.vb
     await touch('touchStart', y0)
     for (let i = 1; i <= 20; i++) await touch('touchMove', y0 - i * 4)
     const halfway = (await sampled()).at(-1)!
     for (let i = 21; i <= 40; i++) await touch('touchMove', y0 - i * 4)
+    const frames = await sampled()
+    const end = frames.at(-1)!
     await touch('touchEnd', y0 - 160)
     await page.waitForTimeout(300)
-    const after = (await sampled()).at(-1)!
 
-    // Dragging up walks the view down the map (south), and it must already be
-    // most of the way there before the finger lifts.
-    expect(yOf(after), 'the drag panned the view').toBeGreaterThan(yOf(before) + 10)
-    const progress = (yOf(halfway) - yOf(before)) / (yOf(after) - yOf(before))
-    expect(progress, 'the view had moved by mid-gesture').toBeGreaterThan(0.35)
+    // Dragging up walks the world up under the finger, and it has to be most
+    // of the way there before the finger lifts.
+    expect(shiftOf(end.t), 'the drag moved the world').toBeLessThan(-10)
+    const progress = shiftOf(halfway.t) / shiftOf(end.t)
+    expect(progress, 'the world had moved by mid-gesture').toBeGreaterThan(0.35)
 
     // Every frame of the gesture, not two: a map that jumps once yields a
     // handful of distinct values across the whole drag.
-    const during = (await sampled()).filter((vb) => yOf(vb) > yOf(before) && yOf(vb) < yOf(after))
-    expect(new Set(during).size, 'the pan is continuous').toBeGreaterThan(10)
+    const during = frames.filter((f) => shiftOf(f.t) < 0 && shiftOf(f.t) > shiftOf(end.t))
+    expect(new Set(during.map((f) => f.t)).size, 'the pan is continuous').toBeGreaterThan(10)
 
-    // Mid-gesture the pan is written straight to the DOM, ahead of React.
-    // Handing it back when the finger lifts is not cosmetic: the component's
-    // own copy is what tap hit-testing and the zoom LOD read, so a view left
-    // behind by a drag silently mis-resolves everything that follows.
-    await expect(page.getByTestId('map-wrap')).toHaveAttribute('data-view', after)
+    // The point of the transform: WebKit re-lays-out the whole SVG when the
+    // viewBox changes, so a gesture must never touch it. If this starts
+    // failing, the map has quietly gone back to being unusable on an iPhone.
+    expect(new Set(frames.map((f) => f.vb)).size, 'the viewBox held still').toBe(1)
+    expect(frames[0]!.vb).toBe(startVb)
+
+    // When the finger lifts the transform folds back into the viewBox, and
+    // React owns the view again — its copy is what tap hit-testing and the
+    // zoom LOD read, so a view left behind by a drag silently mis-resolves
+    // everything that follows.
+    await expect(page.getByTestId('map-pan')).not.toHaveAttribute('transform')
+    const view = (await page.getByTestId('map-wrap').getAttribute('data-view'))!
+    expect(await page.getByTestId('map').getAttribute('viewBox')).toBe(view)
+    expect(Number(view.split(' ')[1]), 'the pan landed in the viewBox').toBeGreaterThan(
+      Number(startVb.split(' ')[1]) + 10,
+    )
   })
 })
 
