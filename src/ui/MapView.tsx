@@ -619,11 +619,18 @@ export function MapView({
     // re-enters React from inside an effect.
     if (!t.covers) recentre(v)
     else paintLayer(t.tx, t.ty, t.s)
-    // The minimap stays live through the gesture, as one transform.
+    // The minimap marker tracks a pan and sits out a zoom. A CSS transform,
+    // not the SVG `transform` attribute — the attribute is part of SVG layout,
+    // so writing it relaid out the minimap every frame. Even as a CSS
+    // transform, though, changing the SCALE makes the engine recompute the
+    // marker's non-scaling stroke: measured over one zoom step at max zoom,
+    // keeping it live cost 57 repaints against 9, and two thirds of the
+    // zoom's entire raster bill. Panning only moves it, which is free, and
+    // the committed render puts the new size on when the zoom lands.
     const mm = minimapRef.current
-    // A CSS transform, not the SVG `transform` attribute: the attribute is
-    // part of SVG layout, so writing it relaid out the minimap every frame.
-    if (mm !== null) mm.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.w}, ${v.h})`
+    if (mm !== null && Math.abs(v.w - baseRef.current.w) < 0.5) {
+      mm.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.w}, ${v.h})`
+    }
   }
 
   // React has just written `view` as the viewBox, so that is the new base.
@@ -1042,9 +1049,12 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, showRivals, isGlobe, globe, projKey, glyphUi])
 
-  // Visibility only changes when the game state, selection, or an LOD
-  // threshold crossing changes — not on every animation frame of a zoom.
+  // Visibility only changes when the game state, selection, an LOD threshold
+  // crossing, or the visible window changes — not on every animation frame of
+  // a zoom, and not while a gesture is moving the layer (which does not touch
+  // `view` at all).
   const lodKey = (scale >= 1.8 ? 2 : 0) | (scale >= 1.5 ? 1 : 0)
+  const cull = view
   const { visible, labeled } = useMemo(() => {
     // Cities the player has a stake in stay visible at any zoom.
     const stakes = new Set<string>()
@@ -1055,13 +1065,30 @@ export function MapView({
     for (const c of CITIES) if (slotsHeld(player, c.id) > 0) stakes.add(c.id)
     for (const e of state.world.events) if (e.city !== null) stakes.add(e.city)
     if (selected !== null) stakes.add(selected)
-    const vis = CITIES.filter((c) => (lodKey >= 2 ? true : cityTier(c) < 3) || stakes.has(c.id))
+    const byTier = CITIES.filter((c) => (lodKey >= 2 ? true : cityTier(c) < 3) || stakes.has(c.id))
+    // ...and then only the ones that can actually be seen. At world view that
+    // is all of them; at 6x it is a couple of dozen out of 165, and the
+    // difference is not just markup. The label pass below tests every label
+    // against every label already placed, so rendering the whole world at
+    // max zoom cost ~54k rectangle intersections to position a dozen labels
+    // — paid again on every re-centre mid-drag. The pad covers the layer's
+    // overhang, so nothing culled here can be revealed by a gesture before
+    // the layer re-centres and this runs again. The globe does its own
+    // culling, by hemisphere.
+    const pad = 0.35
+    const inFrame = (c: City): boolean =>
+      isGlobe ||
+      (x(c.lon) >= cull.x - cull.w * pad &&
+        x(c.lon) <= cull.x + cull.w * (1 + pad) &&
+        y(c.lat) >= cull.y - cull.h * pad &&
+        y(c.lat) <= cull.y + cull.h * (1 + pad))
+    const vis = byTier.filter(inFrame)
     return {
       visible: vis,
       labeled: new Set(vis.filter((c) => cityTier(c) === 1 || lodKey >= 1 || stakes.has(c.id)).map((c) => c.id)),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, selected, lodKey])
+  }, [state, selected, lodKey, isGlobe, cull.x, cull.y, cull.w, cull.h])
 
   // Cursor-anchored zoom, computed in TARGET space so consecutive wheel
   // events compound on where the view is heading, not where it is.

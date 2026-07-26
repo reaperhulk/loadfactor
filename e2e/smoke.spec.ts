@@ -537,8 +537,11 @@ test.describe('touch', () => {
       const w = window as unknown as { __f: number[]; __mut: number }
       w.__f = []
       w.__mut = 0
-      new MutationObserver((recs) => {
-        w.__mut += recs.length
+      // Callbacks, not records: one React commit is one callback however many
+      // nodes it touches, so this counts RENDERS. Counting records instead
+      // would punish a re-centre for swapping in the cities it just revealed.
+      new MutationObserver(() => {
+        w.__mut += 1
       }).observe(document.querySelector('svg.map')!, { attributes: true, childList: true, subtree: true })
       const tick = (): void => {
         const c = document.querySelector('[data-testid="city-JFK"]')
@@ -594,10 +597,11 @@ test.describe('touch', () => {
     // world it holds and has to be re-centred, a few times across a drag this
     // long rather than once a frame. If this starts climbing toward the frame
     // count, the map has quietly gone back to being unusable on an iPhone.
-    const mutations = await page.evaluate(() => (window as unknown as { __mut: number }).__mut)
-    expect(mutations, `the SVG was mutated ${mutations} times mid-drag`).toBeLessThan(
-      frames.length / 3,
-    )
+    const renders = await page.evaluate(() => (window as unknown as { __mut: number }).__mut)
+    expect(
+      renders,
+      `the SVG was re-rendered ${renders} times across ${frames.length} frames of drag`,
+    ).toBeLessThan(8)
 
     // When the finger lifts the transform folds back into the viewBox, and
     // React owns the view again — its copy is what tap hit-testing and the
@@ -698,6 +702,62 @@ test.describe('touch', () => {
       settled * 0.95,
     )
   })
+})
+
+// At 6x, one thirty-sixth of the world is on screen — but every city used to
+// render anyway, and the label placer tests each label against every label
+// already placed. That is ~54k rectangle intersections to position a dozen
+// labels, paid again on every re-centre mid-drag. Off-screen cities cannot be
+// seen, so they are not drawn.
+test('max zoom draws the cities on screen, not all of them', async ({ page }) => {
+  await startGame(page)
+  for (let i = 0; i < 7; i++) {
+    await page.getByTestId('zoom-in').click()
+    await page.waitForTimeout(260)
+  }
+  await page.waitForTimeout(900)
+
+  // Zoomed all the way in the LOD allows every tier, so without a positional
+  // cull this is the whole 165-city catalogue.
+  const drawn = await page.locator('svg.map [data-testid^="city-"]').count()
+  expect(drawn, `${drawn} city markers drawn at max zoom`).toBeLessThan(40)
+  expect(drawn, 'the cities in frame are still drawn').toBeGreaterThan(0)
+
+  // The invariant, stated directly: nothing is drawn far outside the frame.
+  // The margin is the layer's overhang plus slack — a gesture may reveal a
+  // little more world than the frame before the layer re-centres.
+  const strays = await page.evaluate(() => {
+    const frame = document.querySelector('[data-testid="map-wrap"]')!.getBoundingClientRect()
+    const mx = frame.width * 0.6
+    const my = frame.height * 0.6
+    return [...document.querySelectorAll('svg.map [data-testid^="city-"]')]
+      .map((el) => ({ id: el.getAttribute('data-testid')!, r: el.getBoundingClientRect() }))
+      .filter(
+        ({ r }) =>
+          r.right < frame.left - mx ||
+          r.left > frame.right + mx ||
+          r.bottom < frame.top - my ||
+          r.top > frame.bottom + my,
+      )
+      .map(({ id }) => id)
+  })
+  expect(strays, 'cities were drawn nowhere near the frame').toEqual([])
+
+  // And the cull tracks the view: panning somewhere else brings its cities.
+  const before = await page.locator('svg.map text.city-label').allTextContents()
+  const b = (await page.getByTestId('map-wrap').boundingBox())!
+  const y = b.y + b.height / 2
+  let x = b.x + b.width * 0.85
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  for (let i = 0; i < 25; i++) {
+    x -= b.width * 0.03
+    await page.mouse.move(x, y)
+  }
+  await page.mouse.up()
+  await page.waitForTimeout(700)
+  const after = await page.locator('svg.map text.city-label').allTextContents()
+  expect(after.join(), 'panning brought a different part of the world').not.toBe(before.join())
 })
 
 test('zoom reveals small cities that are hidden at world view', async ({ page }) => {
