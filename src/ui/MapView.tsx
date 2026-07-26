@@ -466,6 +466,14 @@ export function MapView({
   const targetRef = useRef<ViewBox>(homeView())
   const rafRef = useRef(0)
 
+  // Projection: the flat overview or a rotatable orthographic globe. The
+  // choice persists — planning favors the whole-world view, the globe is the
+  // honest picture of what long-haul really flies.
+  const [projection, setProjection] = useState<'flat' | 'globe'>(() =>
+    localStorage.getItem('loadfactor:projection') === 'globe' ? 'globe' : 'flat',
+  )
+  const isGlobe = projection === 'globe'
+
   // A finger drag must track the finger, and moving the map by rewriting the
   // SVG's viewBox does not — not on WebKit. A viewBox change re-resolves the
   // root's coordinate system, so the entire SVG subtree (a couple of thousand
@@ -486,7 +494,11 @@ export function MapView({
 
   const paintView = (v: ViewBox): void => {
     const g = panRef.current
-    if (g !== null) {
+    // The globe has a fixed viewBox and re-projects its own geometry, so the
+    // flat map's view has no meaning there — a transform derived from it
+    // would scale and offset the whole sphere.
+    if (g !== null && isGlobe) g.removeAttribute('transform')
+    else if (g !== null) {
       const b = baseRef.current
       const k = b.w / v.w
       const tx = b.x - v.x * k
@@ -577,13 +589,6 @@ export function MapView({
     }
   }, [])
 
-  // Projection: the flat overview or a rotatable orthographic globe. The
-  // choice persists — planning favors the whole-world view, the globe is the
-  // honest picture of what long-haul really flies.
-  const [projection, setProjection] = useState<'flat' | 'globe'>(() =>
-    localStorage.getItem('loadfactor:projection') === 'globe' ? 'globe' : 'flat',
-  )
-  const isGlobe = projection === 'globe'
   const [globe, setGlobe] = useState<GlobeView>(GLOBE_HOME)
   // The globe used to write every zoom straight to state. Continuous inputs
   // (wheel, pinch) hide that — they arrive as many small deltas — but a
@@ -997,6 +1002,21 @@ export function MapView({
 
   const beginGesture = (): void => {
     gesturing.current = true
+    // Grabbing something mid-animation stops it where it is. Gestures compute
+    // from the TARGET so rapid inputs compound smoothly, which means a finger
+    // landing while an eased zoom is still running would otherwise take the
+    // globe (or the map) straight to wherever that zoom was heading — one
+    // touch, and it jumps a whole zoom step and re-centres.
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = 0
+    }
+    if (globeRaf.current) {
+      cancelAnimationFrame(globeRaf.current)
+      globeRaf.current = 0
+    }
+    targetRef.current = view
+    globeTarget.current = globe
     // The coastline's drop-shadow filter re-rasterises the whole world every
     // time the viewBox moves — cheap on a desktop GPU, the single most
     // expensive thing on the map on a phone. Motion hides a 1.4px glow, so it

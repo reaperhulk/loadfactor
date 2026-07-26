@@ -595,6 +595,79 @@ test.describe('touch', () => {
       Number(startVb.split(' ')[1]) + 10,
     )
   })
+
+  // Gestures compute from where the view is HEADING, so consecutive inputs
+  // compound instead of stacking jumps. The cost of that is a finger landing
+  // during an eased zoom: without stopping the animation first, the first
+  // move teleports the map to the zoom's destination. On the globe that reads
+  // as it instantly zooming and re-centring the moment you touch it.
+  test('grabbing the map during an eased zoom stops the zoom where it is', async ({
+    page,
+    context,
+  }) => {
+    await startGame(page)
+    const box = (await page.getByTestId('map').boundingBox())!
+    const cdp = await context.newCDPSession(page)
+    const x = box.x + box.width / 2
+    const y = box.y + box.height / 2
+    const touch = async (
+      type: 'touchStart' | 'touchMove' | 'touchEnd',
+      px: number,
+    ): Promise<void> => {
+      await cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: type === 'touchEnd' ? [] : [{ x: px, y, id: 1 }],
+      })
+    }
+    // Two steps in one round trip, so the drag starts well inside the ~130ms
+    // the ease takes rather than racing it.
+    const zoomTwice = async (): Promise<void> =>
+      page.evaluate(() => {
+        const b = document.querySelector<HTMLElement>('[data-testid="zoom-in"]')!
+        b.click()
+        b.click()
+      })
+    const grab = async (): Promise<void> => {
+      await touch('touchStart', x)
+      await touch('touchMove', x + 8)
+      await touch('touchMove', x + 18)
+    }
+
+    // Flat map: a drag that starts mid-zoom may only pan, so the scale in the
+    // pan transform stays 1. Teleporting to the zoom target shows up as the
+    // group suddenly carrying the whole zoom step.
+    await zoomTwice()
+    await grab()
+    const k = await page.evaluate(() => {
+      const t = document.querySelector('[data-testid="map-pan"]')?.getAttribute('transform') ?? ''
+      return Number(/scale\(([-\d.]+)\)/.exec(t)?.[1] ?? 1)
+    })
+    await touch('touchEnd', x + 18)
+    expect(k, 'the grab panned without zooming').toBeCloseTo(1, 2)
+
+    // Globe: the disc radius is the zoom, so the jump is directly readable.
+    // Calibrated against the same zoom left to settle, rather than a hard
+    // number, so the assertion cannot drift with the zoom step.
+    await page.getByTestId('map-projection').click()
+    await page.waitForTimeout(400)
+    const discR = async (): Promise<number> =>
+      Number(await page.locator('.globe-disc').getAttribute('r'))
+    await zoomTwice()
+    await page.waitForTimeout(600)
+    const settled = await discR()
+    await page.getByTestId('zoom-reset').click()
+    await page.waitForTimeout(600)
+    const home = await discR()
+    expect(settled, 'two zoom steps grow the globe').toBeGreaterThan(home * 1.5)
+
+    await zoomTwice()
+    await grab()
+    const grabbed = await discR()
+    await touch('touchEnd', x + 18)
+    expect(grabbed, 'the touch did not teleport the globe to the zoom target').toBeLessThan(
+      settled * 0.95,
+    )
+  })
 })
 
 test('zoom reveals small cities that are hidden at world view', async ({ page }) => {
