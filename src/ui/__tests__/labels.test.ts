@@ -147,23 +147,23 @@ describe('placeLabels', () => {
     expect(new Set(out.map((p) => `${p.x},${p.y},${p.anchor}`)).size).toBe(sites.length)
   })
 
-  it('does not blow up as the catalogue grows', () => {
-    // Above the threshold the grid is what runs, so a 4x bigger input should
-    // cost roughly 4x, not 16x. The bound is loose — this is a shape check on
-    // a shared runner, not a benchmark — but it still catches the grid being
-    // bypassed and the whole list being scanned again.
-    const time = (n: number): number => {
-      const sites = layout(5, n, 960)
-      for (let i = 0; i < 200; i++) placeLabels(sites, 9, 3) // warm the JIT
-      const t0 = performance.now()
-      for (let i = 0; i < 50; i++) placeLabels(sites, 9, 3)
-      return performance.now() - t0
-    }
-    const small = Math.max(time(300), 0.5)
-    const big = time(1200)
+  it('does the work the grid promises, not the scan\'s', () => {
+    // Counted, not timed: a wall-clock ratio makes the result depend on how
+    // busy the runner is, and this suite runs alongside multi-career
+    // simulations. Comparisons are the same number on every machine.
+    const sites = layout(5, 1200, 960)
+    const grid = { comparisons: 0 }
+    const scan = { comparisons: 0 }
+    placeLabels(sites, 9, 3, 0, grid)
+    placeLabels(sites, 9, 3, Number.POSITIVE_INFINITY, scan)
     expect(
-      big / small,
-      `1200 labels took ${(big / small).toFixed(1)}x the time of 300`,
-    ).toBeLessThan(10)
+      grid.comparisons,
+      `grid made ${grid.comparisons} comparisons, scan ${scan.comparisons}`,
+    ).toBeLessThan(scan.comparisons / 10)
+    // And both still land on the same answer, which is the point of having
+    // two of them at all.
+    expect(placeLabels(sites, 9, 3, 0)).toEqual(
+      placeLabels(sites, 9, 3, Number.POSITIVE_INFINITY),
+    )
   })
 })

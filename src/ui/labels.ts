@@ -70,11 +70,20 @@ const leftEdge = (x: number, w: number, anchor: LabelAnchor): number =>
 // precision, only to be in the right place.
 export const GRID_FROM = 200
 
+// How many box-vs-box comparisons a pass made. This is what separates the two
+// strategies, and unlike a stopwatch it is the same number on every machine —
+// so the test that guards the grid can assert on it without ever depending on
+// how loaded the runner is.
+export interface PlaceStats {
+  comparisons: number
+}
+
 export function placeLabels(
   sites: readonly LabelSite[],
   fs: number, // font size, and the height of a label box
   gap: number, // clearance between a marker and its name
   gridFrom: number = GRID_FROM, // tests pin this to exercise both paths
+  stats?: PlaceStats,
 ): LabelPlacement[] {
   // Cells sized against the type: a label is at most ~5 characters of 0.66em,
   // so a box spans no more than two cells on either axis and the work per
@@ -87,9 +96,13 @@ export function placeLabels(
   // string keys a Map of `${ix},${iy}` would allocate per lookup.
   const key = (ix: number, iy: number): number => ix * 1e7 + iy
 
+  let comparisons = 0
   const clashes = (b: Box): boolean => {
     if (grid === null) {
-      for (const other of flat) if (overlaps(b, other)) return true
+      for (const other of flat) {
+        comparisons++
+        if (overlaps(b, other)) return true
+      }
       return false
     }
     const ix1 = Math.floor(b.x2 / cell)
@@ -98,7 +111,10 @@ export function placeLabels(
       for (let iy = Math.floor(b.y1 / cell); iy <= iy1; iy++) {
         const bucket = grid.get(key(ix, iy))
         if (bucket === undefined) continue
-        for (const other of bucket) if (overlaps(b, other)) return true
+        for (const other of bucket) {
+          comparisons++
+          if (overlaps(b, other)) return true
+        }
       }
     }
     return false
@@ -141,5 +157,6 @@ export function placeLabels(
     keep({ x1: px1, y1: pick.y - fs, x2: px1 + site.w, y2: pick.y })
     out.push({ id: site.id, x: pick.x, y: pick.y, anchor: pick.anchor })
   }
+  if (stats !== undefined) stats.comparisons = comparisons
   return out
 }

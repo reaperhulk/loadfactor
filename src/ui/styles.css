@@ -1734,6 +1734,29 @@ input[type='number'] {
   align-self: center;
 }
 
+/* The build stamp: there to be read when you go looking for it and ignored
+   the rest of the time. Selectable, because the point of it is to be copied
+   into a commit lookup. */
+.build-stamp {
+  color: var(--dim);
+  opacity: 0.5;
+  font-size: 0.7rem;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  align-self: center;
+  margin-left: 10px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.build-stamp:hover {
+  opacity: 0.9;
+}
+
+/* On the menu it trails the tagline rather than a nav row. */
+.tagline .build-stamp {
+  margin-left: 6px;
+}
+
 /* Tablet and below: tighter chrome, bigger tap targets, no page-level
    horizontal scroll — wide content scrolls inside its own container. */
 @media (max-width: 900px) {

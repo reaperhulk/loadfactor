@@ -66,6 +66,25 @@ test('routes open via the city panel plan-route flow with a launch schedule', as
   await expect(page.getByTestId('route-MIA-ORD')).toBeVisible()
 })
 
+// Which build is this? The deployed page and the repo are otherwise
+// impossible to line up by eye, so the commit is stamped into the bundle and
+// shown in the footer of both the menu and the game.
+test('the running build says which commit it is', async ({ page }) => {
+  await page.goto('/')
+  const stamp = page.getByTestId('build-stamp')
+  await expect(stamp, 'the menu carries it too — that is where you land').toBeVisible()
+  // A short SHA, or "dev" when built without git. A trailing + means the
+  // build came from a dirty tree, which is exactly what you want to know.
+  const menuText = (await stamp.textContent())!.trim()
+  expect(menuText).toMatch(/^([0-9a-f]{7}\+?|dev)$/)
+  await expect(stamp).toHaveAttribute('title', new RegExp(`build ${menuText.replace('+', '\\+')} · `))
+
+  await startGame(page)
+  const inGame = page.getByTestId('build-stamp')
+  await expect(inGame).toBeVisible()
+  expect((await inGame.textContent())!.trim()).toBe(menuText)
+})
+
 test('every scenario starts from its menu card', async ({ page }) => {
   await page.goto('/')
   await page.getByTestId('seed-input').fill('menu-seed')

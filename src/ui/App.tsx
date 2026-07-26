@@ -96,7 +96,9 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
   return (
     <main className="menu">
       <h1>Load Factor</h1>
-      <p className="tagline">Routes. Jets. Margins. Fill the seats.</p>
+      <p className="tagline">
+        Routes. Jets. Margins. Fill the seats. <BuildStamp />
+      </p>
       {challenge && (
         <div className="scenario-card continue-card" data-testid="challenge-card">
           <h2>⚔ Challenge accepted?</h2>
@@ -959,6 +961,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           </button>
         ))}
         <span className="key-hints">space = end quarter · 1–6 = panels · esc = deselect</span>
+        <BuildStamp />
       </nav>
       <section className="panel">
         {tab === 'routes' && (
@@ -982,6 +985,22 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         ))}
       </footer>
     </main>
+  )
+}
+
+// Which build is running. Small, dim, and selectable, in the footer of the
+// menu and of the game — the deployed page and the repo are otherwise
+// impossible to line up by eye. A trailing "+" means the build was made from
+// a working tree with uncommitted changes, so the hash alone would be a lie.
+function BuildStamp() {
+  return (
+    <span
+      className="build-stamp"
+      data-testid="build-stamp"
+      title={`build ${__BUILD_SHA__} · ${__BUILD_TIME__}`}
+    >
+      {__BUILD_SHA__}
+    </span>
   )
 }
 
