@@ -485,6 +485,15 @@ export function MapView({
     }
   }
   const [view, setView] = useState<ViewBox>(homeView)
+  // What the SVG rasters, as opposed to what React knows. `view` is the
+  // logical view — taps, cull-adjacent reads, the minimap, data-view — and
+  // `anchor` is the viewBox actually written to the DOM. They part ways after
+  // a pan: the world at a shifted offset is the same pixels, already painted,
+  // so a pan commits into `view` and leaves the layer's transform parked —
+  // no viewBox rewrite, no re-raster, nothing. Only a zoom (new resolution)
+  // or a re-centre (new world content) moves the anchor, and each is a single
+  // raster taken at rest.
+  const [anchor, setAnchor] = useState<ViewBox>(homeView)
   const svgRef = useRef<SVGSVGElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const drag = useRef<{ px: number; py: number; moved: boolean } | null>(null)
@@ -545,12 +554,6 @@ export function MapView({
       paused.current = []
     }
   }
-  // Narrower than `moving`, and the distinction is the whole trick. Sliding a
-  // composited layer is free — the compositor moves a texture it already has,
-  // so a pan keeps every last coastline curve. Scaling one is not: the texture
-  // has to be redrawn at the new size, every frame of the ease. So detail
-  // comes off for zooms only, which is exactly where it pays for itself.
-  const [scaling, setScaling] = useState(false)
   const layerRef = useRef<HTMLDivElement>(null)
   const minimapRef = useRef<HTMLDivElement>(null)
   // The viewBox actually in the DOM. The transform maps it to the live view.
@@ -624,22 +627,42 @@ export function MapView({
     }
   }
 
+  // Fold a finished gesture or ease into state. The raster-free path is the
+  // point: a pure pan whose target the layer still covers changes nothing the
+  // SVG renders — same viewBox, same cull — so the only DOM the commit touches
+  // is outside the layer, and the compositor keeps carrying the texture it
+  // already has. Everything else re-anchors: one raster, taken at rest.
+  const commitView = (t: ViewBox): void => {
+    setView(t)
+    const rect = frameRect()
+    const panOnly = Math.abs(t.w - baseRef.current.w) < 1e-6
+    if (!panOnly || rect === null || !layerFor(t, rect).covers) setAnchor(t)
+  }
+
   // The layer has run out of world. Re-render at the new view so it is centred
   // again and the transform can start over from identity. Synchronously,
   // because the transform we paint next assumes the viewBox already moved.
   // A long drag pays this once per quarter-frame of travel instead of a
   // re-raster per frame, which is the whole trade.
   const recentre = (v: ViewBox): void => {
-    flushSync(() => setView(v))
+    flushSync(() => {
+      setView(v)
+      setAnchor(v)
+    })
     const rect = frameRect()
     if (rect === null) return
     const t = layerFor(v, rect)
     paintLayer(t.tx, t.ty, t.s)
   }
 
+  // The flat view most recently painted to the DOM — where a new ease starts
+  // from, now that the committed view and the rastered anchor can differ.
+  const paintedRef = useRef<ViewBox>(homeView())
+
   const paintView = (v: ViewBox): void => {
     const rect = frameRect()
     if (rect === null) return
+    if (!isGlobe) paintedRef.current = v
     if (isGlobe) {
       // The flat map's view means nothing here — the globe has a fixed viewBox
       // and re-projects its own geometry. But a globe ZOOM is a pure scale
@@ -684,15 +707,15 @@ export function MapView({
     }
   }
 
-  // React has just written `view` as the viewBox, so that is the new base.
-  // Re-derive the transform against it: mid-gesture that re-asserts the live
-  // pan over a render triggered by something else, and at the end of one it
-  // resolves to identity and the attribute comes off — before paint, so the
-  // handoff from transform to viewBox never shows a frame of either alone.
+  // React has just written `anchor` as the viewBox, so that is the base the
+  // transform is derived against. After a pan commit the two differ and the
+  // transform stays parked; after a zoom or re-centre they coincide and it
+  // resolves to identity — before paint, so the handoff never shows a frame
+  // of either alone.
   useLayoutEffect(() => {
-    baseRef.current = view
+    baseRef.current = anchor
     globeBaseRef.current = globe
-    spanRef.current = isGlobe ? SPAN_MIN : layerSpan(view.w)
+    spanRef.current = isGlobe ? SPAN_MIN : layerSpan(anchor.w)
     // A render can land mid-ease — starting one drops detail, and a quarter
     // can resolve underneath it. The ease repaints the transform from its own
     // rAF every frame, so this effect must not paint the committed view over
@@ -740,8 +763,7 @@ export function MapView({
       rafRef.current = 0
       easing.current = false
       setMoving(false)
-      setScaling(false)
-      setView(t)
+      commitView(t)
       return
     }
     easeRef.current = next
@@ -755,7 +777,6 @@ export function MapView({
       // Mid-gesture: straight to the DOM, no render, no media query. A pinch
       // changes the width and pays the same scaling bill as an eased zoom.
       stopEase()
-      if (Math.abs(targetRef.current.w - baseRef.current.w) > 0.5) setScaling(true)
       paintView(targetRef.current)
       return
     }
@@ -763,16 +784,13 @@ export function MapView({
     if (immediate || reduced) {
       stopEase()
       setMoving(false)
-      setScaling(false)
-      setView(targetRef.current)
+      commitView(targetRef.current)
       return
     }
     if (!rafRef.current) {
-      easeRef.current = baseRef.current
+      easeRef.current = paintedRef.current
       easing.current = true
       setMoving(true)
-      // Only a zoom needs the cheaper geometry; an eased recentre does not.
-      setScaling(Math.abs(targetRef.current.w - baseRef.current.w) > 0.5)
       rafRef.current = requestAnimationFrame(settleView)
     }
   }
@@ -1102,9 +1120,13 @@ export function MapView({
   // a zoom, and not while a gesture is moving the layer (which does not touch
   // `view` at all).
   const lodKey = (scale >= 1.8 ? 2 : 0) | (scale >= 1.5 ? 1 : 0)
-  const cull = view
+  // Culling follows the ANCHOR — the window the layer is actually painted
+  // around — not the logical view. A pan commit moves only the view; if it
+  // moved the cull too, the city set would change and invalidate the raster
+  // the pan-commit path exists to keep.
+  const cull = anchor
   // The globe re-projects rather than panning, so it needs no overhang.
-  const span = isGlobe ? SPAN_MIN : layerSpan(view.w)
+  const span = isGlobe ? SPAN_MIN : layerSpan(anchor.w)
   const { visible, labeled } = useMemo(() => {
     // Cities the player has a stake in stay visible at any zoom.
     const stakes = new Set<string>()
@@ -1263,10 +1285,10 @@ export function MapView({
     if (!gesturing.current) return
     gesturing.current = false
     setMoving(false)
-    setScaling(false)
     gestureRect.current = null
-    // Hand the live view back to React in one commit.
-    setView(targetRef.current)
+    // Hand the live view back to React in one commit — which, for the pan
+    // this almost always is, rewrites nothing the SVG rasters.
+    commitView(targetRef.current)
   }
 
   const pinchGeometry = (): { dist: number; midX: number; midY: number } | null => {
@@ -1484,7 +1506,7 @@ export function MapView({
           width: `${(1 / span) * 100}%`,
           height: `${(1 / span) * 100}%`,
         }}
-        viewBox={isGlobe ? `0 0 ${W} ${H}` : `${view.x} ${view.y} ${view.w} ${view.h}`}
+        viewBox={isGlobe ? `0 0 ${W} ${H}` : `${anchor.x} ${anchor.y} ${anchor.w} ${anchor.h}`}
         preserveAspectRatio="xMidYMid slice"
         className={`map era-${Math.min(2000, Math.max(1960, Math.floor(yearOf(state) / 10) * 10))}`}
         role="img"
@@ -1513,10 +1535,6 @@ export function MapView({
             <stop offset="0%" className="sea-stop-shallow" />
             <stop offset="100%" className="sea-stop-deep" />
           </radialGradient>
-          {/* A hair of light along every coast, so land reads as raised. */}
-          <filter id="coastGlow" x="-4%" y="-4%" width="108%" height="108%">
-            <feDropShadow dx="0" dy="0" stdDeviation="1.4" floodColor="var(--coast-glow, #4a6b93)" floodOpacity="0.55" />
-          </filter>
         </defs>
         {/* Everything that pans lives in one group so a gesture can move it
             with a transform instead of a viewBox — see paintView. The
@@ -1548,20 +1566,24 @@ export function MapView({
             </>
           ) : (
             <>
+              {/* The coast's glow is GEOMETRY, not a filter: the same path
+                  stroked wide underneath, and the land drawn over its inner
+                  half leaves a halo. It used to be an SVG drop-shadow, and an
+                  SVG filter's region is the bounding box of the whole world —
+                  WebKit re-runs that blur on every re-raster of the layer,
+                  which measured as the difference between a 186ms and a 46ms
+                  worst frame during a drag. A stroke is just another path
+                  pass, cheap on every engine, and at 2.5 non-scaling pixels
+                  it reads the same. */}
+              <path d={scale >= 1.8 ? WORLD_PATH_FINE : WORLD_PATH} className="map-coast-glow" />
               {/* Detail that resolves: the coarse coastline is a smear at 3x,
-                  and the fine one is wasted bytes of curve at world view. This
-                  drops to the coarse path while the view is being SCALED —
-                  a zoom redraws the layer every frame, and four times the
-                  curve is four times that bill. A pan keeps full detail: the
-                  compositor slides a texture it already has. */}
-              <path
-                d={scale >= 1.8 && !scaling ? WORLD_PATH_FINE : WORLD_PATH}
-                className="map-land"
-                filter="url(#coastGlow)"
-              />
+                  and the fine one is wasted bytes of curve at world view. The
+                  swap happens at a committed render, once per threshold
+                  crossing — never mid-gesture. */}
+              <path d={scale >= 1.8 ? WORLD_PATH_FINE : WORLD_PATH} className="map-land" />
               {/* Country borders come from a separate mesh, so they are the
                   borders themselves and never a second copy of the coast. */}
-              {scale >= 1.35 && !scaling && <path d={BORDERS_PATH} className="map-border" />}
+              {scale >= 1.35 && <path d={BORDERS_PATH} className="map-border" />}
               {/* Islands with an airport but too small to survive 1:50m
                   generalisation — without these, Guam is an airport in open
                   ocean. */}

@@ -269,6 +269,22 @@ button:disabled {
   transition: fill 1200ms ease, stroke 1200ms ease;
 }
 
+/* The hair of light along every coast. A second copy of the coastline stroked
+   wide beneath the land — the land covers the inner half, what remains is the
+   halo. This replaced an feDropShadow filter: same look at these sizes, and a
+   plain stroke pass instead of a whole-world gaussian blur on every raster of
+   the layer (the difference between 186ms and 46ms worst frames in WebKit). */
+.map-coast-glow {
+  fill: none;
+  stroke: var(--coast-glow, #4a6b93);
+  stroke-width: 2.5;
+  stroke-opacity: 0.5;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transition: stroke 1200ms ease;
+}
+
 /* Anything that MOVES on its own has to hold still while the map moves:
    content that changes inside a composited layer invalidates it, dragging a
    full re-raster back into every frame — the one thing this layer exists to

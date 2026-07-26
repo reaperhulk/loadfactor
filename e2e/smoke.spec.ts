@@ -622,18 +622,31 @@ test.describe('touch', () => {
       `the SVG was re-rendered ${renders} times across ${frames.length} frames of drag`,
     ).toBeLessThan(8)
 
-    // When the finger lifts the transform folds back into the viewBox, and
-    // React owns the view again — its copy is what tap hit-testing and the
-    // zoom LOD read, so a view left behind by a drag silently mis-resolves
-    // everything that follows.
-    await expect
-      .poll(() => page.getByTestId('map-pan').evaluate((el) => (el as HTMLElement).style.transform))
-      .toBe('')
+    // When the finger lifts, React's copy of the view — what tap hit-testing
+    // and the minimap read — must carry the pan. The viewBox deliberately
+    // does NOT: the world at a shifted offset is pixels the layer already
+    // holds, so a pan commit leaves the raster alone and parks the transform.
+    // What has to hold is consistency: viewBox composed with the parked
+    // transform equals the committed view, exactly.
+    await page.waitForTimeout(200)
     const view = (await page.getByTestId('map-wrap').getAttribute('data-view'))!
-    expect(await page.getByTestId('map').getAttribute('viewBox')).toBe(view)
-    expect(Number(view.split(' ')[1]), 'the pan landed in the viewBox').toBeGreaterThan(
+      .split(' ')
+      .map(Number)
+    expect(view[1]!, 'the pan landed in the committed view').toBeGreaterThan(
       Number(startVb.split(' ')[1]) + 10,
     )
+    const shown = await page.evaluate(() => {
+      const svg = document.querySelector('svg.map')!
+      const [bx, by, bw, bh] = svg.getAttribute('viewBox')!.split(' ').map(Number)
+      const t = (document.querySelector('[data-testid="map-pan"]') as HTMLElement).style.transform
+      const m = /translate3d\((-?[\d.]+)px,\s*(-?[\d.]+)px/.exec(t)
+      const rect = document.querySelector('[data-testid="map-wrap"]')!.getBoundingClientRect()
+      const k = Math.max(rect.width / bw!, rect.height / bh!)
+      // paintLayer with s=1: tx = k*(base.x - v.x)  =>  v = base - t/k
+      return [bx! - Number(m?.[1] ?? 0) / k, by! - Number(m?.[2] ?? 0) / k]
+    })
+    expect(shown[0], 'displayed x agrees with the committed view').toBeCloseTo(view[0]!, 0)
+    expect(shown[1], 'displayed y agrees with the committed view').toBeCloseTo(view[1]!, 0)
   })
 
   // Gestures compute from where the view is HEADING, so consecutive inputs
@@ -767,12 +780,16 @@ test('a drag at low zoom never rewrites the viewBox, however long', async ({ pag
   await page.waitForTimeout(500)
 
   expect(during, `the viewBox was rewritten ${during} times mid-drag`).toBe(0)
-  // It still has to land: the gesture folds into the viewBox on release.
+  // And not on release either: a pan's pixels are already painted, so the
+  // commit moves React's view and leaves the raster untouched. The whole
+  // drag, start to settle, costs the viewBox nothing.
+  await page.waitForTimeout(400)
   const after = await page.evaluate(() => (window as unknown as { __vb: number }).__vb)
-  expect(after, 'the drag committed when the finger lifted').toBeGreaterThan(0)
-  await expect
-    .poll(() => page.getByTestId('map-pan').evaluate((el) => (el as HTMLElement).style.transform))
-    .toBe('')
+  expect(after, 'a pan never rewrites the viewBox at all').toBe(0)
+  // The commit still happened — the logical view carries the pan.
+  const dv = (await page.getByTestId('map-wrap').getAttribute('data-view'))!.split(' ').map(Number)
+  const vb = (await page.getByTestId('map').getAttribute('viewBox'))!.split(' ').map(Number)
+  expect(dv[0]!, 'the committed view moved off the anchor').not.toBeCloseTo(vb[0]!, 1)
 })
 
 // Two animation systems live inside the composited layer, and content that
@@ -1137,14 +1154,14 @@ test('the globe sits on sea all the way to the edge of the frame', async ({ page
   for (const hit of painted) expect(hit, `frame edge showed "${hit}" instead of ocean`).toContain('map-sea')
 })
 
-// Detail comes off for scaling and only for scaling, and that asymmetry is
-// the point. Sliding a composited layer is free — the compositor moves a
-// texture it already has — so a pan has no reason to give anything up.
-// Scaling one redraws it every frame, so a zoom does.
-test('a pan keeps full detail; only a zoom trades it away', async ({ page }) => {
+// Nothing about the map changes while it moves, and nothing on it needs an
+// SVG filter. Both used to be false, and each was a stutter: dropping detail
+// for a zoom forced two extra re-rasters (a habit left over from when zooms
+// re-rastered per frame), and the coast's glow was an feDropShadow whose
+// filter region is the whole world — WebKit re-ran that blur on every raster
+// of the layer, a consistent ~150ms frame on every zoom step.
+test('detail survives pan and zoom alike, with no filter in the layer', async ({ page }) => {
   await startGame(page)
-  // Past both LOD thresholds, so the fine coastline and the border mesh are
-  // the ones on screen and there is something to lose.
   for (let i = 0; i < 3; i++) await page.getByTestId('zoom-in').click()
   await page.waitForTimeout(900)
   const landChars = async (): Promise<number> =>
@@ -1152,7 +1169,12 @@ test('a pan keeps full detail; only a zoom trades it away', async ({ page }) => 
 
   const settled = await landChars()
   await expect(page.locator('.map-border')).toHaveCount(1)
+  // The glow is a stroked path, not a filter, and nothing inside the moving
+  // layer carries an SVG filter attribute at all.
+  await expect(page.locator('.map-coast-glow')).toHaveCount(1)
+  expect(await page.locator('.map-layer [filter]').count()).toBe(0)
 
+  // A drag keeps everything.
   const box = (await page.getByTestId('map-wrap').boundingBox())!
   const x = box.x + box.width / 2
   const y = box.y + box.height / 2
@@ -1165,13 +1187,14 @@ test('a pan keeps full detail; only a zoom trades it away', async ({ page }) => 
   await page.mouse.up()
   await page.waitForTimeout(400)
 
-  // A zoom is the case that redraws, so it drops to the coarse path.
+  // A zoom keeps everything too: the ease rides the layer transform, and the
+  // only content change is the LOD threshold, which this step does not cross.
   await page.getByTestId('zoom-in').click()
-  await expect.poll(landChars, { timeout: 2000 }).toBeLessThan(settled / 2)
-  await expect(page.locator('.map-border')).toHaveCount(0)
-  // And it all comes back the moment it settles.
-  await expect.poll(landChars, { timeout: 4000 }).toBe(settled)
+  await page.waitForTimeout(120)
+  expect(await landChars(), 'mid-zoom the coastline holds').toBe(settled)
   await expect(page.locator('.map-border')).toHaveCount(1)
+  await page.waitForTimeout(900)
+  expect(await landChars()).toBe(settled)
 })
 
 test('the late-game map stays within its structural render budget', async ({ page }) => {
