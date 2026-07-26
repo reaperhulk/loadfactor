@@ -4,6 +4,7 @@
 // are fine here — the engine never sees screen coordinates.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import type { MouseEvent as ReactMouseEvent, PointerEvent } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
@@ -54,6 +55,11 @@ function slotsUsedAt(routes: readonly Route[], city: string): number {
 // an airport can never drift off its own continent.
 const W = MAP_W
 const H = MAP_H
+
+// How far the moving layer hangs past the frame on each side, as a fraction of
+// the frame. Must match `.map-layer` in styles.css (left/top -25%, 150% wide).
+// This is the budget a gesture can spend before the layer has to be re-centred.
+const OVERHANG = 0.25
 
 const x = projectLon
 const y = projectLat
@@ -459,6 +465,7 @@ export function MapView({
   }
   const [view, setView] = useState<ViewBox>(homeView)
   const svgRef = useRef<SVGSVGElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   const drag = useRef<{ px: number; py: number; moved: boolean } | null>(null)
   // Zoom eases toward targetRef via exponential smoothing in a rAF loop;
   // panning writes through immediately. Wheel/button handlers mutate the
@@ -487,10 +494,16 @@ export function MapView({
   // does not invalidate layout on any engine. React state is synced once,
   // when the finger lifts, and the transform folds back into the viewBox.
   const gesturing = useRef(false)
-  // Same fact as `gesturing`, in state: the render needs it to drop detail
-  // while the map is moving. Two renders per gesture, not per frame.
+  // Same fact as `gesturing`, in state: the render needs it. Two renders per
+  // gesture, not per frame.
   const [moving, setMoving] = useState(false)
-  const panRef = useRef<SVGGElement>(null)
+  // Narrower than `moving`, and the distinction is the whole trick. Sliding a
+  // composited layer is free — the compositor moves a texture it already has,
+  // so a pan keeps every last coastline curve. Scaling one is not: the texture
+  // has to be redrawn at the new size, every frame of the ease. So detail
+  // comes off for zooms only, which is exactly where it pays for itself.
+  const [scaling, setScaling] = useState(false)
+  const layerRef = useRef<HTMLDivElement>(null)
   const minimapRef = useRef<SVGRectElement>(null)
   // The viewBox actually in the DOM. The transform maps it to the live view.
   const baseRef = useRef<ViewBox>(homeView())
@@ -501,42 +514,116 @@ export function MapView({
   const globeEase = useRef<GlobeView>(GLOBE_HOME)
   const globeEasing = useRef(false)
 
+  // Move the layer to show view `v` while the SVG underneath still holds the
+  // committed one. Everything is in CSS pixels, because a CSS transform on a
+  // promoted layer is the whole point: the compositor moves an already-drawn
+  // texture and nothing re-rasterises.
+  //
+  // The layer paints the base viewBox B at k px per unit (`slice`, so k is the
+  // larger ratio and the surplus splits either side). Showing v instead means
+  // scaling by s = B.w/v.w and sliding by the difference between where a world
+  // point sits under B and where it should sit under v. Working that through,
+  // with the transform taken about the layer's centre:
+  //
+  //   T = s*k*(B.x - v.x) - (1 - s)*B.w*k/2
+  //
+  // which for a pure pan (s = 1) is just k*(B.x - v.x).
+  const paintLayer = (tx: number, ty: number, s: number): void => {
+    const el = layerRef.current
+    if (el === null) return
+    if (Math.abs(s - 1) < 1e-9 && Math.abs(tx) < 0.01 && Math.abs(ty) < 0.01) {
+      // At rest, hand the pixels back: an identity transform still pins a
+      // composited texture in memory for a map nobody is touching.
+      el.style.transform = ''
+      return
+    }
+    el.style.transform = `translate3d(${tx.toFixed(2)}px, ${ty.toFixed(2)}px, 0) scale(${s.toFixed(6)})`
+  }
+
+  // The frame the map is seen through. Measured on the WRAPPER, not the SVG:
+  // the SVG rides the layer now, so mid-gesture its bounding box carries the
+  // gesture's own transform and every reading would feed back on itself. The
+  // wrapper never moves. Cached for the duration of a gesture, because
+  // getBoundingClientRect() forces a layout flush and paying for one on every
+  // pointermove taxes the frame that has to track the finger.
+  const gestureRect = useRef<DOMRect | null>(null)
+  const frameRect = (): DOMRect | null => {
+    const measure = (): DOMRect | null => wrapRef.current?.getBoundingClientRect() ?? null
+    if (!gesturing.current) return measure()
+    if (gestureRect.current === null) gestureRect.current = measure()
+    return gestureRect.current
+  }
+
+  // Where the layer has to sit to show `v`, and whether it still covers the
+  // frame when it gets there. Scale eats the overhang: at s = 1 there is a
+  // quarter-frame of slack each way, and a zoom-out shrinks the layer toward
+  // the frame's own size until there is none.
+  const layerFor = (v: ViewBox, rect: DOMRect): { tx: number; ty: number; s: number; covers: boolean } => {
+    const b = baseRef.current
+    const s = b.w / v.w
+    const k = viewToCss(rect, b.w, b.h).k
+    const tx = s * k * (b.x - v.x) - ((1 - s) * b.w * k) / 2
+    const ty = s * k * (b.y - v.y) - ((1 - s) * b.h * k) / 2
+    const slack = (0.5 + OVERHANG) * s - 0.5
+    return {
+      tx,
+      ty,
+      s,
+      covers: Math.abs(tx) <= rect.width * slack && Math.abs(ty) <= rect.height * slack,
+    }
+  }
+
+  // The layer has run out of world. Re-render at the new view so it is centred
+  // again and the transform can start over from identity. Synchronously,
+  // because the transform we paint next assumes the viewBox already moved.
+  // A long drag pays this once per quarter-frame of travel instead of a
+  // re-raster per frame, which is the whole trade.
+  const recentre = (v: ViewBox): void => {
+    flushSync(() => setView(v))
+    const rect = frameRect()
+    if (rect === null) return
+    const t = layerFor(v, rect)
+    paintLayer(t.tx, t.ty, t.s)
+  }
+
   const paintView = (v: ViewBox): void => {
-    const g = panRef.current
-    if (g !== null && isGlobe) {
+    const rect = frameRect()
+    if (rect === null) return
+    if (isGlobe) {
       // The flat map's view means nothing here — the globe has a fixed viewBox
       // and re-projects its own geometry. But a globe ZOOM is a pure scale
       // about the centre: every projected point is centre + R*f(lon,lat) with
       // R = GLOBE_R*s, and which hemisphere is visible does not depend on R at
-      // all. So a zoom-only ease rides a transform, exactly like a flat pan,
+      // all. So a zoom-only ease rides the same layer transform as a flat pan,
       // instead of re-projecting the whole world once per frame.
-      const k = !globeEasing.current ? 1 : globeEase.current.s / globeBaseRef.current.s
-      if (Math.abs(k - 1) < 1e-9) g.removeAttribute('transform')
-      else g.setAttribute('transform', `translate(${((1 - k) * W) / 2} ${((1 - k) * H) / 2}) scale(${k})`)
-    } else if (g !== null) {
-      const b = baseRef.current
-      const k = b.w / v.w
-      const tx = b.x - v.x * k
-      const ty = b.y - v.y * k
-      const still = Math.abs(tx) < 1e-9 && Math.abs(ty) < 1e-9
-      // A drag carries no zoom, so say so: a bare translate is a case engines
-      // can recognise and shortcut, where translate+scale(1) is just another
-      // matrix to push through the general path.
-      if (Math.abs(k - 1) < 1e-9) {
-        if (still) g.removeAttribute('transform')
-        else g.setAttribute('transform', `translate(${tx} ${ty})`)
-      } else {
-        g.setAttribute('transform', `translate(${tx} ${ty}) scale(${k})`)
+      const s = !globeEasing.current ? 1 : globeEase.current.s / globeBaseRef.current.s
+      // A pure scale about the frame's centre, and the layer's centre IS the
+      // frame's centre — so there is nothing to translate. (The flat map's
+      // shift term exists because zooming there also moves the view's corner;
+      // applying it here pushed the globe off to one side.)
+      if ((0.5 + OVERHANG) * s - 0.5 < 0) {
+        // Shrunk past its own overhang: the layer no longer covers the frame,
+        // so commit the zoom and let the globe re-project at the new size.
+        const g = globeEase.current
+        globeEasing.current = false
+        flushSync(() => setGlobe(g))
+        paintLayer(0, 0, 1)
+        return
       }
+      paintLayer(0, 0, s)
+      return
     }
-    // The minimap is its own small SVG, so its rect is cheap to keep live.
+    const t = layerFor(v, rect)
+    // Called from the layout effect too, where the base has just been set to
+    // `v` — so the transform is identity, it always covers, and this never
+    // re-enters React from inside an effect.
+    if (!t.covers) recentre(v)
+    else paintLayer(t.tx, t.ty, t.s)
+    // The minimap stays live through the gesture, as one transform.
     const mm = minimapRef.current
-    if (mm !== null) {
-      mm.setAttribute('x', String(v.x))
-      mm.setAttribute('y', String(v.y))
-      mm.setAttribute('width', String(v.w))
-      mm.setAttribute('height', String(v.h))
-    }
+    // A CSS transform, not the SVG `transform` attribute: the attribute is
+    // part of SVG layout, so writing it relaid out the minimap every frame.
+    if (mm !== null) mm.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.w}, ${v.h})`
   }
 
   // React has just written `view` as the viewBox, so that is the new base.
@@ -563,17 +650,6 @@ export function MapView({
     if (moving && !isGlobe) return
     paintView(view)
   })
-
-  // The SVG's box cannot change while a finger is down, so measure it once per
-  // gesture: getBoundingClientRect() forces a layout flush, and paying for one
-  // on every pointermove is a tax on the frame that has to track the finger.
-  const gestureRect = useRef<DOMRect | null>(null)
-  const mapRect = (): DOMRect | null => {
-    const measure = (): DOMRect | null => svgRef.current?.getBoundingClientRect() ?? null
-    if (!gesturing.current) return measure()
-    if (gestureRect.current === null) gestureRect.current = measure()
-    return gestureRect.current
-  }
 
   // Where an eased view has got to, and whether one is in flight. When it is
   // not, the committed `view` is the truth.
@@ -609,6 +685,7 @@ export function MapView({
       rafRef.current = 0
       easing.current = false
       setMoving(false)
+      setScaling(false)
       setView(t)
       return
     }
@@ -620,8 +697,10 @@ export function MapView({
   const applyView = (target: ViewBox, immediate: boolean): void => {
     targetRef.current = clampView(target)
     if (gesturing.current) {
-      // Mid-gesture: straight to the DOM, no render, no media query.
+      // Mid-gesture: straight to the DOM, no render, no media query. A pinch
+      // changes the width and pays the same scaling bill as an eased zoom.
       stopEase()
+      if (Math.abs(targetRef.current.w - baseRef.current.w) > 0.5) setScaling(true)
       paintView(targetRef.current)
       return
     }
@@ -629,6 +708,7 @@ export function MapView({
     if (immediate || reduced) {
       stopEase()
       setMoving(false)
+      setScaling(false)
       setView(targetRef.current)
       return
     }
@@ -636,6 +716,8 @@ export function MapView({
       easeRef.current = baseRef.current
       easing.current = true
       setMoving(true)
+      // Only a zoom needs the cheaper geometry; an eased recentre does not.
+      setScaling(Math.abs(targetRef.current.w - baseRef.current.w) > 0.5)
       rafRef.current = requestAnimationFrame(settleView)
     }
   }
@@ -992,7 +1074,7 @@ export function MapView({
     const t = targetRef.current
     let mx = t.x + t.w / 2
     let my = t.y + t.h / 2
-    const rect = clientX !== null && clientY !== null ? mapRect() : null
+    const rect = clientX !== null && clientY !== null ? frameRect() : null
     if (clientX !== null && clientY !== null && rect !== null) {
       const m = viewToCss(rect, t.w, t.h)
       mx = t.x + (clientX - rect.left - m.offX) / m.k
@@ -1022,7 +1104,7 @@ export function MapView({
         // Zoom toward the terrain under the cursor: drift the globe center a
         // share of the way to the cursor's geo point as the scale grows, so
         // what you point at is what you approach.
-        const rect = svgRef.current?.getBoundingClientRect()
+        const rect = frameRect()
         const g = globeTarget.current
         const next = { ...g, s: g.s * factor }
         if (rect && factor > 1) {
@@ -1104,6 +1186,7 @@ export function MapView({
     if (!gesturing.current) return
     gesturing.current = false
     setMoving(false)
+    setScaling(false)
     gestureRect.current = null
     // Hand the live view back to React in one commit.
     setView(targetRef.current)
@@ -1142,7 +1225,7 @@ export function MapView({
     }
     if (pinch.current) {
       const now = pinchGeometry()
-      const rect = mapRect()
+      const rect = frameRect()
       if (!now || rect === null) return
       if (isGlobe) {
         const ratio = now.dist / pinch.current.dist
@@ -1179,7 +1262,7 @@ export function MapView({
       beginGesture()
       tryCapture(e.currentTarget, e.pointerId, e.pointerType)
     }
-    const rect = mapRect()
+    const rect = frameRect()
     if (rect === null) return
     if (isGlobe) {
       // Trackball: the terrain follows the pointer. Degrees per pixel shrink
@@ -1249,7 +1332,7 @@ export function MapView({
       suppressClick.current = false
       return
     }
-    const rect = svgRef.current?.getBoundingClientRect()
+    const rect = frameRect()
     if (!rect) return
     const cssX = e.clientX - rect.left
     const cssY = e.clientY - rect.top
@@ -1290,10 +1373,22 @@ export function MapView({
     // how the handoff back at the end of the gesture can be seen: React only
     // rewrites it when the state actually changes.
     <div
+      ref={wrapRef}
       className="map-wrap"
       data-testid="map-wrap"
       data-view={`${view.x} ${view.y} ${view.w} ${view.h}`}
+      style={{ aspectRatio: `${W} / ${H}` }}
     >
+      {/* The element a gesture moves, and the reason it is a div rather than
+          the <g> it used to be. Transforming an SVG group re-rasterises every
+          path under it on every frame: measured over a 40-frame drag at full
+          detail, 876ms of raster. A promoted div with a CSS transform is a
+          compositor operation — the same drag rasterises 0ms, identical to
+          not moving at all. `contain: paint` and a standing will-change are
+          what buy the cached layer; the SVG inside paints past its own box
+          (overflow: visible) so the layer holds a frame-and-a-bit of world
+          and a drag has real map to reveal instead of a blank edge. */}
+      <div className="map-layer" ref={layerRef} data-testid="map-pan">
       <svg
         ref={svgRef}
         viewBox={isGlobe ? `0 0 ${W} ${H}` : `${view.x} ${view.y} ${view.w} ${view.h}`}
@@ -1329,23 +1424,18 @@ export function MapView({
           <filter id="coastGlow" x="-4%" y="-4%" width="108%" height="108%">
             <feDropShadow dx="0" dy="0" stdDeviation="1.4" floodColor="var(--coast-glow, #4a6b93)" floodOpacity="0.55" />
           </filter>
-          {/* Vignette: the frame darkens at the edges and the eye goes to the
-              middle of the world rather than the corners of a rectangle. */}
-          <radialGradient id="mapVignette" cx="50%" cy="50%" r="72%">
-            <stop offset="55%" stopColor="#000" stopOpacity="0" />
-            <stop offset="100%" stopColor="#000" stopOpacity="0.55" />
-          </radialGradient>
         </defs>
         {/* Everything that pans lives in one group so a gesture can move it
             with a transform instead of a viewBox — see paintView. The
             vignette stays outside, pinned to the frame. */}
-        <g ref={panRef} className="map-pan" data-testid="map-pan">
-          {/* The sea overscans a whole frame on every side. `slice` scales the
-              viewBox to COVER the element, so whenever the container is a
-              different shape from the viewBox — always, on the globe, whose
-              viewBox is a fixed W x H — there is visible area outside it. A
-              sea of exactly W x H left that area unpainted, and the globe sat
-              in a black rectangle narrower than the window. */}
+        <g className="map-pan">
+          {/* The sea overscans a whole frame on every side, for two reasons:
+              `slice` scales the viewBox to COVER the element, so a container
+              shaped differently from the viewBox — always, on the globe, whose
+              viewBox is a fixed W x H — has visible area outside it; and the
+              layer now bleeds past the frame so a drag reveals painted world.
+              A sea of exactly W x H left both unpainted, and the globe sat in
+              a black rectangle narrower than the window. */}
           <rect x={-W} y={-H} width={W * 3} height={H * 3} className="map-sea" fill="url(#seaDepth)" />
           {!isGlobe && <path d={graticulePath()} className="graticule map-graticule" />}
           {isGlobe ? (
@@ -1365,20 +1455,20 @@ export function MapView({
             </>
           ) : (
             <>
-              {/* Detail that resolves: the coarse coastline is a smear at 3x, and
-                  the fine one is wasted bytes of curve at world view. A map in
-                  motion resolves less again — the fine path is four times the
-                  curve to re-raster every frame, and nobody reads a coastline
-                  while it slides past, so a gesture drops back to the coarse
-                  one and the detail returns the moment it settles. */}
+              {/* Detail that resolves: the coarse coastline is a smear at 3x,
+                  and the fine one is wasted bytes of curve at world view. This
+                  drops to the coarse path while the view is being SCALED —
+                  a zoom redraws the layer every frame, and four times the
+                  curve is four times that bill. A pan keeps full detail: the
+                  compositor slides a texture it already has. */}
               <path
-                d={scale >= 1.8 && !moving ? WORLD_PATH_FINE : WORLD_PATH}
+                d={scale >= 1.8 && !scaling ? WORLD_PATH_FINE : WORLD_PATH}
                 className="map-land"
                 filter="url(#coastGlow)"
               />
               {/* Country borders come from a separate mesh, so they are the
                   borders themselves and never a second copy of the coast. */}
-              {scale >= 1.35 && !moving && <path d={BORDERS_PATH} className="map-border" />}
+              {scale >= 1.35 && !scaling && <path d={BORDERS_PATH} className="map-border" />}
               {/* Islands with an airport but too small to survive 1:50m
                   generalisation — without these, Guam is an airport in open
                   ocean. */}
@@ -1617,19 +1707,14 @@ export function MapView({
             })
           })()}
         </g>
-        {/* Last, so it sits over everything: the frame falls off into the
-            dark and the middle of the world holds the eye. Outside the pan
-            group — it is the frame, not the world, so a gesture must not
-            drag it around, and it never needs repainting mid-drag. */}
-        <rect
-          x={isGlobe ? 0 : view.x}
-          y={isGlobe ? 0 : view.y}
-          width={isGlobe ? W : view.w}
-          height={isGlobe ? H : view.h}
-          fill="url(#mapVignette)"
-          className="map-vignette"
-        />
       </svg>
+      </div>
+      {/* The frame falls off into the dark so the middle of the world holds
+          the eye. It belongs to the frame, not the world, so it sits outside
+          the layer entirely — a gesture must not drag it around. A CSS
+          gradient on a div, rather than a rect inside the SVG, is what keeps
+          it still now that the whole SVG moves. */}
+      <div className="map-vignette" />
       <div className="map-controls">
         <button
           data-testid="zoom-in"
@@ -1711,12 +1796,20 @@ export function MapView({
         >
           <rect x={0} y={0} width={W} height={H} className="map-sea" />
           <path d={WORLD_PATH} className="minimap-land" />
+          {/* A unit rect placed by transform, not four live geometry
+              attributes. Rewriting x/y/width/height re-laid-out and repainted
+              the minimap on every frame of a drag — with the map itself now
+              riding the compositor, that made this little inset the single
+              most expensive thing on screen (38 of 40 frames repainted; 2
+              without it). A transform is the cheap way to say the same thing,
+              and non-scaling-stroke keeps the outline 1px under the scale. */}
           <rect
             ref={minimapRef}
-            x={view.x}
-            y={view.y}
-            width={view.w}
-            height={view.h}
+            x={0}
+            y={0}
+            width={1}
+            height={1}
+            style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.w}, ${view.h})` }}
             className="minimap-viewport"
             data-testid="minimap-viewport"
           />

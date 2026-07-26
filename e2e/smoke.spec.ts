@@ -478,7 +478,7 @@ test('every zoom eases — buttons and double-click, flat map and globe', async 
           let n = 0
           const tick = () => {
             const vb = document.querySelector('svg.map')?.getAttribute('viewBox') ?? ''
-            const tf = document.querySelector('[data-testid="map-pan"]')?.getAttribute('transform') ?? ''
+            const tf = (document.querySelector('.map-layer') as HTMLElement | null)?.style.transform ?? ''
             const r = document.querySelector('.globe-disc')?.getAttribute('r') ?? ''
             out.push(`${vb}|${tf}|${r}`)
             if (++n < 20) requestAnimationFrame(tick)
@@ -529,21 +529,26 @@ test.describe('touch', () => {
     await startGame(page)
     const box = (await page.getByTestId('map').boundingBox())!
 
+    // Sample where the world actually IS on screen, not how it got there: a
+    // city's own client rect, which folds the layer transform and the viewBox
+    // together. Alongside it, count every mutation of the SVG — the whole
+    // point of the layer is that a drag does not touch the document.
     await page.evaluate(() => {
-      const w = window as unknown as { __f: { t: string; vb: string }[] }
+      const w = window as unknown as { __f: number[]; __mut: number }
       w.__f = []
-      const svg = document.querySelector('svg.map')!
-      const pan = document.querySelector('[data-testid="map-pan"]')!
+      w.__mut = 0
+      new MutationObserver((recs) => {
+        w.__mut += recs.length
+      }).observe(document.querySelector('svg.map')!, { attributes: true, childList: true, subtree: true })
       const tick = (): void => {
-        w.__f.push({ t: pan.getAttribute('transform') ?? '', vb: svg.getAttribute('viewBox') ?? '' })
+        const c = document.querySelector('[data-testid="city-JFK"]')
+        if (c !== null) w.__f.push(Math.round(c.getBoundingClientRect().top * 10) / 10)
         requestAnimationFrame(tick)
       }
       requestAnimationFrame(tick)
     })
-    const sampled = async (): Promise<{ t: string; vb: string }[]> =>
-      page.evaluate(() => (window as unknown as { __f: { t: string; vb: string }[] }).__f.slice())
-    // translate(tx ty) scale(k) — ty is how far the world has been shifted.
-    const shiftOf = (t: string): number => Number(/translate\([-\d.]+ ([-\d.]+)\)/.exec(t)?.[1] ?? 0)
+    const sampled = async (): Promise<number[]> =>
+      page.evaluate(() => (window as unknown as { __f: number[] }).__f.slice())
 
     // Playwright's touchscreen only taps, so the drag goes through CDP — the
     // same input path a real finger takes.
@@ -560,7 +565,8 @@ test.describe('touch', () => {
       })
     }
 
-    const startVb = (await sampled()).at(-1)!.vb
+    const startVb = (await page.getByTestId('map').getAttribute('viewBox'))!
+    const start = (await sampled()).at(-1)!
     await touch('touchStart', y0)
     for (let i = 1; i <= 20; i++) await touch('touchMove', y0 - i * 4)
     const halfway = (await sampled()).at(-1)!
@@ -572,26 +578,34 @@ test.describe('touch', () => {
 
     // Dragging up walks the world up under the finger, and it has to be most
     // of the way there before the finger lifts.
-    expect(shiftOf(end.t), 'the drag moved the world').toBeLessThan(-10)
-    const progress = shiftOf(halfway.t) / shiftOf(end.t)
-    expect(progress, 'the world had moved by mid-gesture').toBeGreaterThan(0.35)
+    expect(end, 'the drag moved the world').toBeLessThan(start - 10)
+    expect((halfway - start) / (end - start), 'the world had moved by mid-gesture').toBeGreaterThan(
+      0.35,
+    )
 
     // Every frame of the gesture, not two: a map that jumps once yields a
-    // handful of distinct values across the whole drag.
-    const during = frames.filter((f) => shiftOf(f.t) < 0 && shiftOf(f.t) > shiftOf(end.t))
-    expect(new Set(during.map((f) => f.t)).size, 'the pan is continuous').toBeGreaterThan(10)
+    // handful of distinct positions across the whole drag.
+    const during = frames.filter((f) => f < start && f > end)
+    expect(new Set(during).size, 'the pan is continuous').toBeGreaterThan(10)
 
-    // The point of the transform: WebKit re-lays-out the whole SVG when the
-    // viewBox changes, so a gesture must never touch it. If this starts
-    // failing, the map has quietly gone back to being unusable on an iPhone.
-    expect(new Set(frames.map((f) => f.vb)).size, 'the viewBox held still').toBe(1)
-    expect(frames[0]!.vb).toBe(startVb)
+    // And it costs the document nothing. WebKit re-lays-out the whole SVG when
+    // the viewBox changes, so a drag rides a CSS transform on a composited
+    // layer instead — the SVG is touched only when the layer runs out of the
+    // world it holds and has to be re-centred, a few times across a drag this
+    // long rather than once a frame. If this starts climbing toward the frame
+    // count, the map has quietly gone back to being unusable on an iPhone.
+    const mutations = await page.evaluate(() => (window as unknown as { __mut: number }).__mut)
+    expect(mutations, `the SVG was mutated ${mutations} times mid-drag`).toBeLessThan(
+      frames.length / 3,
+    )
 
     // When the finger lifts the transform folds back into the viewBox, and
     // React owns the view again — its copy is what tap hit-testing and the
     // zoom LOD read, so a view left behind by a drag silently mis-resolves
     // everything that follows.
-    await expect(page.getByTestId('map-pan')).not.toHaveAttribute('transform')
+    await expect
+      .poll(() => page.getByTestId('map-pan').evaluate((el) => (el as HTMLElement).style.transform))
+      .toBe('')
     const view = (await page.getByTestId('map-wrap').getAttribute('data-view'))!
     expect(await page.getByTestId('map').getAttribute('viewBox')).toBe(view)
     expect(Number(view.split(' ')[1]), 'the pan landed in the viewBox').toBeGreaterThan(
@@ -922,7 +936,9 @@ test('a globe zoom scales without re-projecting the world every frame', async ({
   const mutations = await page.evaluate(() => (window as unknown as { __gmut: number }).__gmut)
   expect(mutations, `one globe zoom mutated the DOM ${mutations} times`).toBeLessThan(700)
   // The ease has to commit to state, not leave the map parked on a transform.
-  await expect(page.getByTestId('map-pan')).not.toHaveAttribute('transform', /.+/)
+  await expect
+    .poll(() => page.getByTestId('map-pan').evaluate((el) => (el as HTMLElement).style.transform))
+    .toBe('')
   expect((await width()) / before).toBeCloseTo(1.5, 1)
 })
 
@@ -955,36 +971,40 @@ test('the globe sits on sea all the way to the edge of the frame', async ({ page
   for (const hit of painted) expect(hit, `frame edge showed "${hit}" instead of ocean`).toContain('map-sea')
 })
 
-// Whatever the engine, the cheapest frame is the one with less in it. A map
-// being dragged is re-rasterised every frame, and the zoomed-in coastline is
-// four times the curve of the coarse one — detail nobody can read while the
-// world slides past.
-test('a map in motion drops to coarse detail, and gets it back', async ({ page }) => {
+// Detail comes off for scaling and only for scaling, and that asymmetry is
+// the point. Sliding a composited layer is free — the compositor moves a
+// texture it already has — so a pan has no reason to give anything up.
+// Scaling one redraws it every frame, so a zoom does.
+test('a pan keeps full detail; only a zoom trades it away', async ({ page }) => {
   await startGame(page)
-  // Zoom past both LOD thresholds, so the fine coastline and the border mesh
-  // are the ones on screen.
+  // Past both LOD thresholds, so the fine coastline and the border mesh are
+  // the ones on screen and there is something to lose.
   for (let i = 0; i < 3; i++) await page.getByTestId('zoom-in').click()
-  await page.waitForTimeout(600)
+  await page.waitForTimeout(900)
   const landChars = async (): Promise<number> =>
     (await page.locator('path.map-land').first().getAttribute('d'))!.length
 
-  const still = await landChars()
+  const settled = await landChars()
   await expect(page.locator('.map-border')).toHaveCount(1)
 
-  const box = (await page.getByTestId('map').boundingBox())!
+  const box = (await page.getByTestId('map-wrap').boundingBox())!
   const x = box.x + box.width / 2
   const y = box.y + box.height / 2
   await page.mouse.move(x, y)
   await page.mouse.down()
-  await page.mouse.move(x - 20, y - 8)
-  await page.mouse.move(x - 40, y - 16)
-  const dragging = await landChars()
-  await expect(page.locator('.map-border'), 'the border mesh sits out the drag').toHaveCount(0)
+  await page.mouse.move(x - 15, y - 6)
+  await page.mouse.move(x - 30, y - 12)
+  expect(await landChars(), 'a pan keeps the fine coastline').toBe(settled)
+  await expect(page.locator('.map-border'), 'a pan keeps the borders').toHaveCount(1)
   await page.mouse.up()
+  await page.waitForTimeout(400)
 
-  expect(dragging, 'the coastline coarsens while the map moves').toBeLessThan(still / 2)
-  // And the detail is not lost — it comes straight back when it settles.
-  await expect.poll(landChars).toBe(still)
+  // A zoom is the case that redraws, so it drops to the coarse path.
+  await page.getByTestId('zoom-in').click()
+  await expect.poll(landChars, { timeout: 2000 }).toBeLessThan(settled / 2)
+  await expect(page.locator('.map-border')).toHaveCount(0)
+  // And it all comes back the moment it settles.
+  await expect.poll(landChars, { timeout: 4000 }).toBe(settled)
   await expect(page.locator('.map-border')).toHaveCount(1)
 })
 
@@ -1055,12 +1075,15 @@ test('the minimap appears when zoomed and jumps the view on click', async ({ pag
   await page.getByTestId('zoom-in').click()
   await page.getByTestId('zoom-in').click()
   await expect(page.getByTestId('minimap')).toBeVisible()
-  const before = await page.getByTestId('minimap-viewport').getAttribute('x')
+  // The marker is a unit rect placed by transform, so that is where its
+  // position lives — reading x would report the constant 0 forever.
+  const markerAt = async (): Promise<string> =>
+    page.getByTestId('minimap-viewport').evaluate((el) => (el as SVGElement).style.transform)
+  const before = await markerAt()
+  expect(before, 'the marker is placed by a transform').toContain('translate')
   // Clicking the far side of the thumbnail recenters the viewport there.
   await page.getByTestId('minimap').click({ position: { x: 130, y: 40 } })
-  await expect
-    .poll(async () => page.getByTestId('minimap-viewport').getAttribute('x'))
-    .not.toBe(before)
+  await expect.poll(markerAt).not.toBe(before)
   // Zooming back out dismisses it.
   await page.getByTestId('zoom-reset').click()
   await expect(page.getByTestId('minimap')).toHaveCount(0)
