@@ -1167,6 +1167,49 @@ test('a globe zoom scales without re-projecting the world every frame', async ({
   expect((await width()) / before).toBeCloseTo(1.5, 1)
 })
 
+// The globe is the same world at the same quality, not a lo-fi preview: coast
+// glow, fine coastline past the same zoom threshold, and country borders.
+// The one concession is mid-rotation, when every frame is a full
+// re-projection — coarse rings until it rests, full detail back at rest.
+test('the globe matches the flat map: glow, borders, and fine detail at rest', async ({
+  page,
+}) => {
+  await startGame(page)
+  await page.getByTestId('map-projection').click()
+  await expect(page.getByTestId('globe-land')).toBeVisible()
+  await page.waitForTimeout(600)
+  const landChars = async (): Promise<number> =>
+    (await page.getByTestId('globe-land').getAttribute('d'))!.length
+  await expect(page.locator('svg.map .map-coast-glow')).toHaveCount(1)
+  const coarse = await landChars()
+
+  // Past the flat map's fine threshold (1.5^2 = 2.25 >= 1.8): the coastline
+  // sharpens and borders appear, exactly as they would flat.
+  for (let i = 0; i < 2; i++) {
+    await page.getByTestId('zoom-in').click()
+    await page.waitForTimeout(600)
+  }
+  await page.waitForTimeout(600)
+  const fine = await landChars()
+  expect(fine, 'the zoomed globe carries the fine coastline').toBeGreaterThan(coarse * 1.5)
+  await expect(page.locator('svg.map .map-border')).toHaveCount(1)
+  expect((await page.locator('svg.map .map-border').getAttribute('d'))!.length).toBeGreaterThan(100)
+
+  // Mid-rotation it re-projects every frame, so it drops to the coarse rings
+  // — and takes the detail back the moment the finger lifts.
+  const b = (await page.getByTestId('map-wrap').boundingBox())!
+  const y = b.y + b.height / 2
+  await page.mouse.move(b.x + b.width / 2, y)
+  await page.mouse.down()
+  await page.mouse.move(b.x + b.width / 2 - 40, y)
+  await page.mouse.move(b.x + b.width / 2 - 80, y)
+  expect(await landChars(), 'rotation projects the coarse rings').toBeLessThan(fine / 1.5)
+  await expect(page.locator('svg.map .map-border'), 'borders sit out the rotation').toHaveCount(0)
+  await page.mouse.up()
+  await expect.poll(landChars, { timeout: 3000 }).toBeGreaterThan(coarse * 1.5)
+  await expect(page.locator('svg.map .map-border')).toHaveCount(1)
+})
+
 // `preserveAspectRatio="slice"` scales the viewBox to COVER the element, so
 // any container that is not exactly the viewBox's shape has visible area
 // outside it. The globe's viewBox is a fixed 960x352 — nothing like a window —

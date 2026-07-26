@@ -20,7 +20,10 @@ import {
   MAP_W,
   WORLD_PATH,
   WORLD_PATH_FINE,
+  BORDER_LINES,
+  ISLET_POINTS,
   WORLD_RINGS,
+  WORLD_RINGS_FINE,
   projectLat,
   projectLon,
 } from '../data/worldmap.gen'
@@ -295,12 +298,15 @@ export function globeUnproject(g: GlobeView, X: number, Y: number): { lon: numbe
 // azimuth is numerically meaningless and used to fling chords across the
 // disc), and consecutive limb points bridge along the limb ARC in short
 // steps instead of a straight chord.
-function globeLandPath(g: GlobeView): string {
+function globeLandPath(
+  g: GlobeView,
+  rings: readonly (readonly (readonly [number, number])[])[],
+): string {
   const R = GLOBE_R * g.s
   const cx = W / 2
   const cy = H / 2
   const parts: string[] = []
-  for (const ring of WORLD_RINGS) {
+  for (const ring of rings) {
     let d = ''
     let anyVisible = false
     let prevLimbAz: number | null = null
@@ -338,6 +344,28 @@ function globeLandPath(g: GlobeView): string {
 
 // Subtle meridians and parallels every 30° — the globe reads as a globe even
 // over open ocean. Same pen-down visibility walk the routes use.
+// Open polylines (borders) on the sphere: project what faces us and lift the
+// pen wherever the line rolls behind the limb — a stroke needs no bridge.
+function globeLinesPath(
+  g: GlobeView,
+  lines: readonly (readonly (readonly [number, number])[])[],
+): string {
+  let out = ''
+  for (const line of lines) {
+    let pen = false
+    for (const [lon, lat] of line) {
+      const p = globeProjectFull(g, lon!, lat!)
+      if (p.cosc > 0.001) {
+        out += `${pen ? 'L' : 'M'}${p.X.toFixed(1)} ${p.Y.toFixed(1)}`
+        pen = true
+      } else {
+        pen = false
+      }
+    }
+  }
+  return out
+}
+
 function globeGraticule(g: GlobeView): string {
   let d = ''
   const line = (points: [number, number][]): void => {
@@ -532,6 +560,14 @@ export function MapView({
   // it does needs a render: the class goes on the wrapper (whose className
   // React never rewrites, so an imperative toggle is safe) and the SMIL pause
   // is a method call.
+  // The globe alone re-renders per frame while it turns — rotation changes
+  // which hemisphere faces us, so there is no texture to slide. Re-projecting
+  // the fine coastline's ~19k points every one of those frames is real money,
+  // so the globe drops to the coarse rings while a gesture is turning it and
+  // takes the full detail back the moment it rests. State rather than a ref
+  // because the render picks rings by it; gated to the globe so starting a
+  // FLAT drag still renders nothing (the 124ms lesson).
+  const [rotating, setRotating] = useState(false)
   const movingRef = useRef(false)
   const paused = useRef<Animation[]>([])
   const setMoving = (on: boolean): void => {
@@ -1123,6 +1159,14 @@ export function MapView({
   // a zoom, and not while a gesture is moving the layer (which does not touch
   // `view` at all).
   const lodKey = (scale >= 1.8 ? 2 : 0) | (scale >= 1.5 ? 1 : 0)
+  const globeLand = useMemo(
+    () =>
+      isGlobe
+        ? globeLandPath(globe, globe.s >= 1.8 && !rotating ? WORLD_RINGS_FINE : WORLD_RINGS)
+        : '',
+    [isGlobe, globe, rotating],
+  )
+
   // Culling follows the ANCHOR — the window the layer is actually painted
   // around — not the logical view. A pan commit moves only the view; if it
   // moved the cull too, the city set would change and invalidate the raster
@@ -1267,6 +1311,7 @@ export function MapView({
   const beginGesture = (): void => {
     gesturing.current = true
     setMoving(true)
+    if (isGlobe) setRotating(true)
     // While the map is being dragged nothing on the PAGE may be selected
     // either — Safari can arm a text selection at press and extend it into
     // the content around the map once the pointer leaves it. The canceled
@@ -1297,6 +1342,7 @@ export function MapView({
     if (!gesturing.current) return
     gesturing.current = false
     setMoving(false)
+    setRotating(false)
     document.documentElement.classList.remove('map-gesture')
     gestureRect.current = null
     // Hand the live view back to React in one commit — which, for the pan
@@ -1583,7 +1629,32 @@ export function MapView({
               </defs>
               <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} fill="url(#globeShade)" className="globe-disc" />
               <path d={globeGraticule(globe)} className="graticule" />
-              <path d={globeLandPath(globe)} className="map-land" data-testid="globe-land" />
+              {/* Same quality ladder as the flat map: coast glow under the
+                  land, fine coastline and borders past the same thresholds,
+                  islets for the airports whose islands do not survive 1:50m.
+                  The one concession is mid-rotation, where every frame is a
+                  full re-projection: coarse rings until the globe rests. */}
+              <path d={globeLand} className="map-coast-glow" />
+              <path d={globeLand} className="map-land" data-testid="globe-land" />
+              {globe.s >= 1.35 && !rotating && (
+                <path d={globeLinesPath(globe, BORDER_LINES)} className="map-border" />
+              )}
+              {ISLET_POINTS.map(([lon, lat]) => {
+                const p = globeProjectFull(globe, lon, lat)
+                if (p.cosc <= 0.001) return null
+                // The flat islet is r=1.6 in a map where 360 degrees is 960
+                // units; the globe's equator is 2*pi*R, so the same island is
+                // scaled by the ratio of the two.
+                return (
+                  <circle
+                    key={`islet-${lon},${lat}`}
+                    cx={p.X}
+                    cy={p.Y}
+                    r={(1.6 * (2 * Math.PI * GLOBE_R * globe.s)) / W}
+                    className="map-land map-islet"
+                  />
+                )
+              })}
               <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} className="globe-limb" />
             </>
           ) : (
