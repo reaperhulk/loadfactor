@@ -494,14 +494,26 @@ export function MapView({
   const minimapRef = useRef<SVGRectElement>(null)
   // The viewBox actually in the DOM. The transform maps it to the live view.
   const baseRef = useRef<ViewBox>(homeView())
+  // The globe equivalents: what is committed to state, and where a zoom-only
+  // ease has got to on top of it.
+  const [globe, setGlobe] = useState<GlobeView>(GLOBE_HOME)
+  const globeBaseRef = useRef<GlobeView>(GLOBE_HOME)
+  const globeEase = useRef<GlobeView>(GLOBE_HOME)
+  const globeEasing = useRef(false)
 
   const paintView = (v: ViewBox): void => {
     const g = panRef.current
-    // The globe has a fixed viewBox and re-projects its own geometry, so the
-    // flat map's view has no meaning there — a transform derived from it
-    // would scale and offset the whole sphere.
-    if (g !== null && isGlobe) g.removeAttribute('transform')
-    else if (g !== null) {
+    if (g !== null && isGlobe) {
+      // The flat map's view means nothing here — the globe has a fixed viewBox
+      // and re-projects its own geometry. But a globe ZOOM is a pure scale
+      // about the centre: every projected point is centre + R*f(lon,lat) with
+      // R = GLOBE_R*s, and which hemisphere is visible does not depend on R at
+      // all. So a zoom-only ease rides a transform, exactly like a flat pan,
+      // instead of re-projecting the whole world once per frame.
+      const k = !globeEasing.current ? 1 : globeEase.current.s / globeBaseRef.current.s
+      if (Math.abs(k - 1) < 1e-9) g.removeAttribute('transform')
+      else g.setAttribute('transform', `translate(${((1 - k) * W) / 2} ${((1 - k) * H) / 2}) scale(${k})`)
+    } else if (g !== null) {
       const b = baseRef.current
       const k = b.w / v.w
       const tx = b.x - v.x * k
@@ -534,7 +546,22 @@ export function MapView({
   // handoff from transform to viewBox never shows a frame of either alone.
   useLayoutEffect(() => {
     baseRef.current = view
-    paintView(gesturing.current ? targetRef.current : view)
+    globeBaseRef.current = globe
+    // A render can land mid-ease — starting one drops detail, and a quarter
+    // can resolve underneath it. The ease repaints the transform from its own
+    // rAF every frame, so this effect must not paint the committed view over
+    // it. Nothing is lost by skipping: `view` cannot change while an ease
+    // runs, since only the ease's final commit moves it.
+    // `moving` is true for exactly the interval in which something else owns
+    // the transform, so it is the flag to read here — and being state rather
+    // than a ref, reading it does not make the ease's own bookkeeping
+    // untouchable to the compiler.
+    // On the flat map the gesture or ease paints the transform itself, so
+    // this must not paint over it. The globe re-projects from state instead,
+    // and paintView is what takes the ease's leftover transform back off —
+    // skip it there and a grab mid-ease leaves the zoom applied twice.
+    if (moving && !isGlobe) return
+    paintView(view)
   })
 
   // The SVG's box cannot change while a finger is down, so measure it once per
@@ -548,47 +575,69 @@ export function MapView({
     return gestureRect.current
   }
 
+  // Where an eased view has got to, and whether one is in flight. When it is
+  // not, the committed `view` is the truth.
+  const easeRef = useRef<ViewBox>(homeView())
+  const easing = useRef(false)
+  const stopEase = (): void => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = 0
+    }
+    easing.current = false
+  }
+
+  // A zoom step eases exactly the way a drag tracks a finger: transform to the
+  // DOM per frame, one React render at the end. It used to call setView on
+  // every frame of the ease, so a 130ms animation asked React to reconcile the
+  // whole map thirty times over. On a fast engine that is invisible; on a slow
+  // one each render outlasts its frame, the next frame is already behind, and
+  // one zoom step takes seconds to land.
   const settleView = (): void => {
-    setView((v) => {
-      const t = targetRef.current
-      const k = 0.25 // smoothing per frame ≈ 130ms to settle at 60fps
-      const next = {
-        x: v.x + (t.x - v.x) * k,
-        y: v.y + (t.y - v.y) * k,
-        w: v.w + (t.w - v.w) * k,
-        h: v.h + (t.h - v.h) * k,
-      }
-      const done = Math.abs(next.w - t.w) < 0.5 && Math.abs(next.x - t.x) < 0.5 && Math.abs(next.y - t.y) < 0.5
-      if (done) {
-        rafRef.current = 0
-        return t
-      }
-      rafRef.current = requestAnimationFrame(settleView)
-      return next
-    })
+    const t = targetRef.current
+    const v = easing.current ? easeRef.current : baseRef.current
+    const k = 0.25 // smoothing per frame ≈ 130ms to settle at 60fps
+    const next = {
+      x: v.x + (t.x - v.x) * k,
+      y: v.y + (t.y - v.y) * k,
+      w: v.w + (t.w - v.w) * k,
+      h: v.h + (t.h - v.h) * k,
+    }
+    const done = Math.abs(next.w - t.w) < 0.5 && Math.abs(next.x - t.x) < 0.5 && Math.abs(next.y - t.y) < 0.5
+    if (done) {
+      // The one render: it commits the target and brings the detail back.
+      rafRef.current = 0
+      easing.current = false
+      setMoving(false)
+      setView(t)
+      return
+    }
+    easeRef.current = next
+    paintView(next)
+    rafRef.current = requestAnimationFrame(settleView)
   }
 
   const applyView = (target: ViewBox, immediate: boolean): void => {
     targetRef.current = clampView(target)
     if (gesturing.current) {
       // Mid-gesture: straight to the DOM, no render, no media query.
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current)
-        rafRef.current = 0
-      }
+      stopEase()
       paintView(targetRef.current)
       return
     }
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (immediate || reduced) {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current)
-        rafRef.current = 0
-      }
+      stopEase()
+      setMoving(false)
       setView(targetRef.current)
       return
     }
-    if (!rafRef.current) rafRef.current = requestAnimationFrame(settleView)
+    if (!rafRef.current) {
+      easeRef.current = baseRef.current
+      easing.current = true
+      setMoving(true)
+      rafRef.current = requestAnimationFrame(settleView)
+    }
   }
 
   useEffect(() => {
@@ -597,7 +646,6 @@ export function MapView({
     }
   }, [])
 
-  const [globe, setGlobe] = useState<GlobeView>(GLOBE_HOME)
   // The globe used to write every zoom straight to state. Continuous inputs
   // (wheel, pinch) hide that — they arrive as many small deltas — but a
   // discrete 1.5x step from a button or a double click landed in one frame
@@ -607,43 +655,67 @@ export function MapView({
   const globeTarget = useRef<GlobeView>(GLOBE_HOME)
   const globeRaf = useRef(0)
 
+  const stopGlobeEase = (): void => {
+    if (globeRaf.current) {
+      cancelAnimationFrame(globeRaf.current)
+      globeRaf.current = 0
+    }
+    globeEasing.current = false
+  }
+
   const settleGlobe = (): void => {
-    setGlobe((g) => {
-      const t = globeTarget.current
-      const k = 0.25
-      // Longitude wraps: ease the SHORT way round, or spinning past the
-      // antimeridian takes the scenic route.
-      let dLon = t.cLon - g.cLon
-      while (dLon > 180) dLon -= 360
-      while (dLon < -180) dLon += 360
-      const next = {
-        cLon: g.cLon + dLon * k,
-        cLat: g.cLat + (t.cLat - g.cLat) * k,
-        s: g.s + (t.s - g.s) * k,
-      }
-      const done =
-        Math.abs(next.s - t.s) < 0.002 && Math.abs(dLon) < 0.15 && Math.abs(t.cLat - next.cLat) < 0.15
-      if (done) {
-        globeRaf.current = 0
-        return t
-      }
-      globeRaf.current = requestAnimationFrame(settleGlobe)
-      return next
-    })
+    const t = globeTarget.current
+    const b = globeBaseRef.current
+    const g = globeEasing.current ? globeEase.current : b
+    const k = 0.25
+    // Longitude wraps: ease the SHORT way round, or spinning past the
+    // antimeridian takes the scenic route.
+    let dLon = t.cLon - g.cLon
+    while (dLon > 180) dLon -= 360
+    while (dLon < -180) dLon += 360
+    const next = {
+      cLon: g.cLon + dLon * k,
+      cLat: g.cLat + (t.cLat - g.cLat) * k,
+      s: g.s + (t.s - g.s) * k,
+    }
+    const done =
+      Math.abs(next.s - t.s) < 0.002 && Math.abs(dLon) < 0.15 && Math.abs(t.cLat - next.cLat) < 0.15
+    if (done) {
+      globeRaf.current = 0
+      globeEasing.current = false
+      setMoving(false)
+      setGlobe(t)
+      return
+    }
+    // Turning the globe changes which hemisphere faces us, so it has to be
+    // re-projected and cannot be a transform. Zooming can — and zooming is
+    // what every zoom control produces.
+    const turns = Math.abs(t.cLon - b.cLon) > 1e-6 || Math.abs(t.cLat - b.cLat) > 1e-6
+    if (turns) {
+      globeEasing.current = false
+      setGlobe(next)
+    } else {
+      globeEase.current = next
+      paintView(baseRef.current)
+    }
+    globeRaf.current = requestAnimationFrame(settleGlobe)
   }
 
   const applyGlobe = (next: GlobeView, immediate: boolean): void => {
     globeTarget.current = clampGlobe(next)
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (immediate || reduced) {
-      if (globeRaf.current) {
-        cancelAnimationFrame(globeRaf.current)
-        globeRaf.current = 0
-      }
+      stopGlobeEase()
+      if (!gesturing.current) setMoving(false)
       setGlobe(globeTarget.current)
       return
     }
-    if (!globeRaf.current) globeRaf.current = requestAnimationFrame(settleGlobe)
+    if (!globeRaf.current) {
+      globeEase.current = globeBaseRef.current
+      globeEasing.current = true
+      setMoving(true)
+      globeRaf.current = requestAnimationFrame(settleGlobe)
+    }
   }
   // 'g' flips the projection from anywhere (except form fields).
   useEffect(() => {
@@ -1020,17 +1092,12 @@ export function MapView({
       cancelAnimationFrame(rafRef.current)
       rafRef.current = 0
     }
-    if (globeRaf.current) {
-      cancelAnimationFrame(globeRaf.current)
-      globeRaf.current = 0
-    }
-    targetRef.current = view
-    globeTarget.current = globe
-    // The coastline's drop-shadow filter re-rasterises the whole world every
-    // time the viewBox moves — cheap on a desktop GPU, the single most
-    // expensive thing on the map on a phone. Motion hides a 1.4px glow, so it
-    // comes off for the duration of the gesture and back on when it settles.
-    svgRef.current?.classList.add('gesturing')
+    // "Where it is" is the eased position if one is in flight, not the last
+    // committed view — the ease paints the DOM without going through state.
+    targetRef.current = easing.current ? easeRef.current : view
+    easing.current = false
+    globeTarget.current = globeEasing.current ? globeEase.current : globe
+    stopGlobeEase()
   }
 
   const endGesture = (): void => {
@@ -1038,7 +1105,6 @@ export function MapView({
     gesturing.current = false
     setMoving(false)
     gestureRect.current = null
-    svgRef.current?.classList.remove('gesturing')
     // Hand the live view back to React in one commit.
     setView(targetRef.current)
   }
@@ -1232,7 +1298,7 @@ export function MapView({
         ref={svgRef}
         viewBox={isGlobe ? `0 0 ${W} ${H}` : `${view.x} ${view.y} ${view.w} ${view.h}`}
         preserveAspectRatio="xMidYMid slice"
-        className={`map era-${Math.min(2000, Math.max(1960, Math.floor(yearOf(state) / 10) * 10))}`}
+        className={`map era-${Math.min(2000, Math.max(1960, Math.floor(yearOf(state) / 10) * 10))}${moving ? ' gesturing' : ''}`}
         role="img"
         aria-label="World route map"
         data-testid="map"
@@ -1246,7 +1312,16 @@ export function MapView({
         <defs>
           {/* Ocean depth: the abyssal plain is darker than the shelves, so the
               continents sit ON something instead of floating in flat black. */}
-          <radialGradient id="seaDepth" cx="50%" cy="42%" r="78%">
+          {/* Pinned to the world, not to the rect that carries it: the sea
+              rect overscans the frame (see below) and a bounding-box gradient
+              would stretch and re-centre with it. */}
+          <radialGradient
+            id="seaDepth"
+            gradientUnits="userSpaceOnUse"
+            cx={W / 2}
+            cy={H * 0.42}
+            r={Math.max(W, H) * 0.78}
+          >
             <stop offset="0%" className="sea-stop-shallow" />
             <stop offset="100%" className="sea-stop-deep" />
           </radialGradient>
@@ -1265,7 +1340,13 @@ export function MapView({
             with a transform instead of a viewBox — see paintView. The
             vignette stays outside, pinned to the frame. */}
         <g ref={panRef} className="map-pan" data-testid="map-pan">
-          <rect x={0} y={0} width={W} height={H} className="map-sea" fill="url(#seaDepth)" />
+          {/* The sea overscans a whole frame on every side. `slice` scales the
+              viewBox to COVER the element, so whenever the container is a
+              different shape from the viewBox — always, on the globe, whose
+              viewBox is a fixed W x H — there is visible area outside it. A
+              sea of exactly W x H left that area unpainted, and the globe sat
+              in a black rectangle narrower than the window. */}
+          <rect x={-W} y={-H} width={W * 3} height={H * 3} className="map-sea" fill="url(#seaDepth)" />
           {!isGlobe && <path d={graticulePath()} className="graticule map-graticule" />}
           {isGlobe ? (
             <>
@@ -1541,8 +1622,8 @@ export function MapView({
             group — it is the frame, not the world, so a gesture must not
             drag it around, and it never needs repainting mid-drag. */}
         <rect
-          x={view.x}
-          y={view.y}
+          x={isGlobe ? 0 : view.x}
+          y={isGlobe ? 0 : view.y}
           width={isGlobe ? W : view.w}
           height={isGlobe ? H : view.h}
           fill="url(#mapVignette)"

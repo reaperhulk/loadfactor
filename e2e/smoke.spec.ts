@@ -466,21 +466,26 @@ test('every zoom eases — buttons and double-click, flat map and globe', async 
   // that lands in one frame yields two distinct values; an eased one yields
   // a dozen. Continuous inputs (wheel, pinch) always looked smooth because
   // they arrive as many small deltas — the discrete steps did not.
-  const frames = (selector: string, attr: string) =>
+  // Sample everything the zoom can live in: the viewBox, the pan group's
+  // transform (where an eased step now runs, to keep React out of the frame
+  // loop) and the globe's radius. The test is about the zoom taking many
+  // frames, not about which attribute carries it.
+  const frames = () =>
     page.evaluate(
-      ([sel, at]) =>
+      () =>
         new Promise<string[]>((res) => {
           const out: string[] = []
           let n = 0
           const tick = () => {
-            const el = document.querySelector(sel!)
-            out.push(el?.getAttribute(at!) ?? '')
+            const vb = document.querySelector('svg.map')?.getAttribute('viewBox') ?? ''
+            const tf = document.querySelector('[data-testid="map-pan"]')?.getAttribute('transform') ?? ''
+            const r = document.querySelector('.globe-disc')?.getAttribute('r') ?? ''
+            out.push(`${vb}|${tf}|${r}`)
             if (++n < 20) requestAnimationFrame(tick)
             else res(out)
           }
           requestAnimationFrame(tick)
         }),
-      [selector, attr] as const,
     )
 
   const centreOfMap = async () => {
@@ -488,27 +493,25 @@ test('every zoom eases — buttons and double-click, flat map and globe', async 
     return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
   }
 
-  // Flat map: the viewBox width is the zoom.
-  let collect = frames('svg.map', 'viewBox')
+  let collect = frames()
   await page.getByTestId('zoom-in').click()
   expect(new Set(await collect).size, 'flat zoom button eases').toBeGreaterThan(5)
 
   await page.getByTestId('zoom-reset').click()
   await page.waitForTimeout(400)
-  collect = frames('svg.map', 'viewBox')
+  collect = frames()
   const c = await centreOfMap()
   await page.mouse.dblclick(c.x, c.y)
   expect(new Set(await collect).size, 'flat double-click eases').toBeGreaterThan(5)
 
-  // Globe: the viewBox is fixed, so the disc radius carries the zoom.
   await page.getByTestId('map-projection').click()
   await page.waitForTimeout(400)
-  collect = frames('.globe-disc', 'r')
+  collect = frames()
   await page.getByTestId('zoom-in').click()
   expect(new Set(await collect).size, 'globe zoom button eases').toBeGreaterThan(5)
 
   await page.waitForTimeout(400)
-  collect = frames('.globe-disc', 'r')
+  collect = frames()
   const g = await centreOfMap()
   await page.mouse.dblclick(g.x, g.y)
   expect(new Set(await collect).size, 'globe double-click eases').toBeGreaterThan(5)
@@ -633,17 +636,30 @@ test.describe('touch', () => {
       await touch('touchMove', x + 18)
     }
 
-    // Flat map: a drag that starts mid-zoom may only pan, so the scale in the
-    // pan transform stays 1. Teleporting to the zoom target shows up as the
-    // group suddenly carrying the whole zoom step.
+    // Flat map: how wide a slice of the world is on screen, however the zoom
+    // is currently expressed — the viewBox, the ease's transform, or both.
+    // Calibrated against the same two clicks left to settle, so the assertion
+    // cannot drift with the zoom step.
+    const shownWidth = async (): Promise<number> =>
+      page.evaluate(() => {
+        const vb = document.querySelector('svg.map')!.getAttribute('viewBox')!.split(/\s+/)
+        const t = document.querySelector('[data-testid="map-pan"]')?.getAttribute('transform') ?? ''
+        return Number(vb[2]) / Number(/scale\(([-\d.]+)\)/.exec(t)?.[1] ?? 1)
+      })
+    await zoomTwice()
+    await page.waitForTimeout(700)
+    const settledFlat = await shownWidth()
+    await page.getByTestId('zoom-reset').click()
+    await page.waitForTimeout(700)
+    expect(settledFlat, 'two zoom steps narrow the view').toBeLessThan((await shownWidth()) * 0.8)
+
     await zoomTwice()
     await grab()
-    const k = await page.evaluate(() => {
-      const t = document.querySelector('[data-testid="map-pan"]')?.getAttribute('transform') ?? ''
-      return Number(/scale\(([-\d.]+)\)/.exec(t)?.[1] ?? 1)
-    })
+    const grabbedFlat = await shownWidth()
     await touch('touchEnd', x + 18)
-    expect(k, 'the grab panned without zooming').toBeCloseTo(1, 2)
+    expect(grabbedFlat, 'the touch did not teleport the map to the zoom target').toBeGreaterThan(
+      settledFlat * 1.05,
+    )
 
     // Globe: the disc radius is the zoom, so the jump is directly readable.
     // Calibrated against the same zoom left to settle, rather than a hard
@@ -851,6 +867,92 @@ test('an aircraft order cancels for the partial refund', async ({ page }) => {
   // 80% of the purchase price comes back (ORDER_CANCEL_REFUND_BP).
   const cashFinal = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)
   expect(cashFinal).toBe(cashAfterOrder + Math.floor(price * 0.8))
+})
+
+// A zoom step eases over ~130ms. It used to push every one of those frames
+// through React, reconciling the whole map thirty-odd times for one click —
+// invisible on a fast engine, seconds of lag on a slow one. The ease belongs
+// in the DOM, like the drag, with a single render to commit the result.
+test('an eased zoom does not re-render the map on every frame', async ({ page }) => {
+  await startGame(page)
+  await page.waitForTimeout(400)
+  await page.evaluate(() => {
+    const w = window as unknown as { __mut: number }
+    w.__mut = 0
+    new MutationObserver((recs) => {
+      w.__mut += recs.length
+    }).observe(document.querySelector('svg.map')!, { attributes: true, childList: true, subtree: true })
+  })
+  await page.getByTestId('zoom-in').click()
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __mut: number }).__mut), { timeout: 4000 })
+    .toBeGreaterThan(0)
+  await page.waitForTimeout(1200)
+  const mutations = await page.evaluate(() => (window as unknown as { __mut: number }).__mut)
+  // The whole-map reconcile is ~450 mutations; per-frame easing ran ~1900 for
+  // one step. A transform-driven ease plus one commit lands an order of
+  // magnitude below that, with room for the frame count to vary by machine.
+  expect(mutations, `one zoom step mutated the DOM ${mutations} times`).toBeLessThan(700)
+})
+
+// Same defect on the globe, and worse: each of those renders re-projected
+// every coastline point in JS. A globe zoom is a pure scale about the centre
+// (the visible hemisphere depends on the rotation, never on the radius), so
+// it rides a transform and commits once — and must still land exactly on the
+// 1.5x step, with no transform left over.
+test('a globe zoom scales without re-projecting the world every frame', async ({ page }) => {
+  await startGame(page)
+  await page.getByTestId('map-projection').click()
+  await expect(page.getByTestId('globe-land')).toBeVisible()
+  await page.waitForTimeout(700)
+  const width = async (): Promise<number> =>
+    page.getByTestId('globe-land').evaluate((el) => (el as SVGGraphicsElement).getBBox().width)
+
+  const before = await width()
+  await page.evaluate(() => {
+    const w = window as unknown as { __gmut: number }
+    w.__gmut = 0
+    new MutationObserver((recs) => {
+      w.__gmut += recs.length
+    }).observe(document.querySelector('svg.map')!, { attributes: true, childList: true, subtree: true })
+  })
+  await page.getByTestId('zoom-in').click()
+  await page.waitForTimeout(1500)
+
+  const mutations = await page.evaluate(() => (window as unknown as { __gmut: number }).__gmut)
+  expect(mutations, `one globe zoom mutated the DOM ${mutations} times`).toBeLessThan(700)
+  // The ease has to commit to state, not leave the map parked on a transform.
+  await expect(page.getByTestId('map-pan')).not.toHaveAttribute('transform', /.+/)
+  expect((await width()) / before).toBeCloseTo(1.5, 1)
+})
+
+// `preserveAspectRatio="slice"` scales the viewBox to COVER the element, so
+// any container that is not exactly the viewBox's shape has visible area
+// outside it. The globe's viewBox is a fixed 960x352 — nothing like a window —
+// so a sea rect of exactly that size left the globe in a black letterbox.
+test('the globe sits on sea all the way to the edge of the frame', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 })
+  await startGame(page)
+  await page.getByTestId('map-projection').click()
+  await expect(page.getByTestId('globe-land')).toBeVisible()
+  await page.waitForTimeout(700)
+
+  const painted = await page.evaluate(() => {
+    const svg = document.querySelector('svg.map')!
+    const r = svg.getBoundingClientRect()
+    // Just inside each edge, away from the map's own control cluster.
+    const probes: Array<[number, number]> = [
+      [0.5, 0.02],
+      [0.5, 0.98],
+      [0.97, 0.05],
+      [0.97, 0.95],
+    ]
+    return probes.map(([fx, fy]) => {
+      const el = document.elementFromPoint(r.left + r.width * fx, r.top + r.height * fy)
+      return el instanceof SVGElement ? el.getAttribute('class') : `non-svg:${el?.tagName}`
+    })
+  })
+  for (const hit of painted) expect(hit, `frame edge showed "${hit}" instead of ocean`).toContain('map-sea')
 })
 
 // Whatever the engine, the cheapest frame is the one with less in it. A map
