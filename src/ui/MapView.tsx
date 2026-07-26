@@ -10,6 +10,7 @@ import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { seasonalBp } from '../engine/market'
+import { placeLabels } from './labels'
 import {
   BORDERS_PATH,
   ISLETS_PATH,
@@ -1684,54 +1685,40 @@ export function MapView({
             )
           })}
           {/* Labels draw in their own layer ABOVE every dot, with a halo — a
-              neighboring city's dot can never sit on top of a name. Placement
-              runs a greedy collision pass in mass order: majors claim the
-              right-hand slot, and a label that would overlap one already
-              placed tries left, above, then below before giving in — dense
-              regions (Europe) stay readable instead of shingling. */}
+              neighboring city's dot can never sit on top of a name. Mass order
+              is the priority order: majors get first pick of the slots. The
+              collision pass itself is in labels.ts, which does it against a
+              uniform grid rather than by scanning every label already placed;
+              the naive version is quadratic and peaks at ~150 labels around
+              1.8x zoom, where tier-3 cities unlock but the frame still holds
+              most of the world. */}
           {(() => {
             const fs = 9 / uiScale
-            const placed: { x1: number; y1: number; x2: number; y2: number }[] = []
-            const order = visible
+            const gap = 3 / uiScale
+            const sites = visible
               .filter((c) => labeled.has(c.id))
               .sort((a, b) => cityMass(b) - cityMass(a) || (a.id < b.id ? -1 : 1))
-            return order.map((c) => {
-              const p = pt(c.lon, c.lat)
-              if (!p.vis) return null
-              const r = (1.7 + cityMass(c) / 13) / Math.sqrt(uiScale)
-              const w = c.id.length * fs * 0.66
-              const gap = 3 / uiScale
-              // Candidate anchors: right (default), left, above, below.
-              const spots = [
-                { x: p.X + r + gap, y: p.Y + fs / 3, anchor: 'start' as const },
-                { x: p.X - r - gap, y: p.Y + fs / 3, anchor: 'end' as const },
-                { x: p.X, y: p.Y - r - gap, anchor: 'middle' as const },
-                { x: p.X, y: p.Y + r + fs, anchor: 'middle' as const },
-              ]
-              let pick = spots[0]!
-              for (const spot of spots) {
-                const x1 = spot.anchor === 'start' ? spot.x : spot.anchor === 'end' ? spot.x - w : spot.x - w / 2
-                const box = { x1, y1: spot.y - fs, x2: x1 + w, y2: spot.y }
-                if (!placed.some((b) => box.x1 < b.x2 && box.x2 > b.x1 && box.y1 < b.y2 && box.y2 > b.y1)) {
-                  pick = spot
-                  break
-                }
-              }
-              const px1 = pick.anchor === 'start' ? pick.x : pick.anchor === 'end' ? pick.x - w : pick.x - w / 2
-              placed.push({ x1: px1, y1: pick.y - fs, x2: px1 + w, y2: pick.y })
-              return (
-                <text
-                  key={`label-${c.id}`}
-                  x={pick.x}
-                  y={pick.y}
-                  fontSize={fs}
-                  textAnchor={pick.anchor}
-                  className="city-label"
-                >
-                  {c.id}
-                </text>
-              )
-            })
+              .map((c) => ({ c, p: pt(c.lon, c.lat) }))
+              .filter(({ p }) => p.vis)
+              .map(({ c, p }) => ({
+                id: c.id,
+                x: p.X,
+                y: p.Y,
+                r: (1.7 + cityMass(c) / 13) / Math.sqrt(uiScale),
+                w: c.id.length * fs * 0.66,
+              }))
+            return placeLabels(sites, fs, gap).map((l) => (
+              <text
+                key={`label-${l.id}`}
+                x={l.x}
+                y={l.y}
+                fontSize={fs}
+                textAnchor={l.anchor}
+                className="city-label"
+              >
+                {l.id}
+              </text>
+            ))
           })()}
         </g>
       </svg>
