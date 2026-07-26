@@ -853,6 +853,39 @@ test('an aircraft order cancels for the partial refund', async ({ page }) => {
   expect(cashFinal).toBe(cashAfterOrder + Math.floor(price * 0.8))
 })
 
+// Whatever the engine, the cheapest frame is the one with less in it. A map
+// being dragged is re-rasterised every frame, and the zoomed-in coastline is
+// four times the curve of the coarse one — detail nobody can read while the
+// world slides past.
+test('a map in motion drops to coarse detail, and gets it back', async ({ page }) => {
+  await startGame(page)
+  // Zoom past both LOD thresholds, so the fine coastline and the border mesh
+  // are the ones on screen.
+  for (let i = 0; i < 3; i++) await page.getByTestId('zoom-in').click()
+  await page.waitForTimeout(600)
+  const landChars = async (): Promise<number> =>
+    (await page.locator('path.map-land').first().getAttribute('d'))!.length
+
+  const still = await landChars()
+  await expect(page.locator('.map-border')).toHaveCount(1)
+
+  const box = (await page.getByTestId('map').boundingBox())!
+  const x = box.x + box.width / 2
+  const y = box.y + box.height / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x - 20, y - 8)
+  await page.mouse.move(x - 40, y - 16)
+  const dragging = await landChars()
+  await expect(page.locator('.map-border'), 'the border mesh sits out the drag').toHaveCount(0)
+  await page.mouse.up()
+
+  expect(dragging, 'the coastline coarsens while the map moves').toBeLessThan(still / 2)
+  // And the detail is not lost — it comes straight back when it settles.
+  await expect.poll(landChars).toBe(still)
+  await expect(page.locator('.map-border')).toHaveCount(1)
+})
+
 test('the late-game map stays within its structural render budget', async ({ page }) => {
   await startGame(page)
   // A working network keeps the player solvent while rivals expand for four

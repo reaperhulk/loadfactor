@@ -230,13 +230,27 @@ button:disabled {
   transition: fill 1200ms ease, stroke 1200ms ease;
 }
 
-/* While a finger is dragging or pinching, the coastline's drop-shadow filter
-   comes off. It re-rasterises the entire world every time the viewBox moves —
-   free on a desktop GPU, the most expensive thing on the map on a phone — and
-   a 1.4px glow is not something anyone can see mid-gesture. A CSS property
-   beats the `filter` presentation attribute, so no markup change is needed. */
-.map.gesturing .map-land {
+/* A map in motion is drawn cheaply. Every filter here is a separate region
+   the engine re-rasterises each frame, and the ambient planes animate on top
+   of that — none of it survives a glance while the world slides past, and all
+   of it is back the moment the gesture ends. A CSS `filter` beats the SVG
+   presentation attribute, so the coastline needs no markup change. The
+   coarse coastline and the hidden border mesh are picked in MapView, which
+   needs the render to know. */
+.map.gesturing .map-land,
+.map.gesturing .route-long,
+.map.gesturing .plane {
   filter: none;
+}
+
+.map.gesturing .plane {
+  display: none;
+}
+
+/* Hint the engine that this group is about to move, so it can hold a layer
+   for it rather than re-deriving one every frame. */
+.map.gesturing .map-pan {
+  will-change: transform;
 }
 
 /* Political borders: a hairline INSIDE the landmass. Deliberately weaker than

@@ -487,6 +487,9 @@ export function MapView({
   // does not invalidate layout on any engine. React state is synced once,
   // when the finger lifts, and the transform folds back into the viewBox.
   const gesturing = useRef(false)
+  // Same fact as `gesturing`, in state: the render needs it to drop detail
+  // while the map is moving. Two renders per gesture, not per frame.
+  const [moving, setMoving] = useState(false)
   const panRef = useRef<SVGGElement>(null)
   const minimapRef = useRef<SVGRectElement>(null)
   // The viewBox actually in the DOM. The transform maps it to the live view.
@@ -503,8 +506,13 @@ export function MapView({
       const k = b.w / v.w
       const tx = b.x - v.x * k
       const ty = b.y - v.y * k
-      if (Math.abs(k - 1) < 1e-9 && Math.abs(tx) < 1e-9 && Math.abs(ty) < 1e-9) {
-        g.removeAttribute('transform')
+      const still = Math.abs(tx) < 1e-9 && Math.abs(ty) < 1e-9
+      // A drag carries no zoom, so say so: a bare translate is a case engines
+      // can recognise and shortcut, where translate+scale(1) is just another
+      // matrix to push through the general path.
+      if (Math.abs(k - 1) < 1e-9) {
+        if (still) g.removeAttribute('transform')
+        else g.setAttribute('transform', `translate(${tx} ${ty})`)
       } else {
         g.setAttribute('transform', `translate(${tx} ${ty}) scale(${k})`)
       }
@@ -1002,6 +1010,7 @@ export function MapView({
 
   const beginGesture = (): void => {
     gesturing.current = true
+    setMoving(true)
     // Grabbing something mid-animation stops it where it is. Gestures compute
     // from the TARGET so rapid inputs compound smoothly, which means a finger
     // landing while an eased zoom is still running would otherwise take the
@@ -1027,6 +1036,7 @@ export function MapView({
   const endGesture = (): void => {
     if (!gesturing.current) return
     gesturing.current = false
+    setMoving(false)
     gestureRect.current = null
     svgRef.current?.classList.remove('gesturing')
     // Hand the live view back to React in one commit.
@@ -1254,7 +1264,7 @@ export function MapView({
         {/* Everything that pans lives in one group so a gesture can move it
             with a transform instead of a viewBox — see paintView. The
             vignette stays outside, pinned to the frame. */}
-        <g ref={panRef} data-testid="map-pan">
+        <g ref={panRef} className="map-pan" data-testid="map-pan">
           <rect x={0} y={0} width={W} height={H} className="map-sea" fill="url(#seaDepth)" />
           {!isGlobe && <path d={graticulePath()} className="graticule map-graticule" />}
           {isGlobe ? (
@@ -1275,15 +1285,19 @@ export function MapView({
           ) : (
             <>
               {/* Detail that resolves: the coarse coastline is a smear at 3x, and
-                  the fine one is wasted bytes of curve at world view. */}
+                  the fine one is wasted bytes of curve at world view. A map in
+                  motion resolves less again — the fine path is four times the
+                  curve to re-raster every frame, and nobody reads a coastline
+                  while it slides past, so a gesture drops back to the coarse
+                  one and the detail returns the moment it settles. */}
               <path
-                d={scale >= 1.8 ? WORLD_PATH_FINE : WORLD_PATH}
+                d={scale >= 1.8 && !moving ? WORLD_PATH_FINE : WORLD_PATH}
                 className="map-land"
                 filter="url(#coastGlow)"
               />
               {/* Country borders come from a separate mesh, so they are the
                   borders themselves and never a second copy of the coast. */}
-              {scale >= 1.35 && <path d={BORDERS_PATH} className="map-border" />}
+              {scale >= 1.35 && !moving && <path d={BORDERS_PATH} className="map-border" />}
               {/* Islands with an airport but too small to survive 1:50m
                   generalisation — without these, Guam is an airport in open
                   ocean. */}
