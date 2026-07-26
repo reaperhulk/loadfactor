@@ -3,7 +3,7 @@
 // tells you short-haul from long-haul at a glance. Presentation-only floats
 // are fine here — the engine never sees screen coordinates.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
@@ -466,6 +466,45 @@ export function MapView({
   const targetRef = useRef<ViewBox>(homeView())
   const rafRef = useRef(0)
 
+  // A finger drag must track the finger, and on a phone a React re-render of
+  // the whole board per frame does not. While a gesture is in flight the pan
+  // is written STRAIGHT to the DOM — the viewBox and the two rects that follow
+  // it — and React state is synced once, when the finger lifts. Nothing else
+  // in the tree depends on where the view sits (visibility and labels key off
+  // the zoom LEVEL, which a pan does not change), so the skipped renders would
+  // have produced identical nodes anyway.
+  const gesturing = useRef(false)
+  const vignetteRef = useRef<SVGRectElement>(null)
+  const minimapRef = useRef<SVGRectElement>(null)
+
+  const paintView = (v: ViewBox): void => {
+    svgRef.current?.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`)
+    for (const el of [vignetteRef.current, minimapRef.current]) {
+      if (el === null) continue
+      el.setAttribute('x', String(v.x))
+      el.setAttribute('y', String(v.y))
+      el.setAttribute('width', String(v.w))
+      el.setAttribute('height', String(v.h))
+    }
+  }
+
+  // Any render triggered mid-gesture (an ambient timer, a hover) would paint
+  // the stale state back over the live pan. Re-assert it after every commit.
+  useLayoutEffect(() => {
+    if (gesturing.current) paintView(targetRef.current)
+  })
+
+  // The SVG's box cannot change while a finger is down, so measure it once per
+  // gesture: getBoundingClientRect() forces a layout flush, and paying for one
+  // on every pointermove is a tax on the frame that has to track the finger.
+  const gestureRect = useRef<DOMRect | null>(null)
+  const mapRect = (): DOMRect | null => {
+    const measure = (): DOMRect | null => svgRef.current?.getBoundingClientRect() ?? null
+    if (!gesturing.current) return measure()
+    if (gestureRect.current === null) gestureRect.current = measure()
+    return gestureRect.current
+  }
+
   const settleView = (): void => {
     setView((v) => {
       const t = targetRef.current
@@ -488,6 +527,15 @@ export function MapView({
 
   const applyView = (target: ViewBox, immediate: boolean): void => {
     targetRef.current = clampView(target)
+    if (gesturing.current) {
+      // Mid-gesture: straight to the DOM, no render, no media query.
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = 0
+      }
+      paintView(targetRef.current)
+      return
+    }
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (immediate || reduced) {
       if (rafRef.current) {
@@ -836,8 +884,8 @@ export function MapView({
     const t = targetRef.current
     let mx = t.x + t.w / 2
     let my = t.y + t.h / 2
-    if (clientX !== null && clientY !== null && svgRef.current) {
-      const rect = svgRef.current.getBoundingClientRect()
+    const rect = clientX !== null && clientY !== null ? mapRect() : null
+    if (clientX !== null && clientY !== null && rect !== null) {
       const m = viewToCss(rect, t.w, t.h)
       mx = t.x + (clientX - rect.left - m.offX) / m.k
       my = t.y + (clientY - rect.top - m.offY) / m.k
@@ -891,13 +939,56 @@ export function MapView({
     if (!el) return
     const handler = (e: globalThis.WheelEvent): void => wheelRef.current(e)
     el.addEventListener('wheel', handler, { passive: false })
-    return () => el.removeEventListener('wheel', handler)
+    // `touch-action: none` should be enough to stop the browser claiming a
+    // touch as a scroll — but it is honoured inconsistently on SVG elements,
+    // and a browser that thinks a scroll may be starting stops painting the
+    // page until the finger lifts, which is exactly "the map only moves when
+    // I let go". Cancelling the default outright leaves nothing to decide.
+    // React registers onTouchMove passively, so this has to be native.
+    const swallow = (e: TouchEvent): void => {
+      if (e.cancelable) e.preventDefault()
+    }
+    el.addEventListener('touchmove', swallow, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', handler)
+      el.removeEventListener('touchmove', swallow)
+    }
   }, [])
 
   // Touch pinch: two active pointers zoom about their midpoint and pan with
   // it, writing through immediately (easing would fight fingers).
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const pinch = useRef<{ dist: number; midX: number; midY: number } | null>(null)
+  // Explicit capture is best-effort. Touch pointers are captured implicitly by
+  // the spec already, and SVG capture has been unreliable enough in the wild
+  // that a throw here must never be allowed to abort the drag it was meant to
+  // make smoother.
+  const tryCapture = (el: SVGSVGElement, pointerId: number, type: string): void => {
+    if (type === 'touch') return
+    try {
+      el.setPointerCapture(pointerId)
+    } catch {
+      /* the gesture works without it */
+    }
+  }
+
+  const beginGesture = (): void => {
+    gesturing.current = true
+    // The coastline's drop-shadow filter re-rasterises the whole world every
+    // time the viewBox moves — cheap on a desktop GPU, the single most
+    // expensive thing on the map on a phone. Motion hides a 1.4px glow, so it
+    // comes off for the duration of the gesture and back on when it settles.
+    svgRef.current?.classList.add('gesturing')
+  }
+
+  const endGesture = (): void => {
+    if (!gesturing.current) return
+    gesturing.current = false
+    gestureRect.current = null
+    svgRef.current?.classList.remove('gesturing')
+    // Hand the live view back to React in one commit.
+    setView(targetRef.current)
+  }
 
   const pinchGeometry = (): { dist: number; midX: number; midY: number } | null => {
     if (pointers.current.size < 2) return null
@@ -919,7 +1010,8 @@ export function MapView({
       pinch.current = pinchGeometry()
       drag.current = null
       suppressClick.current = true
-      e.currentTarget.setPointerCapture(e.pointerId)
+      beginGesture()
+      tryCapture(e.currentTarget, e.pointerId, e.pointerType)
     } else if (pointers.current.size === 1) {
       drag.current = { px: e.clientX, py: e.clientY, moved: false }
     }
@@ -931,8 +1023,8 @@ export function MapView({
     }
     if (pinch.current) {
       const now = pinchGeometry()
-      if (!now || !svgRef.current) return
-      const rect = svgRef.current.getBoundingClientRect()
+      const rect = mapRect()
+      if (!now || rect === null) return
       if (isGlobe) {
         const ratio = now.dist / pinch.current.dist
         const dmx = now.midX - pinch.current.midX
@@ -964,10 +1056,12 @@ export function MapView({
     if (!drag.current.moved) {
       // Capture only once a real drag starts — capturing on pointerdown would
       // steal the click from the city dots.
-      e.currentTarget.setPointerCapture(e.pointerId)
+      drag.current.moved = true
+      beginGesture()
+      tryCapture(e.currentTarget, e.pointerId, e.pointerType)
     }
-    drag.current.moved = true
-    const rect = svgRef.current!.getBoundingClientRect()
+    const rect = mapRect()
+    if (rect === null) return
     if (isGlobe) {
       // Trackball: the terrain follows the pointer. Degrees per pixel shrink
       // as the globe grows.
@@ -1001,6 +1095,7 @@ export function MapView({
     const wasDrag = drag.current?.moved ?? false
     drag.current = null
     if (wasDrag) suppressClick.current = true
+    if (pointers.current.size === 0) endGesture()
     if (e.pointerType === 'touch' && !wasDrag && pointers.current.size === 0) {
       const prev = lastTap.current
       const now = e.timeStamp
@@ -1071,7 +1166,15 @@ export function MapView({
   }
 
   return (
-    <div className="map-wrap">
+    // The view React has committed. During a gesture the viewBox on the SVG
+    // runs ahead of it — written straight to the DOM — and this attribute is
+    // how the handoff back at the end of the gesture can be seen: React only
+    // rewrites it when the state actually changes.
+    <div
+      className="map-wrap"
+      data-testid="map-wrap"
+      data-view={`${view.x} ${view.y} ${view.w} ${view.h}`}
+    >
       <svg
         ref={svgRef}
         viewBox={isGlobe ? `0 0 ${W} ${H}` : `${view.x} ${view.y} ${view.w} ${view.h}`}
@@ -1374,6 +1477,7 @@ export function MapView({
         {/* Last, so it sits over everything: the frame falls off into the
             dark and the middle of the world holds the eye. */}
         <rect
+          ref={vignetteRef}
           x={view.x}
           y={view.y}
           width={isGlobe ? W : view.w}
@@ -1464,6 +1568,7 @@ export function MapView({
           <rect x={0} y={0} width={W} height={H} className="map-sea" />
           <path d={WORLD_PATH} className="minimap-land" />
           <rect
+            ref={minimapRef}
             x={view.x}
             y={view.y}
             width={view.w}

@@ -514,6 +514,74 @@ test('every zoom eases — buttons and double-click, flat map and globe', async 
   expect(new Set(await collect).size, 'globe double-click eases').toBeGreaterThan(5)
 })
 
+// A touch drag has to move the map WHILE the finger moves. It used to be
+// reported as only updating on release, so this samples the viewBox halfway
+// through the gesture, not just at the end — a map that catches up on release
+// passes an end-state assertion and fails a player.
+test.describe('touch', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })
+
+  test('the map pans with the finger, not on release', async ({ page, context }) => {
+    await startGame(page)
+    const box = (await page.getByTestId('map').boundingBox())!
+
+    await page.evaluate(() => {
+      const w = window as unknown as { __pan: string[] }
+      w.__pan = []
+      const svg = document.querySelector('svg.map')!
+      const tick = (): void => {
+        w.__pan.push(svg.getAttribute('viewBox') ?? '')
+        requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    })
+    const sampled = async (): Promise<string[]> =>
+      page.evaluate(() => (window as unknown as { __pan: string[] }).__pan.slice())
+    const yOf = (vb: string): number => Number(vb.split(' ')[1])
+
+    // Playwright's touchscreen only taps, so the drag goes through CDP — the
+    // same input path a real finger takes.
+    const cdp = await context.newCDPSession(page)
+    const x = box.x + box.width / 2
+    const y0 = box.y + box.height * 0.7
+    const touch = async (
+      type: 'touchStart' | 'touchMove' | 'touchEnd',
+      y: number,
+    ): Promise<void> => {
+      await cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }],
+      })
+    }
+
+    const before = (await sampled()).at(-1)!
+    await touch('touchStart', y0)
+    for (let i = 1; i <= 20; i++) await touch('touchMove', y0 - i * 4)
+    const halfway = (await sampled()).at(-1)!
+    for (let i = 21; i <= 40; i++) await touch('touchMove', y0 - i * 4)
+    await touch('touchEnd', y0 - 160)
+    await page.waitForTimeout(300)
+    const after = (await sampled()).at(-1)!
+
+    // Dragging up walks the view down the map (south), and it must already be
+    // most of the way there before the finger lifts.
+    expect(yOf(after), 'the drag panned the view').toBeGreaterThan(yOf(before) + 10)
+    const progress = (yOf(halfway) - yOf(before)) / (yOf(after) - yOf(before))
+    expect(progress, 'the view had moved by mid-gesture').toBeGreaterThan(0.35)
+
+    // Every frame of the gesture, not two: a map that jumps once yields a
+    // handful of distinct values across the whole drag.
+    const during = (await sampled()).filter((vb) => yOf(vb) > yOf(before) && yOf(vb) < yOf(after))
+    expect(new Set(during).size, 'the pan is continuous').toBeGreaterThan(10)
+
+    // Mid-gesture the pan is written straight to the DOM, ahead of React.
+    // Handing it back when the finger lifts is not cosmetic: the component's
+    // own copy is what tap hit-testing and the zoom LOD read, so a view left
+    // behind by a drag silently mis-resolves everything that follows.
+    await expect(page.getByTestId('map-wrap')).toHaveAttribute('data-view', after)
+  })
+})
+
 test('zoom reveals small cities that are hidden at world view', async ({ page }) => {
   await startGame(page)
   // Doha is a tier-3 field with no player stake: invisible at world zoom.
