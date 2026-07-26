@@ -180,6 +180,15 @@ button:disabled {
   color: var(--neg);
 }
 
+/* While a map gesture is live, nothing anywhere on the page is selectable —
+   see beginGesture. Scoped to the gesture so text stays copyable the rest of
+   the time. */
+html.map-gesture,
+html.map-gesture * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
 .map-wrap {
   position: relative;
   /* The layer inside overhangs this box on every side so a drag has painted

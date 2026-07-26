@@ -798,6 +798,9 @@ export function MapView({
   useEffect(() => {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      // Unmounting mid-gesture must not leave the page permanently
+      // unselectable.
+      document.documentElement.classList.remove('map-gesture')
     }
   }, [])
 
@@ -1264,6 +1267,15 @@ export function MapView({
   const beginGesture = (): void => {
     gesturing.current = true
     setMoving(true)
+    // While the map is being dragged nothing on the PAGE may be selected
+    // either — Safari can arm a text selection at press and extend it into
+    // the content around the map once the pointer leaves it. The canceled
+    // mousedown (on the svg) should prevent that, but some WebKit versions
+    // arm it anyway, so selection is switched off document-wide for the
+    // gesture and anything that slipped through is dropped.
+    document.documentElement.classList.add('map-gesture')
+    const sel = window.getSelection()
+    if (sel !== null && !sel.isCollapsed) sel.removeAllRanges()
     // Grabbing something mid-animation stops it where it is. Gestures compute
     // from the TARGET so rapid inputs compound smoothly, which means a finger
     // landing while an eased zoom is still running would otherwise take the
@@ -1285,6 +1297,7 @@ export function MapView({
     if (!gesturing.current) return
     gesturing.current = false
     setMoving(false)
+    document.documentElement.classList.remove('map-gesture')
     gestureRect.current = null
     // Hand the live view back to React in one commit — which, for the pan
     // this almost always is, rewrites nothing the SVG rasters.
@@ -1513,6 +1526,15 @@ export function MapView({
         aria-label="World route map"
         data-testid="map"
         onPointerDown={onPointerDown}
+        onMouseDown={(e) => {
+          // A press on the map is a pan, never the start of a text selection.
+          // user-select: none covers the map itself, but Safari arms the
+          // selection at mousedown and extends it into the page around the
+          // map the moment the pointer leaves it mid-drag. Canceling
+          // mousedown keeps it from arming at all; click and dblclick still
+          // fire, so taps and double-click zoom are untouched.
+          e.preventDefault()
+        }}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
@@ -1888,6 +1910,7 @@ export function MapView({
           data-testid="minimap"
           role="img"
           aria-label="Minimap — click to move the view"
+          onMouseDown={(e) => e.preventDefault()} // a jump, never a selection
           onPointerDown={(e) => {
             const rect = e.currentTarget.getBoundingClientRect()
             const mx = ((e.clientX - rect.left) / rect.width) * W

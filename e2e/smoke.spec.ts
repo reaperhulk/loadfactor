@@ -741,6 +741,48 @@ test.describe('touch', () => {
 // already placed. That is ~54k rectangle intersections to position a dozen
 // labels, paid again on every re-centre mid-drag. Off-screen cities cannot be
 // seen, so they are not drawn.
+// A drag that starts on the map and runs off its edge must never turn into a
+// text selection of the page around it. Safari arms the selection at
+// mousedown and extends it into the neighbours once the pointer leaves the
+// map, so the map cancels the mousedown AND makes the whole page unselectable
+// for exactly the duration of a gesture.
+test('dragging off the map edge selects no text, and selection returns after', async ({
+  page,
+}) => {
+  await startGame(page)
+  const box = (await page.getByTestId('map-wrap').boundingBox())!
+  const x = box.x + box.width / 2
+
+  // Drag from mid-map to well below its bottom edge, across the tab bar and
+  // panel text, and release there.
+  await page.mouse.move(x, box.y + box.height * 0.6)
+  await page.mouse.down()
+  for (let i = 1; i <= 12; i++) {
+    await page.mouse.move(x, box.y + box.height * 0.6 + i * 25)
+  }
+  // Mid-drag the page-wide lock is on.
+  await expect(page.locator('html.map-gesture')).toHaveCount(1)
+  const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '')
+  await page.mouse.up()
+
+  expect(selected, 'the drag painted a selection across the page').toBe('')
+  expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('')
+  // And the lock comes off, so text is copyable again the rest of the time.
+  await expect(page.locator('html.map-gesture')).toHaveCount(0)
+  const copyable = await page.evaluate(() => {
+    const el = document.querySelector('.key-hints')!
+    const r = document.createRange()
+    r.selectNodeContents(el)
+    const sel = window.getSelection()!
+    sel.removeAllRanges()
+    sel.addRange(r)
+    const got = sel.toString()
+    sel.removeAllRanges()
+    return got
+  })
+  expect(copyable, 'page text is still selectable after the gesture').toContain('end quarter')
+})
+
 // The stutter you feel while dragging is a re-centre: the layer runs out of
 // painted world, the viewBox is rewritten, and the whole cached texture is
 // thrown away mid-gesture. Zoomed out, the world is only a couple of frames
