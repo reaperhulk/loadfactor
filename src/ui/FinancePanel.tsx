@@ -18,7 +18,7 @@ import { inflationBp } from '../engine/market'
 import { currentLoanRateBp, debtCeiling, routeWeeklyCapacity, totalDebt } from '../engine/queries'
 import { HedgeLegend, MarketingLegend, RivalryLegend } from './legends'
 import { Sparkline } from './Sparkline'
-import { dispatch } from './session'
+import { viewSeat, dispatch } from './session'
 import { COST_LABELS, money } from './format'
 
 // The cost buckets in a stable presentation order, labelled from the shared
@@ -48,7 +48,7 @@ const BUCKET_COLORS: Record<keyof CostBreakdown, string> = {
 // breakdown. Structure drift (fuel creeping up, ownership swelling after a
 // buying spree) is visible at a glance; absolutes live in the table below.
 function CostMixHistory({ state }: { state: GameState }) {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const hist = player.history.slice(-16).filter((h) => h.costs > 0)
   if (hist.length < 2) return null
   const w = 360
@@ -88,7 +88,7 @@ function CostMixHistory({ state }: { state: GameState }) {
 // sum to reported costs), largest first, with proportional bars and the
 // quarter-over-quarter move per bucket.
 function CostStructure({ state }: { state: GameState }) {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const now = player.history[player.history.length - 1]
   const prev = player.history[player.history.length - 2]
   if (!now || now.costs <= 0) return null
@@ -130,7 +130,7 @@ function CostStructure({ state }: { state: GameState }) {
 }
 
 export function FinancePanel({ state }: { state: GameState }) {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const [amount, setAmount] = useState(5000)
   const ceiling = debtCeiling(player)
   const debt = totalDebt(player)

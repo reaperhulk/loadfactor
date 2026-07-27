@@ -2125,3 +2125,27 @@ td, th {
   font-size: 8px;
   opacity: 0.8;
 }
+
+/* Hot-seat and link-duel chrome: the active player's chip and the pass/send
+   controls share the End Quarter slot at the header's right edge. */
+.hotseat-controls {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.seat-chip {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* A refused turn link says why, wherever you are. */
+.mp-notice {
+  max-width: 1040px;
+  margin: 8px auto 0;
+  padding: 6px 12px;
+  border: 1px solid var(--neg);
+  border-radius: 8px;
+  color: var(--neg);
+}

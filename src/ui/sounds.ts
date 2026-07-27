@@ -3,7 +3,7 @@
 // first user-gesture-driven event so autoplay policies stay happy.
 
 import type { GameEvent } from '../engine'
-import { subscribe, getSession } from './session'
+import { viewSeat, subscribe, getSession } from './session'
 
 const MUTE_KEY = 'loadfactor:muted:v1'
 
@@ -113,7 +113,7 @@ function soundFor(events: GameEvent[]): string | null {
   for (const e of events) {
     // A rival opening on a pair the player serves is an act of war.
     if (e.type === 'route_opened' && e.airline !== 0) {
-      const mine = getSession()?.state.airlines[0]?.routes ?? []
+      const mine = getSession()?.state.airlines[viewSeat()]?.routes ?? []
       if (mine.some((r) => (r.from === e.from && r.to === e.to) || (r.from === e.to && r.to === e.from))) {
         return 'incursion'
       }

@@ -21,7 +21,7 @@ import { Sparkline } from './Sparkline'
 import { assignAndSchedule } from './assign'
 import { estimateWeeklyPax } from './estimate'
 import { HubLegend, SpoolLegend } from './legends'
-import { dispatch } from './session'
+import { viewSeat, dispatch } from './session'
 import { money } from './format'
 
 interface RouteDossierProps {
@@ -32,7 +32,7 @@ interface RouteDossierProps {
 }
 
 export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDossierProps) {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const route = player.routes.find((r) => r.id === routeId)
   if (!route) return null
   const km = distanceKm(route.from, route.to)

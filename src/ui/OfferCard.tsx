@@ -3,13 +3,13 @@
 // on the card — declining is a real choice, not a dismissal.
 
 import type { GameState } from '../engine'
-import { dispatch } from './session'
+import { viewSeat, dispatch } from './session'
 import { money } from './format'
 
 export function OfferCard({ state }: { state: GameState }) {
   const offer = state.world.offers[0]
   if (!offer) return null
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const quartersLeft = offer.expiresTurn - state.turn
   const affordable = player.cash >= offer.costK
   return (
@@ -50,7 +50,7 @@ export function OfferCard({ state }: { state: GameState }) {
 
 // Deals still running, so the player can see what they committed to.
 export function ActiveDeals({ state }: { state: GameState }) {
-  const deals = state.airlines[0]!.deals ?? []
+  const deals = state.airlines[viewSeat()]!.deals ?? []
   if (deals.length === 0) return null
   return (
     <p className="events-strip" data-testid="active-deals">

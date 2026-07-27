@@ -13,7 +13,7 @@ import { cityPool, nextExpansion, slotFee, slotQueue, slotRent, slotsRemaining }
 import { airlinesOnPair, networkCities, slotsAllocated, slotsFree, slotsHeld, slotsUsed } from '../engine/queries'
 import { cityMass, cityTier } from './MapView'
 import { ConfirmButton } from './ConfirmButton'
-import { dispatch } from './session'
+import { viewSeat, dispatch } from './session'
 import { money } from './format'
 
 const REGION_NAMES: Record<string, string> = {
@@ -50,7 +50,7 @@ interface CityPanelProps {
 
 export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, onClose }: CityPanelProps) {
   const city = getCity(cityId)
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
 
   const held = slotsHeld(player, cityId)
   const used = slotsUsed(player, cityId)

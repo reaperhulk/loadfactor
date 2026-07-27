@@ -7,11 +7,12 @@ import { useState } from 'react'
 import { pairKey } from '../data/cities'
 import type { GameState } from '../engine'
 import { slotCities } from '../engine/queries'
+import { viewSeat } from './session'
 
 const COACH_KEY = 'loadfactor:coach:v1' // legacy global key, still honored
 
 function nextHint(state: GameState): string | null {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   if (player.routes.length === 0) {
     return 'Start here: click one of your blue cities on the map, then “✈ Open route from here” and pick a destination.'
   }

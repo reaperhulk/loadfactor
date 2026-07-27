@@ -10,6 +10,7 @@ import { DEMAND_NOISE_SPREAD_BP, FARE_DEMAND_BP } from '../data/constants'
 import type { GameState, Route } from '../engine'
 import { pairWeeklyDemand, routeShareWeight, routeSpoolBp } from '../engine/market'
 import { routeWeeklyCapacity } from '../engine/queries'
+import { viewSeat } from './session'
 
 export interface PaxEstimate {
   pax: number // weekly, capacity-capped — the midpoint, not a promise
@@ -22,7 +23,7 @@ export interface PaxEstimate {
 // Estimate weekly direct pax for a variant of one of the player's routes
 // (same id — the fleet assignment must resolve — with fare/service tweaked).
 export function estimateWeeklyPax(state: GameState, variant: Route): PaxEstimate {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const demand = pairWeeklyDemand(state, variant.from, variant.to)
   const key = pairKey(variant.from, variant.to)
   let othersWeight = 0

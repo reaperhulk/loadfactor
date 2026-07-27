@@ -8,6 +8,7 @@ import { pairKey } from '../data/cities'
 import { ROUTE_SPOOL_BP } from '../data/constants'
 import type { GameEvent, GameState } from '../engine'
 import { quarterOf, yearOf } from '../engine/queries'
+import { viewSeat } from './session'
 
 export interface Toast {
   id: number
@@ -48,7 +49,7 @@ export const EVENT_NAMES: Record<string, string> = {
 // onto the player's own pairs surface as incursion alerts.
 export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, 'id'>[] {
   const out: Omit<Toast, 'id'>[] = []
-  const myPairs = new Set(state?.airlines[0]?.routes.map((r) => pairKey(r.from, r.to)) ?? [])
+  const myPairs = new Set(state?.airlines[viewSeat()]?.routes.map((r) => pairKey(r.from, r.to)) ?? [])
   // A new year begins as a quarter resolves into Q1 — announce airframes
   // hitting the market. Fleet transitions are the era's drumbeat.
   if (state && quarterOf(state) === 1 && events.some((e) => e.type === 'quarter_report')) {
@@ -60,7 +61,7 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
   }
   // A route that just finished its spool-up is now at full market strength.
   if (state && events.some((e) => e.type === 'quarter_report')) {
-    for (const r of state.airlines[0]?.routes ?? []) {
+    for (const r of state.airlines[viewSeat()]?.routes ?? []) {
       if (r.history.length === ROUTE_SPOOL_BP.length && r.lastCapacity > 0) {
         out.push({
           kind: 'route',
@@ -83,7 +84,7 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
           out.push({ kind: 'route', icon: '✈️', text: `Route opened: ${e.from} – ${e.to}` })
         } else if (myPairs.has(pairKey(e.from, e.to))) {
           const rival = state?.airlines[e.airline]?.name ?? 'A rival'
-          const mine = state?.airlines[0]?.routes.find((r) => pairKey(r.from, r.to) === pairKey(e.from, e.to))
+          const mine = state?.airlines[viewSeat()]?.routes.find((r) => pairKey(r.from, r.to) === pairKey(e.from, e.to))
           out.push({
             kind: 'error',
             icon: '⚔️',

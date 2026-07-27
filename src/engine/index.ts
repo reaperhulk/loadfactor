@@ -17,10 +17,45 @@ export { endQuarter } from './turn'
 export * from './types'
 
 export function applyCommand(prev: GameState, command: Command): EngineResult {
+  return applyCommandFor(prev, 0, command)
+}
+
+// The multiplayer entry point: any airline seat a human holds issues its
+// commands here. Seat 0 via applyCommand is the same call — "the player" is
+// a UI convention, not an engine one. end_quarter is seat-agnostic: it is a
+// phase transition, and who may trigger it is the session's protocol rule.
+export function applyCommandFor(prev: GameState, seat: number, command: Command): EngineResult {
   if (command.type === 'end_quarter') return endQuarter(prev)
   const state = structuredClone(prev)
-  const { events } = applyPlanningCommand(state, 0, command)
+  const { events } = applyPlanningCommand(state, seat, command)
   return { state, events }
+}
+
+// A multiplayer log entry: which seat issued the command. A multiplayer game
+// is (scenario, seed, seats, entries) exactly as a solo game is
+// (scenario, seed, commands) — fold the entries and determinism does the rest.
+export interface SeatCommand {
+  seat: number
+  command: Command
+}
+
+export interface SeatReplay {
+  scenario: string
+  seed: string
+  player?: PlayerSetup
+  humanSeats: readonly number[]
+  entries: readonly SeatCommand[]
+}
+
+export function runSeatReplay(replay: SeatReplay): { state: GameState; events: GameEvent[] } {
+  let state = newGame(replay.scenario, replay.seed, replay.player, replay.humanSeats)
+  const allEvents: GameEvent[] = []
+  for (const entry of replay.entries) {
+    const result = applyCommandFor(state, entry.seat, entry.command)
+    state = result.state
+    allEvents.push(...result.events)
+  }
+  return { state, events: allEvents }
 }
 
 export interface Replay {

@@ -9,6 +9,7 @@ import type { GameEvent, GameState } from '../engine'
 import { quarterOf, yearOf } from '../engine/queries'
 import { COST_LABELS, money } from './format'
 import { Sparkline } from './Sparkline'
+import { viewSeat } from './session'
 
 function delta(now: number, prev: number | undefined): string {
   if (prev === undefined) return ''
@@ -24,7 +25,7 @@ interface ReportCardProps {
 }
 
 export function ReportCard({ state, events, onClose }: ReportCardProps) {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const now = player.history[player.history.length - 1]
   const prev = player.history[player.history.length - 2]
   if (!now) return null

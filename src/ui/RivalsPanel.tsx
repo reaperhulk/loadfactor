@@ -12,7 +12,7 @@ import { ConfirmButton } from './ConfirmButton'
 import { RIVAL_COLORS } from './MapView'
 import { RaceChart, Sparkline } from './Sparkline'
 import { TakeoverLegend } from './legends'
-import { dispatch, getChallengeTarget } from './session'
+import { viewSeat, dispatch, getChallengeTarget } from './session'
 import { copyTsv, money, objectiveValue } from './format'
 
 const PERSONALITY_BLURBS: Record<string, string> = {
@@ -168,7 +168,7 @@ const RACE_METRICS = [
 // who is taking YOUR passengers, on which pairs, and whether you are winning
 // there — the difference between a league table and intelligence.
 function HeadToHead({ state }: { state: GameState }) {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const myPairs = new Map(player.routes.map((r) => [pairKey(r.from, r.to), r]))
   const rows = state.airlines
     .filter((a) => a.id !== 0 && !a.bankrupt)
@@ -266,7 +266,7 @@ export function RivalsPanel({ state }: { state: GameState }) {
       className: i === 0 ? 'race-me' : `race-rival-${i}`,
     }
   })
-  const mySeats = fieldedSeats(state.airlines[0]!)
+  const mySeats = fieldedSeats(state.airlines[viewSeat()]!)
 
   return (
     <div data-testid="rivals-panel">
@@ -304,7 +304,7 @@ export function RivalsPanel({ state }: { state: GameState }) {
         // deadline. A projection, not a promise — but it turns "am I
         // winning?" into a number you can steer by.
         const scenario = getScenario(state.scenario)
-        const me = state.airlines[0]!
+        const me = state.airlines[viewSeat()]!
         const h = me.history
         const remaining = scenario.quarters - state.turn
         if (h.length < 8 || remaining <= 0) return null
@@ -336,10 +336,10 @@ export function RivalsPanel({ state }: { state: GameState }) {
       </div>
       <TakeoverLegend />
       <div className="rival-cards">
-        {state.airlines.slice(1).map((rival) => {
+        {state.airlines.filter((a) => a.id !== viewSeat()).map((rival) => {
           const last = rival.history[rival.history.length - 1]
           // Pairs where this rival and the player are in direct battle.
-          const myPairs = new Set(state.airlines[0]!.routes.map((r) => pairKey(r.from, r.to)))
+          const myPairs = new Set(state.airlines[viewSeat()]!.routes.map((r) => pairKey(r.from, r.to)))
           const contested = rival.routes.filter((r) => myPairs.has(pairKey(r.from, r.to))).length
           return (
             <div key={rival.id} className="rival-card" data-testid={`rival-${rival.id}`}>
@@ -397,7 +397,7 @@ export function RivalsPanel({ state }: { state: GameState }) {
                   {(() => {
                     // The endgame lever: distressed rivals can be bought
                     // outright — fleet, routes, slots, and their debt.
-                    const me = state.airlines[0]!
+                    const me = state.airlines[viewSeat()]!
                     const worth = netWorth(rival)
                     const distressed = rival.insolventQuarters >= 1 || worth * 4 <= netWorth(me)
                     if (!distressed) return null

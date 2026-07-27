@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { getScenario } from '../data/scenarios'
 import type { GameEvent, GameState } from '../engine'
-import { type QuarterRecord } from './session'
+import { viewSeat, type QuarterRecord } from './session'
 import { money } from './format'
 
 function describeEvent(state: GameState, e: GameEvent): string | null {
@@ -125,7 +125,7 @@ function QuarterPage({ state, events }: { state: GameState; events: GameEvent[] 
       (e): e is Extract<GameEvent, { type: 'route_result' }> => e.type === 'route_result' && e.airline === 0,
     )
     .sort((a, b) => b.revenue - b.cost - (a.revenue - a.cost))
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const routeName = (routeId: number): string => {
     const r = player.routes.find((x) => x.id === routeId)
     return r ? `${r.from}–${r.to}` : '(closed)'
@@ -187,7 +187,7 @@ function QuarterPage({ state, events }: { state: GameState; events: GameEvent[] 
 // The annual review: each completed year's totals from the ledger the
 // engine already keeps — where the decades came from, at a glance.
 function AnnualReview({ state }: { state: GameState }) {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const startYear = getScenario(state.scenario).startYear
   const years: { year: number; revenue: number; profit: number; pax: number; endWorth: number }[] = []
   for (let i = 0; i + 4 <= player.history.length; i += 4) {

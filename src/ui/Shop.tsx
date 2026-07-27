@@ -8,13 +8,13 @@ import { LEASE_BP_PER_QUARTER } from '../data/constants'
 import type { GameState } from '../engine'
 import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor } from '../engine/market'
 import { yearOf } from '../engine/queries'
-import { dispatch } from './session'
+import { viewSeat, dispatch } from './session'
 import { money } from './format'
 
 // The showroom: full specs, and — pick one of your routes — an honest
 // estimate of what each type would cost and carry there per quarter.
 export function Shop({ state }: { state: GameState }) {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const year = yearOf(state)
   const [routeId, setRouteId] = useState<number | ''>('')
   const route = player.routes.find((r) => r.id === routeId)

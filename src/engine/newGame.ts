@@ -62,7 +62,15 @@ function makeAirline(id: number, setup: AirlineSetup, controller: 'player' | 'ri
   return airline
 }
 
-export function newGame(scenarioId: string, seed: string, player?: PlayerSetup): GameState {
+export function newGame(
+  scenarioId: string,
+  seed: string,
+  player?: PlayerSetup,
+  // Airline indices beyond 0 that are humans, for multiplayer. Part of game
+  // identity: a replay must recreate the same controllers or the rival AI
+  // would move airlines the humans owned.
+  humanSeats?: readonly number[],
+): GameState {
   const scenario = getScenario(scenarioId)
   // Customization overlays the scenario's authored player seat. A custom HQ
   // swaps the authored footholds for ones derived around the new home.
@@ -75,7 +83,13 @@ export function newGame(scenarioId: string, seed: string, player?: PlayerSetup):
     playerSetup = { ...playerSetup, hq: player.hq, extraSlots: deriveFootholds(player.hq) }
   }
   const airlines = [makeAirline(0, playerSetup, 'player')]
-  scenario.rivals.forEach((r, i) => airlines.push(makeAirline(i + 1, r, 'rival')))
+  // Multiplayer: extra HUMAN seats take over rival slots. A human-controlled
+  // airline keeps its scenario identity (name, HQ, footholds) but the rival
+  // AI never moves it — turn resolution only drives controller === 'rival'.
+  const humans = new Set(humanSeats ?? [])
+  scenario.rivals.forEach((r, i) =>
+    airlines.push(makeAirline(i + 1, r, humans.has(i + 1) ? 'player' : 'rival')),
+  )
   return {
     scenario: scenarioId,
     seed,

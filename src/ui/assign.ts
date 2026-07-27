@@ -8,10 +8,10 @@ import { distanceKm } from '../data/cities'
 import type { GameState } from '../engine'
 import { pairWeeklyDemand } from '../engine/market'
 import { maxRouteFrequency, roundTripsPerWeek, routeWeeklyCapacity } from '../engine/queries'
-import { dispatch, getSession } from './session'
+import { viewSeat, dispatch, getSession } from './session'
 
 export function assignAndSchedule(state: GameState, aircraftId: number, routeId: number): void {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const aircraft = player.fleet.find((a) => a.id === aircraftId)
   const route = player.routes.find((r) => r.id === routeId)
   if (!aircraft || !route) return
@@ -36,7 +36,7 @@ export function assignAllIdle(): void {
   for (let guard = 0; guard < 50; guard++) {
     const s = getSession()?.state
     if (!s) return
-    const p = s.airlines[0]!
+    const p = s.airlines[viewSeat()]!
     const idle = p.fleet.find((a) => a.routeId === null)
     if (!idle) return
     const range = getAircraftType(idle.type).rangeKm

@@ -18,7 +18,7 @@ import { RivalsPanel } from './RivalsPanel'
 import { RouteDossier } from './RouteDossier'
 import { RouteSetupDialog } from './RouteSetupDialog'
 import { ACHIEVEMENTS, loadAchievements } from './achievements'
-import {
+import { canEndQuarter, getLastSentLink, listMpGames, mpStatus, passSeat, receiveTurn, resumeMpGame, seatOrder, sendSitting, startLinkGame, viewSeat,
   clearAllData,
   clearSaveAt,
   exportSave,
@@ -60,6 +60,8 @@ const LIVERY_COLORS = ['#4fa3ff', '#4fae62', '#d0636e', '#d8a052', '#9d7bd8', '#
 
 function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => void }) {
   const [seed, setSeed] = useState('')
+  const [players, setPlayers] = useState(1) // hot-seat seats at this device
+
   const [airlineName, setAirlineName] = useState('')
   const [color, setColor] = useState<string>(LIVERY_COLORS[0])
   const [hq, setHq] = useState('') // '' = the scenario's authored HQ
@@ -99,6 +101,19 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
       <p className="tagline">
         Routes. Jets. Margins. Fill the seats. <BuildStamp />
       </p>
+      {listMpGames().length > 0 && (
+        <div className="scenario-card continue-card" data-testid="mp-games">
+          <h2>Link duels</h2>
+          {listMpGames().map((g) => (
+            <p key={g.gameId}>
+              seed “{g.seed}” · seat {g.mySeat + 1} · {g.awaiting ? 'waiting for their turn' : 'your move'}{' '}
+              <button data-testid={`mp-resume-${g.gameId}`} onClick={() => resumeMpGame(g.gameId)}>
+                Open
+              </button>
+            </p>
+          ))}
+        </div>
+      )}
       {challenge && (
         <div className="scenario-card continue-card" data-testid="challenge-card">
           <h2>⚔ Challenge accepted?</h2>
@@ -142,18 +157,24 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
                       return save!.scenario
                     }
                   })()}{' '}
-                  · seed “{save!.seed}” · {save!.commands.filter((c) => c.type === 'end_quarter').length} quarters
+                  · seed “{save!.seed}” ·{' '}
+                  {(save!.version === 1 ? save!.commands : save!.entries.map((e) => e.command)).filter(
+                    (c) => c.type === 'end_quarter',
+                  ).length}{' '}
+                  quarters{save!.version === 2 ? ' · hot-seat' : ''}
                 </span>
               </span>{' '}
               <button data-testid={i === 0 ? 'continue-save' : `continue-save-${slot}`} onClick={() => resumeSave(slot)}>
                 Continue
               </button>{' '}
-              <button
-                data-testid={i === 0 ? 'watch-save-replay' : `watch-save-replay-${slot}`}
-                onClick={() => onWatchReplay(save!)}
-              >
-                Watch replay
-              </button>{' '}
+              {save!.version === 1 && (
+                <button
+                  data-testid={i === 0 ? 'watch-save-replay' : `watch-save-replay-${slot}`}
+                  onClick={() => onWatchReplay(save! as Replay)}
+                >
+                  Watch replay
+                </button>
+              )}{' '}
               <button
                 data-testid={`export-save-${slot}`}
                 title="copy this career as JSON — paste it into Import on any browser"
@@ -255,7 +276,22 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           placeholder="random each day"
           onChange={(e) => setSeed(e.target.value)}
           data-testid="seed-input"
-        />
+        />{' '}
+        <label className="dim">
+          players{' '}
+          <select
+            data-testid="players-select"
+            value={players}
+            onChange={(e) => setPlayers(Number(e.target.value))}
+            title="more than one: hot-seat — each quarter, every player plans in turn at this device"
+          >
+            {[1, 2, 3, 4].map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
       </label>
       <div className="scenario-card continue-card">
         <h2>Daily challenge</h2>
@@ -375,15 +411,28 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
                   ? `${prev!.name} not yet won — start anyway?`
                   : 'all slots full — overwrite your oldest save?'
               }
-              onConfirm={() => startGame(s.id, seed || new Date().toISOString().slice(0, 10), custom())}
+              onConfirm={() =>
+                startGame(s.id, seed || new Date().toISOString().slice(0, 10), custom(), undefined, players)
+              }
             />
           ) : (
-            <button
-              data-testid={`start-${s.id}`}
-              onClick={() => startGame(s.id, seed || new Date().toISOString().slice(0, 10), custom())}
-            >
-              Start
-            </button>
+            <>
+              <button
+                data-testid={`start-${s.id}`}
+                onClick={() =>
+                  startGame(s.id, seed || new Date().toISOString().slice(0, 10), custom(), undefined, players)
+                }
+              >
+                Start
+              </button>{' '}
+              <button
+                data-testid={`duel-${s.id}`}
+                title="start a two-player game by link: you open the first quarter, then send the turn link to your opponent — no server, the link is the game"
+                onClick={() => startLinkGame(s.id, seed || new Date().toISOString().slice(0, 10))}
+              >
+                ✉ duel
+              </button>
+            </>
           )}
         </div>
         )
@@ -429,7 +478,7 @@ function GameOverOverlay({
     obj.higherIsBetter ? score(b) - score(a) : score(a) - score(b),
   )
   // The career in numbers — what those decades added up to.
-  const me = state.airlines[0]!
+  const me = state.airlines[viewSeat()]!
   const totalPax = me.history.reduce((s, h) => s + h.pax, 0)
   const totalProfit = me.history.reduce((s, h) => s + h.profit, 0)
   const peakWorth = me.history.reduce((s, h) => Math.max(s, h.netWorth), 0)
@@ -550,7 +599,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const [showReport, setShowReport] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const state = session.state
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const scenario = getScenario(state.scenario)
 
   // Map interaction: a click selects a city (dossier panel). With a route
@@ -576,6 +625,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
 
   const endQuarter = (): void => {
     if (getSession()?.state.phase !== 'planning') return
+    if (!canEndQuarter()) return // hot-seat: not the last planner; link: not the closer
     dispatch({ type: 'end_quarter' })
     setShowReport(true)
   }
@@ -592,8 +642,10 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         setShowReport((open) => {
           if (open) return false
           if (e.key !== 'Enter') {
-            // End the quarter only when no report card was in the way.
-            if (getSession()?.state.phase === 'planning') {
+            // End the quarter only when no report card was in the way — and
+            // only for whoever may: in hot-seat that is the last planner, in
+            // a link duel the quarter's closer. Space is not a bypass.
+            if (getSession()?.state.phase === 'planning' && canEndQuarter()) {
               dispatch({ type: 'end_quarter' })
               return true
             }
@@ -605,7 +657,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         // answer to hunting for dots on a dense map.
         const s = getSession()?.state
         if (!s) return
-        const cities = [...networkCities(s.airlines[0]!)].sort()
+        const cities = [...networkCities(s.airlines[viewSeat()]!)].sort()
         if (cities.length === 0) return
         e.preventDefault()
         const step = e.key === 'ArrowRight' ? 1 : -1
@@ -736,7 +788,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           onClick={() => {
             // The link carries your current net worth as the number to beat —
             // sharing mid-career throws down where you stand right now.
-            const me = state.airlines[0]!
+            const me = state.airlines[viewSeat()]!
             const url =
               `${window.location.origin}${window.location.pathname}?scenario=${encodeURIComponent(
                 state.scenario,
@@ -748,11 +800,77 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           ⚔ share
         </button>
         <MuteToggle />
-        {state.phase === 'planning' && (
-          <button className="end-quarter" data-testid="end-quarter" onClick={endQuarter}>
-            End Quarter ▶
-          </button>
-        )}
+        {state.phase === 'planning' &&
+          (() => {
+            const sess = getSession()!
+            if (sess.mode === 'hotseat') {
+              const order = seatOrder()
+              const at = order.indexOf(sess.activeSeat)
+              const next = order[at + 1]
+              return (
+                <span className="hotseat-controls">
+                  <span className="seat-chip" data-testid="active-seat">
+                    🎮 {state.airlines[sess.activeSeat]!.name}
+                  </span>
+                  {next !== undefined ? (
+                    <button
+                      className="end-quarter"
+                      data-testid="pass-seat"
+                      onClick={() => passSeat()}
+                    >
+                      Done — pass to {state.airlines[next]!.name} ▶
+                    </button>
+                  ) : (
+                    <button className="end-quarter" data-testid="end-quarter" onClick={endQuarter}>
+                      End Quarter ▶
+                    </button>
+                  )}
+                </span>
+              )
+            }
+            if (sess.mode === 'link') {
+              const st = mpStatus()
+              if (!st) return null
+              if (!st.yourSitting) {
+                return (
+                  <span className="hotseat-controls" data-testid="mp-waiting">
+                    ✉ waiting for opponent
+                    {getLastSentLink() !== null && (
+                      <button onClick={() => copyText(getLastSentLink()!, 'Turn link')}>
+                        copy link again
+                      </button>
+                    )}
+                  </span>
+                )
+              }
+              return (
+                <span className="hotseat-controls">
+                  {canEndQuarter() && (
+                    <button className="end-quarter" data-testid="end-quarter" onClick={endQuarter}>
+                      End Quarter ▶
+                    </button>
+                  )}
+                  <button
+                    className="end-quarter"
+                    data-testid="mp-send"
+                    title="package everything since their last look into a link — send it to them over any channel"
+                    onClick={() => {
+                      void sendSitting().then((url) => {
+                        if (url) copyText(url, 'Turn link')
+                      })
+                    }}
+                  >
+                    ✉ Send turn
+                  </button>
+                </span>
+              )
+            }
+            return (
+              <button className="end-quarter" data-testid="end-quarter" onClick={endQuarter}>
+                End Quarter ▶
+              </button>
+            )
+          })()}
       </header>
       <CoachMarks state={state} />
       {(() => {
@@ -1007,10 +1125,33 @@ function BuildStamp() {
 export function App() {
   const session = useSyncExternalStore(subscribe, getSession)
   const [replay, setReplay] = useState<Replay | null>(null)
+  const [mpNotice, setMpNotice] = useState<string | null>(null)
+  // Turn links arrive as a URL fragment, and they must work from ANY screen —
+  // a player mid-game opens their opponent's reply directly. Same-page hash
+  // navigation fires hashchange rather than a reload, so both paths feed the
+  // same intake.
+  useEffect(() => {
+    const intake = (): void => {
+      const hash = window.location.hash
+      if (!hash.startsWith('#mpturn=')) return
+      void receiveTurn(hash.slice('#mpturn='.length)).then((res) => {
+        window.history.replaceState(null, '', window.location.pathname)
+        setMpNotice(res.ok ? null : res.reason)
+      })
+    }
+    intake()
+    window.addEventListener('hashchange', intake)
+    return () => window.removeEventListener('hashchange', intake)
+  }, [])
   if (replay) return <ReplayViewer replay={replay} onExit={() => setReplay(null)} />
-  return session ? (
-    <GameScreen onWatchReplay={setReplay} />
-  ) : (
-    <ScenarioSelect onWatchReplay={setReplay} />
+  return (
+    <>
+      {mpNotice !== null && (
+        <div className="mp-notice" data-testid="mp-notice" role="alert">
+          ✉ {mpNotice} <button onClick={() => setMpNotice(null)}>dismiss</button>
+        </div>
+      )}
+      {session ? <GameScreen onWatchReplay={setReplay} /> : <ScenarioSelect onWatchReplay={setReplay} />}
+    </>
   )
 }

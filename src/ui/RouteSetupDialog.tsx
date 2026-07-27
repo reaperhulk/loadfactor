@@ -16,7 +16,7 @@ import {
   shareWeightFor,
 } from '../engine/market'
 import { airlinesOnPair, roundTripsPerWeek } from '../engine/queries'
-import { dispatch } from './session'
+import { viewSeat, dispatch } from './session'
 import { money } from './format'
 
 interface RouteSetupDialogProps {
@@ -27,7 +27,7 @@ interface RouteSetupDialogProps {
 }
 
 export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogProps) {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const km = distanceKm(from, to)
   const candidates = player.fleet
     .filter((ac) => ac.routeId === null && getAircraftType(ac.type).rangeKm >= km)

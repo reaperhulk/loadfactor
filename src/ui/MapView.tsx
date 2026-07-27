@@ -38,6 +38,7 @@ import {
 } from '../engine/queries'
 import { cityPool } from '../engine/slots'
 import type { Airline } from '../engine'
+import { viewSeat } from './session'
 
 // Arc weight tells capacity: seats/wk drive stroke width, so the map itself
 // shows where an airline's hardware is concentrated. Fed to CSS as a custom
@@ -502,7 +503,7 @@ export function MapView({
   // aspect and nothing is cropped at all.
   const homeView = (): ViewBox => {
     if (typeof window === 'undefined' || window.innerWidth > 640) return FULL_VIEW
-    const hq = getCity(state.airlines[0]!.hq)
+    const hq = getCity(state.airlines[viewSeat()]!.hq)
     const w = W / 2.2
     const h = (w * H) / W
     return {
@@ -932,7 +933,7 @@ export function MapView({
     s: Math.min(MAX_SCALE, Math.max(1, g.s)),
   })
 
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const scale = isGlobe ? globe.s : W / view.w
   // Screen-size compensation. On the flat map the viewBox shrinks as you
   // zoom, so sizes divide by scale to stay constant on screen. The globe
@@ -995,7 +996,7 @@ export function MapView({
   }
   // Every pair any rival serves — player arcs on these run contested-hot.
   const rivalPairs = new Set(
-    state.airlines.slice(1).flatMap((a) => a.routes.map((r) => pairKey(r.from, r.to))),
+    state.airlines.filter((a) => a.id !== viewSeat()).flatMap((a) => a.routes.map((r) => pairKey(r.from, r.to))),
   )
 
   // Set when a drag/pinch gesture ends so the click that follows it is
@@ -1011,7 +1012,7 @@ export function MapView({
   const pulseUi = newRouteIds.size > 0 ? uiScale : 1
   const rivalArcsLayer = useMemo(() => {
     if (!showRivals) return null
-    return state.airlines.slice(1).map((airline) =>
+    return state.airlines.filter((a) => a.id !== viewSeat()).map((airline) =>
       airline.routes.map((r) => {
         const d = routePathFor(r.from, r.to)
         if (d === '') return null

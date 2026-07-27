@@ -40,7 +40,7 @@ import { Shop } from './Shop'
 import { assignAllIdle, assignAndSchedule } from './assign'
 import { sortHeaderFactory } from './sortHeader'
 import { ConfirmButton } from './ConfirmButton'
-import { dispatch } from './session'
+import { viewSeat, dispatch } from './session'
 import { copyTsv, money } from './format'
 import {
   CabinLegend,
@@ -83,7 +83,7 @@ export function RoutesPanel({
   onInspect: (routeId: number) => void
   onPlan?: (from: string, to: string) => void
 }) {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const [sortKey, setSortKey] = useState<RouteSortKey>('profit')
   const [sortAsc, setSortAsc] = useState(false)
   const [filter, setFilter] = useState<RouteFilter>('all')
@@ -426,7 +426,7 @@ export function RoutesPanel({
 // The planning tool the bots keep to themselves: the richest unserved pairs
 // you could open from your current slots and network, market-dollars first.
 function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: string, to: string) => void }) {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const network = networkCities(player)
   const cities = slotCities(player)
   const served = new Set(player.routes.map((r) => pairKey(r.from, r.to)))
@@ -575,7 +575,7 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
 type FleetSortKey = 'type' | 'age' | 'util' | 'maint' | 'value'
 
 export function FleetPanel({ state }: { state: GameState }) {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const year = yearOf(state)
   const [fleetSort, setFleetSort] = useState<FleetSortKey>('type')
   const [fleetAsc, setFleetAsc] = useState(true)
@@ -841,7 +841,7 @@ export function FleetPanel({ state }: { state: GameState }) {
 }
 
 export function AirportsPanel({ state }: { state: GameState }) {
-  const player = state.airlines[0]!
+  const player = state.airlines[viewSeat()]!
   const [onlyMine, setOnlyMine] = useState(true)
   const [query, setQuery] = useState('')
   // Your airports first (held slots, then usage), the rest of the world by
