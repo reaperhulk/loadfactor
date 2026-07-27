@@ -44,6 +44,7 @@ One turn = one calendar quarter. A scenario spans decades (e.g. 1960–1980 =
 80 turns).
 
 **Planning phase** (player acts, nothing resolves):
+
 - Open/close routes between cities where the airline holds slots. A new
   route must touch the airline's network — its HQ or a city it already
   serves. Airlines build networks, never disconnected cherry-picked pairs;
@@ -102,7 +103,7 @@ points where precision matters).
   have to learn it exists. Incumbency is worth something, and a raid takes
   quarters to bite.
 - **Connecting traffic.** After direct demand is seated, a share of demand on
-  city pairs an airline serves at both ends *without* a direct flight will
+  city pairs an airline serves at both ends _without_ a direct flight will
   take a one-stop over the airline's own network: best hub by total distance,
   detour capped, riding only spare seats on both legs, each leg sold at a
   through-fare discount. Hub-and-spoke emerges from real itineraries, not a
@@ -159,13 +160,14 @@ per airline, starting cash/fleet/slots, rival count and personalities,
 objective, and event-deck weights. A scenario is a **race over a fixed
 window**: victory is scored only when the final quarter resolves, and the
 player must finish **#1 among the airlines on the scenario metric** (net
-worth in scenario 1) *and* clear an absolute qualifying floor (so limping
+worth in scenario 1) _and_ clear an absolute qualifying floor (so limping
 past weak rivals is not a win). There is no early exit; bankruptcy loses at
 any time. Later scenarios can swap the metric (pax share, regional
 dominance) without changing the shape.
 
 The difficulty contract (asserted by balance tests, tuned over milestones):
-- A naive bot (opens obvious routes, never adjusts fares) should *fail* the
+
+- A naive bot (opens obvious routes, never adjusts fares) should _fail_ the
   first scenario's objective but survive solvency.
 - A competent greedy bot should win the first scenario on most seeds.
 - No strategy should be able to 10× the objective (fuzzer's job to find one).
@@ -192,7 +194,7 @@ The difficulty contract (asserted by balance tests, tuned over milestones):
 
 ### 3.2 Determinism rules (enforced, not aspirational)
 
-1. All randomness flows from seeded xoshiro128** streams stored **in**
+1. All randomness flows from seeded xoshiro128** streams stored **in\*\*
    `GameState` (`src/engine/rng.ts`), one substream per subsystem (economy,
    events, rivals, offers) so adding a draw to one never reshuffles
    another. Draws return the next RNG state; nothing mutates.
@@ -230,6 +232,7 @@ The difficulty contract (asserted by balance tests, tuned over milestones):
 ## 4. Why this architecture serves the tests
 
 Because the engine is a pure function of `(scenario, seed, commands)`:
+
 - any bug report is a replay file;
 - golden tests pin entire careers with one hash;
 - property tests can hurl thousands of random command sequences at the
@@ -311,8 +314,8 @@ committing).
   Engine steel thread: `newGame` → commands → `endQuarter` with the v1
   economic model, one scenario ("Jet Age", 1960–1980), ~30 cities, 8
   aircraft types, 2 rivals with a simple greedy policy. Harness: hash, naive
-  + greedy bots, simulate. Tests: rng, determinism, turn accounting,
-  property, goldens. Minimal UI: map, panels, end-quarter report. E2E smoke.
+  - greedy bots, simulate. Tests: rng, determinism, turn accounting,
+    property, goldens. Minimal UI: map, panels, end-quarter report. E2E smoke.
 - **M1 — Playable depth.** Fare elasticity tuning, service quality effects,
   slot scarcity pressure, quarterly report UI polish, save/load + replay
   viewer, balance envelope tightened.
@@ -364,3 +367,94 @@ personalities, and the fuzz genome all run one shared strategy brain
   data, distance table is generated, goldens make retunes explicit diffs.
 - **UI scope creep.** Mitigation: the engine is the product in early
   milestones; UI stays a thin command shell until M5/M6.
+
+## 10. Multiplayer (design — not yet built)
+
+The engine was built for this without knowing it. Three properties do all the
+heavy lifting, and each is already enforced by tests:
+
+- **Determinism** (§3.2): a game is `(scenario, seed, commands)`; two machines
+  fed the same inputs produce byte-identical states.
+- **Commands are per-airline**: `applyPlanningCommand(state, airlineIdx, cmd)`
+  takes a seat index, and rivals already issue their moves through the same
+  entry point (`rivals.ts`). "The player" is a UI convention, not an engine
+  concept — any airline slot can be a human.
+- **`hashState`** (harness): a cheap per-quarter fingerprint of the full state.
+
+### 10.1 The model: lockstep, simultaneous quarters
+
+Nobody ever transmits game state. Each quarter, every human seat submits its
+command list; every client applies all seats' commands in a fixed order and
+calls `endQuarter`. Everyone simulates the identical game locally.
+
+- **Seats** are airline indices. Empty seats stay AI (the shared policy brain
+  already plays them through commands), which gives drop-in/drop-out and
+  timeout handling for free: a seat that misses the deadline is played by its
+  AI for that quarter.
+- **Ordering**: within a quarter, seat batches apply in seat order, and the
+  engine's fixed resolution order (§3.3) does the rest. Contested resources
+  (slot queues, used aircraft, bidding) already resolve deterministically
+  among four airlines. The within-quarter tiebreak should rotate with the
+  quarter index so no seat holds a standing edge.
+- **Desync and cheating are the same problem with the same answer**: exchange
+  `hashState` alongside each quarter's commands. Any disagreement is
+  detectable immediately, and any finished game is verifiable by replaying
+  `(scenario, seed, commands)` from scratch — the replay system is the
+  anti-cheat.
+- **Hidden information**: there is none in `GameState` (the intel panel is a
+  UI filter). Fine for friendly play. Ranked play adds commit-reveal per
+  quarter — submit `hash(commands + salt)`, reveal after all seats commit —
+  which removes last-mover advantage without touching the engine.
+- **Career length**: multiplayer scenarios want 20–32 quarters, not 80.
+
+### 10.2 Wire format: deltas, never history
+
+Measured with the harness (greedy bot, jet_age): a player issues ~5–7
+commands per quarter; a full 80-quarter log is 25.6KB of JSON (3.1KB
+deflated). So links that carry the whole history grow without bound and are
+already marginal by mid-career — the turn payload must be a **delta**:
+
+```
+{ gameId, quarter, seat, commands[], parentHash }
+```
+
+One quarter's commands deflate+base64url to roughly 150–250 bytes; with
+envelope and hash a turn link stays **under ~400 characters forever**,
+independent of game length. Both clients already hold the prior state — they
+have been simulating all along and persist locally (the save system). The
+full log exists in exactly two places: local storage, and the recovery path —
+a cold rejoin or a finished-game verification uses the existing career
+export/import file, not a URL.
+
+### 10.3 Delivery ladder
+
+- **MP0 — Hot-seat.** Two humans, one machine, alternating planning within a
+  quarter. Zero networking. Forces the one real refactor: thread a seat index
+  through the UI (session, panels, map selection) instead of assuming
+  airline 0. Everything later builds on this seam.
+- **MP1 — Async duel by link.** Extends the existing challenge/duel links:
+  each turn produces a delta URL (format above) pasted over any channel.
+  Works on static hosting with no server. Two players; the UI shows "waiting
+  for their quarter" state and verifies `parentHash` before applying.
+- **MP2 — Relay server.** A room keyed by `(scenario, seed)`: clients POST
+  their quarter's command batch, the server broadcasts when all seats are in
+  (or the deadline passes and AI fills the gap). The server is a **mailbox —
+  it never runs the engine**, so it is ~200 lines on any substrate (Durable
+  Object, Supabase channel, one WebSocket process). Turn timers live here;
+  wall-clock never enters the engine.
+- **MP3 — Ranked.** Commit-reveal, server-side replay verification of final
+  hashes, a ladder. Only worth building if MP2 finds an audience.
+
+Explicitly rejected: server-authoritative real-time. It discards the
+determinism asset, requires hosting the engine, and buys nothing for a
+quarterly turn game.
+
+### 10.4 Engine-side work (small, all additive)
+
+- A `SeatConfig` on `GameState` or scenario: which airline indices are
+  human. Rival AI skips human seats in `endQuarter`.
+- Rotate the within-quarter seat application order by quarter index.
+- An engine-level guard that a command's seat matches its author (MP2+;
+  hot-seat and links trust the channel).
+- Nothing else: resolution, RNG, events, and serialization are already
+  multiplayer-shaped.
