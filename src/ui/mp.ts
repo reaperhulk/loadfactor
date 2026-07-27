@@ -118,6 +118,35 @@ export type ApplyOutcome =
   | { ok: true; entries: SeatCommand[]; state: GameState }
   | { ok: false; reason: string }
 
+// A sitting has ONE legal shape, and validating it is what stops the quiet
+// cheats that authorship and hashes cannot see. Without this, a hostile
+// sender could pack several end_quarters into one delta and play multiple
+// quarters solo while the opponent's airline idles — every hash would check
+// out, because hashes attest what happened, not that it was allowed.
+const MAX_DELTA = 200 // a sitting is ~a dozen commands; 200 is not a game, it is an attack
+
+export function validSittingShape(
+  prior: readonly SeatCommand[],
+  delta: readonly SeatCommand[],
+  finalState: GameState,
+): string | null {
+  if (delta.length === 0) return 'empty turn — nothing to apply'
+  if (delta.length > MAX_DELTA) return 'turn is implausibly large'
+  const eqCount = delta.filter((e) => e.command.type === 'end_quarter').length
+  if (prior.length === 0) {
+    // The creator's opening: plan quarter 1, resolve nothing.
+    if (eqCount !== 0) return 'an opening sitting cannot resolve quarters'
+    return null
+  }
+  if (eqCount !== 1) return 'a sitting resolves exactly one quarter'
+  // Nothing may follow the resolution if it ended the game.
+  const eqAt = delta.findIndex((e) => e.command.type === 'end_quarter')
+  if (finalState.phase !== 'planning' && eqAt !== delta.length - 1) {
+    return 'commands after the end of the game'
+  }
+  return null
+}
+
 // Fold an incoming turn into a local game. Every failure mode is a distinct,
 // human-readable reason — a mis-pasted link should say what went wrong.
 export function applyTurn(game: MpGame, turn: MpTurn): ApplyOutcome {
@@ -138,8 +167,20 @@ export function applyTurn(game: MpGame, turn: MpTurn): ApplyOutcome {
   if (hashState(before) !== turn.expect) {
     return { ok: false, reason: 'games out of sync — this link was made against a different history' }
   }
+  // Fold their commands through OUR engine. The engine validates every one
+  // exactly as it would our own — that is the security model: state is never
+  // accepted from the wire, only commands, so an illegal state cannot be
+  // injected, only proposed move by move to a rules engine we run. The
+  // try/catch turns any residual engine surprise from hostile JSON into a
+  // refusal instead of a crash.
   let after = before
-  for (const e of turn.delta) after = applyCommandFor(after, e.seat, e.command).state
+  try {
+    for (const e of turn.delta) after = applyCommandFor(after, e.seat, e.command).state
+  } catch {
+    return { ok: false, reason: 'link contains a command the engine cannot process' }
+  }
+  const shape = validSittingShape(game.entries, turn.delta, after)
+  if (shape !== null) return { ok: false, reason: shape }
   if (hashState(after) !== turn.result) {
     return { ok: false, reason: 'replaying their turn gave a different world — the link is corrupt' }
   }
@@ -175,13 +216,48 @@ export async function encodeTurn(turn: MpTurn): Promise<string> {
   return '1' + b64url(await pipe(raw, new CompressionStream('deflate-raw')))
 }
 
+// Wire caps: a legitimate turn is under a kilobyte encoded (§10.2), so these
+// bounds cost nothing real — but without the second one, a 400-character
+// link could deflate to gigabytes and take the receiver's tab with it.
+const MAX_ENCODED = 64 * 1024
+const MAX_DECODED = 512 * 1024
+
+async function inflateCapped(bytes: Uint8Array): Promise<Uint8Array | null> {
+  const reader = new Blob([bytes as BlobPart])
+    .stream()
+    .pipeThrough(new DecompressionStream('deflate-raw'))
+    .getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.length
+    if (total > MAX_DECODED) {
+      await reader.cancel()
+      return null
+    }
+    chunks.push(value)
+  }
+  const out = new Uint8Array(total)
+  let at = 0
+  for (const c of chunks) {
+    out.set(c, at)
+    at += c.length
+  }
+  return out
+}
+
 export async function decodeTurn(text: string): Promise<MpTurn | null> {
   try {
+    if (text.length > MAX_ENCODED) return null
     const body = unb64url(text.slice(1))
-    const raw =
-      text[0] === '1' ? await pipe(body, new DecompressionStream('deflate-raw')) : body
+    const raw = text[0] === '1' ? await inflateCapped(body) : body
+    if (raw === null || raw.length > MAX_DECODED) return null
     const turn = JSON.parse(new TextDecoder().decode(raw)) as MpTurn
     if (turn.v !== 1 || typeof turn.gameId !== 'string' || !Array.isArray(turn.delta)) return null
+    if (turn.seat !== 0 && turn.seat !== 1) return null
+    if (typeof turn.expect !== 'string' || typeof turn.result !== 'string') return null
     return turn
   } catch {
     return null

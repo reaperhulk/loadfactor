@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyCommandFor, newGame, type Command, type GameState } from '../../engine'
+import { applyCommandFor, newGame, type Command, type GameState, type SeatCommand } from '../../engine'
 import { hashState } from '../../harness/hash'
 import {
   applyTurn,
@@ -154,12 +154,101 @@ describe('the chain protocol', () => {
   it('a corrupt result hash is refused', () => {
     const alice = mkGame(0)
     const bob = mkGame(1)
-    const opening = sittingEntries(alice.entries, 0, [], [])
+    const state = replayEntries(alice.scenario, alice.seed, [])
+    const opening = sittingEntries(alice.entries, 0, [], planFor(state, 0))
     const turn = { ...buildTurn(alice, opening), result: 'deadbeef' }
     expect(applyTurn(bob, turn)).toMatchObject({
       ok: false,
       reason: expect.stringContaining('different world'),
     })
+  })
+})
+
+describe('adversarial turns', () => {
+  // Handcraft a hostile delta with CORRECT hashes — the attacks that
+  // authorship and sync checks cannot see. buildTurn computes honest hashes
+  // over whatever entries it is given, exactly as a modified client would.
+  const craft = (game: MpGame, delta: SeatCommand[]) => buildTurn({ ...game }, delta)
+
+  it('cannot resolve more than one quarter per sitting', () => {
+    const alice = mkGame(0)
+    const bob = mkGame(1)
+    // Alice opens legitimately; Bob tries to close q1 AND play q2, q3 solo.
+    const opening = sittingEntries(alice.entries, 0, [], planFor(replayEntries(alice.scenario, alice.seed, []), 0))
+    const applied = applyTurn(bob, craft({ ...alice, entries: [] }, opening))
+    alice.entries = [...alice.entries, ...opening]
+    expect(applied.ok).toBe(true)
+    if (applied.ok) bob.entries = applied.entries
+
+    const eq: Command = { type: 'end_quarter' }
+    const smuggle: SeatCommand[] = [
+      { seat: 1, command: eq },
+      { seat: 1, command: eq },
+      { seat: 1, command: eq },
+    ]
+    const turn = craft({ ...bob, entries: bob.entries }, smuggle)
+    const outcome = applyTurn({ ...alice, entries: bob.entries, mySeat: 0 }, turn)
+    expect(outcome).toMatchObject({ ok: false, reason: expect.stringContaining('exactly one quarter') })
+  })
+
+  it('an opening sitting cannot resolve quarters either', () => {
+    const alice = mkGame(0)
+    const bob = mkGame(1)
+    const eq: Command = { type: 'end_quarter' }
+    // A hostile creator plays three quarters alone before the invite.
+    const turn = craft(alice, [
+      { seat: 0, command: eq },
+      { seat: 0, command: eq },
+      { seat: 0, command: eq },
+    ])
+    expect(applyTurn(bob, turn)).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('opening sitting'),
+    })
+  })
+
+  it('rejects empty and implausibly large deltas', () => {
+    const alice = mkGame(0)
+    const bob = mkGame(1)
+    expect(applyTurn(bob, craft(alice, []))).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('empty'),
+    })
+    const spam: SeatCommand[] = Array.from({ length: 201 }, () => ({
+      seat: 0 as const,
+      command: { type: 'set_fare', routeId: 1, fareLevel: 2 } as Command,
+    }))
+    expect(applyTurn(bob, craft(alice, spam))).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('large'),
+    })
+  })
+
+  it('an unknown command type is refused by the engine, not a crash', () => {
+    const state = newGame('jet_age', 'adv', undefined, MP_SEATS)
+    const evil = { type: 'grant_me_money', amount: 1e9 } as unknown as Command
+    const { state: after, events } = applyCommandFor(state, 1, evil)
+    expect(events.some((e) => e.type === 'command_rejected')).toBe(true)
+    expect(hashState(after)).toBe(hashState(state))
+  })
+
+  it('a malformed command never crashes the receiver', () => {
+    const alice = mkGame(0)
+    const bob = mkGame(1)
+    const bad = {
+      v: 1 as const,
+      gameId: bob.gameId,
+      scenario: bob.scenario,
+      seed: bob.seed,
+      seat: 0 as const,
+      delta: [
+        { seat: 0 as const, command: { type: 'open_route', from: { evil: 1 }, to: null } as unknown as Command },
+      ],
+      expect: hashState(replayEntries(alice.scenario, alice.seed, [])),
+      result: 'whatever',
+    }
+    const outcome = applyTurn(bob, bad)
+    expect(outcome.ok).toBe(false) // reason varies; not throwing is the assertion
   })
 })
 
@@ -175,6 +264,26 @@ describe('the wire format', () => {
     expect(encoded.length).toBeLessThan(1200)
     const decoded = await decodeTurn(encoded)
     expect(decoded).toEqual(turn)
+  })
+
+  it('a compression bomb is refused before it inflates', async () => {
+    // 8MB of zeros deflates to a few KB — a link-sized payload that would
+    // expand to megabytes on the receiver. The capped inflater bails out.
+    const huge = new Uint8Array(8 * 1024 * 1024)
+    const deflated = new Uint8Array(
+      await new Response(
+        new Blob([huge]).stream().pipeThrough(new CompressionStream('deflate-raw')),
+      ).arrayBuffer(),
+    )
+    let bin = ''
+    for (const b of deflated) bin += String.fromCharCode(b)
+    const bomb = '1' + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    expect(bomb.length).toBeLessThan(64 * 1024) // it really is link-sized
+    expect(await decodeTurn(bomb)).toBeNull()
+  })
+
+  it('oversized encoded input is refused outright', async () => {
+    expect(await decodeTurn('1' + 'A'.repeat(70 * 1024))).toBeNull()
   })
 
   it('garbage decodes to null, never throws', async () => {

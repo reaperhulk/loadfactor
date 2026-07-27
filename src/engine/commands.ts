@@ -532,6 +532,13 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
     case 'end_quarter':
       // Resolved by endQuarter (see index.ts); reaching here is a caller bug.
       return reject(airlineIdx, command, 'end_quarter is not a planning command')
+    // The Command union is closed in TypeScript, but multiplayer folds
+    // commands that arrived over a LINK — arbitrary JSON. An unknown type
+    // must reject like any other invalid command, not fall off the switch
+    // and crash the receiver: "engine entry points never throw on user
+    // input" includes input a hostile opponent authored.
+    default:
+      return reject(airlineIdx, command, 'unknown command')
   }
 }
 

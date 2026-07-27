@@ -426,7 +426,49 @@ full log exists in exactly two places: local storage, and the recovery path —
 a cold rejoin or a finished-game verification uses the existing career
 export/import file, not a URL.
 
-### 10.3 Delivery ladder
+### 10.3 Threat model (adversarial game state)
+
+The security property everything rests on: **state is never accepted from the
+wire.** A turn link carries commands, and the receiver folds them through its
+own engine, which validates each one exactly as it validates the local
+player's. An illegal state cannot be injected — only proposed, move by move,
+to a rules engine the victim runs. The hashes are sync/integrity checks, not
+authentication (FNV-1a is not cryptographic and does not need to be here: a
+collision would not help an attacker, because the receiver derives state from
+the commands, never from the hash).
+
+Attacks and their answers, each with a test in `mp.test.ts`:
+
+- **Forged authorship** — commands tagged with the opponent's seat: rejected
+  at the trust boundary before the engine sees them.
+- **Stale / replayed / cross-game links**: the expect-hash and gameId checks
+  refuse them with distinct human-readable reasons.
+- **Tampered deltas**: replaying must land on the sender's result hash.
+- **Sitting-shape smuggling** — the quiet cheat hashes cannot see: a delta
+  packing several `end_quarter`s would let a player resolve quarters solo
+  while the opponent's airline idles, with every hash checking out.
+  `validSittingShape` enforces the protocol's one legal shape: an opening
+  resolves nothing; every other sitting resolves exactly one quarter; nothing
+  follows a game-ending resolution; deltas are non-empty and bounded (200
+  entries).
+- **Unknown or malformed commands** (arbitrary JSON): the engine's command
+  switch rejects unknown types (`default` case — "never throw on user input"
+  includes input a hostile opponent authored), and the fold is wrapped so any
+  residual throw becomes a refusal, not a crash.
+- **Compression bombs**: a link-sized deflate payload can inflate to
+  gigabytes; the decoder caps encoded input (64KB) and streamed inflation
+  (512KB) and returns null past either.
+
+Accepted risks, by design: the quarter's **closer sees the opener's moves**
+before committing (alternates fairly; commit-reveal in MP3 removes it);
+**local takebacks** before sending (symmetric — both sides can re-plan their
+own sitting); **full state visibility** (there is no hidden information);
+**abandonment** (no reply ever comes — needs deadlines, i.e. a server). A
+modified client can also simply play badly on purpose or feed its own UI
+anything it likes — that is its own machine; the protocol only guarantees it
+cannot corrupt YOURS.
+
+### 10.4 Delivery ladder
 
 - **MP0 — Hot-seat.** Two humans, one machine, alternating planning within a
   quarter. Zero networking. Forces the one real refactor: thread a seat index
@@ -449,7 +491,7 @@ Explicitly rejected: server-authoritative real-time. It discards the
 determinism asset, requires hosting the engine, and buys nothing for a
 quarterly turn game.
 
-### 10.4 Engine-side work (small, all additive)
+### 10.5 Engine-side work (small, all additive)
 
 - A `SeatConfig` on `GameState` or scenario: which airline indices are
   human. Rival AI skips human seats in `endQuarter`.
