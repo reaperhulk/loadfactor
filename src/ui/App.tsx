@@ -1046,7 +1046,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       <div className="map-area">
         <Suspense
           fallback={
-            <div className="map-wrap map-loading" data-testid="map-wrap" aria-busy="true">
+            <div className="map-wrap map-loading" data-testid="map-loading" aria-busy="true">
               <span>Loading route map…</span>
             </div>
           }

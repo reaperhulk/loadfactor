@@ -112,6 +112,9 @@ test('link duel: two browsers exchange turn links and stay in lockstep', async (
   // Alice's opening really reached Bob's world.
   expect(await b.evaluate(() => window.__harness.getState()!.airlines[0]!.routes.length)).toBe(1)
   await b.getByTestId('mp-send').click()
+  // Sending packages the turn asynchronously, then updates the clipboard.
+  // Reading immediately raced the previous clipboard contents on CI.
+  await expect(b.getByTestId('mp-waiting')).toBeVisible()
   const reply = await b.evaluate(() => navigator.clipboard.readText())
 
   // Alice opens the reply: quarter 1 resolves identically on her side.
