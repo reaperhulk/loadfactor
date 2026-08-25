@@ -4,6 +4,7 @@
 // path — the UI never mutates state.
 
 import {
+  applyCommandBatchFor,
   applyCommandFor,
   newGame,
   runReplay,
@@ -243,6 +244,7 @@ export function clearSaveAt(slot: number): void {
 export function resumeSave(slot = 0): boolean {
   const save = loadSaveAt(slot)
   if (!save) return false
+  undoGroups = []
   activeSlot = slot
   sessionPlayer = save.player ?? null
   playerColor = save.color ?? null
@@ -272,6 +274,7 @@ export function resumeSave(slot = 0): boolean {
 type Listener = () => void
 
 let session: Session | null = null
+let undoGroups: { seat: number; count: number }[] = []
 const listeners = new Set<Listener>()
 
 function notify(): void {
@@ -294,6 +297,7 @@ export function startGame(
   challenge?: ChallengeTarget,
   humans = 1, // hot-seat: how many airline seats are people at this device
 ): void {
+  undoGroups = []
   const player: PlayerSetup | null =
     custom && (custom.name !== undefined || custom.hq !== undefined)
       ? { name: custom.name, hq: custom.hq }
@@ -430,9 +434,78 @@ export function dispatch(command: Command): GameEvent[] {
     entries: [...session.entries, { seat, command }],
     mp: session.mp,
   }
+  if (command.type === 'end_quarter') undoGroups = []
+  else undoGroups.push({ seat, count: 1 })
   persist()
   notify()
   return events
+}
+
+// Several low-level commands can represent one planning intent (for example,
+// assign an aircraft and raise the schedule). Commit them with one clone and
+// expose them as one undo step.
+export function dispatchBatch(commands: readonly Command[]): GameEvent[] {
+  if (!session) throw new Error('no active session')
+  if (commands.length === 0) return []
+  if (commands.some((command) => command.type === 'end_quarter')) {
+    throw new Error('dispatchBatch accepts planning commands only')
+  }
+  if (session.mode === 'link' && session.mp?.awaiting) return []
+  const seat = session.activeSeat
+  const entries = commands.map((command) => ({ seat, command }))
+  const { state, events } = applyCommandBatchFor(session.state, entries)
+  const unlocks = session.mode === 'solo' ? checkAchievements(state, events) : []
+  session = {
+    ...session,
+    state,
+    lastEvents: events,
+    commandLog: [...session.commandLog, ...commands],
+    lastUnlocks: unlocks,
+    careerUnlocks: unlocks.length
+      ? [...session.careerUnlocks, ...unlocks.map((achievement) => achievement.id)]
+      : session.careerUnlocks,
+    entries: [...session.entries, ...entries],
+  }
+  undoGroups.push({ seat, count: commands.length })
+  persist()
+  notify()
+  return events
+}
+
+export function canUndo(): boolean {
+  if (!session || session.state.phase !== 'planning') return false
+  if (session.mode === 'link' && session.mp?.awaiting) return false
+  const group = undoGroups[undoGroups.length - 1]
+  if (!group || group.seat !== session.activeSeat || group.count > session.entries.length) return false
+  return session.entries
+    .slice(-group.count)
+    .every((entry) => entry.seat === group.seat && entry.command.type !== 'end_quarter')
+}
+
+export function undoLastAction(): boolean {
+  if (!session || !canUndo()) return false
+  const previous = session
+  const group = undoGroups.pop()!
+  const entries = previous.entries.slice(0, -group.count)
+  sessionFromEntries({
+    scenario: previous.state.scenario,
+    seed: previous.state.seed,
+    entries,
+    mode: previous.mode,
+    seats: previous.seats,
+    activeSeat: previous.activeSeat,
+    mp: previous.mp,
+    player: sessionPlayer ?? undefined,
+  })
+  session = {
+    ...session!,
+    lastEvents: [],
+    lastUnlocks: [],
+    careerUnlocks: previous.careerUnlocks,
+  }
+  persist()
+  notify()
+  return true
 }
 
 // --- Link duels (PLAN.md §10, MP1) ----------------------------------------
@@ -500,7 +573,16 @@ function sessionFromEntries(record: {
 }): void {
   let state = newGame(record.scenario, record.seed, record.player, record.seats.slice(1))
   const reportArchive: QuarterRecord[] = []
+  let planningEntries: SeatCommand[] = []
   for (const e of record.entries) {
+    if (e.command.type !== 'end_quarter') {
+      planningEntries.push(e)
+      continue
+    }
+    if (planningEntries.length > 0) {
+      state = applyCommandBatchFor(state, planningEntries).state
+      planningEntries = []
+    }
     const turnBefore = state.turn
     const res = applyCommandFor(state, e.seat, e.command)
     state = res.state
@@ -511,6 +593,7 @@ function sessionFromEntries(record: {
       reportArchive.push({ turn: turnBefore, events: res.events })
     }
   }
+  if (planningEntries.length > 0) state = applyCommandBatchFor(state, planningEntries).state
   session = {
     state,
     lastEvents: [],
@@ -528,6 +611,7 @@ function sessionFromEntries(record: {
 }
 
 export function startLinkGame(scenarioId: string, seed: string): void {
+  undoGroups = []
   const gameId = `${seed}-${crypto.randomUUID().slice(0, 8)}`
   sessionPlayer = null
   playerColor = null
@@ -551,6 +635,7 @@ export function resumeMpGame(gameId: string): boolean {
   sessionPlayer = null
   playerColor = null
   challengeTarget = null
+  undoGroups = []
   sessionFromEntries({
     scenario: rec.scenario,
     seed: rec.seed,
@@ -645,6 +730,7 @@ export async function receiveTurn(encoded: string): Promise<ReceiveResult> {
   sessionPlayer = null
   playerColor = null
   challengeTarget = null
+  undoGroups = []
   sessionFromEntries({
     scenario: rec.scenario,
     seed: rec.seed,
@@ -688,6 +774,7 @@ export function getReplay(): Replay | null {
 // via nextFreeSlot (stalest first) or an explicit delete.
 export function reset(): void {
   session = null
+  undoGroups = []
   sessionPlayer = null
   playerColor = null
   challengeTarget = null

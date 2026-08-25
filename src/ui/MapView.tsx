@@ -10,7 +10,9 @@ import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { seasonalBp } from '../engine/market'
+import { Icon } from './Icon'
 import { placeLabels } from './labels'
+import { cityMass, cityTier, rivalColorClass } from './mapStyle'
 import {
   BORDERS_PATH,
   ISLETS_PATH,
@@ -89,10 +91,6 @@ const layerSpan = (viewW: number): number => {
 const x = projectLon
 const y = projectLat
 
-export function cityMass(c: City): number {
-  return c.pop * 4 + c.biz * 3 + c.tour * 2
-}
-
 // Top-view airliner silhouette, nose on the +x axis — animateMotion's
 // rotate="auto" aligns +x with the direction of travel, so this glyph always
 // flies nose-first.
@@ -100,20 +98,6 @@ const PLANE_GLYPH =
   'M 7 0 C 6 -0.9 5 -1 4 -1 L 1.2 -1 L -1.8 -5 L -3.6 -5 L -1.9 -1 L -4.6 -1 ' +
   'L -6.2 -2.6 L -6.8 -2.6 L -5.8 0 L -6.8 2.6 L -6.2 2.6 L -4.6 1 L -1.9 1 ' +
   'L -3.6 5 L -1.8 5 L 1.2 1 L 4 1 C 5 1 6 0.9 7 0 Z'
-
-// One color per rival, everywhere it appears (map arcs, panel chips).
-export const RIVAL_COLORS = ['#d0636e', '#9d7bd8', '#d8a052'] as const
-
-export function rivalColorClass(airlineId: number): string {
-  return `rival-c${(airlineId - 1) % RIVAL_COLORS.length}`
-}
-
-// Level of detail: majors always visible, regionals from mid zoom, small
-// fields only up close — plus anything the player has a stake in.
-export function cityTier(c: City): 1 | 2 | 3 {
-  const mass = cityMass(c)
-  return mass >= 62 ? 1 : mass >= 45 ? 2 : 3
-}
 
 // LOD contract: majors and regionals (tier 1-2) are visible from the world
 // view — Aerobiz-style busy map; small fields (tier 3) fade in at 1.8× zoom,
@@ -1920,7 +1904,7 @@ export function MapView({
               : zoomAt(null, null, 1.5)
           }
         >
-          +
+          <Icon name="zoomIn" />
         </button>
         <button
           data-testid="zoom-out"
@@ -1931,14 +1915,14 @@ export function MapView({
               : zoomAt(null, null, 1 / 1.5)
           }
         >
-          −
+          <Icon name="zoomOut" />
         </button>
         <button
           data-testid="zoom-reset"
           aria-label="reset zoom"
           onClick={() => (isGlobe ? applyGlobe(GLOBE_HOME, false) : applyView(homeView(), false))}
         >
-          ⤢
+          <Icon name="reset" />
         </button>
         <button
           data-testid="map-projection"
@@ -1951,7 +1935,7 @@ export function MapView({
             localStorage.setItem('loadfactor:projection', next)
           }}
         >
-          🌐
+          <Icon name="globe" />
         </button>
         <button
           data-testid="toggle-rivals"
@@ -1959,7 +1943,7 @@ export function MapView({
           className={showRivals ? 'active' : ''}
           onClick={() => setShowRivals((v) => !v)}
         >
-          ⚔
+          <Icon name="rivals" />
         </button>
         <button
           data-testid="map-lens"
@@ -1968,7 +1952,7 @@ export function MapView({
           className={lens !== 'none' ? 'active' : ''}
           onClick={() => setLens(lens === 'none' ? 'load' : lens === 'load' ? 'profit' : lens === 'profit' ? 'season' : 'none')}
         >
-          {lens === 'profit' ? '$' : lens === 'season' ? '🌞' : '◐'}
+          {lens === 'profit' ? '$' : <Icon name={lens === 'season' ? 'sun' : 'lens'} />}
         </button>
       </div>
       {/* Minimap inset: once zoomed in, a world thumbnail shows where the

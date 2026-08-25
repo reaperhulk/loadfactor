@@ -61,6 +61,63 @@ h1 {
   text-align: left;
 }
 
+.scenario-era {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--era-card) 34%, #283247);
+  border-top: 3px solid var(--era-card);
+  background:
+    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--era-card) 17%, transparent), transparent 42%),
+    var(--panel);
+  box-shadow: 0 14px 34px #0000002e;
+  transition: transform 180ms ease, border-color 180ms ease;
+}
+
+.scenario-era:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--era-card) 62%, #283247);
+}
+
+.scenario-era-1960 { --era-card: #d9b779; }
+.scenario-era-1972 { --era-card: #d9844f; }
+.scenario-era-1985 { --era-card: #d6a45c; }
+.scenario-era-1995 { --era-card: #63c6e0; }
+.scenario-era-2005 { --era-card: #59d6c4; }
+
+.era-mark {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  margin: -7px 0 3px;
+  color: var(--era-card);
+}
+
+.era-mark svg {
+  width: 180px;
+  height: 44px;
+}
+
+.era-mark-route {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-dasharray: 3 5;
+  opacity: 0.52;
+}
+
+.era-mark-plane {
+  fill: currentColor;
+  opacity: 0.9;
+}
+
+.era-mark span {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
 header {
   display: flex;
   align-items: flex-end;
@@ -159,12 +216,31 @@ button:disabled {
   cursor: default;
 }
 
+.icon {
+  display: inline-block;
+  flex: 0 0 auto;
+  vertical-align: -0.22em;
+}
+
+button .icon {
+  margin-right: 0.25em;
+}
+
+.map-controls button .icon,
+.mute-toggle .icon {
+  margin-right: 0;
+}
+
 .end-quarter {
   margin-left: auto;
   background: var(--accent);
   color: #06101f;
   font-weight: 700;
   padding: 8px 18px;
+}
+
+.undo-action {
+  padding-inline: 10px;
 }
 
 .banner {
@@ -207,6 +283,14 @@ html.map-gesture * {
      is honoured inconsistently, and the wrapper is an ordinary block box that
      every engine agrees about. */
   touch-action: none;
+}
+
+.map-loading {
+  aspect-ratio: 30 / 11;
+  display: grid;
+  place-items: center;
+  color: var(--dim);
+  letter-spacing: 0.04em;
 }
 
 /* The layer that moves. `will-change` is permanent and deliberate: this

@@ -33,6 +33,16 @@ export interface ScenarioObjective {
   blurb: string // one line telling the player how to win this era
 }
 
+export interface ScenarioRules {
+  blurb: string
+  longHaulDemandBp?: number
+  hedgePremiumBp?: number
+  playerFuelBp?: number
+  discountDemandBp?: number
+  connectionDemandBp?: number
+  routeOverheadBp?: number
+}
+
 export interface Scenario {
   id: string
   name: string
@@ -48,6 +58,9 @@ export interface Scenario {
   // "how big is big here" both read this. Equals the objective target for
   // net-worth eras.
   targetNetWorth: number
+  // A small, explicit rules twist makes the era change how a network should
+  // be built, not merely which number is scored at the end.
+  rules: ScenarioRules
   // Era flavor: multipliers on world-event draw weights (e.g. oil_shock ×4
   // in the Oil Crisis scenario). Unlisted events keep weight ×1.
   eventWeightMult?: Readonly<Record<string, number>>
@@ -111,6 +124,10 @@ export const SCENARIOS: readonly Scenario[] = [
       blurb: 'Build the most valuable airline in the sky by 1980.',
     },
     targetNetWorth: 550_000,
+    rules: {
+      blurb: 'Jet prestige: demand on routes over 4,000 km is 10% higher.',
+      longHaulDemandBp: 11000,
+    },
   },
   {
     id: 'oil_crisis',
@@ -118,7 +135,7 @@ export const SCENARIOS: readonly Scenario[] = [
     description:
       'London, 1972. Widebodies are landing just as the fuel bill explodes, ' +
       'and the discounters smell blood. Survive the shocks and finish 1987 ' +
-      'as the #1 airline, worth at least $400M.',
+      'with the most cumulative profit.',
     startYear: 1972,
     quarters: 60,
     player: {
@@ -158,6 +175,11 @@ export const SCENARIOS: readonly Scenario[] = [
       blurb: 'Anyone can fly jets in a boom. Bank the most money ACROSS the crisis — every quarter of profit counts, every loss claws it back.',
     },
     targetNetWorth: 400_000,
+    rules: {
+      blurb: 'Crisis desk: supply contracts cut your fuel bill 3%, and hedge premiums are 40% cheaper.',
+      hedgePremiumBp: 6000,
+      playerFuelBp: 9700,
+    },
     eventWeightMult: { oil_shock: 4, recession: 2, boom: 0.5 },
   },
   {
@@ -165,8 +187,8 @@ export const SCENARIOS: readonly Scenario[] = [
     name: 'Deregulation',
     description:
       'Los Angeles, 1985. The rules are gone, the twins are efficient, and ' +
-      'three rivals want your gates. Out-fly a price war and finish 2000 as ' +
-      'the #1 airline, worth at least $600M.',
+      'three rivals want your gates. Out-fly the price war and carry the most ' +
+      'passengers by 2000.',
     startYear: 1985,
     quarters: 60,
     player: {
@@ -215,6 +237,10 @@ export const SCENARIOS: readonly Scenario[] = [
       blurb: 'The rules are gone and the public is the prize: carry more passengers than anyone else by 2000.',
     },
     targetNetWorth: 600_000,
+    rules: {
+      blurb: 'Fare freedom: discounted routes attract 5% more passengers.',
+      discountDemandBp: 10500,
+    },
     eventWeightMult: { boom: 2, tourism_wave: 2 },
   },
   {
@@ -222,8 +248,8 @@ export const SCENARIOS: readonly Scenario[] = [
     name: 'Open Skies',
     description:
       'Singapore, 1995. Borders open, the big twins fly anywhere, and every ' +
-      'megahub wants your passengers. Finish 2010 as the #1 airline by net ' +
-      'worth — and be worth at least $750M.',
+      'megahub wants your passengers. Build the strongest connecting network ' +
+      'and carry the most transfer traffic by 2010.',
     startYear: 1995,
     quarters: 60,
     player: {
@@ -272,6 +298,10 @@ export const SCENARIOS: readonly Scenario[] = [
       blurb: 'Megahub or nothing: win on CONNECTING passengers — travellers who change planes inside your network.',
     },
     targetNetWorth: 750_000,
+    rules: {
+      blurb: 'Open-skies rights: your hubs attract 10% more connecting travellers.',
+      connectionDemandBp: 11000,
+    },
     eventWeightMult: { boom: 2, tourism_wave: 2, conflict: 1.5 },
   },
   {
@@ -279,8 +309,8 @@ export const SCENARIOS: readonly Scenario[] = [
     name: 'Low-Cost Wars',
     description:
       'Barcelona, 2005. Fuel spikes, slumps ground whole fleets, and every ' +
-      'discounter is packing A320s nose to tail. Out-lean them all and ' +
-      'finish 2020 as the #1 airline, worth at least $750M.',
+      'discounter is packing A320s nose to tail. Out-lean them all and finish ' +
+      '2020 with the highest lifetime load factor.',
     startYear: 2005,
     quarters: 60,
     player: {
@@ -329,6 +359,10 @@ export const SCENARIOS: readonly Scenario[] = [
       blurb: 'Fill the seats. Every empty seat you fly is money burned — win on the share of seats actually sold across the era.',
     },
     targetNetWorth: 750_000,
+    rules: {
+      blurb: 'Lean operations: quadratic network-management overhead is 30% lower.',
+      routeOverheadBp: 7000,
+    },
     eventWeightMult: { travel_slump: 3, oil_shock: 2, alliance_boom: 2, boom: 0.75 },
   },
 ]

@@ -13,6 +13,7 @@ import {
   MARKETING_PER_ROUTE_PER_LEVEL,
   MARKETING_WEIGHT_BP_PER_LEVEL,
 } from '../data/constants'
+import { getScenario } from '../data/scenarios'
 import type { CostBreakdown, GameState } from '../engine'
 import { inflationBp } from '../engine/market'
 import { currentLoanRateBp, debtCeiling, routeWeeklyCapacity, totalDebt } from '../engine/queries'
@@ -131,6 +132,14 @@ function CostStructure({ state }: { state: GameState }) {
 
 export function FinancePanel({ state }: { state: GameState }) {
   const player = state.airlines[viewSeat()]!
+  const hedgePremium = (quarters: number): number =>
+    Math.floor(
+      (HEDGE_PREMIUM_PER_AIRCRAFT *
+        player.fleet.length *
+        quarters *
+        (getScenario(state.scenario).rules.hedgePremiumBp ?? 10000)) /
+        10000,
+    )
   const [amount, setAmount] = useState(5000)
   const ceiling = debtCeiling(player)
   const debt = totalDebt(player)
@@ -335,12 +344,12 @@ export function FinancePanel({ state }: { state: GameState }) {
                   player.fleet.length === 0 ||
                   q < HEDGE_MIN_QUARTERS ||
                   q > HEDGE_MAX_QUARTERS ||
-                  player.cash < HEDGE_PREMIUM_PER_AIRCRAFT * player.fleet.length * q
+                  player.cash < hedgePremium(q)
                 }
                 title="lock today's fuel index for your whole fleet"
                 onClick={() => dispatch({ type: 'hedge_fuel', quarters: q })}
               >
-                {q}q — {money(HEDGE_PREMIUM_PER_AIRCRAFT * player.fleet.length * q)}
+                {q}q — {money(hedgePremium(q))}
               </button>
             ))}
           </>

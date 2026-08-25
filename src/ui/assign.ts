@@ -5,10 +5,10 @@
 
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm } from '../data/cities'
-import type { GameState } from '../engine'
+import type { Command, GameState } from '../engine'
 import { pairWeeklyDemand } from '../engine/market'
-import { maxRouteFrequency, roundTripsPerWeek, routeWeeklyCapacity } from '../engine/queries'
-import { viewSeat, dispatch, getSession } from './session'
+import { airlinesOnPair, maxRouteFrequency, roundTripsPerWeek, routeWeeklyCapacity } from '../engine/queries'
+import { viewSeat, dispatchBatch, getSession } from './session'
 
 export function assignAndSchedule(state: GameState, aircraftId: number, routeId: number): void {
   const player = state.airlines[viewSeat()]!
@@ -16,17 +16,51 @@ export function assignAndSchedule(state: GameState, aircraftId: number, routeId:
   const route = player.routes.find((r) => r.id === routeId)
   if (!aircraft || !route) return
   const km = distanceKm(route.from, route.to)
-  dispatch({ type: 'assign_aircraft', aircraftId, routeId })
   // Out of range → the engine already rejected the assign with a toast;
   // don't stack a second rejection on the schedule bump.
-  if (getAircraftType(aircraft.type).rangeKm < km) return
+  if (getAircraftType(aircraft.type).rangeKm < km) {
+    dispatchBatch([{ type: 'assign_aircraft', aircraftId, routeId }])
+    return
+  }
   const trips = roundTripsPerWeek(aircraft.type, km)
   // maxRouteFrequency is computed pre-assign, so the new plane's trips are
   // added by hand; the requested schedule grows by what the plane can fly.
   const target = Math.min(maxRouteFrequency(player, route) + trips, route.frequency + trips)
-  if (target > route.frequency) {
-    dispatch({ type: 'set_frequency', routeId, frequency: target })
+  const commands: Command[] = [{ type: 'assign_aircraft', aircraftId, routeId }]
+  if (target > route.frequency) commands.push({ type: 'set_frequency', routeId, frequency: target })
+  dispatchBatch(commands)
+}
+
+// Delegate repetitive schedule tuning while keeping network strategy in the
+// player's hands. Each route gets enough weekly seats for its fair share of
+// forecast demand plus 8% headroom, capped by the fleet actually assigned.
+export function balancedScheduleCommands(state: GameState, airlineIdx: number): Command[] {
+  const airline = state.airlines[airlineIdx]
+  if (!airline) return []
+  const commands: Command[] = []
+  for (const route of airline.routes) {
+    const max = maxRouteFrequency(airline, route)
+    if (max < 1) continue
+    const competitors = airlinesOnPair(state, route.from, route.to, airlineIdx)
+    const demandShare = Math.ceil(
+      (pairWeeklyDemand(state, route.from, route.to) * 10800) / (10000 * (competitors + 1)),
+    )
+    let frequency = max
+    for (let candidate = 1; candidate <= max; candidate++) {
+      if (routeWeeklyCapacity(airline, { ...route, frequency: candidate }) >= demandShare) {
+        frequency = candidate
+        break
+      }
+    }
+    if (frequency !== route.frequency) {
+      commands.push({ type: 'set_frequency', routeId: route.id, frequency })
+    }
   }
+  return commands
+}
+
+export function balanceSchedules(state: GameState): void {
+  dispatchBatch(balancedScheduleCommands(state, viewSeat()))
 }
 
 // Put every idle airframe to work: a greedy pass, one plane at a time

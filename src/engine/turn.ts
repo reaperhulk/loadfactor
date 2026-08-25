@@ -319,9 +319,14 @@ export function endQuarter(prev: GameState): EngineResult {
         ? Math.floor((type.price * LEASE_BP_PER_QUARTER) / 10000)
         : Math.floor((type.price * OWNERSHIP_BP_PER_QUARTER) / 10000)
     }
-    let overhead = inflate(
-      AIRLINE_OVERHEAD_PER_QUARTER + ROUTE_OVERHEAD_QUAD * airline.routes.length * airline.routes.length,
+    const routeOverhead = Math.floor(
+      (ROUTE_OVERHEAD_QUAD *
+        airline.routes.length *
+        airline.routes.length *
+        (getScenario(state.scenario).rules.routeOverheadBp ?? 10000)) /
+        10000,
     )
+    let overhead = inflate(AIRLINE_OVERHEAD_PER_QUARTER + routeOverhead)
     // Regulatory scrutiny: past a share of industry seats, dominance costs
     // real money (compliance, political friction, punitive fees, fare caps).
     // Charged against REVENUE so it scales with the airline it restrains —

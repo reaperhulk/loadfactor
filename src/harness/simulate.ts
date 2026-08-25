@@ -2,7 +2,7 @@
 // engine surface — exactly the API the UI uses. Checkpoint hashes feed the
 // golden tests; summaries feed the balance envelope.
 
-import { applyCommand, newGame } from '../engine'
+import { applyCommandBatch, newGame } from '../engine'
 import { checkInvariants } from '../engine/invariants'
 import { netWorth } from '../engine/queries'
 import type { Command, GameState } from '../engine/types'
@@ -35,12 +35,9 @@ export function runCareer(
   const checkpointHashes: Record<number, string> = {}
 
   for (let q = 0; q < maxQuarters && state.phase === 'planning'; q++) {
-    for (const command of botCommands(state, bot)) {
-      state = applyCommand(state, command).state
-      commandLog.push(command)
-    }
-    state = applyCommand(state, { type: 'end_quarter' }).state
-    commandLog.push({ type: 'end_quarter' })
+    const commands = [...botCommands(state, bot), { type: 'end_quarter' } as const]
+    state = applyCommandBatch(state, commands).state
+    commandLog.push(...commands)
     checkInvariants(state)
     if (state.turn % 10 === 0) checkpointHashes[state.turn] = hashState(state)
   }
