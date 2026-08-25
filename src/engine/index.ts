@@ -31,6 +31,41 @@ export function applyCommandFor(prev: GameState, seat: number, command: Command)
   return { state, events }
 }
 
+// Apply a log without cloning the whole simulation for every planning click.
+// State is cloned lazily once per consecutive planning run; endQuarter keeps
+// its existing immutable boundary. This preserves the exact command/event
+// ordering of repeated applyCommandFor calls while making long replays cheap.
+export function applyCommandBatchFor(prev: GameState, entries: readonly SeatCommand[]): EngineResult {
+  let state = prev
+  let planningStateIsMutable = false
+  const events: GameEvent[] = []
+
+  for (const { seat, command } of entries) {
+    if (command.type === 'end_quarter') {
+      const result = endQuarter(state)
+      state = result.state
+      planningStateIsMutable = false
+      events.push(...result.events)
+      continue
+    }
+
+    if (!planningStateIsMutable) {
+      state = structuredClone(state)
+      planningStateIsMutable = true
+    }
+    events.push(...applyPlanningCommand(state, seat, command).events)
+  }
+
+  return { state, events }
+}
+
+export function applyCommandBatch(prev: GameState, commands: readonly Command[]): EngineResult {
+  return applyCommandBatchFor(
+    prev,
+    commands.map((command) => ({ seat: 0, command })),
+  )
+}
+
 // A multiplayer log entry: which seat issued the command. A multiplayer game
 // is (scenario, seed, seats, entries) exactly as a solo game is
 // (scenario, seed, commands) — fold the entries and determinism does the rest.
@@ -48,14 +83,10 @@ export interface SeatReplay {
 }
 
 export function runSeatReplay(replay: SeatReplay): { state: GameState; events: GameEvent[] } {
-  let state = newGame(replay.scenario, replay.seed, replay.player, replay.humanSeats)
-  const allEvents: GameEvent[] = []
-  for (const entry of replay.entries) {
-    const result = applyCommandFor(state, entry.seat, entry.command)
-    state = result.state
-    allEvents.push(...result.events)
-  }
-  return { state, events: allEvents }
+  return applyCommandBatchFor(
+    newGame(replay.scenario, replay.seed, replay.player, replay.humanSeats),
+    replay.entries,
+  )
 }
 
 export interface Replay {
@@ -68,12 +99,5 @@ export interface Replay {
 }
 
 export function runReplay(replay: Replay): { state: GameState; events: GameEvent[] } {
-  let state = newGame(replay.scenario, replay.seed, replay.player)
-  const allEvents: GameEvent[] = []
-  for (const command of replay.commands) {
-    const result = applyCommand(state, command)
-    state = result.state
-    allEvents.push(...result.events)
-  }
-  return { state, events: allEvents }
+  return applyCommandBatch(newGame(replay.scenario, replay.seed, replay.player), replay.commands)
 }

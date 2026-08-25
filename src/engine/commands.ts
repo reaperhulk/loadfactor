@@ -5,6 +5,7 @@
 
 import { getAircraftType, isAircraftType } from '../data/aircraft'
 import { distanceKm, getCity, isCity, pairKey } from '../data/cities'
+import { getScenario } from '../data/scenarios'
 import {
   CABIN_REFIT_COST_BP,
   ORDER_CANCEL_REFUND_BP,
@@ -271,7 +272,13 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         return reject(airlineIdx, command, `hedge must run ${HEDGE_MIN_QUARTERS}..${HEDGE_MAX_QUARTERS} quarters`)
       if (airline.fuelHedge !== null) return reject(airlineIdx, command, 'a hedge is already running')
       if (airline.fleet.length === 0) return reject(airlineIdx, command, 'no fleet to hedge')
-      const premium = HEDGE_PREMIUM_PER_AIRCRAFT * airline.fleet.length * command.quarters
+      const premium = Math.floor(
+        (HEDGE_PREMIUM_PER_AIRCRAFT *
+          airline.fleet.length *
+          command.quarters *
+          (getScenario(state.scenario).rules.hedgePremiumBp ?? 10000)) /
+          10000,
+      )
       if (airline.cash < premium) return reject(airlineIdx, command, 'insufficient cash')
       airline.cash -= premium
       const bp = effFuelBp(state.world)

@@ -6,6 +6,7 @@
 
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm, getCity, pairKey } from '../data/cities'
+import { getScenario } from '../data/scenarios'
 import {
   AIRCRAFT_ADMIN_PER_QUARTER,
   CABIN_WEIGHT,
@@ -77,7 +78,12 @@ export function estimateAircraftQuarterCost(state: GameState, typeId: string, km
   const t = getAircraftType(typeId)
   if (km > t.rangeKm) return -1
   const rt = roundTripsPerWeek(typeId, km)
-  const fuelBp = Math.floor((effFuelBp(state.world) * fuelInflationBp(state.turn)) / 10000)
+  const fuelBp = Math.floor(
+    (effFuelBp(state.world) *
+      fuelInflationBp(state.turn) *
+      (getScenario(state.scenario).rules.playerFuelBp ?? 10000)) /
+      100_000_000,
+  )
   const weeklyFuel = Math.floor((rt * 2 * km * t.fuelPerKm * fuelBp) / 10000)
   const weeklyFees = rt * 2 * (LANDING_FEE_BASE + t.seats * LANDING_FEE_PER_SEAT)
   const weeklyCrewMin = rt * 2 * Math.floor((km * 60) / t.speedKmh)
@@ -141,6 +147,9 @@ export function pairWeeklyDemand(state: GameState, a: string, b: string): number
   demand = Math.floor((demand * seasonalBp(a, state.turn)) / 10000)
   demand = Math.floor((demand * seasonalBp(b, state.turn)) / 10000)
   demand = Math.floor((demand * hashNoiseBp(state.seed, state.turn, pairKey(a, b), DEMAND_NOISE_SPREAD_BP)) / 10000)
+  if (km >= 4000) {
+    demand = Math.floor((demand * (getScenario(state.scenario).rules.longHaulDemandBp ?? 10000)) / 10000)
+  }
   return demand
 }
 
@@ -242,10 +251,13 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
     service: 0,
   }))
   const marketFuelBp = effFuelBp(state.world)
+  const rules = getScenario(state.scenario).rules
   const fuelBpFor = (idx: number): number => {
-    const hedge = state.airlines[idx]!.fuelHedge
+    const airline = state.airlines[idx]!
+    const hedge = airline.fuelHedge
     const base = hedge !== null && hedge.quartersLeft > 0 ? hedge.bp : marketFuelBp
-    return Math.floor((base * fuelInflationBp(state.turn)) / 10000)
+    const playerFuelBp = airline.controller === 'player' ? (rules.playerFuelBp ?? 10000) : 10000
+    return Math.floor((base * fuelInflationBp(state.turn) * playerFuelBp) / 100_000_000)
   }
   const inflBp = inflationBp(state.turn)
 
@@ -296,6 +308,9 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       if (totalWeight === 0) return 0
       let a = Math.floor((demand * e.weight) / totalWeight)
       a = Math.floor((a * FARE_DEMAND_BP[e.route.fareLevel + 2]!) / 10000)
+      if (e.route.fareLevel < 0) {
+        a = Math.floor((a * (rules.discountDemandBp ?? 10000)) / 10000)
+      }
       // Spool-up: young routes attach only part of their share until the
       // market learns them (monopoly or contested alike).
       a = Math.floor((a * routeSpoolBp(state.airlines[e.airlineIdx]!, e.route, state.turn)) / 10000)
@@ -393,7 +408,10 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
         const spare1 = best.leg1.weeklyCapacity - best.leg1.weeklyPax
         const spare2 = best.leg2.weeklyCapacity - best.leg2.weeklyPax
         if (spare1 <= 0 || spare2 <= 0) continue
-        const willing = Math.floor((pairWeeklyDemand(state, a, c) * CONNECT_WILLING_BP) / 10000)
+        const connectionBp = airline.controller === 'player' ? (rules.connectionDemandBp ?? 10000) : 10000
+        const willing = Math.floor(
+          (pairWeeklyDemand(state, a, c) * CONNECT_WILLING_BP * connectionBp) / 100_000_000,
+        )
         const take = Math.min(willing, spare1, spare2)
         if (take <= 0) continue
         for (const leg of [best.leg1, best.leg2]) {

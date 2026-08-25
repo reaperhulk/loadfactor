@@ -4,9 +4,10 @@
 
 import { describe, expect, it } from 'vitest'
 import { typesOnSale } from '../../data/aircraft'
+import { HEDGE_PREMIUM_PER_AIRCRAFT } from '../../data/constants'
 import { SCENARIOS } from '../../data/scenarios'
 import { runCareer } from '../../harness/simulate'
-import { newGame } from '../index'
+import { applyCommand, newGame } from '../index'
 import { netWorth, objectiveScore } from '../queries'
 
 describe('scenario smoke', () => {
@@ -36,6 +37,32 @@ describe('scenario smoke', () => {
 })
 
 describe('era objectives (F3)', () => {
+  it('every era exposes a distinct operational rule', () => {
+    const ruleKeys = SCENARIOS.map((scenario) =>
+      Object.keys(scenario.rules)
+        .filter((key) => key !== 'blurb')
+        .join(','),
+    )
+    expect(new Set(ruleKeys).size).toBe(SCENARIOS.length)
+    for (const scenario of SCENARIOS) {
+      expect(scenario.rules.blurb.length, `${scenario.id}: explains its rules twist`).toBeGreaterThan(20)
+      expect(ruleKeys[SCENARIOS.indexOf(scenario)], `${scenario.id}: changes a mechanic`).not.toBe('')
+    }
+  })
+
+  it('the Oil Crisis applies its authored hedge discount', () => {
+    const state = newGame('oil_crisis', 'rules-hedge')
+    const fleet = state.airlines[0]!.fleet.length
+    const result = applyCommand(state, { type: 'hedge_fuel', quarters: 4 })
+    const event = result.events.find((candidate) => candidate.type === 'fuel_hedged')
+    expect(event?.type).toBe('fuel_hedged')
+    if (event?.type === 'fuel_hedged') {
+      expect(event.premium).toBe(
+        Math.floor((HEDGE_PREMIUM_PER_AIRCRAFT * fleet * 4 * 6000) / 10000),
+      )
+    }
+  })
+
   it('every scenario names a distinct, scoreable objective', () => {
     const kinds = SCENARIOS.map((s) => s.objective.kind)
     expect(new Set(kinds).size, 'five eras, five different questions').toBe(SCENARIOS.length)

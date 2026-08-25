@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState, useSyncExternalStore } from 'react'
+import { lazy, Suspense, useEffect, useReducer, useState, useSyncExternalStore } from 'react'
 import { CITIES } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { SCENARIOS, getScenario } from '../data/scenarios'
@@ -9,10 +9,8 @@ import { CoachMarks } from './CoachMarks'
 import { ConfirmButton } from './ConfirmButton'
 import { useCountUp } from './countUp'
 import { isMuted, setMuted } from './sounds'
-import { MapView } from './MapView'
 import { ActiveDeals, OfferCard } from './OfferCard'
 import { AirportsPanel, FinancePanel, FleetPanel, ReportPanel, RoutesPanel } from './panels'
-import { ReplayViewer } from './ReplayViewer'
 import { ReportCard } from './ReportCard'
 import { RivalsPanel } from './RivalsPanel'
 import { RouteDossier } from './RouteDossier'
@@ -21,6 +19,7 @@ import { ACHIEVEMENTS, loadAchievements } from './achievements'
 import { canEndQuarter, getLastSentLink, listMpGames, mpStatus, passSeat, receiveTurn, resumeMpGame, seatOrder, sendSitting, startLinkGame, viewSeat,
   clearAllData,
   clearSaveAt,
+  canUndo,
   exportSave,
   importSave,
   dispatch,
@@ -34,6 +33,7 @@ import { canEndQuarter, getLastSentLink, listMpGames, mpStatus, passSeat, receiv
   resumeSave,
   startGame,
   reset,
+  undoLastAction,
 } from './session'
 import { subscribe } from './session'
 import {
@@ -52,11 +52,27 @@ import {
 import { EVENT_ICONS, EVENT_NAMES, ToastStack } from './toasts'
 import type { GameState, Replay } from '../engine'
 import { copyText, money, objectiveValue } from './format'
+import { Icon } from './Icon'
 
 type Tab = 'routes' | 'fleet' | 'airports' | 'rivals' | 'finance' | 'report'
 
+const MapView = lazy(() => import('./MapView').then(({ MapView }) => ({ default: MapView })))
+const ReplayViewer = lazy(() => import('./ReplayViewer').then(({ ReplayViewer }) => ({ default: ReplayViewer })))
+
 // Livery choices: the player's accent color across the whole UI.
 const LIVERY_COLORS = ['#4fa3ff', '#4fae62', '#d0636e', '#d8a052', '#9d7bd8', '#3fbfb0'] as const
+
+function EraMark({ year }: { year: number }) {
+  return (
+    <div className="era-mark" aria-hidden="true">
+      <svg viewBox="0 0 180 44">
+        <path className="era-mark-route" d="M7 35C48 4 111 4 173 27" />
+        <path className="era-mark-plane" d="m99 13 18 4 10-7 4 1-7 9 14 5-2 4-16-3-5 10-4-1 1-11-14-6Z" />
+      </svg>
+      <span>{year}s</span>
+    </div>
+  )
+}
 
 function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => void }) {
   const [seed, setSeed] = useState('')
@@ -378,7 +394,12 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
         const prev = si > 0 ? SCENARIOS[si - 1]! : null
         const locked = prev !== null && !wonIds.has(prev.id)
         return (
-        <div key={s.id} className="scenario-card" data-testid={`scenario-${s.id}`}>
+        <div
+          key={s.id}
+          className={`scenario-card scenario-era scenario-era-${s.startYear}`}
+          data-testid={`scenario-${s.id}`}
+        >
+          <EraMark year={s.startYear} />
           <h2>
             {s.name}
             {won && <span className="pos" title="you have won this era"> ✓</span>}
@@ -396,6 +417,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
             {s.rivals.map((r) => `${r.name} (${r.personality ?? 'balanced'})`).join(', ')}
           </p>
           <p className="scenario-chips">
+            <span className="event-chip scenario-rule">{s.rules.blurb}</span>
             <span className="event-chip">✈ {s.player.name} — {s.player.hq}</span>
             <span className="event-chip">⚔ {s.rivals.length} rival{s.rivals.length > 1 ? 's' : ''}</span>
             {(s.eventWeightMult?.['oil_shock'] ?? 1) > 1 && <span className="event-chip">🛢️ volatile fuel</span>}
@@ -423,14 +445,14 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
                   startGame(s.id, seed || new Date().toISOString().slice(0, 10), custom(), undefined, players)
                 }
               >
-                Start
+                <Icon name="play" /> Start
               </button>{' '}
               <button
                 data-testid={`duel-${s.id}`}
                 title="start a two-player game by link: you open the first quarter, then send the turn link to your opponent — no server, the link is the game"
                 onClick={() => startLinkGame(s.id, seed || new Date().toISOString().slice(0, 10))}
               >
-                ✉ duel
+                <Icon name="duel" /> duel
               </button>
             </>
           )}
@@ -455,7 +477,7 @@ function MuteToggle() {
         setMutedState(!muted)
       }}
     >
-      {muted ? '🔇' : '🔊'}
+      <Icon name={muted ? 'mute' : 'volume'} />
     </button>
   )
 }
@@ -637,7 +659,9 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     const onKey = (e: KeyboardEvent): void => {
       const target = e.target as HTMLElement | null
       if (target && ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(target.tagName)) return
-      if (e.key === ' ' || e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        if (undoLastAction()) e.preventDefault()
+      } else if (e.key === ' ' || e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
         e.preventDefault()
         setShowReport((open) => {
           if (open) return false
@@ -782,6 +806,15 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           )
         })()}
         <button
+          className="undo-action"
+          data-testid="undo-action"
+          disabled={!canUndo()}
+          title="undo the last planning action (Ctrl/⌘ Z)"
+          onClick={() => undoLastAction()}
+        >
+          <Icon name="undo" /> Undo
+        </button>
+        <button
           data-testid="share-challenge"
           title="copy a challenge link — same scenario, same seed, same world for whoever opens it"
           aria-label="copy challenge link"
@@ -797,7 +830,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             copyText(url, 'Challenge link')
           }}
         >
-          ⚔ share
+          <Icon name="share" /> share
         </button>
         <MuteToggle />
         {state.phase === 'planning' &&
@@ -1011,34 +1044,42 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         </div>
       )}
       <div className="map-area">
-        <MapView
-          state={state}
-          selected={selectedCity}
-          routeFrom={routeFrom}
-          onCityClick={handleCityClick}
-          onRouteClick={inspectRoute}
-          newRouteIds={
-            new Set(
-              session.lastEvents
-                .filter((e) => e.type === 'route_opened' && e.airline === 0)
-                .map((e) => (e.type === 'route_opened' ? e.routeId : -1)),
-            )
+        <Suspense
+          fallback={
+            <div className="map-wrap map-loading" data-testid="map-loading" aria-busy="true">
+              <span>Loading route map…</span>
+            </div>
           }
-          newSlotCities={
-            new Set(
-              session.lastEvents
-                .filter((e) => e.type === 'slots_granted' && e.airline === 0)
-                .map((e) => (e.type === 'slots_granted' ? e.city : '')),
-            )
-          }
-          acquiredRouteIds={(() => {
-            // A takeover appends the target's routes with fresh ids — the
-            // last `routes` entries are the ones that just changed flags.
-            const deal = session.lastEvents.find((e) => e.type === 'rival_acquired' && e.airline === 0)
-            if (!deal || deal.type !== 'rival_acquired' || deal.routes === 0) return new Set<number>()
-            return new Set(player.routes.slice(-deal.routes).map((r) => r.id))
-          })()}
-        />
+        >
+          <MapView
+            state={state}
+            selected={selectedCity}
+            routeFrom={routeFrom}
+            onCityClick={handleCityClick}
+            onRouteClick={inspectRoute}
+            newRouteIds={
+              new Set(
+                session.lastEvents
+                  .filter((e) => e.type === 'route_opened' && e.airline === 0)
+                  .map((e) => (e.type === 'route_opened' ? e.routeId : -1)),
+              )
+            }
+            newSlotCities={
+              new Set(
+                session.lastEvents
+                  .filter((e) => e.type === 'slots_granted' && e.airline === 0)
+                  .map((e) => (e.type === 'slots_granted' ? e.city : '')),
+              )
+            }
+            acquiredRouteIds={(() => {
+              // A takeover appends the target's routes with fresh ids — the
+              // last `routes` entries are the ones that just changed flags.
+              const deal = session.lastEvents.find((e) => e.type === 'rival_acquired' && e.airline === 0)
+              if (!deal || deal.type !== 'rival_acquired' || deal.routes === 0) return new Set<number>()
+              return new Set(player.routes.slice(-deal.routes).map((r) => r.id))
+            })()}
+          />
+        </Suspense>
         {selectedCity !== null && (
           <CityPanel
             state={state}
@@ -1143,7 +1184,12 @@ export function App() {
     window.addEventListener('hashchange', intake)
     return () => window.removeEventListener('hashchange', intake)
   }, [])
-  if (replay) return <ReplayViewer replay={replay} onExit={() => setReplay(null)} />
+  if (replay)
+    return (
+      <Suspense fallback={<main className="menu">Loading replay…</main>}>
+        <ReplayViewer replay={replay} onExit={() => setReplay(null)} />
+      </Suspense>
+    )
   return (
     <>
       {mpNotice !== null && (

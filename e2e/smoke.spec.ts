@@ -15,6 +15,10 @@ async function startGame(page: Page): Promise<void> {
   await page.getByTestId('seed-input').fill('e2e-seed')
   await page.getByTestId('start-jet_age').click()
   await expect(page.getByTestId('date')).toHaveText('1960 Q1')
+  // MapView is a lazy production chunk. Wait for the real interactive map,
+  // not merely the game shell, before a test starts sampling animation frames
+  // or computing gesture coordinates.
+  await expect(page.getByTestId('map')).toBeVisible()
 }
 
 // Ending a quarter via the UI presents the report card; dismiss it so the

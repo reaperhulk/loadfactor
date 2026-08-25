@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, pairKey } from '../data/cities'
 import { MIN_ROUTE_KM } from '../data/constants'
+import { getScenario } from '../data/scenarios'
 import type { GameState } from '../engine'
 import { baseFare, fareFor, pairWeeklyDemand, routeSpoolBp, seasonalBp } from '../engine/market'
 import {
@@ -37,11 +38,12 @@ import {
   yearOf,
 } from '../engine/queries'
 import { Shop } from './Shop'
-import { assignAllIdle, assignAndSchedule } from './assign'
+import { assignAllIdle, assignAndSchedule, balanceSchedules, balancedScheduleCommands } from './assign'
 import { sortHeaderFactory } from './sortHeader'
 import { ConfirmButton } from './ConfirmButton'
 import { viewSeat, dispatch } from './session'
 import { copyTsv, money } from './format'
+import { Icon } from './Icon'
 import {
   CabinLegend,
   ReliabilityLegend,
@@ -99,7 +101,12 @@ export function RoutesPanel({
     )
   }
   const networkOverhead = Math.floor(
-    (ROUTE_OVERHEAD_QUAD * player.routes.length * player.routes.length * inflationBp(state.turn)) / 10000,
+    (ROUTE_OVERHEAD_QUAD *
+      player.routes.length *
+      player.routes.length *
+      inflationBp(state.turn) *
+      (getScenario(state.scenario).rules.routeOverheadBp ?? 10000)) /
+      100_000_000,
   )
   const allRows = player.routes.map((r) => {
     const prev = r.history.length >= 2 ? r.history[r.history.length - 2] : undefined
@@ -224,6 +231,15 @@ export function RoutesPanel({
         }
       >
         ⎘ copy as spreadsheet
+      </button>
+      <button
+        className="link-btn"
+        data-testid="balance-schedules"
+        disabled={balancedScheduleCommands(state, viewSeat()).length === 0}
+        title="right-size every route to forecast demand; undo restores the previous schedules"
+        onClick={() => balanceSchedules(state)}
+      >
+        <Icon name="balance" /> Balance schedules
       </button>
     </p>
     <div className="filter-bar">

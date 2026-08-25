@@ -23,6 +23,7 @@ export const CITIES: readonly City[] = citiesJson as City[]
 export const CITY_IDS: readonly string[] = CITIES.map((c) => c.id).sort()
 
 const byId = new Map(CITIES.map((c) => [c.id, c]))
+const indexById = new Map(CITY_IDS.map((id, index) => [id, index]))
 
 export function getCity(id: string): City {
   const c = byId.get(id)
@@ -40,7 +41,12 @@ export function pairKey(a: string, b: string): string {
 }
 
 export function distanceKm(a: string, b: string): number {
-  const d = DISTANCES_KM[pairKey(a, b)]
-  if (d === undefined) throw new Error(`no distance for ${a}-${b}`)
-  return d
+  let i = indexById.get(a)
+  let j = indexById.get(b)
+  if (i === undefined || j === undefined || i === j) throw new Error(`no distance for ${a}-${b}`)
+  if (i > j) [i, j] = [j, i]
+  const offset = (i * (2 * CITY_IDS.length - i - 1)) / 2
+  const distance = DISTANCES_KM[offset + j - i - 1]
+  if (distance === undefined) throw new Error(`no distance for ${a}-${b}`)
+  return distance
 }
