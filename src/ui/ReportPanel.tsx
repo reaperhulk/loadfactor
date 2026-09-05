@@ -12,21 +12,21 @@ function describeEvent(state: GameState, e: GameEvent): string | null {
   const name = (idx: number): string => state.airlines[idx]?.name ?? `airline ${idx}`
   switch (e.type) {
     case 'command_rejected':
-      return e.airline === 0 ? `Rejected: ${e.reason}` : null
+      return e.airline === viewSeat() ? `Rejected: ${e.reason}` : null
     case 'route_opened':
       return `${name(e.airline)} opened ${e.from}–${e.to}`
     case 'route_closed':
-      return e.airline === 0 ? `Closed route` : null
+      return e.airline === viewSeat() ? `Closed route` : null
     case 'aircraft_delivered':
       return `${name(e.airline)} took delivery of a ${getAircraftType(e.aircraftType).name}`
     case 'slots_granted':
       return `${name(e.airline)} took ${e.slots} slots at ${e.city}${e.waited > 1 ? ` after ${e.waited}q in line` : ''}`
     case 'slot_requested':
-      return e.airline === 0 ? `Joined the list at ${e.city} — #${e.queuePosition} (${money(e.fee)})` : null
+      return e.airline === viewSeat() ? `Joined the list at ${e.city} — #${e.queuePosition} (${money(e.fee)})` : null
     case 'slot_request_cancelled':
-      return e.airline === 0 ? `Left the list at ${e.city} — ${money(e.refund)} back` : null
+      return e.airline === viewSeat() ? `Left the list at ${e.city} — ${money(e.refund)} back` : null
     case 'slots_released':
-      return e.airline === 0 ? `Handed ${e.slots} slots back at ${e.city}` : null
+      return e.airline === viewSeat() ? `Handed ${e.slots} slots back at ${e.city}` : null
     case 'airport_expanded':
       return `${e.city} opened capacity — +${e.slots} slots`
     case 'rival_acquired':
@@ -42,7 +42,7 @@ function describeEvent(state: GameState, e: GameEvent): string | null {
     case 'airline_entered':
       return `${e.name} enters the market from ${e.hq}`
     case 'aircraft_grounded':
-      return e.airline === 0
+      return e.airline === viewSeat()
         ? `${getAircraftType(e.aircraftType).name} grounded for maintenance — ${money(e.repairK)} repair`
         : null
     case 'milestone_reached':
@@ -58,7 +58,7 @@ function describeEvent(state: GameState, e: GameEvent): string | null {
     case 'deal_ended':
       return `A commitment ran its course${e.city ? ` at ${e.city}` : ''}`
     case 'quarter_report':
-      return e.airline === 0
+      return e.airline === viewSeat()
         ? `Quarter closed: revenue ${money(e.revenue)}, profit ${money(e.profit)}, net worth ${money(e.netWorth)}`
         : null
     case 'game_over':
@@ -122,7 +122,7 @@ function QuarterPage({ state, events }: { state: GameState; events: GameEvent[] 
     .filter((l): l is string => l !== null)
   const results = events
     .filter(
-      (e): e is Extract<GameEvent, { type: 'route_result' }> => e.type === 'route_result' && e.airline === 0,
+      (e): e is Extract<GameEvent, { type: 'route_result' }> => e.type === 'route_result' && e.airline === viewSeat(),
     )
     .sort((a, b) => b.revenue - b.cost - (a.revenue - a.cost))
   const player = state.airlines[viewSeat()]!

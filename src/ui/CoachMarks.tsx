@@ -28,7 +28,7 @@ function nextHint(state: GameState): string | null {
   // A rival is on one of your pairs and you're not fighting back with brand.
   const myPairs = new Set(player.routes.map((r) => pairKey(r.from, r.to)))
   const contested = state.airlines
-    .slice(1)
+    .filter((a) => a.id !== viewSeat())
     .some((a) => a.routes.some((r) => myPairs.has(pairKey(r.from, r.to))))
   if (state.turn >= 3 && contested && player.marketing === 0) {
     return 'A rival is on one of your pairs. Marketing (finance tab) buys appeal in every share battle.'

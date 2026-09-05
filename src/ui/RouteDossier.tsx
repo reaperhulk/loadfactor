@@ -19,6 +19,7 @@ import {
 import { ConfirmButton } from './ConfirmButton'
 import { Sparkline } from './Sparkline'
 import { assignAndSchedule } from './assign'
+import { forecastDirectRoute } from '../engine/forecast'
 import { estimateWeeklyPax } from './estimate'
 import { HubLegend, SpoolLegend } from './legends'
 import { viewSeat, dispatch } from './session'
@@ -47,7 +48,7 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
       if (!theirRoute) return null
       return {
         name: airline.name,
-        me: airline.id === 0,
+        me: airline.id === viewSeat(),
         capacity: routeWeeklyCapacity(airline, theirRoute),
         pax: theirRoute.lastPax,
         fare: fareFor(km, theirRoute.fareLevel),
@@ -220,13 +221,15 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
         const rows = [-2, -1, 0, 1, 2].map((level) => {
           const est = estimateWeeklyPax(state, { ...route, fareLevel: level })
           const fare = fareFor(km, level)
+          const resolved = forecastDirectRoute(state, viewSeat(), { ...route, fareLevel: level })
+          const revenue = Math.floor(resolved.lastRevenue / 13)
           return {
             level,
             fare,
             est,
-            revenueK: Math.floor((est.pax * fare) / 1000),
-            lowK: Math.floor((est.low * fare) / 1000),
-            highK: Math.floor((est.high * fare) / 1000),
+            revenueK: revenue,
+            lowK: Math.floor(revenue * (10000 - DEMAND_NOISE_SPREAD_BP) / 10000),
+            highK: Math.floor(revenue * (10000 + DEMAND_NOISE_SPREAD_BP) / 10000),
           }
         })
         const best = Math.max(...rows.map((r) => r.revenueK))

@@ -557,7 +557,7 @@ function GameOverOverlay({
         </p>
         <ol data-testid="final-standings">
           {ranked.map((a) => (
-            <li key={a.id} className={a.id === 0 ? 'me' : ''}>
+            <li key={a.id} className={a.id === viewSeat() ? 'me' : ''}>
               {a.name} —{' '}
               {a.bankrupt ? (
                 'bankrupt'
@@ -782,11 +782,11 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         {(() => {
           // The race, always on screen: current rank among the living, and
           // the gap to whoever must be caught (or is catching up).
-          const worths = state.airlines.filter((a) => !a.bankrupt).map((a) => ({ id: a.id, w: netWorth(a) }))
+          const worths = state.airlines.filter((a) => !a.bankrupt).map((a) => ({ id: a.id, w: objectiveScore(a, scenario.objective.kind) }))
           worths.sort((a, b) => b.w - a.w)
-          const rank = worths.findIndex((x) => x.id === 0) + 1
+          const rank = worths.findIndex((x) => x.id === viewSeat()) + 1
           if (rank === 0) return null
-          const me = netWorth(player)
+          const me = objectiveScore(player, scenario.objective.kind)
           const gapTo = rank === 1 ? worths[1] : worths[rank - 2]
           return (
             <span
@@ -799,7 +799,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
                 <span className="dim">
                   {' '}
                   ({rank === 1 ? '+' : '−'}
-                  {money(Math.abs(me - gapTo.w))})
+                  {objectiveValue(Math.abs(me - gapTo.w), scenario.objective.unit)})
                 </span>
               )}
             </span>
@@ -1060,21 +1060,21 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             newRouteIds={
               new Set(
                 session.lastEvents
-                  .filter((e) => e.type === 'route_opened' && e.airline === 0)
+                  .filter((e) => e.type === 'route_opened' && e.airline === viewSeat())
                   .map((e) => (e.type === 'route_opened' ? e.routeId : -1)),
               )
             }
             newSlotCities={
               new Set(
                 session.lastEvents
-                  .filter((e) => e.type === 'slots_granted' && e.airline === 0)
+                  .filter((e) => e.type === 'slots_granted' && e.airline === viewSeat())
                   .map((e) => (e.type === 'slots_granted' ? e.city : '')),
               )
             }
             acquiredRouteIds={(() => {
               // A takeover appends the target's routes with fresh ids — the
               // last `routes` entries are the ones that just changed flags.
-              const deal = session.lastEvents.find((e) => e.type === 'rival_acquired' && e.airline === 0)
+              const deal = session.lastEvents.find((e) => e.type === 'rival_acquired' && e.airline === viewSeat())
               if (!deal || deal.type !== 'rival_acquired' || deal.routes === 0) return new Set<number>()
               return new Set(player.routes.slice(-deal.routes).map((r) => r.id))
             })()}
@@ -1138,7 +1138,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       </section>
       <footer className="standings">
         {state.airlines.map((a) => (
-          <span key={a.id} className={a.id === 0 ? 'me' : ''}>
+          <span key={a.id} className={a.id === viewSeat() ? 'me' : ''}>
             {a.name}: {a.bankrupt ? 'bankrupt' : `${a.routes.length} routes, ${money(netWorth(a))}`}
           </span>
         ))}

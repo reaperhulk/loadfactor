@@ -8,7 +8,7 @@ export function cityMass(city: City): number {
 export const RIVAL_COLORS = ['#d0636e', '#9d7bd8', '#d8a052'] as const
 
 export function rivalColorClass(airlineId: number): string {
-  return `rival-c${(airlineId - 1) % RIVAL_COLORS.length}`
+  return `rival-c${(airlineId + RIVAL_COLORS.length - 1) % RIVAL_COLORS.length}`
 }
 
 // Level of detail: majors always visible, regionals from mid zoom, small

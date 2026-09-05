@@ -917,7 +917,8 @@ export function MapView({
     s: Math.min(MAX_SCALE, Math.max(1, g.s)),
   })
 
-  const player = state.airlines[viewSeat()]!
+  const seat = viewSeat()
+  const player = state.airlines[seat]!
   const scale = isGlobe ? globe.s : W / view.w
   // Screen-size compensation. On the flat map the viewBox shrinks as you
   // zoom, so sizes divide by scale to stay constant on screen. The globe
@@ -1011,7 +1012,7 @@ export function MapView({
       }),
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, showRivals, isGlobe, globe, projKey])
+  }, [state, seat, showRivals, isGlobe, globe, projKey])
 
   const playerArcsLayer = useMemo(() => {
     return player.routes.map((r) => {
@@ -1059,7 +1060,7 @@ export function MapView({
       )
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, isGlobe, globe, projKey, newRouteIds, acquiredRouteIds, lens, pulseUi, onRouteClick])
+  }, [state, seat, isGlobe, globe, projKey, newRouteIds, acquiredRouteIds, lens, pulseUi, onRouteClick])
 
   const playerPlanesLayer = useMemo(() => {
     return flownRoutes.flatMap((r) => {
@@ -1107,12 +1108,12 @@ export function MapView({
       ))
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, isGlobe, globe, projKey, glyphUi])
+  }, [state, seat, isGlobe, globe, projKey, glyphUi])
 
   const rivalPlanesLayer = useMemo(() => {
     if (!showRivals) return null
     return state.airlines
-      .slice(1)
+      .filter((a) => a.id !== viewSeat())
       .flatMap((airline) => airline.routes.map((r) => ({ airline, r })))
       .slice(0, 12)
       .map(({ airline, r }) => {
@@ -1137,7 +1138,7 @@ export function MapView({
         )
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, showRivals, isGlobe, globe, projKey, glyphUi])
+  }, [state, seat, showRivals, isGlobe, globe, projKey, glyphUi])
 
   // Visibility only changes when the game state, selection, an LOD threshold
   // crossing, or the visible window changes — not on every animation frame of
@@ -1192,7 +1193,7 @@ export function MapView({
       labeled: new Set(vis.filter((c) => cityTier(c) === 1 || lodKey >= 1 || stakes.has(c.id)).map((c) => c.id)),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, selected, lodKey, isGlobe, cull.x, cull.y, cull.w, cull.h])
+  }, [state, seat, selected, lodKey, isGlobe, cull.x, cull.y, cull.w, cull.h])
 
   // Cursor-anchored zoom, computed in TARGET space so consecutive wheel
   // events compound on where the view is heading, not where it is.
@@ -1804,7 +1805,7 @@ export function MapView({
                 {/* A rival has announced it will court this authority next
                     quarter. Knowing BEFORE you commit is the difference between
                     a bidding war and an ambush. */}
-                {state.airlines.some((a) => a.id !== 0 && !a.bankrupt && a.slotInterest === c.id) && (
+                {state.airlines.some((a) => a.id !== viewSeat() && !a.bankrupt && a.slotInterest === c.id) && (
                   <circle
                     cx={p.X}
                     cy={p.Y}

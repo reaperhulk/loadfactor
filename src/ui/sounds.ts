@@ -104,15 +104,15 @@ function soundFor(events: GameEvent[]): string | null {
     if (e.type === 'game_over') return e.result === 'won' ? 'victory' : 'defeat'
   }
   for (const e of events) {
-    if (e.type === 'slots_granted' && e.airline === 0) return 'slots'
+    if (e.type === 'slots_granted' && e.airline === viewSeat()) return 'slots'
   }
   for (const e of events) {
-    if (e.type === 'route_opened' && e.airline === 0) return 'route'
-    if (e.type === 'aircraft_delivered' && e.airline === 0) return 'delivery'
+    if (e.type === 'route_opened' && e.airline === viewSeat()) return 'route'
+    if (e.type === 'aircraft_delivered' && e.airline === viewSeat()) return 'delivery'
   }
   for (const e of events) {
     // A rival opening on a pair the player serves is an act of war.
-    if (e.type === 'route_opened' && e.airline !== 0) {
+    if (e.type === 'route_opened' && e.airline !== viewSeat()) {
       const mine = getSession()?.state.airlines[viewSeat()]?.routes ?? []
       if (mine.some((r) => (r.from === e.from && r.to === e.to) || (r.from === e.to && r.to === e.from))) {
         return 'incursion'
@@ -120,10 +120,10 @@ function soundFor(events: GameEvent[]): string | null {
     }
   }
   for (const e of events) {
-    if (e.type === 'slots_released' && e.airline === 0) return 'loss'
+    if (e.type === 'slots_released' && e.airline === viewSeat()) return 'loss'
   }
   for (const e of events) {
-    if (e.type === 'quarter_report' && e.airline === 0) return 'quarter'
+    if (e.type === 'quarter_report' && e.airline === viewSeat()) return 'quarter'
   }
   return null
 }

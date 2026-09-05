@@ -1,3 +1,4 @@
+import { recurringFinancials } from './accounting'
 // Quarter resolution — the fixed order documented in PLAN.md §3.3. Every cash
 // movement in this file flows through the quarterly P&L so the accounting test
 // can reconcile reported profit against the actual cash delta.
@@ -5,16 +6,7 @@
 import { AIRCRAFT, getAircraftType, typesOnSale } from '../data/aircraft'
 import { CITIES } from '../data/cities'
 import {
-  AIRCRAFT_ADMIN_PER_QUARTER,
-  AIRLINE_OVERHEAD_PER_QUARTER,
-  CREW_SALARY_BP_PER_QUARTER,
   INSOLVENCY_QUARTERS_TO_FAIL,
-  LEASE_BP_PER_QUARTER,
-  MARKETING_BASE_PER_LEVEL,
-  MARKETING_PER_ROUTE_PER_LEVEL,
-  MAINT_AGE_BP_PER_QUARTER,
-  OWNERSHIP_BP_PER_QUARTER,
-  ROUTE_OVERHEAD_QUAD,
   USED_MARGIN_BP,
   USED_OFFERS_PER_QUARTER,
   LOAN_AMORT_BP,
@@ -28,22 +20,18 @@ import {
   REPUTATION_HIT_PER_GROUNDING,
   REPUTATION_MIN_BP,
   REPUTATION_RECOVERY_BP,
-  DOMINANCE_PARITY_MULT_BP,
-  DOMINANCE_SCRUTINY_BP,
-  DOMINANCE_SCRUTINY_MAX_BP,
   ENTRANT_EVERY_QUARTERS,
   RESTRUCTURE_CASH_K,
   RESTRUCTURE_KEEP_FLEET,
   RESTRUCTURE_KEEP_ROUTES,
-  RESTRUCTURE_MAX,
-} from '../data/constants'
+  RESTRUCTURE_MAX} from '../data/constants'
 import { fnv1a, nextInt } from './rng'
 import { getScenario } from '../data/scenarios'
 import { inflationBp, resolveMarket } from './market'
-import { resaleValue, routeWeeklyCapacity, totalDebt } from './queries'
-import { expansionEvents, resolveSlotRequests, slotRentTotal, slotsRemaining } from './slots'
+import { resaleValue, totalDebt } from './queries'
+import { expansionEvents, resolveSlotRequests, slotsRemaining } from './slots'
 import { isGrounded, netWorth, objectiveBeats, objectiveMet, objectiveScore, objectiveScoreAt, yearOf } from './queries'
-import { dealUpkeep, expireOffersAndDeals, maybeOfferDeal } from './offers'
+import { expireOffersAndDeals, maybeOfferDeal } from './offers'
 import { deriveFootholds } from './newGame'
 import { runRivalTurn } from './rivals'
 import type { Airline, EngineResult, GameEvent, GameState } from './types'
@@ -114,14 +102,6 @@ function restructure(airline: Airline, turn: number): GameEvent {
   airline.restructures = (airline.restructures ?? 0) + 1
   airline.fuelHedge = null
   return { type: 'airline_restructured', airline: airline.id, routesClosed, fleetSold, debtWiped }
-}
-
-// Total weekly seats an airline puts in the air — the industry-share
-// denominator for regulatory scrutiny.
-function fieldedSeats(airline: Airline): number {
-  let seats = 0
-  for (const r of airline.routes) seats += routeWeeklyCapacity(airline, r)
-  return seats
 }
 
 // Clamp a starting endowment to the capacity actually free at each airport.
@@ -296,106 +276,11 @@ export function endQuarter(prev: GameState): EngineResult {
       continue
     }
     const t = totals[airline.id]!
-    // Overhead, maintenance, admin, and salaries inflate with the era
-    // (market.ts inflates the per-route operating costs); ownership and
-    // lease payments track list price. Sprawl carries a quadratic overhead.
-    const inflate = (v: number) => Math.floor((v * inflationBp(state.turn)) / 10000)
-    let maintenance = 0
-    let admin = 0
-    let salaries = 0
-    let ownership = 0
-    for (const ac of airline.fleet) {
-      const type = getAircraftType(ac.type)
-      maintenance += inflate(
-        Math.floor((type.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * ac.ageQuarters)) / 10000),
-      )
-      admin += inflate(AIRCRAFT_ADMIN_PER_QUARTER)
-      // Crews are salaried per airframe whether it flies or not — parking
-      // the schedule saves fuel and fees, never the payroll.
-      salaries += inflate(Math.floor((type.price * CREW_SALARY_BP_PER_QUARTER) / 10000))
-      // Owned airframes carry ownership (depreciation+insurance); leased ones
-      // pay the lessor instead.
-      ownership += ac.leased
-        ? Math.floor((type.price * LEASE_BP_PER_QUARTER) / 10000)
-        : Math.floor((type.price * OWNERSHIP_BP_PER_QUARTER) / 10000)
-    }
-    const routeOverhead = Math.floor(
-      (ROUTE_OVERHEAD_QUAD *
-        airline.routes.length *
-        airline.routes.length *
-        (getScenario(state.scenario).rules.routeOverheadBp ?? 10000)) /
-        10000,
-    )
-    let overhead = inflate(AIRLINE_OVERHEAD_PER_QUARTER + routeOverhead)
-    // Regulatory scrutiny: past a share of industry seats, dominance costs
-    // real money (compliance, political friction, punitive fees, fare caps).
-    // Charged against REVENUE so it scales with the airline it restrains —
-    // an overhead-based charge is rounding error to a monopolist. Folded into
-    // the overhead bucket so the breakdown still sums exactly to costs.
-    const mySeats = fieldedSeats(airline)
-    if (mySeats > 0) {
-      let industrySeats = 0
-      let liveAirlines = 0
-      for (const a of state.airlines) {
-        industrySeats += fieldedSeats(a)
-        if (!a.bankrupt) liveAirlines++
-      }
-      const shareBp = industrySeats > 0 ? Math.floor((mySeats * 10000) / industrySeats) : 0
-      const parityBp = Math.floor(10000 / Math.max(1, liveAirlines))
-      const thresholdBp = Math.floor((parityBp * DOMINANCE_PARITY_MULT_BP) / 10000)
-      if (shareBp > thresholdBp) {
-        const excessBp = shareBp - thresholdBp
-        const chargeBp = Math.min(
-          DOMINANCE_SCRUTINY_MAX_BP,
-          Math.floor((excessBp * DOMINANCE_SCRUTINY_BP) / 10000),
-        )
-        overhead += Math.floor((t.revenue * chargeBp) / 10000)
-      }
-    }
-    // Public-service obligations and other accepted deals bill every quarter
-    // until they run out — the price of the gates you took early.
-    overhead += dealUpkeep(airline)
-    // Brand spend: priced per level against network size (see constants).
-    const marketing =
-      airline.marketing *
-      inflate(MARKETING_BASE_PER_LEVEL + MARKETING_PER_ROUTE_PER_LEVEL * airline.routes.length)
-    let interest = 0
+    const { revenue, costs, profit, debtPayment, breakdown } = recurringFinancials(state, airline, t)
     for (const loan of airline.loans) {
-      interest += Math.floor((loan.principal * loan.annualRateBp) / 4 / 10000)
+      loan.principal -= Math.min(loan.principal, Math.max(100, Math.floor((loan.principal * LOAN_AMORT_BP) / 10000)))
     }
-    // Principal amortizes AFTER interest accrues on the carried balance: a
-    // share of the remaining principal comes due each quarter, with a floor
-    // so stubs extinguish. Not a cost — a balance-sheet transfer — but it
-    // drains the treasury, so leverage must be productive, not parked.
-    let debtPayment = 0
-    for (const loan of airline.loans) {
-      const due = Math.min(loan.principal, Math.max(100, Math.floor((loan.principal * LOAN_AMORT_BP) / 10000)))
-      loan.principal -= due
-      debtPayment += due
-    }
-    airline.loans = airline.loans.filter((l) => l.principal > 0)
-    // Airport rent: every slot held bills every quarter, whether an aircraft
-    // uses it or not. Capacity is leased from the authority, and a position
-    // you are not flying is a position you are paying to deny to someone else.
-    const slotRent = slotRentTotal(airline)
-    const breakdown = {
-      fuel: t.fuel,
-      fees: t.fees,
-      flightPay: t.flightPay,
-      service: t.service,
-      salaries,
-      ownership,
-      maintenance,
-      admin,
-      slots: slotRent,
-      overhead,
-      marketing,
-      interest,
-    }
-    const revenue = t.revenue
-    const costs =
-      t.cost + salaries + ownership + maintenance + admin + slotRent + overhead + marketing + interest
-    const profit = revenue - costs
+    airline.loans = airline.loans.filter((loan) => loan.principal > 0)
     airline.cash += profit - debtPayment
 
     // 7. Aging, reliability, hedge runoff, solvency, stats.

@@ -7,7 +7,8 @@ import { getAircraftType } from '../data/aircraft'
 import { distanceKm } from '../data/cities'
 import type { Command, GameState } from '../engine'
 import { pairWeeklyDemand } from '../engine/market'
-import { airlinesOnPair, maxRouteFrequency, roundTripsPerWeek, routeWeeklyCapacity } from '../engine/queries'
+import { maxRouteFrequency, roundTripsPerWeek, routeWeeklyCapacity } from '../engine/queries'
+import { forecastDirectRoute } from '../engine/forecast'
 import { viewSeat, dispatchBatch, getSession } from './session'
 
 export function assignAndSchedule(state: GameState, aircraftId: number, routeId: number): void {
@@ -32,8 +33,8 @@ export function assignAndSchedule(state: GameState, aircraftId: number, routeId:
 }
 
 // Delegate repetitive schedule tuning while keeping network strategy in the
-// player's hands. Each route gets enough weekly seats for its fair share of
-// forecast demand plus 8% headroom, capped by the fleet actually assigned.
+// player's hands. Compare direct-market contribution against competing
+// schedules, capped by the fleet actually assigned.
 export function balancedScheduleCommands(state: GameState, airlineIdx: number): Command[] {
   const airline = state.airlines[airlineIdx]
   if (!airline) return []
@@ -41,17 +42,24 @@ export function balancedScheduleCommands(state: GameState, airlineIdx: number): 
   for (const route of airline.routes) {
     const max = maxRouteFrequency(airline, route)
     if (max < 1) continue
-    const competitors = airlinesOnPair(state, route.from, route.to, airlineIdx)
-    const demandShare = Math.ceil(
-      (pairWeeklyDemand(state, route.from, route.to) * 10800) / (10000 * (competitors + 1)),
-    )
-    let frequency = max
-    for (let candidate = 1; candidate <= max; candidate++) {
-      if (routeWeeklyCapacity(airline, { ...route, frequency: candidate }) >= demandShare) {
+    // Maximize the route's contribution against the actual competing schedules.
+    // Bound candidate count for very large fleets, then refine around the winner.
+    const step = Math.max(1, Math.ceil(max / 32))
+    let frequency = Math.min(route.frequency, max)
+    let best = -Infinity
+    const consider = (candidate: number) => {
+      const result = forecastDirectRoute(state, airlineIdx, { ...route, frequency: candidate })
+      const contribution = result.lastRevenue - result.lastCost
+      if (contribution > best || (contribution === best && candidate < frequency)) {
+        best = contribution
         frequency = candidate
-        break
       }
     }
+    consider(frequency)
+    for (let candidate = 1; candidate <= max; candidate += step) consider(candidate)
+    consider(max)
+    const center = frequency
+    for (let candidate = Math.max(1, center - step); candidate <= Math.min(max, center + step); candidate++) consider(candidate)
     if (frequency !== route.frequency) {
       commands.push({ type: 'set_frequency', routeId: route.id, frequency })
     }

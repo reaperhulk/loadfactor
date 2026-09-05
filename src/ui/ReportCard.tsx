@@ -2,11 +2,12 @@
 // every End Quarter. Built purely from the session's reportEvents plus the
 // player's stats history (this quarter vs last).
 
+import { getScenario } from '../data/scenarios'
 import { AIRCRAFT, getAircraftType } from '../data/aircraft'
 import { pairKey } from '../data/cities'
 import { getEventDef } from '../data/events'
 import type { GameEvent, GameState } from '../engine'
-import { quarterOf, yearOf } from '../engine/queries'
+import { objectiveScoreAt, quarterOf, yearOf } from '../engine/queries'
 import { COST_LABELS, money } from './format'
 import { Sparkline } from './Sparkline'
 import { viewSeat } from './session'
@@ -31,7 +32,7 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
   if (!now) return null
 
   const routeResults = events.filter(
-    (e): e is Extract<GameEvent, { type: 'route_result' }> => e.type === 'route_result' && e.airline === 0,
+    (e): e is Extract<GameEvent, { type: 'route_result' }> => e.type === 'route_result' && e.airline === viewSeat(),
   )
   let best: (typeof routeResults)[number] | null = null
   let worst: (typeof routeResults)[number] | null = null
@@ -49,10 +50,10 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
 
   const deliveries = events.filter(
     (e): e is Extract<GameEvent, { type: 'aircraft_delivered' }> =>
-      e.type === 'aircraft_delivered' && e.airline === 0,
+      e.type === 'aircraft_delivered' && e.airline === viewSeat(),
   )
   const slotWins = events.filter(
-    (e): e is Extract<GameEvent, { type: 'slots_granted' }> => e.type === 'slots_granted' && e.airline === 0,
+    (e): e is Extract<GameEvent, { type: 'slots_granted' }> => e.type === 'slots_granted' && e.airline === viewSeat(),
   )
   const expansions = events.filter(
     (e): e is Extract<GameEvent, { type: 'airport_expanded' }> => e.type === 'airport_expanded',
@@ -62,13 +63,13 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
   const myPairs = new Set(player.routes.map((r) => pairKey(r.from, r.to)))
   const incursions = events.filter(
     (e): e is Extract<GameEvent, { type: 'route_opened' }> =>
-      e.type === 'route_opened' && e.airline !== 0 && myPairs.has(pairKey(e.from, e.to)),
+      e.type === 'route_opened' && e.airline !== viewSeat() && myPairs.has(pairKey(e.from, e.to)),
   )
   const worldNews = events.filter(
     (e): e is Extract<GameEvent, { type: 'world_event_started' }> => e.type === 'world_event_started',
   )
   const rivalReports = events.filter(
-    (e): e is Extract<GameEvent, { type: 'quarter_report' }> => e.type === 'quarter_report' && e.airline !== 0,
+    (e): e is Extract<GameEvent, { type: 'quarter_report' }> => e.type === 'quarter_report' && e.airline !== viewSeat(),
   )
 
   return (
@@ -79,7 +80,7 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
             is the supporting detail, which is the order a reader wants it in. */}
         <div className="report-hero" data-testid="report-hero">
           <div className="report-hero-label">
-            {yearOf(state)} Q{quarterOf(state)} · {now.profit >= 0 ? 'profit' : 'loss'}
+            {yearOf({ ...state, turn: now.turn })} Q{quarterOf({ ...state, turn: now.turn })} · {now.profit >= 0 ? 'profit' : 'loss'}
           </div>
           <div className={`report-hero-figure ${now.profit >= 0 ? 'pos' : 'neg'}`}>
             {money(Math.abs(now.profit))}
@@ -96,6 +97,11 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
             />
           )}
         </div>
+        <p className="profit-bridge" data-testid="profit-bridge">
+          Route contribution {money(now.revenue - now.breakdown.fuel - now.breakdown.fees - now.breakdown.flightPay - now.breakdown.service)}
+          {' '}− fleet, airport and company costs {money(now.costs - now.breakdown.fuel - now.breakdown.fees - now.breakdown.flightPay - now.breakdown.service)}
+          {' '}= airline net profit {money(now.profit)}.
+        </p>
         <table className="report-lines">
           <tbody>
             <tr>
@@ -136,10 +142,10 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
               const rankAt = (pick: (a: (typeof state.airlines)[number]) => number): number => {
                 const alive = state.airlines.filter((a) => !a.bankrupt)
                 alive.sort((a, b) => pick(b) - pick(a))
-                return alive.findIndex((a) => a.id === 0) + 1
+                return alive.findIndex((a) => a.id === viewSeat()) + 1
               }
-              const rankNow = rankAt((a) => a.history[a.history.length - 1]?.netWorth ?? 0)
-              const rankPrev = prev ? rankAt((a) => a.history[a.history.length - 2]?.netWorth ?? 0) : rankNow
+              const rankNow = rankAt((a) => objectiveScoreAt(a, getScenario(state.scenario).objective.kind, a.history.length))
+              const rankPrev = prev ? rankAt((a) => objectiveScoreAt(a, getScenario(state.scenario).objective.kind, Math.max(0, a.history.length - 1))) : rankNow
               if (rankNow === 0) return null
               return (
                 <tr>
@@ -255,7 +261,7 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
           for (const c of Object.keys(player.slots).sort()) if ((player.slots[c] ?? 0) > 0) myCities.add(c)
           const rivalGains = events.filter(
             (e): e is Extract<GameEvent, { type: 'slots_granted' }> =>
-              e.type === 'slots_granted' && e.airline !== 0 && myCities.has(e.city),
+              e.type === 'slots_granted' && e.airline !== viewSeat() && myCities.has(e.city),
           )
           if (rivalGains.length === 0) return null
           return (

@@ -2,20 +2,13 @@
 // weekly round-trip frequency it will fly (bounded by its speed and the
 // distance), plus fare and service posture. Confirm dispatches open_route.
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { getAircraftType } from '../data/aircraft'
-import { distanceKm, pairKey } from '../data/cities'
+import { distanceKm } from '../data/cities'
 import type { GameState } from '../engine'
-import { CABIN_WEIGHT, FARE_DEMAND_BP, ROUTE_MEMORY_QUARTERS, ROUTE_SPOOL_BP } from '../data/constants'
-import {
-  estimateAircraftQuarterCost,
-  estimateWeeklySeats,
-  fareFor,
-  pairWeeklyDemand,
-  routeShareWeight,
-  shareWeightFor,
-} from '../engine/market'
-import { airlinesOnPair, roundTripsPerWeek } from '../engine/queries'
+import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor, pairWeeklyDemand } from '../engine/market'
+import { cabinSeats, isGrounded, roundTripsPerWeek } from '../engine/queries'
+import { forecastQuarter } from '../engine/forecast'
 import { viewSeat, dispatch } from './session'
 import { money } from './format'
 
@@ -30,7 +23,7 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
   const player = state.airlines[viewSeat()]!
   const km = distanceKm(from, to)
   const candidates = player.fleet
-    .filter((ac) => ac.routeId === null && getAircraftType(ac.type).rangeKm >= km)
+    .filter((ac) => ac.routeId === null && !isGrounded(ac, state.turn) && getAircraftType(ac.type).rangeKm >= km)
     .sort((a, b) => {
       // Best default first: cheapest quarterly cost per seat on THIS route.
       const perSeat = (ac: typeof a) => {
@@ -49,8 +42,13 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
 
   const clampedFreq = Math.max(1, Math.min(frequency, maxFreq))
   const demand = pairWeeklyDemand(state, from, to)
-  const seats = chosen ? getAircraftType(chosen.type).seats * clampedFreq * 2 : 0
-  const estCost = chosen ? estimateAircraftQuarterCost(state, chosen.type, km) : 0
+  const seats = chosen ? cabinSeats(chosen.type, chosen.cabin) * clampedFreq * 2 : 0
+  const seat = viewSeat()
+  const baseline = useMemo(() => forecastQuarter(state, seat), [state, seat])
+  const preview = useMemo(() => aircraftId === null ? null : forecastQuarter(state, seat, [{
+    type: 'open_route', from, to, aircraftId, frequency: clampedFreq, fareLevel, serviceLevel,
+  }]), [state, seat, from, to, aircraftId, clampedFreq, fareLevel, serviceLevel])
+  const launch = preview?.routes.find((route) => !player.routes.some((existing) => existing.id === route.id))
 
   return (
     <div className="gameover-overlay" data-testid="route-setup" onClick={onClose}>
@@ -126,49 +124,15 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
                 </select>
               </label>
             </div>
-            {(() => {
-              // Honest preview in the engine's own resolution order: split the
-              // pair by attractiveness against every incumbent (the prospective
-              // schedule priced by the same weight formula resolution uses),
-              // shape by the chosen fare's elasticity, attach the first-quarter
-              // spool-up, cap at the seats actually flown.
-              const key = pairKey(from, to)
-              let othersWeight = 0
-              for (const airline of state.airlines) {
-                if (airline.id === 0 || airline.bankrupt) continue
-                const theirs = airline.routes.find((r) => pairKey(r.from, r.to) === key)
-                if (theirs) othersWeight += routeShareWeight(airline, theirs)
-              }
-              const myWeight = chosen
-                ? shareWeightFor(player, clampedFreq * CABIN_WEIGHT[chosen.cabin - 1]!, fareLevel, serviceLevel)
-                : 0
-              const total = myWeight + othersWeight
-              let shaped = total > 0 ? Math.floor((demand * myWeight) / total) : 0
-              shaped = Math.floor((shaped * FARE_DEMAND_BP[fareLevel + 2]!) / 10000)
-              const memoryTurn = player.servedUntil[key]
-              const remembered = memoryTurn !== undefined && state.turn - memoryTurn <= ROUTE_MEMORY_QUARTERS
-              if (!remembered) shaped = Math.floor((shaped * ROUTE_SPOOL_BP[0]!) / 10000)
-              const estPax = Math.min(shaped, seats)
-              const estRev = Math.floor((estPax * fareFor(km, fareLevel) * 13) / 1000)
-              const rivalsHere = airlinesOnPair(state, from, to, 0)
-              return (
-                <p data-testid="route-setup-estimate">
-                  First-quarter revenue{' '}
-                  <strong className={estRev >= estCost ? 'pos' : 'neg'}>{money(estRev)}/q</strong> vs aircraft
-                  cost {money(estCost)}/q at full schedule
-                  {rivalsHere > 0 && total > 0 && (
-                    <span className="neg">
-                      {' '}
-                      — contested: your schedule takes ~{Math.floor((myWeight * 100) / total)}% of the pair vs{' '}
-                      {rivalsHere} rival{rivalsHere > 1 ? 's' : ''}
-                    </span>
-                  )}
-                  {!remembered && (
-                    <span className="dim"> — new routes ramp to full demand over 3 quarters</span>
-                  )}
-                </p>
-              )
-            })()}
+            {preview && launch && (
+              <div className="forecast-card" data-testid="route-setup-estimate" aria-live="polite">
+                <p>First-quarter revenue <strong>{money(launch.lastRevenue)}/q</strong> · flight costs {money(launch.lastCost)}/q</p>
+                <p>Route contribution <strong className={launch.lastRevenue >= launch.lastCost ? 'pos' : 'neg'}>{money(launch.lastRevenue - launch.lastCost)}/q</strong></p>
+                <p>Airline net profit <strong>{money(preview.profit)}/q</strong> · change {money(preview.profit - baseline.profit)}/q</p>
+                <p>Cash after quarter {money(preview.cashAfter)} · launch cash {money(preview.cashRequired)}</p>
+                <p className="dim">Includes the selected schedule, cabin, current maintenance, lease payments, hedges and connecting traffic. Holds today's economy and rival schedules fixed; new routes ramp over 3 quarters.</p>
+              </div>
+            )}
             <button
               data-testid="route-setup-confirm"
               onClick={() => {

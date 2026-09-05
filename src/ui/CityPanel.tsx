@@ -59,14 +59,14 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
   const pool = cityPool(state, cityId)
   const remaining = slotsRemaining(state, cityId)
   const queue = slotQueue(state, cityId)
-  const myPlace = queue.findIndex((q) => q.airline === 0)
+  const myPlace = queue.findIndex((q) => q.airline === viewSeat())
   const queued = myPlace >= 0
   const expansion = nextExpansion(state, cityId)
   const fee = slotFee(cityId)
   // Rival intent is public: a carrier announces the authority it will queue at
   // a quarter ahead. Knowing someone is about to take a place in a line you
   // want is the whole reason to take yours first — or to go elsewhere.
-  const rivalNegotiators = state.airlines.filter((a) => a.id !== 0 && !a.bankrupt && a.slotInterest === cityId)
+  const rivalNegotiators = state.airlines.filter((a) => a.id !== viewSeat() && !a.bankrupt && a.slotInterest === cityId)
 
   const activeEvents = state.world.events.filter((e) => {
     const def = getEventDef(e.id)
@@ -162,7 +162,7 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
             {' '}
             (
             {state.airlines
-              .slice(1)
+              .filter((a) => a.id !== viewSeat())
               .map((a) => ({ name: a.name, n: slotsHeld(a, cityId) }))
               .filter((h) => h.n > 0)
               .map((h) => `${h.name} ${h.n}`)
@@ -221,13 +221,13 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
         {queue.length > 0 && (
           <ol className="slot-queue">
             {queue.map((q, i) => {
-              const name = q.airline === 0 ? 'You' : state.airlines[q.airline]!.name
+              const name = q.airline === viewSeat() ? 'You' : state.airlines[q.airline]!.name
               // Capacity is promised in queue order: everyone ahead takes
               // their grant first, so this says whether the line reaches this
               // place at today's pool, or waits for the builders.
               const served = remaining >= (i + 1) * SLOTS_PER_GRANT
               return (
-                <li key={`${q.airline}-${q.city}`} className={q.airline === 0 ? 'me' : ''}>
+                <li key={`${q.airline}-${q.city}`} className={q.airline === viewSeat() ? 'me' : ''}>
                   {name} <span className="dim">queued t{q.queuedTurn}</span>{' '}
                   {served ? (
                     <span className="pos">capacity waiting</span>

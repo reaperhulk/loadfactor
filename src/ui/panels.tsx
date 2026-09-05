@@ -121,7 +121,7 @@ export function RoutesPanel({
       route: r,
       km,
       planes: player.fleet.filter((a) => a.routeId === r.id).length,
-      rivals: airlinesOnPair(state, r.from, r.to, 0),
+      rivals: airlinesOnPair(state, r.from, r.to, viewSeat()),
       profit,
       cost: r.lastCost,
       pax: r.lastPax,
@@ -521,7 +521,7 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
         // Announced rival campaigns: the richest target is a different
         // decision when someone else is already walking toward it.
         courted: state.airlines
-          .filter((a) => a.id !== 0 && !a.bankrupt && a.slotInterest === c.id)
+          .filter((a) => a.id !== viewSeat() && !a.bankrupt && a.slotInterest === c.id)
           .map((a) => a.name),
       })
   }
@@ -919,7 +919,7 @@ export function AirportsPanel({ state }: { state: GameState }) {
             const pool = cityPool(state, c.id)
             const remaining = slotsRemaining(state, c.id)
             const queue = slotQueue(state, c.id)
-            const myPlace = queue.findIndex((entry) => entry.airline === 0)
+            const myPlace = queue.findIndex((entry) => entry.airline === viewSeat())
             const expansion = nextExpansion(state, c.id)
             const fee = slotFee(c.id)
             // The city as a business: traffic and P&L across every route

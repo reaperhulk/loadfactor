@@ -77,10 +77,10 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
       case 'command_rejected':
         // Immediate feedback beats a silent no-op — but only for the player's
         // own clicks (rival rejections are engine-internal noise).
-        if (e.airline === 0) out.push({ kind: 'error', icon: '⚠️', text: e.reason })
+        if (e.airline === viewSeat()) out.push({ kind: 'error', icon: '⚠️', text: e.reason })
         break
       case 'route_opened':
-        if (e.airline === 0) {
+        if (e.airline === viewSeat()) {
           out.push({ kind: 'route', icon: '✈️', text: `Route opened: ${e.from} – ${e.to}` })
         } else if (myPairs.has(pairKey(e.from, e.to))) {
           const rival = state?.airlines[e.airline]?.name ?? 'A rival'
@@ -94,11 +94,11 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
         }
         break
       case 'aircraft_delivered':
-        if (e.airline === 0)
+        if (e.airline === viewSeat())
           out.push({ kind: 'delivery', icon: '🛬', text: `${getAircraftType(e.aircraftType).name} delivered` })
         break
       case 'slots_granted':
-        if (e.airline === 0)
+        if (e.airline === viewSeat())
           out.push({
             kind: 'slots',
             icon: '🛬',
@@ -109,7 +109,7 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
           })
         break
       case 'slots_released':
-        if (e.airline === 0)
+        if (e.airline === viewSeat())
           out.push({ kind: 'slots', icon: '↩️', text: `Handed ${e.slots} slots back at ${e.city}` })
         break
       case 'airport_expanded':
@@ -126,7 +126,7 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
       }
       case 'rival_acquired': {
         const bought = state?.airlines[e.target]?.name ?? 'a rival'
-        if (e.airline === 0) {
+        if (e.airline === viewSeat()) {
           out.push({
             kind: 'victory',
             icon: '💼',
@@ -150,7 +150,7 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
         break
       }
       case 'aircraft_grounded':
-        if (e.airline === 0) {
+        if (e.airline === viewSeat()) {
           out.push({
             kind: 'error',
             icon: '🔧',

@@ -45,6 +45,8 @@ test('hot-seat: two players share a device, planning in rotation', async ({ page
 
   // The last planner resolves. Next quarter the rotation flips: seat 1 first.
   await page.getByTestId('end-quarter').click()
+  await expect(page.getByTestId('report-card')).toContainText('Best route')
+  await expect(page.getByTestId('report-card')).not.toContainText('Best route: closed route')
   await page.getByTestId('report-card-close').click()
   await expect(page.getByTestId('date')).toHaveText('1960 Q2')
   await expect(page.getByTestId('active-seat')).toHaveText(secondAirline!)

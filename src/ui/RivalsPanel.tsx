@@ -55,7 +55,7 @@ function StandingsTable({ state }: { state: GameState }) {
     const prev = a.history[a.history.length - 2]
     return {
       id: a.id,
-      name: a.id === 0 ? `${a.name} (you)` : a.name,
+      name: a.id === viewSeat() ? `${a.name} (you)` : a.name,
       bankrupt: a.bankrupt,
       netWorth: netWorth(a),
       worthTrend: last && prev ? last.netWorth - prev.netWorth : 0,
@@ -126,7 +126,7 @@ function StandingsTable({ state }: { state: GameState }) {
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.id} className={r.id === 0 ? 'me' : r.bankrupt ? 'dim' : ''}>
+            <tr key={r.id} className={r.id === viewSeat() ? 'me' : r.bankrupt ? 'dim' : ''}>
               <td>{r.bankrupt ? `${r.name} ✝` : r.name}</td>
               <td className={!r.bankrupt && r.netWorth === best('netWorth') ? 'pos' : ''}>
                 {money(r.netWorth)}
@@ -171,7 +171,7 @@ function HeadToHead({ state }: { state: GameState }) {
   const player = state.airlines[viewSeat()]!
   const myPairs = new Map(player.routes.map((r) => [pairKey(r.from, r.to), r]))
   const rows = state.airlines
-    .filter((a) => a.id !== 0 && !a.bankrupt)
+    .filter((a) => a.id !== viewSeat() && !a.bankrupt)
     .map((a) => {
       let pairs = 0
       let minePax = 0
@@ -223,7 +223,7 @@ function HeadToHead({ state }: { state: GameState }) {
                   <td>
                     <span
                       className="rival-swatch"
-                      style={{ background: RIVAL_COLORS[(r.id - 1) % RIVAL_COLORS.length] }}
+                      style={{ background: RIVAL_COLORS[(r.id + RIVAL_COLORS.length - 1) % RIVAL_COLORS.length] }}
                     />{' '}
                     {r.name}
                   </td>
@@ -330,7 +330,7 @@ export function RivalsPanel({ state }: { state: GameState }) {
       <div className="race-legend">
         {state.airlines.map((a, i) => (
           <span key={a.id} className={i === 0 ? 'race-key me' : `race-key rival-${i}`}>
-            ■ {a.id === 0 ? 'You' : a.name}
+            ■ {a.id === viewSeat() ? 'You' : a.name}
           </span>
         ))}
       </div>
