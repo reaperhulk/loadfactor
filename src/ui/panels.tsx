@@ -1,3 +1,4 @@
+import { PlanningWorkbench } from './PlanningWorkbench'
 import { OperationsPanel } from './OperationsPanel'
 // Management panels: routes, fleet, airports, finance, and the quarterly
 // report. Every button is a Command dispatch — no state is touched directly.
@@ -91,6 +92,7 @@ export function RoutesPanel({
   const [sortAsc, setSortAsc] = useState(false)
   const [filter, setFilter] = useState<RouteFilter>('all')
   const [routeQuery, setRouteQuery] = useState('')
+  const [allMetrics, setAllMetrics] = useState(false)
   const seat = viewSeat()
   const schedulePlan = useMemo(() => balancedScheduleCommands(state, seat), [state, seat])
   if (player.routes.length === 0) {
@@ -207,6 +209,7 @@ export function RoutesPanel({
   })
   return (
     <div>
+    <PlanningWorkbench key={`${state.turn}-${seat}`} state={state} suggestions={schedulePlan} />
     <p className="dim" data-testid="network-overhead">
       Network management: {money(networkOverhead)}/quarter for {player.routes.length} routes (grows with the
       square of the network — quality beats sprawl){' '}
@@ -285,7 +288,8 @@ export function RoutesPanel({
         aria-label="filter routes by city code"
       />
     </div>
-    <div className="table-scroll"><table>
+    <button className="metrics-toggle" aria-pressed={allMetrics} onClick={() => setAllMetrics((value) => !value)}>{allMetrics ? 'Show essential metrics' : 'Show all metrics'}</button>
+    <div className="table-scroll"><table className={`route-table ${allMetrics ? '' : 'route-table-compact'}`}>
       <thead>
         <tr>
           {header('name', 'Route')}
@@ -302,7 +306,7 @@ export function RoutesPanel({
           {header('revenue', 'Rev')}
           {header('cost', 'Cost')}
           {header('margin', 'Margin')}
-          {header('profit', 'P&L')}
+          {header('profit', 'Contribution', 'route revenue minus flight costs; company fixed costs are reported separately')}
           <th />
         </tr>
       </thead>

@@ -315,8 +315,8 @@ test('previews report bands, opportunities carry risks, rival intent is visible'
   await page.getByTestId('tab-routes').click()
   await page.getByTestId('inspect-JFK-ORD').click()
   await page.getByTestId('fare-whatif').locator('summary').click()
-  await expect(page.getByTestId('fare-whatif').locator('tbody')).toContainText(/[\d,]+–[\d,]+/)
-  await expect(page.getByTestId('fare-whatif-verdict')).toContainText(/Clear call|Too close to call/)
+  await expect(page.getByTestId('fare-whatif').locator('tbody tr')).toHaveCount(5)
+  await expect(page.getByTestId('fare-whatif-verdict')).toContainText(/highest company profit under current conditions/)
   await page.getByTestId('route-dossier-close').click()
 
   // Every opportunity row states what the headline market number omits.
@@ -960,7 +960,7 @@ test('the route dossier and rivals intel expose the numbers', async ({ page }) =
   await expect(page.getByTestId('route-dossier')).toContainText('rt/wk')
   // The fare what-if table replays the share math at every posture.
   await page.getByTestId('fare-whatif').locator('summary').click()
-  await expect(page.getByTestId('fare-whatif')).toContainText('est. revenue/wk')
+  await expect(page.getByTestId('fare-whatif')).toContainText('Airline profit/q')
   await expect(page.getByTestId('fare-whatif')).toContainText('(now)')
   // Adding an idle plane from the dossier grows the schedule in one pick:
   // assign + frequency bump together (a bare assign would fly nothing extra).

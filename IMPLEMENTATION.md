@@ -66,3 +66,12 @@ careers reached their deadlines, 84 won, and no naive career won. Results are
 checked in as `fixtures/balance-v2-report.json`; the independent CI seed matrix
 also passes. Local browser tests still cannot launch the unavailable executable;
 the hosted Chromium gate validates the pushed build.
+
+Stage 3 hosted browser results: 57/60 passed. Fixed two offer-card stacking
+failures on mobile and a legacy challenge target hidden by the new default
+metric. Stage 4 adds original five-era generative music, three audio buses,
+visibility suspension, text/motion/traffic preferences, aircraft illustrations,
+navy operations screens and paper reports, responsive dossiers, a three-quarter
+introduction, actionable brief, an atomic planning workbench, lazy full-network
+fare/service/closure comparisons, public aircraft/airport calendar, and two new
+milestones. Five new end-to-end flows cover these controls and recovery.

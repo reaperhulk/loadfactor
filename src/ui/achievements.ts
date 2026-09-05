@@ -2,6 +2,8 @@
 // session after every engine call — pure checks over state/events, stored as
 // unlock flags in localStorage. Presentation-only; the engine knows nothing.
 
+import { getCity } from '../data/cities'
+import { getAircraftType } from '../data/aircraft'
 import type { GameEvent, GameState } from '../engine'
 import { netWorth, slotCities } from '../engine/queries'
 
@@ -14,6 +16,8 @@ export interface AchievementDef {
 }
 
 export const ACHIEVEMENTS: readonly AchievementDef[] = [
+  { id: 'across_regions', icon: '🌐', name: 'Beyond the horizon', desc: 'Fly a route between two world regions', test: (s) => s.airlines[0]!.routes.some((r) => r.lastPax > 0 && getCity(r.from).region !== getCity(r.to).region) },
+  { id: 'widebody', icon: '🛩', name: 'The widebody era', desc: 'Operate an aircraft with at least 280 seats', test: (s) => s.airlines[0]!.fleet.some((a) => a.routeId !== null && getAircraftType(a.type).seats >= 280) },
   {
     id: 'first_flight',
     icon: '🛫',

@@ -4,12 +4,13 @@
 
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm, pairKey } from '../data/cities'
-import { DEMAND_NOISE_SPREAD_BP, FARE_DEMAND_BP, ROUTE_MEMORY_QUARTERS, SERVICE_COST_PER_PAX } from '../data/constants'
+import { FARE_DEMAND_BP, ROUTE_MEMORY_QUARTERS } from '../data/constants'
 import type { GameState } from '../engine'
 import { fareFor, fuelInflationBp, pairWeeklyDemand, routeShareWeight, routeSpoolBp, seasonalBp } from '../engine/market'
 import { effFuelBp } from '../engine/worldEvents'
 import {
   allocateTrips,
+  isGrounded,
   cabinSeats,
   effectiveFrequency,
   maxRouteFrequency,
@@ -19,8 +20,8 @@ import {
 import { ConfirmButton } from './ConfirmButton'
 import { Sparkline } from './Sparkline'
 import { assignAndSchedule } from './assign'
-import { forecastDirectRoute } from '../engine/forecast'
-import { estimateWeeklyPax } from './estimate'
+import { RouteWhatIf } from './RouteWhatIf'
+import { rulesOf } from '../engine/version'
 import { HubLegend, SpoolLegend } from './legends'
 import { viewSeat, dispatch } from './session'
 import { money } from './format'
@@ -60,10 +61,10 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
   const totalPax = contenders.reduce((sum, c) => sum + c.pax, 0)
   const myWeight = contenders.find((c) => c.me)?.weight ?? 0
 
-  const assigned = player.fleet.filter((a) => a.routeId === route.id)
+  const assigned = player.fleet.filter((a) => (a.routeId === route.id || a.secondaryRouteId === route.id))
   // Idle airframes with the legs for this route — one pick adds them to the
   // schedule (assign + frequency bump in one intent).
-  const idleCapable = player.fleet.filter((a) => a.routeId === null && getAircraftType(a.type).rangeKm >= km)
+  const idleCapable = player.fleet.filter((a) => a.routeId === null && !a.reserve && !isGrounded(a, state.turn) && getAircraftType(a.type).rangeKm >= km)
   // Surface the market model: connecting traffic actually flown over this leg
   // last quarter, and elasticity of the current fare posture.
   const elasticityBp = FARE_DEMAND_BP[route.fareLevel + 2]!
@@ -216,115 +217,9 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
         </details>
       )}
 
-      {(() => {
-        // Fare what-if: the shared estimator (share → elasticity → spool →
-        // cap, the engine's own order) at each posture, rivals held fixed.
-        // Direct traffic only — connections and cabin yield ride on top.
-        const myCapacity = routeWeeklyCapacity(player, route)
-        if (myCapacity === 0) return null
-        const spooling = routeSpoolBp(player, route, state.turn) < 10000
-        const rows = [-2, -1, 0, 1, 2].map((level) => {
-          const est = estimateWeeklyPax(state, { ...route, fareLevel: level })
-          const fare = fareFor(km, level)
-          const resolved = forecastDirectRoute(state, viewSeat(), { ...route, fareLevel: level })
-          const revenue = Math.floor(resolved.lastRevenue / 13)
-          return {
-            level,
-            fare,
-            est,
-            revenueK: revenue,
-            lowK: Math.floor(revenue * (10000 - DEMAND_NOISE_SPREAD_BP) / 10000),
-            highK: Math.floor(revenue * (10000 + DEMAND_NOISE_SPREAD_BP) / 10000),
-          }
-        })
-        const best = Math.max(...rows.map((r) => r.revenueK))
-        const leader = rows.find((r) => r.revenueK === best)!
-        // Only crown a winner when it actually wins: if the runner-up's band
-        // overlaps the leader's, the difference is smaller than the demand
-        // noise nobody can see in advance, and the table says so.
-        const contenders = rows.filter((r) => r.level !== leader.level && r.highK >= leader.lowK)
-        const decisive = contenders.length === 0
-        return (
-          <details className="dossier-history" data-testid="fare-whatif">
-            <summary className="dim">What-if: fare posture</summary>
-            <table>
-              <thead>
-                <tr className="dim">
-                  <th>fare</th>
-                  <th>est. pax/wk</th>
-                  <th>est. revenue/wk</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.level} className={r.level === route.fareLevel ? 'me' : ''}>
-                    <td>
-                      ${r.fare}
-                      {r.level === route.fareLevel && <span className="dim"> (now)</span>}
-                    </td>
-                    <td>
-                      {r.est.low.toLocaleString('en-US')}–{r.est.high.toLocaleString('en-US')}
-                    </td>
-                    <td className={decisive && r.revenueK === best ? 'pos' : ''}>
-                      {money(r.lowK)}–{money(r.highK)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="hint" data-testid="fare-whatif-verdict">
-              {decisive
-                ? `Clear call: $${leader.fare} beats every alternative by more than demand noise can explain.`
-                : `Too close to call — ${contenders.length + 1} fare levels sit inside the same band. Demand noise (±${(DEMAND_NOISE_SPREAD_BP / 100).toFixed(0)}%) will decide it, not the table.`}{' '}
-              Ranges are direct traffic at this quarter's demand (season included
-              {spooling ? ', ramp-up included' : ''}), rivals held fixed.
-            </p>
-          </details>
-        )
-      })()}
-
-      {(() => {
-        // Service what-if: the same estimator along the soft-product axis,
-        // with the per-pax service cost shown against the pax gained.
-        const myCapacity = routeWeeklyCapacity(player, route)
-        if (myCapacity === 0) return null
-        const rows = [1, 2, 3].map((level) => {
-          const est = estimateWeeklyPax(state, { ...route, serviceLevel: level })
-          return { level, est, costK: Math.floor((est.pax * SERVICE_COST_PER_PAX[level - 1]!) / 1000) }
-        })
-        return (
-          <details className="dossier-history" data-testid="service-whatif">
-            <summary className="dim">What-if: service level</summary>
-            <table>
-              <thead>
-                <tr className="dim">
-                  <th>service</th>
-                  <th>est. pax/wk</th>
-                  <th>service cost/wk</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.level} className={r.level === route.serviceLevel ? 'me' : ''}>
-                    <td>
-                      {['', 'basic', 'standard', 'premium'][r.level]}
-                      {r.level === route.serviceLevel && <span className="dim"> (now)</span>}
-                    </td>
-                    <td>
-                      {r.est.low.toLocaleString('en-US')}–{r.est.high.toLocaleString('en-US')}
-                    </td>
-                    <td>{money(r.costK)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="hint">
-              Better service wins share but costs per passenger — worth most on contested pairs,
-              least in a monopoly.
-            </p>
-          </details>
-        )
-      })()}
+      <RouteWhatIf state={state} route={route} mode="fare" />
+      <RouteWhatIf state={state} route={route} mode="service" />
+      <RouteWhatIf state={state} route={route} mode="closure" />
 
       <SpoolLegend />
       <HubLegend />
@@ -400,7 +295,7 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
             <th>seats/wk</th>
             <th>fare</th>
             <th>svc</th>
-            <th>appeal</th>
+            {rulesOf(state) === 1 && <th>appeal</th>}
           </tr>
         </thead>
         <tbody>
@@ -411,19 +306,21 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
               <td>{c.capacity}</td>
               <td>${c.fare}</td>
               <td className="dim">{['', 'basic', 'std', 'prem'][c.serviceLevel]}</td>
-              <td className={!c.me && myWeight > 0 && c.weight > myWeight ? 'neg' : ''}>
+              {rulesOf(state) === 1 && <td className={!c.me && myWeight > 0 && c.weight > myWeight ? 'neg' : ''}>
                 {myWeight > 0 ? Math.round((c.weight * 100) / myWeight) : c.weight > 0 ? '∞' : '—'}
-              </td>
+              </td>}
             </tr>
           ))}
         </tbody>
       </table>
-      {contenders.length > 1 && (
+      {rulesOf(state) === 1 && contenders.length > 1 && (
         <p className="hint">
           Share splits by appeal (yours = 100): schedule × cabin × fare posture × service × brand.
           Out-schedule, undercut, out-serve, or out-market them to take riders.
         </p>
       )}
+
+      {rulesOf(state) >= 2 && <p className="hint">Shares compare boardings on these direct services. Business, leisure and budget passengers also compare connecting itineraries across competing hubs.</p>}
 
       <h3>Fleet on this route</h3>
       {assigned.length === 0 ? (

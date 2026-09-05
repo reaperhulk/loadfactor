@@ -1,3 +1,4 @@
+import { installDisplay } from './ui/display'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './ui/App'
@@ -5,6 +6,7 @@ import { installHarness } from './ui/harness'
 import { installSounds } from './ui/sounds'
 import './ui/styles.css'
 
+installDisplay()
 installHarness()
 installSounds()
 

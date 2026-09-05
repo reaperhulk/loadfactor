@@ -51,12 +51,15 @@ export function CoachMarks({ state }: { state: GameState }) {
       return true
     }
   })
-  if (dismissed || state.turn > 6) return null
+  if (dismissed || state.turn > 2) return null
   const hint = nextHint(state)
   if (hint === null) return null
   return (
     <div className="coach" data-testid="coach" role="status">
-      <span>💡 {hint}</span>
+      <div><strong>Flight school · {Math.min(3, state.turn + 1)} of 3 quarters</strong>
+        <ol className="tutorial-steps"><li aria-current={state.turn === 0 ? 'step' : undefined}>Choose a market</li><li aria-current={state.turn === 1 ? 'step' : undefined}>Read profit & refine the schedule</li><li aria-current={state.turn === 2 ? 'step' : undefined}>Grow or protect your cash</li></ol>
+        <span>💡 {state.turn === 1 ? 'Your report separates route contribution from company profit. Open the Planning workbench on Routes to compare a fare or schedule change, then commit it as one undoable action.' : state.turn === 2 ? 'Choose your pace: expand into another market, or keep a cash cushion and improve reliability. The operations desk explains the tradeoff.' : hint}</span>
+      </div>
       <button
         data-testid="coach-dismiss"
         onClick={() => {

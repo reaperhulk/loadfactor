@@ -196,7 +196,7 @@ function HeadToHead({ state }: { state: GameState }) {
   if (rows.length === 0) {
     return (
       <p className="hint" data-testid="head-to-head-empty">
-        No rival flies a pair you fly — every route you hold is a monopoly today.
+        No direct rival flies your pairs. Connecting itineraries may still compete for your passengers.
       </p>
     )
   }
@@ -252,7 +252,7 @@ function HeadToHead({ state }: { state: GameState }) {
 }
 
 export function RivalsPanel({ state }: { state: GameState }) {
-  const [metric, setMetric] = useState<(typeof RACE_METRICS)[number]['key']>('objective')
+  const [metric, setMetric] = useState<(typeof RACE_METRICS)[number]['key']>(() => { const duel = getChallengeTarget(); return duel && (!duel.kind || duel.kind === 'netWorth') ? 'netWorth' : 'objective' })
   // Late entrants have shorter histories than the founders. The chart spaces
   // points by index, so pad on the left with zeros — every series then shares
   // one time axis, and an entrant's line correctly starts at the quarter it

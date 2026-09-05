@@ -1,3 +1,4 @@
+import { Dialog } from './Dialog'
 // Opening a route is a scheduling decision: pick the launch aircraft and the
 // weekly round-trip frequency it will fly (bounded by its speed and the
 // distance), plus fare and service posture. Confirm dispatches open_route.
@@ -23,7 +24,7 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
   const player = state.airlines[viewSeat()]!
   const km = distanceKm(from, to)
   const candidates = player.fleet
-    .filter((ac) => ac.routeId === null && !isGrounded(ac, state.turn) && getAircraftType(ac.type).rangeKm >= km)
+    .filter((ac) => ac.routeId === null && !ac.reserve && !isGrounded(ac, state.turn) && getAircraftType(ac.type).rangeKm >= km)
     .sort((a, b) => {
       // Best default first: cheapest quarterly cost per seat on THIS route.
       const perSeat = (ac: typeof a) => {
@@ -36,12 +37,13 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
   const [aircraftId, setAircraftId] = useState<number | null>(candidates[0]?.id ?? null)
   const chosen = candidates.find((ac) => ac.id === aircraftId) ?? null
   const maxFreq = chosen ? roundTripsPerWeek(chosen.type, km) : 0
-  const [frequency, setFrequency] = useState(maxFreq)
+  const demand = pairWeeklyDemand(state, from, to)
+  const suggestedFrequency = (ac: (typeof candidates)[number]) => Math.max(1, Math.min(roundTripsPerWeek(ac.type, km), Math.ceil(demand * 0.7 / (cabinSeats(ac.type, ac.cabin) * 2))))
+  const [frequency, setFrequency] = useState(chosen ? suggestedFrequency(chosen) : 1)
   const [fareLevel, setFareLevel] = useState(0)
   const [serviceLevel, setServiceLevel] = useState(2)
 
   const clampedFreq = Math.max(1, Math.min(frequency, maxFreq))
-  const demand = pairWeeklyDemand(state, from, to)
   const seats = chosen ? cabinSeats(chosen.type, chosen.cabin) * clampedFreq * 2 : 0
   const seat = viewSeat()
   const baseline = useMemo(() => forecastQuarter(state, seat), [state, seat])
@@ -51,7 +53,7 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
   const launch = preview?.routes.find((route) => !player.routes.some((existing) => existing.id === route.id))
 
   return (
-    <div className="gameover-overlay" data-testid="route-setup" onClick={onClose}>
+    <Dialog label={`Plan ${from} to ${to}`} className="gameover-overlay" testId="route-setup" onClose={onClose}>
       <div className="gameover-card report-card" onClick={(e) => e.stopPropagation()}>
         <h2>
           Open {from}–{to}
@@ -77,7 +79,7 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
                   const id = Number(e.target.value)
                   setAircraftId(id)
                   const ac = candidates.find((c) => c.id === id)
-                  if (ac) setFrequency(roundTripsPerWeek(ac.type, km))
+                  if (ac) setFrequency(suggestedFrequency(ac))
                 }}
               >
                 {candidates.map((ac) => {
@@ -157,6 +159,6 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
           </>
         )}
       </div>
-    </div>
+    </Dialog>
   )
 }

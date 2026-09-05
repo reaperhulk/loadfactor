@@ -11,6 +11,8 @@ import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { seasonalBp } from '../engine/market'
 import { Icon } from './Icon'
+import { aircraftGlyph } from './AircraftArt'
+import { useDisplayPreferences, useReducedMotion } from './display'
 import { placeLabels } from './labels'
 import { cityMass, cityTier, rivalColorClass } from './mapStyle'
 import {
@@ -479,6 +481,8 @@ export function MapView({
   newSlotCities,
   acquiredRouteIds,
 }: MapViewProps) {
+  const display = useDisplayPreferences()
+  const reduceMotion = useReducedMotion()
   // A phone's map box is nearly square; the world is 2.7:1. Covering that box
   // with the WHOLE world would crop 60% of its width — measured, Chicago
   // rendered at x = -45. So on a narrow screen "home" is the player's own
@@ -519,9 +523,9 @@ export function MapView({
   // Projection: the flat overview or a rotatable orthographic globe. The
   // choice persists — planning favors the whole-world view, the globe is the
   // honest picture of what long-haul really flies.
-  const [projection, setProjection] = useState<'flat' | 'globe'>(() =>
-    localStorage.getItem('loadfactor:projection') === 'globe' ? 'globe' : 'flat',
-  )
+  const [projection, setProjection] = useState<'flat' | 'globe'>(() => {
+    try { return localStorage.getItem('loadfactor:projection') === 'globe' ? 'globe' : 'flat' } catch { return 'flat' }
+  })
   const isGlobe = projection === 'globe'
 
   // A finger drag must track the finger, and moving the map by rewriting the
@@ -569,12 +573,23 @@ export function MapView({
       svg.pauseAnimations() // SMIL: the planes, which ignore CSS entirely
       paused.current = svg.getAnimations({ subtree: true }).filter((a) => a.playState === 'running')
       for (const a of paused.current) a.pause() // CSS: selection ring, target blink
-    } else {
+    } else if (!document.hidden && !reduceMotion) {
       svg.unpauseAnimations()
       for (const a of paused.current) a.play()
       paused.current = []
     }
   }
+  useEffect(() => {
+    const visibility = () => {
+      const svg = svgRef.current
+      if (!svg) return
+      if (document.hidden || reduceMotion || movingRef.current) svg.pauseAnimations()
+      else svg.unpauseAnimations()
+    }
+    visibility()
+    document.addEventListener('visibilitychange', visibility)
+    return () => document.removeEventListener('visibilitychange', visibility)
+  }, [reduceMotion])
   const layerRef = useRef<HTMLDivElement>(null)
   const minimapRef = useRef<HTMLDivElement>(null)
   // The viewBox actually in the DOM. The transform maps it to the live view.
@@ -793,6 +808,7 @@ export function MapView({
   }
 
   const applyView = (target: ViewBox, immediate: boolean): void => {
+    immediate = immediate || reduceMotion
     targetRef.current = clampView(target)
     if (gesturing.current) {
       // Mid-gesture: straight to the DOM, no render, no media query. A pinch
@@ -881,6 +897,7 @@ export function MapView({
   }
 
   const applyGlobe = (next: GlobeView, immediate: boolean): void => {
+    immediate = immediate || reduceMotion
     globeTarget.current = clampGlobe(next)
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (immediate || reduced) {
@@ -904,7 +921,7 @@ export function MapView({
       if (target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return
       setProjection((p) => {
         const next = p === 'globe' ? 'flat' : 'globe'
-        localStorage.setItem('loadfactor:projection', next)
+        try { localStorage.setItem('loadfactor:projection', next) } catch { /* session preference */ }
         return next
       })
     }
@@ -1063,32 +1080,38 @@ export function MapView({
   }, [state, seat, isGlobe, globe, projKey, newRouteIds, acquiredRouteIds, lens, pulseUi, onRouteClick])
 
   const playerPlanesLayer = useMemo(() => {
+    if (reduceMotion) return []
+    let remaining = display.traffic === 'low' ? 8 : 24
     return flownRoutes.flatMap((r) => {
       const km = distanceKm(r.from, r.to)
       const freq = effectiveFrequency(player, r)
-      const planes = Math.max(1, Math.min(4, Math.round(freq / 8)))
+      const planes = Math.min(remaining, Math.max(1, Math.min(4, Math.round(freq / 8))))
+      if (!planes) return []
       const path = tripPathFor(r.from, r.to)
       if (path === null) return [] // route crosses the horizon — no shuttle
+      remaining -= planes
       // The glyph wears the metal: widebodies render visibly larger than
       // regional jets, and fast airframes visibly outrun the fleet
       // (Concorde zips). Biggest/fastest airframe assigned to the route.
-      let biggestSeats = 100
-      let fastestKmh = 850
+      let biggestSeats = 0
+      let fastestKmh = 0
+      let aircraftType = 'caravelle'
       for (const ac of player.fleet) {
-        if (ac.routeId !== r.id) continue
+        if (ac.routeId !== r.id && ac.secondaryRouteId !== r.id) continue
         const t = getAircraftType(ac.type)
+        if (t.seats > biggestSeats) aircraftType = ac.type
         biggestSeats = Math.max(biggestSeats, t.seats)
         fastestKmh = Math.max(fastestKmh, t.speedKmh)
       }
       const glyphScale = (0.62 + Math.min(0.5, biggestSeats / 800)) / glyphUi
-      const dur = (4 + Math.min(14, km / 900)) * (850 / fastestKmh)
+      const dur = (4 + Math.min(14, km / 900)) * (850 / Math.max(1, fastestKmh))
       return Array.from({ length: planes }, (_, i) => (
         <g key={`plane-${r.id}-${i}`} className="plane" data-testid={i === 0 ? `plane-${r.id}` : undefined}>
           {/* A silhouette whose nose points along +x: rotate="auto" then
               keeps it flying nose-first on BOTH legs of the shuttle — the
               ✈ text glyph points 45° off-axis and read as flying
               backwards on the return leg. */}
-          <path d={PLANE_GLYPH} transform={`scale(${glyphScale.toFixed(3)})`} />
+          <path d={aircraftGlyph(aircraftType)} transform={`scale(${glyphScale.toFixed(3)})`} />
           {/* The path itself runs out AND back, traversed forward only —
               brief dwells at each end, correct nose-first orientation on
               both legs in every engine (keyPoints reversal breaks
@@ -1108,14 +1131,14 @@ export function MapView({
       ))
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, seat, isGlobe, globe, projKey, glyphUi])
+  }, [state, seat, isGlobe, globe, projKey, glyphUi, reduceMotion, display.traffic])
 
   const rivalPlanesLayer = useMemo(() => {
-    if (!showRivals) return null
+    if (reduceMotion || !showRivals) return null
     return state.airlines
       .filter((a) => a.id !== viewSeat())
       .flatMap((airline) => airline.routes.map((r) => ({ airline, r })))
-      .slice(0, 12)
+      .slice(0, display.traffic === 'low' ? 4 : 12)
       .map(({ airline, r }) => {
         const path = tripPathFor(r.from, r.to)
         if (path === null) return null
@@ -1138,7 +1161,7 @@ export function MapView({
         )
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, seat, showRivals, isGlobe, globe, projKey, glyphUi])
+  }, [state, seat, showRivals, isGlobe, globe, projKey, glyphUi, reduceMotion, display.traffic])
 
   // Visibility only changes when the game state, selection, an LOD threshold
   // crossing, or the visible window changes — not on every animation frame of
@@ -1933,7 +1956,7 @@ export function MapView({
           onClick={() => {
             const next = isGlobe ? 'flat' : 'globe'
             setProjection(next)
-            localStorage.setItem('loadfactor:projection', next)
+            try { localStorage.setItem('loadfactor:projection', next) } catch { /* session preference */ }
           }}
         >
           <Icon name="globe" />
@@ -1955,6 +1978,16 @@ export function MapView({
         >
           {lens === 'profit' ? '$' : <Icon name={lens === 'season' ? 'sun' : 'lens'} />}
         </button>
+      </div>
+      <div className="map-data-control">
+        <label>Map colors <select aria-label="map colors" value={lens} onChange={(e) => setLens(e.target.value as typeof lens)}>
+          <option value="none">Ownership</option><option value="load">Load factor</option><option value="profit">Route margin</option><option value="season">Season</option>
+        </select></label>
+        {lens !== 'none' && <span className="map-data-legend" data-testid="map-data-legend">
+          <span className="pos">━━ {lens === 'load' ? '≥80%' : lens === 'profit' ? '≥15%' : 'High season'}</span>
+          <span>┄┄ {lens === 'load' ? '55–79%' : lens === 'profit' ? '0–14%' : 'Neutral'}</span>
+          <span className="neg">···· {lens === 'load' ? '<55%' : lens === 'profit' ? 'Loss' : 'Low season'}</span>
+        </span>}
       </div>
       {/* Minimap inset: once zoomed in, a world thumbnail shows where the
           viewport sits — click (or drag) to jump the view there. Flat map

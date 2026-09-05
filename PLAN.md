@@ -541,3 +541,16 @@ adds a scenario/policy/seed distribution gate, itinerary conservation tests,
 operational hour/seat/replacement tests, and a reproducible balance-report CLI.
 A connection-focused policy values complementary spokes as well as direct O/D
 traffic; the cautious reference policy preserves a larger cash buffer.
+
+### Player experience implementation (2026-09-05)
+
+PlanningWorkbench stages command batches and compares company accounting with
+forecastQuarter; a commit is one undo intent. RouteWhatIf resolves full itineraries
+only when expanded. ManagementBrief chooses at most three actionable concerns.
+Display preferences own motion, text and decorative traffic density; player
+traffic is capped at 24 glyphs (8 on low), rival traffic at 12 (4 on low). SVG
+animations pause on hidden tabs; reduced motion omits shuttles and zoom easing.
+AudioScore composes original 96-bar arrangements across five historical palettes,
+with separate music/ambience/effects buses, financial tension, bounded voices,
+alert ducking and gesture-only context activation. Hidden and muted sessions
+suspend the context and scheduler. These systems do not enter simulation state.

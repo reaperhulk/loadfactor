@@ -7,7 +7,7 @@ import { getAircraftType } from '../data/aircraft'
 import { distanceKm } from '../data/cities'
 import type { Command, GameState } from '../engine'
 import { pairWeeklyDemand } from '../engine/market'
-import { maxRouteFrequency, roundTripsPerWeek, routeWeeklyCapacity } from '../engine/queries'
+import { isGrounded, maxRouteFrequency, roundTripsPerWeek, routeWeeklyCapacity } from '../engine/queries'
 import { forecastDirectRoute } from '../engine/forecast'
 import { viewSeat, dispatchBatch, getSession } from './session'
 
@@ -79,7 +79,7 @@ export function assignAllIdle(): void {
     const s = getSession()?.state
     if (!s) return
     const p = s.airlines[viewSeat()]!
-    const idle = p.fleet.find((a) => a.routeId === null)
+    const idle = p.fleet.find((a) => a.routeId === null && !a.reserve && !isGrounded(a, s.turn))
     if (!idle) return
     const range = getAircraftType(idle.type).rangeKm
     let bestRoute: (typeof p.routes)[number] | null = null

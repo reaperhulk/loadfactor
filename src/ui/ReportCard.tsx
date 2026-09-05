@@ -1,3 +1,4 @@
+import { Dialog } from './Dialog'
 // The quarterly report card: what just happened, at a glance — shown after
 // every End Quarter. Built purely from the session's reportEvents plus the
 // player's stats history (this quarter vs last).
@@ -73,7 +74,7 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
   )
 
   return (
-    <div className="gameover-overlay report-overlay" data-testid="report-card" onClick={onClose}>
+    <Dialog label="Quarterly report" className="gameover-overlay report-overlay" testId="report-card" onClose={onClose}>
       <div className="gameover-card report-card" onClick={(e) => e.stopPropagation()}>
         {/* The quarter's headline, not its ledger. A profit figure the size of
             a poster, its direction, and the margin behind it — the table below
@@ -372,6 +373,6 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
           Continue (space)
         </button>
       </div>
-    </div>
+    </Dialog>
   )
 }

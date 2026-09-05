@@ -1,10 +1,15 @@
+import { DisplaySettings } from './DisplaySettings'
+import { Dialog } from './Dialog'
+import { AudioSettings } from './AudioSettings'
+import { ManagementBrief } from './ManagementBrief'
 import { rulesOf, identityOf } from '../engine/version'
 import { lazy, Suspense, useEffect, useReducer, useState, useSyncExternalStore } from 'react'
 import { CITIES } from '../data/cities'
+import { AIRCRAFT } from '../data/aircraft'
 import { getEventDef } from '../data/events'
 import { SCENARIOS, SHORT_SCENARIOS, getScenario } from '../data/scenarios'
 import { netWorth, networkCities, objectiveScore, quarterOf, yearOf } from '../engine/queries'
-import { idleSlotRent } from '../engine/slots'
+import { idleSlotRent, nextExpansion } from '../engine/slots'
 import { CityPanel } from './CityPanel'
 import { CoachMarks } from './CoachMarks'
 import { ConfirmButton } from './ConfirmButton'
@@ -518,7 +523,7 @@ function GameOverOverlay({
   const peakWorth = me.history.reduce((s, h) => Math.max(s, h.netWorth), 0)
   const won = state.winnerSeat === undefined ? state.phase === 'won' : state.winnerSeat === viewSeat()
   return (
-    <div className="gameover-overlay" data-testid="gameover-overlay">
+    <Dialog label="Career results" className="gameover-overlay" testId="gameover-overlay" onClose={() => {}}>
       {won && (
         <div className="confetti" aria-hidden="true" data-testid="confetti">
           {/* Deterministic scatter — index drives position, drift, and delay. */}
@@ -610,7 +615,7 @@ function GameOverOverlay({
           New game
         </button>
       </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -672,6 +677,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const target = e.target as HTMLElement | null
+      if (target?.closest('[role=dialog]')) return
       if (target && ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(target.tagName)) return
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         if (undoLastAction()) e.preventDefault()
@@ -849,6 +855,8 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           <Icon name="share" /> share
         </button>
         <MuteToggle />
+        <AudioSettings />
+        <DisplaySettings />
         {state.phase === 'planning' &&
           (() => {
             const sess = getSession()!
@@ -925,7 +933,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       {(() => {
         // Needs attention: money leaking or about to. Each chip jumps to the
         // tab where the fix lives.
-        const idlePlanes = player.fleet.filter((a) => a.routeId === null).length
+        const idlePlanes = player.fleet.filter((a) => a.routeId === null && !a.reserve).length
         // Rent on capacity nothing flies: the bill that quietly grows when a
         // network of positions outruns the fleet that was meant to use them.
         const idleRent = idleSlotRent(player)
@@ -986,7 +994,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         <GameOverOverlay state={state} earned={session.careerUnlocks} onWatchReplay={onWatchReplay} />
       )}
       {showHelp && (
-        <div className="gameover-overlay" data-testid="help-overlay" onClick={() => setShowHelp(false)}>
+        <Dialog label="Airline handbook" className="gameover-overlay" testId="help-overlay" onClose={() => setShowHelp(false)}>
           <div className="gameover-card report-card handbook" onClick={(e) => e.stopPropagation()}>
             <h2>Handbook</h2>
             <p className="dim" data-testid="handbook-intro">
@@ -1057,15 +1065,18 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
               Close
             </button>
           </div>
-        </div>
+        </Dialog>
       )}
       {(state.rulesVersion ?? 1) >= 2 && <details className="world-outlook" data-testid="world-outlook">
         <summary>Planning calendar · next board opportunity in {state.turn % 8 === 0 ? 0 : 8 - state.turn % 8}q</summary>
         <p>Board opportunities arrive every eight quarters with four quarters to decide. Accepted commitments can run for several years.</p>
         <p>{scenario.objective.blurb} {scenario.objective.kind === 'loadFactor' ? 'Qualification also requires 1.5M total passengers and three active routes.' : ''}</p>
         <p>Scheduled deliveries: {player.orders.length === 0 ? 'none' : player.orders.map((o) => `${o.type} in ${o.quartersLeft}q${o.replacesAircraftId ? ' (replacement)' : ''}`).join(' · ')}</p>
+        <p>Aircraft entering the market within two years: {AIRCRAFT.filter((t) => t.availableFrom > yearOf(state) && t.availableFrom <= yearOf(state) + 2).map((t) => `${t.name} (${t.availableFrom})`).join(' · ') || 'none announced'}.</p>
+        <p>Airport programmes on your network: {[...new Set([...Object.keys(player.slots), ...player.slotRequests.map((r) => r.city)])].map((city) => ({ city, ...nextExpansion(state, city) })).filter((e) => e.quartersAway <= 8).sort((a,b) => a.quartersAway-b.quartersAway).map((e) => `${e.city}: +${e.slots} slots in ${e.quartersAway}q`).join(' · ') || 'none opening in the next eight quarters'}.</p>
         {state.airlines.filter((a) => a.campaign).map((a) => <p key={a.id}>{a.name}: {a.campaign!.kind} campaign at {a.campaign!.city}, through quarter {a.campaign!.untilTurn}.</p>)}
       </details>}
+      {state.phase === 'planning' && <ManagementBrief state={state} onTab={setTab} onInspect={inspectRoute} onPlan={(from, to) => setPendingRoute({ from, to })} />}
       <div className="map-area">
         <Suspense
           fallback={

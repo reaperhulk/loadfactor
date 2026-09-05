@@ -1,3 +1,4 @@
+import { AircraftArt } from './AircraftArt'
 // The aircraft showroom, split out of panels.tsx: full specs plus honest
 // per-route economics estimates for each type on sale.
 
@@ -81,7 +82,7 @@ export function Shop({ state }: { state: GameState }) {
               const bestBreakeven = Math.min(...rows.map((r) => r.breakevenBp ?? Infinity))
               return rows.map(({ t, cost, seats, outOfRange, perSeat, breakevenBp }) => (
                 <tr key={t.id} className={outOfRange ? 'dim' : ''}>
-                  <td>{t.name}</td>
+                  <td><strong>{t.name}</strong><AircraftArt type={t.id} /></td>
                   <td>{t.seats}</td>
                   <td>{t.rangeKm}km</td>
                   <td>{t.speedKmh}km/h</td>
@@ -160,7 +161,7 @@ export function Shop({ state }: { state: GameState }) {
                   const discountBp = 10000 - Math.floor((o.price * 10000) / t.price)
                   return (
                     <tr key={o.id}>
-                      <td>{t.name}</td>
+                      <td><strong>{t.name}</strong><AircraftArt type={t.id} /></td>
                       <td>{(o.ageQuarters / 4).toFixed(1)}y old</td>
                       <td>
                         {money(o.price)}{' '}

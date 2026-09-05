@@ -2236,3 +2236,125 @@ td, th {
 
 .save-warning { padding: .75rem 1rem; background: #ffe7a3; color: #312510; border: 2px solid #9c6e16; }
 .save-warning button { margin-left: .7rem; background: #fff8e5; color: #312510; }
+
+/* Airline stationery: dark operations surfaces, warm paper reports, bright
+   ownership blue, green profit and rust losses. All fonts are local. */
+:root { --bg:#071b27; --panel:#132d3b; --ink:#e7edf0; --dim:#b3c0c7; --accent:#80cfeb; --pos:#78d6ae; --neg:#ffad9b; --rule:#38505e; }
+main { max-width:1380px; padding:18px 24px 36px; }
+body { background:linear-gradient(135deg,#0c2635,#071720 65%); }
+.game { border-inline:1px solid #ffffff09; }
+.game.era-1960 { --bg:#112732; --panel:#19333e; --rule:#465254; --era-heading:#ebc588; }
+.game.era-1970 { --bg:#242723; --panel:#32382e; --rule:#565b44; --era-heading:#efbe7a; }
+.game.era-1980 { --bg:#142539; --panel:#22364a; --rule:#456077; --era-heading:#b7cce8; }
+.game.era-1990 { --bg:#0a2837; --panel:#15394a; --rule:#366173; --era-heading:#80d2e7; }
+.game.era-2000 { --bg:#0a242c; --panel:#14333b; --rule:#35606a; --era-heading:#91ddce; }
+h1,.menu h2,.brief-heading h2,.gameover-card h2 { font-family:Georgia,'Times New Roman',serif; font-weight:500; letter-spacing:-.025em; }
+.game.era-1980 h1,.game.era-1990 h1,.game.era-2000 h1 { font-family:system-ui,sans-serif; font-weight:750; letter-spacing:-.04em; }
+.menu { padding-top:7vh; }
+.menu h1 { font-size:clamp(2.7rem,6vw,5.8rem); color:#f2dcac; }
+.tagline { font-size:1.1rem; line-height:1.7; }
+.scenario-card { max-width:680px; padding:25px 28px; border-radius:4px 16px 16px 4px; }
+.scenario-card h2,.scenario-card h3 { margin-top:8px; }
+.scenario-card p { line-height:1.55; }
+.short-scenarios { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; max-width:960px; margin:40px auto; }
+.short-scenarios > h2,.short-scenarios > p { grid-column:1/-1; margin:0; }
+.short-scenarios .scenario-card { margin:0; width:100%; border-left:3px solid #ebc588; }
+button { min-height:32px; background:#253f50; border-color:#526777; font:inherit; font-size:.84rem; }
+button:disabled { opacity:.5; }
+input,select,textarea { font:inherit; font-size:.9rem; max-width:100%; }
+input[type=range] { accent-color:var(--accent); }
+input[type=checkbox] { accent-color:var(--accent); }
+summary { cursor:pointer; line-height:1.5; }
+p { line-height:1.5; }
+th,td,.hud-figure { font-variant-numeric:tabular-nums; }
+th { font-size:.78rem; letter-spacing:.02em; }
+.hud-stat::before { opacity:1; font-size:.66rem; }
+.hud-figure { font-size:1.12rem; }
+.game > header { gap:14px; padding:12px 0 18px; }
+.game > header h1 { font-size:1.7rem; }
+.management-brief { margin:18px 0; padding:20px; background:var(--panel); border:1px solid var(--rule); border-top:3px solid var(--era-heading); border-radius:3px 12px 12px 3px; }
+.brief-heading { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
+.brief-heading h2 { margin:0; font-size:1.55rem; }
+.brief-heading > span { font-size:.85rem; }
+.brief-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:18px; margin-top:12px; }
+.brief-grid article { border-top:1px solid var(--rule); padding-top:8px; }
+.brief-grid h3 { margin:8px 0; font-size:1rem; }
+.brief-grid p { font-size:.88rem; max-width:50ch; }
+.brief-assumptions { color:var(--dim); font-size:.75rem; margin-bottom:0; }
+.eyebrow { text-transform:uppercase; letter-spacing:.1em; font-size:.65rem; color:var(--dim); }
+.world-outlook,.planning-workbench { background:var(--panel); border:1px solid var(--rule); border-radius:8px; padding:12px 16px; margin:14px 0; }
+.world-outlook summary,.planning-workbench summary { color:var(--accent); font-weight:600; }
+.world-outlook p { font-size:.85rem; }
+.plan-inputs { display:grid; grid-template-columns:repeat(4,minmax(120px,1fr)); gap:14px; margin:16px 0; }
+.plan-inputs label { display:grid; gap:6px; font-size:.85rem; }
+.plan-inputs input,.plan-inputs select { width:100%; min-height:36px; }
+.staged-changes { display:flex; flex-wrap:wrap; gap:8px 26px; font-size:.85rem; }
+.forecast-comparison { margin:16px 0; width:100%; }
+.route-table-compact :is(th,td):is(:nth-child(2),:nth-child(4),:nth-child(5),:nth-child(9),:nth-child(10),:nth-child(11),:nth-child(12),:nth-child(13),:nth-child(14)) { display:none; }
+.audio-settings,.display-settings { position:relative; font-size:.8rem; }
+.audio-settings[open],.display-settings[open] { border:1px solid var(--rule); background:var(--panel); padding:8px 12px; border-radius:8px; max-width:330px; }
+.audio-settings label,.display-settings label { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 0; }
+.audio-settings label { text-transform:capitalize; }
+.audio-settings input { width:140px; }
+.audio-settings output { min-width:3ch; }
+.audio-settings p { max-width:30ch; }
+.display-settings select { max-width:190px; }
+.aircraft-art { margin:8px 0 0; width:190px; }
+.aircraft-art svg { width:100%; height:70px; background:linear-gradient(150deg,#26414f,#142b37); border-radius:8px; }
+.aircraft-art figcaption { font-size:.65rem; color:var(--dim); white-space:normal; }
+.aircraft-metal { fill:#dbe1df; stroke:#7d919a; stroke-width:.6; }
+.aircraft-stripe,.aircraft-tail { fill:#d49b55; }
+.aircraft-wing,.aircraft-tailplane { fill:#97aeb7; stroke:#dbe1df; stroke-width:.7; }
+.aircraft-cockpit,.aircraft-window { fill:#244457; }
+.aircraft-shadow { fill:#071923; opacity:.7; }
+.aircraft-engine { fill:#bbc8ca; stroke:#738d98; }
+.aircraft-prop { stroke:#dbe1df; stroke-width:2; }
+.aircraft-art text { fill:#b1c6cf; font:7px system-ui; letter-spacing:2px; }
+.map-area:has(.city-panel) { display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:12px; align-items:start; }
+.map-area .city-panel { position:relative; top:auto; right:auto; width:auto; max-height:72vh; background:var(--panel); border-color:var(--rule); font-size:.88rem; backdrop-filter:none; }
+.map-area .map-wrap { min-width:0; }
+.map-data-control { position:absolute; left:12px; top:10px; z-index:3; max-width:calc(100% - 80px); background:#102b3eee; border:1px solid #4b6878; border-radius:6px; padding:5px 8px; font-size:.73rem; color:#e7edf0; }
+.map-data-control select { font-size:.74rem; max-width:140px; }
+.map-data-legend { display:flex; flex-wrap:wrap; gap:9px; margin-top:6px; }
+.route-player.lens-mid { stroke-dasharray:7 3; }
+.route-player.lens-bad { stroke-dasharray:2 4; }
+.gameover-card,.report-card { --ink:#19313f; --dim:#516571; --pos:#196947; --neg:#a2392b; --accent:#176582; --panel:#ece9dd; --rule:#b9c1bc; background:#f5f1e5; color:var(--ink); box-shadow:0 30px 100px #0009; border:1px solid #d1cfc1; }
+.game .gameover-card h3,.game .report-card h3,.game .report-card .report-hero-figure.pos { color:var(--pos); }
+.gameover-card button,.report-card button { background:#e1e5dc; color:var(--ink); border-color:#899d9e; }
+.gameover-card select,.gameover-card input:not([type=range]),.report-card select { color:var(--ink); background:#fffdf4; border:1px solid #899d9e; color-scheme:light; }
+.gameover-card .me,.report-card .me { background:#dce8de; }
+.gameover-card .event-chip,.report-card .event-chip { background:#e4e7dd; color:var(--ink); border-color:#a1b0a6; }
+.report-card table { border-color:var(--rule); }
+.tutorial-steps { display:flex; gap:22px; flex-wrap:wrap; padding-left:20px; font-size:.8rem; color:var(--dim); }
+.tutorial-steps [aria-current=step] { color:var(--accent); font-weight:700; }
+:root[data-motion=reduced] *, :root[data-motion=reduced] *::before, :root[data-motion=reduced] *::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; }
+:root[data-motion=reduced] .confetti { display:none; }
+:root[data-hidden=true] * { animation-play-state:paused !important; }
+@media(max-width:900px) {
+  main { padding:12px; }
+  .map-area:has(.city-panel) { display:block; }
+  .map-area .city-panel { position:fixed; left:0; right:0; top:auto; bottom:0; z-index:30; width:100%; max-height:62dvh; padding:16px 18px calc(18px + env(safe-area-inset-bottom)); border-radius:16px 16px 0 0; box-shadow:0 -15px 50px #0008; }
+  .city-panel-head { position:sticky; top:-16px; padding-top:12px; z-index:1; background:var(--panel); }
+  .plan-inputs { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .game > header { gap:10px; }
+  button { min-height:36px; }
+}
+@media(max-width:560px) {
+  .short-scenarios { display:block; }
+  .short-scenarios .scenario-card { margin:15px 0; }
+  .management-brief { padding:14px; }
+  .brief-grid { display:flex; flex-direction:column; gap:8px; }
+  .brief-grid article p { margin:8px 0; }
+  .scenario-card { padding:20px; }
+  .hud-objective { min-width:150px; }
+  .map-data-control { left:6px; top:6px; }
+  .audio-settings[open],.display-settings[open] { flex-basis:100%; max-width:100%; }
+  .gameover-card { max-height:88dvh; overflow-y:auto; }
+}
+
+/* Offers remain in the planning flow; modal reports always sit above it. */
+.offer-card { position:relative; inset:auto; width:100%; max-width:none; z-index:auto; margin:12px 0; padding:16px 20px; background:var(--panel); backdrop-filter:none; box-shadow:none; }
+.gameover-overlay { z-index:60; }
+.operations-panel { background:var(--panel); border:1px solid var(--rule); padding:14px 18px; border-radius:8px; margin:16px 0; }
+.operations-panel label { display:block; margin:10px 0; }
+.operations-panel p { font-size:.87rem; }

@@ -4,6 +4,8 @@ export default defineConfig({
   testDir: 'e2e',
   timeout: 60_000,
   retries: process.env.CI ? 2 : 0,
+  maxFailures: process.env.CI ? 0 : 1,
+  reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://localhost:4173',
     trace: 'retain-on-failure',
