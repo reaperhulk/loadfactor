@@ -44,3 +44,8 @@ and scenario ranking. All 188 unit tests, lint, types, build and bundle budget
 passed; legacy golden careers unchanged. `npm run ci` reached browser tests but
 this runtime cannot download Playwright browsers (CDN timeouts). Hosted CI will
 run those tests for each pushed stage.
+
+Stage 1 pushed as 1435497. Stage 2 adds explicit rules/content identity, objective
+challenge/replay/fame displays, hot-seat exports and active-seat restoration,
+visible quota errors with downloadable recovery, persistent outgoing duel links,
+batched multiplayer replay, and quarter-boundary undo. Four recovery tests added.

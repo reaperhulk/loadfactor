@@ -1,3 +1,4 @@
+import { RULES_VERSION, rulesOf } from './version'
 import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity } from '../data/cities'
 import { AI_MIN_ROUTE_KM } from '../data/constants'
@@ -70,7 +71,9 @@ export function newGame(
   // identity: a replay must recreate the same controllers or the rival AI
   // would move airlines the humans owned.
   humanSeats?: readonly number[],
+  rulesVersion = RULES_VERSION,
 ): GameState {
+  rulesOf({ rulesVersion })
   const scenario = getScenario(scenarioId)
   // Customization overlays the scenario's authored player seat. A custom HQ
   // swaps the authored footholds for ones derived around the new home.
@@ -91,6 +94,7 @@ export function newGame(
     airlines.push(makeAirline(i + 1, r, humans.has(i + 1) ? 'player' : 'rival')),
   )
   return {
+    ...(rulesVersion > 1 ? { rulesVersion, contentVersion: 1 } : {}),
     scenario: scenarioId,
     seed,
     turn: 0,

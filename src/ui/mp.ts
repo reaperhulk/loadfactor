@@ -1,3 +1,4 @@
+import { identityOf, rulesOf, type RulesIdentity } from '../engine/version'
 // Async multiplayer by link (PLAN.md §10, MP1). Pure protocol logic — no DOM,
 // no storage, no React — so the whole thing is unit-testable, including two
 // simulated clients playing a full game against each other.
@@ -23,7 +24,7 @@
 // of silently forking the game.
 
 import {
-  applyCommandFor,
+  applyCommandBatchFor,
   newGame,
   type Command,
   type GameState,
@@ -34,7 +35,7 @@ import { hashState } from '../harness/hash'
 export const MP_SEATS: readonly number[] = [1] // seat 1 is human; seat 0 implicit
 export const SEATS: readonly [number, number] = [0, 1]
 
-export interface MpGame {
+export interface MpGame extends RulesIdentity {
   v: 1
   gameId: string
   scenario: string
@@ -50,7 +51,7 @@ export interface MpGame {
 // A turn link's payload. `expect` is the hash of the state the delta applies
 // on top of (a fast, specific "you are behind / ahead" check); `result` is
 // the hash after — the lockstep agreement itself.
-export interface MpTurn {
+export interface MpTurn extends RulesIdentity {
   v: 1
   gameId: string
   scenario: string
@@ -61,10 +62,8 @@ export interface MpTurn {
   result: string
 }
 
-export function replayEntries(scenario: string, seed: string, entries: readonly SeatCommand[]): GameState {
-  let state = newGame(scenario, seed, undefined, MP_SEATS)
-  for (const e of entries) state = applyCommandFor(state, e.seat, e.command).state
-  return state
+export function replayEntries(scenario: string, seed: string, entries: readonly SeatCommand[], identity: RulesIdentity = {}): GameState {
+  return applyCommandBatchFor(newGame(scenario, seed, undefined, MP_SEATS, rulesOf(identity)), entries).state
 }
 
 export function quartersResolved(entries: readonly SeatCommand[]): number {
@@ -99,11 +98,11 @@ export function sittingEntries(
 }
 
 export function buildTurn(game: MpGame, appended: readonly SeatCommand[]): MpTurn {
-  const before = replayEntries(game.scenario, game.seed, game.entries)
-  let after = before
-  for (const e of appended) after = applyCommandFor(after, e.seat, e.command).state
+  const before = replayEntries(game.scenario, game.seed, game.entries, game)
+  const after = applyCommandBatchFor(before, appended).state
   return {
     v: 1,
+    ...identityOf(game),
     gameId: game.gameId,
     scenario: game.scenario,
     seed: game.seed,
@@ -150,6 +149,13 @@ export function validSittingShape(
 // Fold an incoming turn into a local game. Every failure mode is a distinct,
 // human-readable reason — a mis-pasted link should say what went wrong.
 export function applyTurn(game: MpGame, turn: MpTurn): ApplyOutcome {
+  try {
+    if (rulesOf(game) !== rulesOf(turn) || game.scenario !== turn.scenario || game.seed !== turn.seed) {
+      return { ok: false, reason: 'link uses a different scenario, seed, or rules version' }
+    }
+  } catch (error) {
+    return { ok: false, reason: String(error) }
+  }
   if (turn.gameId !== game.gameId) return { ok: false, reason: 'link is for a different game' }
   if (turn.seat === game.mySeat) return { ok: false, reason: 'this is your own link — send it to your opponent' }
   if (turn.seat !== nextActor(game.entries)) {
@@ -163,7 +169,7 @@ export function applyTurn(game: MpGame, turn: MpTurn): ApplyOutcome {
       return { ok: false, reason: 'link contains commands for a seat its sender does not hold' }
     }
   }
-  const before = replayEntries(game.scenario, game.seed, game.entries)
+  const before = replayEntries(game.scenario, game.seed, game.entries, game)
   if (hashState(before) !== turn.expect) {
     return { ok: false, reason: 'games out of sync — this link was made against a different history' }
   }
@@ -175,7 +181,7 @@ export function applyTurn(game: MpGame, turn: MpTurn): ApplyOutcome {
   // refusal instead of a crash.
   let after = before
   try {
-    for (const e of turn.delta) after = applyCommandFor(after, e.seat, e.command).state
+    after = applyCommandBatchFor(before, turn.delta).state
   } catch {
     return { ok: false, reason: 'link contains a command the engine cannot process' }
   }
@@ -257,6 +263,8 @@ export async function decodeTurn(text: string): Promise<MpTurn | null> {
     const turn = JSON.parse(new TextDecoder().decode(raw)) as MpTurn
     if (turn.v !== 1 || typeof turn.gameId !== 'string' || !Array.isArray(turn.delta)) return null
     if (turn.seat !== 0 && turn.seat !== 1) return null
+    if (typeof turn.scenario !== 'string' || typeof turn.seed !== 'string') return null
+    if (turn.delta.some((e) => !e || !e.command || typeof e.command.type !== 'string' || !Number.isInteger(e.seat))) return null
     if (typeof turn.expect !== 'string' || typeof turn.result !== 'string') return null
     return turn
   } catch {

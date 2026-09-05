@@ -1,3 +1,4 @@
+import { rulesOf, type RulesIdentity } from './version'
 // The engine's public surface. Three entry points (PLAN.md §3.1):
 //   newGame(scenarioId, seed) → GameState
 //   applyCommand(state, cmd)  → { state, events }   (planning actions)
@@ -74,7 +75,7 @@ export interface SeatCommand {
   command: Command
 }
 
-export interface SeatReplay {
+export interface SeatReplay extends RulesIdentity {
   scenario: string
   seed: string
   player?: PlayerSetup
@@ -84,12 +85,14 @@ export interface SeatReplay {
 
 export function runSeatReplay(replay: SeatReplay): { state: GameState; events: GameEvent[] } {
   return applyCommandBatchFor(
-    newGame(replay.scenario, replay.seed, replay.player, replay.humanSeats),
+    newGame(replay.scenario, replay.seed, replay.player, replay.humanSeats, rulesOf(replay)),
     replay.entries,
   )
 }
 
-export interface Replay {
+export interface Replay extends RulesIdentity {
+  humanSeats?: readonly number[]
+  entries?: readonly SeatCommand[]
   scenario: string
   seed: string
   // Optional player customization (name, HQ) — part of the replay so a
@@ -99,5 +102,6 @@ export interface Replay {
 }
 
 export function runReplay(replay: Replay): { state: GameState; events: GameEvent[] } {
-  return applyCommandBatch(newGame(replay.scenario, replay.seed, replay.player), replay.commands)
+  if (replay.entries) return runSeatReplay({ ...replay, humanSeats: replay.humanSeats ?? [], entries: replay.entries })
+  return applyCommandBatch(newGame(replay.scenario, replay.seed, replay.player, undefined, rulesOf(replay)), replay.commands)
 }

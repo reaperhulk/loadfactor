@@ -1,3 +1,5 @@
+import { identityOf, rulesOf, RULES_VERSION, CONTENT_VERSION, type RulesIdentity } from '../engine/version'
+import { objectiveScore } from '../engine/queries'
 // The bridge between the pure engine and the React shell. Holds the current
 // GameState plus the full command log (which IS the save/replay format), and
 // notifies subscribers after every engine call. Commands are the only write
@@ -8,6 +10,7 @@ import {
   applyCommandFor,
   newGame,
   runReplay,
+  runSeatReplay,
   type Command,
   type GameEvent,
   type GameState,
@@ -25,7 +28,7 @@ import {
   nextActor,
   type MpGame,
 } from './mp'
-import { getScenario } from '../data/scenarios'
+import { getScenario, type ObjectiveKind } from '../data/scenarios'
 import { checkAchievements, type AchievementDef } from './achievements'
 
 // One resolved quarter's full event batch — the newspaper archive's unit.
@@ -79,6 +82,8 @@ export function passSeat(): boolean {
   const at = order.indexOf(session.activeSeat)
   if (at < 0 || at >= order.length - 1) return false
   session = { ...session, activeSeat: order[at + 1]! }
+  undoGroups = []
+  persist()
   notify()
   return true
 }
@@ -115,7 +120,9 @@ interface SaveV1 extends Replay {
 
 // A hot-seat save: same identity idea, seat-tagged log. Solo saves stay v1
 // so every existing save keeps loading.
-interface SaveV2 {
+interface SaveV2 extends RulesIdentity {
+  challenge?: ChallengeTarget
+  activeSeat?: number
   version: 2
   scenario: string
   seed: string
@@ -130,7 +137,8 @@ interface SaveV2 {
 export type AnySave = SaveV1 | SaveV2
 
 // A challenge link can carry the challenger's net worth — the number to beat.
-export interface ChallengeTarget {
+export interface ChallengeTarget extends RulesIdentity {
+  kind?: ObjectiveKind
   worth: number // $k
   by?: string // challenger's airline name
 }
@@ -150,6 +158,25 @@ export function getPlayerColor(): string | null {
 
 // The slot the current career auto-saves into (claimed at start/resume).
 let activeSlot = 0
+let storageWarning: string | null = null
+export function getStorageWarning(): string | null { return storageWarning }
+function storeJson(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+    storageWarning = null
+  } catch {
+    storageWarning = 'Automatic saving failed. Export this career before closing the tab.'
+  }
+}
+export function exportCurrentCareer(): string | null {
+  if (!session) return null
+  return JSON.stringify({
+    version: 2, ...identityOf(session.state), scenario: session.state.scenario,
+    seed: session.state.seed, player: sessionPlayer ?? undefined, color: playerColor ?? undefined,
+    savedAt: Date.now(), humanSeats: session.seats.slice(1), activeSeat: session.activeSeat,
+    entries: session.entries, challenge: challengeTarget ?? undefined,
+  })
+}
 
 function persist(): void {
   if (!session) return
@@ -160,6 +187,8 @@ function persist(): void {
   if (session.mode === 'hotseat') {
     const save: SaveV2 = {
       version: 2,
+      ...identityOf(session.state),
+      activeSeat: session.activeSeat,
       scenario: session.state.scenario,
       seed: session.state.seed,
       player: sessionPlayer ?? undefined,
@@ -169,15 +198,12 @@ function persist(): void {
       humanSeats: session.seats.filter((x) => x !== 0),
       entries: session.entries,
     }
-    try {
-      localStorage.setItem(SLOT_KEYS[activeSlot]!, JSON.stringify(save))
-    } catch {
-      // no storage, play on
-    }
+    storeJson(SLOT_KEYS[activeSlot]!, save)
     return
   }
   const save: SaveV1 = {
     version: 1,
+    ...identityOf(session.state),
     scenario: session.state.scenario,
     seed: session.state.seed,
     player: sessionPlayer ?? undefined,
@@ -187,11 +213,7 @@ function persist(): void {
     savedAt: Date.now(),
     commands: session.commandLog,
   }
-  try {
-    localStorage.setItem(SLOT_KEYS[activeSlot]!, JSON.stringify(save))
-  } catch {
-    // Storage may be full or unavailable (private mode) — play on without saves.
-  }
+  storeJson(SLOT_KEYS[activeSlot]!, save)
 }
 
 // The customization the current session was started with (part of its replay).
@@ -244,15 +266,17 @@ export function clearSaveAt(slot: number): void {
 export function resumeSave(slot = 0): boolean {
   const save = loadSaveAt(slot)
   if (!save) return false
+  try { rulesOf(save) } catch (error) { storageWarning = String(error); notify(); return false }
   undoGroups = []
   activeSlot = slot
   sessionPlayer = save.player ?? null
   playerColor = save.color ?? null
-  challengeTarget = (save.version === 1 ? save.challenge : undefined) ?? null
+  challengeTarget = save.challenge ?? null
   const seats = save.version === 2 ? [0, ...save.humanSeats] : [0]
   const entries: SeatCommand[] =
     save.version === 2 ? save.entries : save.commands.map((command) => ({ seat: 0, command }))
   sessionFromEntries({
+    ...identityOf(save),
     scenario: save.scenario,
     seed: save.seed,
     entries,
@@ -265,7 +289,8 @@ export function resumeSave(slot = 0): boolean {
     player: save.player,
   })
   if (session && session.mode === 'hotseat') {
-    session = { ...session, activeSeat: session.state.turn % seats.length }
+    session = { ...session, activeSeat: save.version === 2 && seats.includes(save.activeSeat ?? -1)
+      ? save.activeSeat! : seats[session.state.turn % seats.length]! }
   }
   notify()
   return true
@@ -275,6 +300,7 @@ type Listener = () => void
 
 let session: Session | null = null
 let undoGroups: { seat: number; count: number }[] = []
+let quarterBoundary: { state: GameState; entryCount: number } | null = null
 const listeners = new Set<Listener>()
 
 function notify(): void {
@@ -296,6 +322,7 @@ export function startGame(
   custom?: PlayerSetup & { color?: string },
   challenge?: ChallengeTarget,
   humans = 1, // hot-seat: how many airline seats are people at this device
+  rulesVersion = RULES_VERSION,
 ): void {
   undoGroups = []
   const player: PlayerSetup | null =
@@ -308,7 +335,7 @@ export function startGame(
   activeSlot = nextFreeSlot().slot
   const seats = Array.from({ length: Math.max(1, Math.min(4, humans)) }, (_, i) => i)
   session = {
-    state: newGame(scenarioId, seed, player ?? undefined, seats.slice(1)),
+    state: newGame(scenarioId, seed, player ?? undefined, seats.slice(1), rulesVersion),
     lastEvents: [],
     reportEvents: [],
     reportArchive: [],
@@ -321,6 +348,7 @@ export function startGame(
     entries: [],
     mp: null,
   }
+  quarterBoundary = { state: session.state, entryCount: 0 }
   persist()
   notify()
 }
@@ -334,6 +362,7 @@ export interface FameEntry {
   seed: string
   won: boolean
   netWorth: number
+  score?: number
   years: number
 }
 
@@ -347,11 +376,14 @@ export function exportSave(slot: number): string | null {
 
 export function importSave(raw: string, slot: number): boolean {
   try {
-    const save = JSON.parse(raw) as SaveV1
-    if (save.version !== 1 || typeof save.seed !== 'string' || !Array.isArray(save.commands)) return false
-    getScenario(save.scenario) // throws on unknown scenario
-    runReplay(save) // must replay cleanly before we store it
-    localStorage.setItem(SLOT_KEYS[slot] ?? '', JSON.stringify(save))
+    const save = JSON.parse(raw) as AnySave
+    if (!save || typeof save.seed !== 'string' || raw.length > 8_000_000 || !SLOT_KEYS[slot]) return false
+    rulesOf(save)
+    getScenario(save.scenario)
+    if (save.version === 1 && Array.isArray(save.commands)) runReplay(save)
+    else if (save.version === 2 && Array.isArray(save.entries) && Array.isArray(save.humanSeats)) runSeatReplay(save)
+    else return false
+    localStorage.setItem(SLOT_KEYS[slot]!, JSON.stringify(save))
     return true
   } catch {
     return false
@@ -364,7 +396,10 @@ export function clearAllData(): void {
   for (let i = 0; i < SAVE_SLOTS; i++) clearSaveAt(i)
   try {
     localStorage.removeItem(FAME_KEY)
-    localStorage.removeItem('loadfactor:coach:v1')
+    localStorage.removeItem(MP_KEY)
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('loadfactor:coach:')) localStorage.removeItem(key)
+    }
     localStorage.removeItem('loadfactor:achievements:v1')
   } catch {
     // ignore
@@ -389,6 +424,7 @@ function recordFame(state: GameState): void {
     seed: state.seed,
     won: state.phase === 'won',
     netWorth: me.history[me.history.length - 1]?.netWorth ?? 0,
+    score: objectiveScore(me, getScenario(state.scenario).objective.kind),
     years: Math.floor(state.turn / 4),
   }
   try {
@@ -434,7 +470,10 @@ export function dispatch(command: Command): GameEvent[] {
     entries: [...session.entries, { seat, command }],
     mp: session.mp,
   }
-  if (command.type === 'end_quarter') undoGroups = []
+  if (command.type === 'end_quarter') {
+    undoGroups = []
+    quarterBoundary = { state, entryCount: session.entries.length }
+  }
   else undoGroups.push({ seat, count: 1 })
   persist()
   notify()
@@ -487,21 +526,11 @@ export function undoLastAction(): boolean {
   const previous = session
   const group = undoGroups.pop()!
   const entries = previous.entries.slice(0, -group.count)
-  sessionFromEntries({
-    scenario: previous.state.scenario,
-    seed: previous.state.seed,
-    entries,
-    mode: previous.mode,
-    seats: previous.seats,
-    activeSeat: previous.activeSeat,
-    mp: previous.mp,
-    player: sessionPlayer ?? undefined,
-  })
+  if (!quarterBoundary) return false
+  const state = applyCommandBatchFor(quarterBoundary.state, entries.slice(quarterBoundary.entryCount)).state
   session = {
-    ...session!,
-    lastEvents: [],
-    lastUnlocks: [],
-    careerUnlocks: previous.careerUnlocks,
+    ...previous, state, entries, commandLog: entries.map((e) => e.command),
+    lastEvents: [], lastUnlocks: [],
   }
   persist()
   notify()
@@ -514,7 +543,8 @@ export function undoLastAction(): boolean {
 
 const MP_KEY = 'loadfactor:mp:v1'
 
-interface MpRecord {
+interface MpRecord extends RulesIdentity {
+  lastSentLink?: string
   gameId: string
   scenario: string
   seed: string
@@ -539,6 +569,7 @@ function persistMp(): void {
   if (!session || session.mode !== 'link' || !session.mp) return
   const store = loadMpStore()
   store[session.mp.gameId] = {
+    ...identityOf(session.state),
     gameId: session.mp.gameId,
     scenario: session.state.scenario,
     seed: session.state.seed,
@@ -546,13 +577,10 @@ function persistMp(): void {
     entries: session.entries,
     theirKnown: session.mp.theirKnown,
     awaiting: session.mp.awaiting,
+    lastSentLink: lastSentLink ?? undefined,
     savedAt: Date.now(),
   }
-  try {
-    localStorage.setItem(MP_KEY, JSON.stringify(store))
-  } catch {
-    // no storage — the game lives only in this tab
-  }
+  storeJson(MP_KEY, store)
 }
 
 export function listMpGames(): MpRecord[] {
@@ -561,7 +589,7 @@ export function listMpGames(): MpRecord[] {
 
 // Rebuild a live session from an entry log — the one fold used by resume,
 // join, and receive, so they cannot disagree about how a log becomes a game.
-function sessionFromEntries(record: {
+function sessionFromEntries(record: RulesIdentity & {
   scenario: string
   seed: string
   entries: SeatCommand[]
@@ -571,10 +599,11 @@ function sessionFromEntries(record: {
   mp: Session['mp']
   player?: PlayerSetup
 }): void {
-  let state = newGame(record.scenario, record.seed, record.player, record.seats.slice(1))
+  let state = newGame(record.scenario, record.seed, record.player, record.seats.slice(1), rulesOf(record))
+  quarterBoundary = { state, entryCount: 0 }
   const reportArchive: QuarterRecord[] = []
   let planningEntries: SeatCommand[] = []
-  for (const e of record.entries) {
+  for (const [index, e] of record.entries.entries()) {
     if (e.command.type !== 'end_quarter') {
       planningEntries.push(e)
       continue
@@ -586,6 +615,7 @@ function sessionFromEntries(record: {
     const turnBefore = state.turn
     const res = applyCommandFor(state, e.seat, e.command)
     state = res.state
+    quarterBoundary = { state, entryCount: index + 1 }
     if (
       e.command.type === 'end_quarter' &&
       res.events.some((ev) => ev.type === 'quarter_report' || ev.type === 'game_over')
@@ -612,11 +642,13 @@ function sessionFromEntries(record: {
 
 export function startLinkGame(scenarioId: string, seed: string): void {
   undoGroups = []
+  lastSentLink = null
   const gameId = `${seed}-${crypto.randomUUID().slice(0, 8)}`
   sessionPlayer = null
   playerColor = null
   challengeTarget = null
   sessionFromEntries({
+    rulesVersion: RULES_VERSION, contentVersion: CONTENT_VERSION,
     scenario: scenarioId,
     seed,
     entries: [],
@@ -632,11 +664,14 @@ export function startLinkGame(scenarioId: string, seed: string): void {
 export function resumeMpGame(gameId: string): boolean {
   const rec = loadMpStore()[gameId]
   if (!rec) return false
+  try { rulesOf(rec) } catch (error) { storageWarning = String(error); notify(); return false }
+  lastSentLink = rec.lastSentLink ?? null
   sessionPlayer = null
   playerColor = null
   challengeTarget = null
   undoGroups = []
   sessionFromEntries({
+    ...identityOf(rec),
     scenario: rec.scenario,
     seed: rec.seed,
     entries: rec.entries,
@@ -651,9 +686,7 @@ export function resumeMpGame(gameId: string): boolean {
 
 // Package everything the other side has not seen into a turn link, and lock
 // planning until their reply.
-// The most recent outgoing link, for "copy again" while waiting. In-memory
-// only: after a reload the chain still works, there is just nothing to
-// re-copy until the next sitting.
+// Persist the outgoing link so "copy again" still works after a reload.
 let lastSentLink: string | null = null
 
 export function getLastSentLink(): string | null {
@@ -667,6 +700,7 @@ export async function sendSitting(): Promise<string | null> {
   if (appended.length === 0) return null
   const game: MpGame = {
     v: 1,
+    ...identityOf(session.state),
     gameId: session.mp.gameId,
     scenario: session.state.scenario,
     seed: session.state.seed,
@@ -680,10 +714,10 @@ export async function sendSitting(): Promise<string | null> {
     ...session,
     mp: { ...session.mp, theirKnown: session.entries.length, awaiting: true },
   }
-  persist()
-  notify()
   const base = `${window.location.origin}${window.location.pathname}`
   lastSentLink = `${base}#mpturn=${encoded}`
+  persist()
+  notify()
   return lastSentLink
 }
 
@@ -694,17 +728,19 @@ export type ReceiveResult = { ok: true; joined: boolean } | { ok: false; reason:
 export async function receiveTurn(encoded: string): Promise<ReceiveResult> {
   const turn = await decodeTurn(encoded)
   if (!turn) return { ok: false, reason: 'that link is not a turn link' }
+  try { rulesOf(turn); getScenario(turn.scenario) } catch (error) { return { ok: false, reason: String(error) } }
   const store = loadMpStore()
   let rec = store[turn.gameId]
   let joined = false
   if (!rec) {
     // Never seen: joinable only if it opens the game from the start — the
     // expected-state hash must be a fresh world's.
-    const fresh = newGame(turn.scenario, turn.seed, undefined, MP_SEATS)
+    const fresh = newGame(turn.scenario, turn.seed, undefined, MP_SEATS, rulesOf(turn))
     if (turn.seat !== 0 || turn.expect !== hashState(fresh)) {
       return { ok: false, reason: 'no local copy of this game — ask for a fresh invite link' }
     }
     rec = {
+      ...identityOf(turn),
       gameId: turn.gameId,
       scenario: turn.scenario,
       seed: turn.seed,
@@ -719,6 +755,7 @@ export async function receiveTurn(encoded: string): Promise<ReceiveResult> {
   const game: MpGame = {
     v: 1,
     gameId: rec.gameId,
+    ...identityOf(rec),
     scenario: rec.scenario,
     seed: rec.seed,
     mySeat: rec.mySeat,
@@ -732,6 +769,7 @@ export async function receiveTurn(encoded: string): Promise<ReceiveResult> {
   challengeTarget = null
   undoGroups = []
   sessionFromEntries({
+    ...identityOf(rec),
     scenario: rec.scenario,
     seed: rec.seed,
     entries: outcome.entries,
@@ -762,10 +800,12 @@ export function mpStatus(): { yourSitting: boolean; opening: boolean } | null {
 export function getReplay(): Replay | null {
   if (!session) return null
   return {
+    ...identityOf(session.state),
     scenario: session.state.scenario,
     seed: session.state.seed,
     player: sessionPlayer ?? undefined,
     commands: session.commandLog,
+    ...(session.mode !== 'solo' ? { humanSeats: session.seats.slice(1), entries: session.entries } : {}),
   }
 }
 
@@ -774,6 +814,7 @@ export function getReplay(): Replay | null {
 // via nextFreeSlot (stalest first) or an explicit delete.
 export function reset(): void {
   session = null
+  quarterBoundary = null
   undoGroups = []
   sessionPlayer = null
   playerColor = null

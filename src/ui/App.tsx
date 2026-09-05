@@ -1,3 +1,4 @@
+import { rulesOf, identityOf } from '../engine/version'
 import { lazy, Suspense, useEffect, useReducer, useState, useSyncExternalStore } from 'react'
 import { CITIES } from '../data/cities'
 import { getEventDef } from '../data/events'
@@ -21,6 +22,8 @@ import { canEndQuarter, getLastSentLink, listMpGames, mpStatus, passSeat, receiv
   clearSaveAt,
   canUndo,
   exportSave,
+  exportCurrentCareer,
+  getStorageWarning,
   importSave,
   dispatch,
   getChallengeTarget,
@@ -101,11 +104,13 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
     if (!scenario || !chSeed) return null
     const rawTarget = Number.parseInt(params.get('target') ?? '', 10)
     const by = params.get('by')?.trim() || undefined
+    const rulesVersion = Number(params.get('rules') ?? 1)
     try {
       return {
         scenario: getScenario(scenario),
         seed: chSeed,
-        duel: Number.isFinite(rawTarget) && rawTarget > 0 ? { worth: rawTarget, by } : null,
+        rulesVersion: rulesOf({ rulesVersion }),
+        duel: Number.isFinite(rawTarget) && (rawTarget > 0 || params.has('metric')) ? { worth: rawTarget, by, ...(params.get('metric') === getScenario(scenario).objective.kind ? { kind: getScenario(scenario).objective.kind } : {}) } : null,
       }
     } catch {
       return null
@@ -113,6 +118,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
   })()
   return (
     <main className="menu">
+      <SaveWarning />
       <h1>Load Factor</h1>
       <p className="tagline">
         Routes. Jets. Margins. Fill the seats. <BuildStamp />
@@ -138,17 +144,17 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
             {challenge.duel ? (
               <span data-testid="duel-target">
                 Beat {challenge.duel.by ? <strong>{challenge.duel.by}</strong> : 'their'}{' '}
-                <strong className="pos">{money(challenge.duel.worth)}</strong> before the deadline.
+                <strong className="pos">{objectiveValue(challenge.duel.worth, challenge.duel.kind ? challenge.scenario.objective.unit : 'money')}</strong> before the deadline.
               </span>
             ) : (
-              'Beat their net worth.'
+              'Build the strongest airline on this seed.'
             )}
           </p>
           <button
             data-testid="start-challenge"
             onClick={() => {
               window.history.replaceState(null, '', window.location.pathname)
-              startGame(challenge.scenario.id, challenge.seed, custom(), challenge.duel ?? undefined)
+              startGame(challenge.scenario.id, challenge.seed, custom(), challenge.duel ?? undefined, 1, challenge.rulesVersion)
             }}
           >
             ▶ Fly the challenge
@@ -183,10 +189,10 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
               <button data-testid={i === 0 ? 'continue-save' : `continue-save-${slot}`} onClick={() => resumeSave(slot)}>
                 Continue
               </button>{' '}
-              {save!.version === 1 && (
+              {(
                 <button
                   data-testid={i === 0 ? 'watch-save-replay' : `watch-save-replay-${slot}`}
-                  onClick={() => onWatchReplay(save! as Replay)}
+                  onClick={() => { try { rulesOf(save!); onWatchReplay(save!.version === 1 ? save! : { ...save!, commands: [] }) } catch (error) { alert(String(error)) } }}
                 >
                   Watch replay
                 </button>
@@ -337,7 +343,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
             <ul className="fame-list">
               {fame.slice(0, 5).map((f, i) => (
                 <li key={i}>
-                  {f.won ? '🏆' : '🕯'} {f.name} — {money(f.netWorth)} ·{' '}
+                  {f.won ? '🏆' : '🕯'} {f.name} — {objectiveValue(f.score ?? f.netWorth, f.score === undefined ? 'money' : getScenario(f.scenario).objective.unit)} ·{' '}
                   {(() => {
                     try {
                       return getScenario(f.scenario).name
@@ -531,13 +537,14 @@ function GameOverOverlay({
           // scored against the challenger's number, win or lose the race.
           const duel = getChallengeTarget()
           if (!duel) return null
-          const mine = me.history[me.history.length - 1]?.netWorth ?? 0
+          const mine = objectiveScore(me, duel.kind ?? 'netWorth')
+          const duelValue = (n: number) => objectiveValue(n, duel.kind ? obj.unit : 'money')
           const beat = mine > duel.worth
           return (
             <p className={beat ? 'pos' : 'neg'} data-testid="duel-verdict">
               {beat
-                ? `⚔ Duel won — you beat ${duel.by ?? 'the challenger'}'s ${money(duel.worth)} with ${money(mine)}`
-                : `⚔ Duel lost — ${duel.by ?? 'the challenger'}'s ${money(duel.worth)} stood against your ${money(mine)}`}
+                ? `⚔ Duel won — you beat ${duel.by ?? 'the challenger'}'s ${duelValue(duel.worth)} with ${duelValue(mine)}`
+                : `⚔ Duel lost — ${duel.by ?? 'the challenger'}'s ${duelValue(duel.worth)} stood against your ${duelValue(mine)}`}
             </p>
           )
         })()}
@@ -719,6 +726,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       className={`game era-${Math.min(2000, Math.max(1960, Math.floor(yearOf(state) / 10) * 10))}`}
       style={livery ? ({ '--accent': livery } as React.CSSProperties) : undefined}
     >
+      <SaveWarning />
       <header>
         <h1>Load Factor</h1>
         <span className="hud-stat" data-label="Quarter" data-testid="date">
@@ -737,15 +745,16 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           // to beat in the HUD, not just on a chart two tabs away.
           const duel = getChallengeTarget()
           if (!duel) return null
-          const mine = netWorth(player)
+          const mine = objectiveScore(player, duel.kind ?? 'netWorth')
+          const duelValue = (n: number) => objectiveValue(n, duel.kind ? scenario.objective.unit : 'money')
           const ahead = mine > duel.worth
           return (
             <span
               className={ahead ? 'pos' : 'neg'}
               data-testid="duel-chip"
-              title={`challenge target: beat ${duel.by ?? 'the challenger'}'s ${money(duel.worth)}`}
+              title={`challenge target: beat ${duel.by ?? 'the challenger'}'s ${duelValue(duel.worth)}`}
             >
-              ⚔ {ahead ? 'ahead of' : 'behind'} {duel.by ?? 'challenger'} by {money(Math.abs(mine - duel.worth))}
+              ⚔ {ahead ? 'ahead of' : 'behind'} {duel.by ?? 'challenger'} by {duelValue(Math.abs(mine - duel.worth))}
             </span>
           )
         })()}
@@ -826,7 +835,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
               `${window.location.origin}${window.location.pathname}?scenario=${encodeURIComponent(
                 state.scenario,
               )}&seed=${encodeURIComponent(state.seed)}` +
-              `&target=${netWorth(me)}&by=${encodeURIComponent(me.name)}`
+              `&target=${objectiveScore(me, scenario.objective.kind)}&metric=${scenario.objective.kind}&rules=${identityOf(state).rulesVersion}&by=${encodeURIComponent(me.name)}`
             copyText(url, 'Challenge link')
           }}
         >
@@ -1139,7 +1148,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       <footer className="standings">
         {state.airlines.map((a) => (
           <span key={a.id} className={a.id === viewSeat() ? 'me' : ''}>
-            {a.name}: {a.bankrupt ? 'bankrupt' : `${a.routes.length} routes, ${money(netWorth(a))}`}
+            {a.name}: {a.bankrupt ? 'bankrupt' : `${a.routes.length} routes, ${objectiveValue(objectiveScore(a, scenario.objective.kind), scenario.objective.unit)}`}
           </span>
         ))}
       </footer>
@@ -1186,7 +1195,8 @@ export function App() {
   }, [])
   if (replay)
     return (
-      <Suspense fallback={<main className="menu">Loading replay…</main>}>
+      <Suspense fallback={<main className="menu">
+      <SaveWarning />Loading replay…</main>}>
         <ReplayViewer replay={replay} onExit={() => setReplay(null)} />
       </Suspense>
     )
@@ -1200,4 +1210,17 @@ export function App() {
       {session ? <GameScreen onWatchReplay={setReplay} /> : <ScenarioSelect onWatchReplay={setReplay} />}
     </>
   )
+}
+
+function SaveWarning() {
+  const warning = useSyncExternalStore(subscribe, getStorageWarning)
+  if (!warning) return null
+  return <aside role="alert" className="save-warning">{warning} <button onClick={() => {
+    const text = exportCurrentCareer()
+    if (!text) return
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
+    const a = document.createElement('a')
+    a.href = url; a.download = 'loadfactor-career.json'; a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }}>Download career</button></aside>
 }

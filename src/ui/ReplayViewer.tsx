@@ -1,15 +1,16 @@
+import { rulesOf } from '../engine/version'
 // Watch a finished (or in-progress) game re-run itself — determinism as a
 // feature. The full career is refolded through the engine once, snapshotting
 // at every quarter boundary; the viewer then just scrubs snapshots.
 
 import { useEffect, useMemo, useState } from 'react'
 import { getScenario } from '../data/scenarios'
-import { applyCommand, newGame, type GameEvent, type GameState, type Replay } from '../engine'
-import { netWorth, quarterOf, yearOf } from '../engine/queries'
+import { applyCommandBatchFor, newGame, type GameEvent, type GameState, type Replay } from '../engine'
+import { objectiveScore, objectiveScoreAt, quarterOf, yearOf } from '../engine/queries'
 import { MapView } from './MapView'
 import { RaceChart } from './Sparkline'
 import { EVENT_ICONS, EVENT_NAMES } from './toasts'
-import { money } from './format'
+import { objectiveValue } from './format'
 
 const EMPTY = new Set<never>()
 
@@ -51,15 +52,18 @@ function snapshotQuarters(replay: Replay): ReplayFrame[] {
   const frames: ReplayFrame[] = []
   // The player customization is part of the replay — without it a custom-HQ
   // career would replay against the wrong world and silently diverge.
-  let state = newGame(replay.scenario, replay.seed, replay.player)
+  let state = newGame(replay.scenario, replay.seed, replay.player, replay.humanSeats, rulesOf(replay))
   frames.push({ state, headlines: [] })
-  for (const command of replay.commands) {
-    const res = applyCommand(state, command)
+  const entries = replay.entries ?? replay.commands.map((command) => ({ seat: 0, command }))
+  let start = 0
+  for (let i = 0; i < entries.length; i++) {
+    if (entries[i]!.command.type !== 'end_quarter') continue
+    const res = applyCommandBatchFor(state, entries.slice(start, i + 1))
     state = res.state
-    if (command.type === 'end_quarter') {
-      frames.push({ state, headlines: headlinesFor(state, res.events) })
-    }
+    frames.push({ state, headlines: headlinesFor(state, res.events) })
+    start = i + 1
   }
+  if (start < entries.length) frames.push({ state: applyCommandBatchFor(state, entries.slice(start)).state, headlines: [] })
   return frames
 }
 
@@ -74,6 +78,7 @@ export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () =>
     if (!playing) return
     const timer = setInterval(
       () => {
+        if (document.hidden) return
         setIndex((i) => {
           if (i >= last) {
             setPlaying(false)
@@ -179,7 +184,7 @@ export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () =>
             series={(() => {
               const span = Math.max(...state.airlines.map((a) => a.history.length), 0)
               return state.airlines.map((a, i) => {
-                const own = a.history.map((h) => h.netWorth)
+                const own = a.history.map((_, i) => objectiveScoreAt(a, getScenario(state.scenario).objective.kind, i + 1))
                 return {
                   label: a.name,
                   points: [...Array<number>(Math.max(0, span - own.length)).fill(0), ...own],
@@ -193,7 +198,7 @@ export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () =>
       <footer className="standings">
         {state.airlines.map((a) => (
           <span key={a.id} className={a.id === 0 ? 'me' : ''}>
-            {a.name}: {a.bankrupt ? 'bankrupt' : `${a.routes.length} routes, ${money(netWorth(a))}`}
+            {a.name}: {a.bankrupt ? 'bankrupt' : `${a.routes.length} routes, ${objectiveValue(objectiveScore(a, getScenario(state.scenario).objective.kind), getScenario(state.scenario).objective.unit)}`}
           </span>
         ))}
       </footer>

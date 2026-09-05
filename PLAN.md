@@ -500,3 +500,13 @@ quarterly turn game.
   hot-seat and links trust the channel).
 - Nothing else: resolution, RNG, events, and serialization are already
   multiplayer-shaped.
+
+### Rules identity and recovery (September 2026)
+
+Save schema (`version`) and simulation identity (`rulesVersion`, `contentVersion`)
+are separate. Unversioned careers and links always use rules 1. New rule releases
+must retain that deterministic path and test legacy career hashes. Both human
+seats are serialized in portable replays. Undo replays the current quarter from
+its immutable boundary; it never needs to resolve the career's earlier quarters.
+Storage failures surface a downloadable current-career export. A passed hot-seat
+and an outgoing link survive reloads.

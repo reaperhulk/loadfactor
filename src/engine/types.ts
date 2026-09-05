@@ -214,6 +214,8 @@ export interface WorldState {
 }
 
 export interface GameState {
+  rulesVersion?: number
+  contentVersion?: number
   scenario: string
   seed: string
   turn: number // quarters since scenario start
