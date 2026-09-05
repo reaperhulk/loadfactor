@@ -23,7 +23,7 @@ validated commits to main. Preserve quarterly, deterministic, headless play.
       short scenarios and meaningful objective qualification.
 - [x] Quarter-boundary undo, batched replay, browser rendering/animation budgets,
       startup budgets enforced in CI, Chromium and WebKit coverage.
-- [ ] Broader held-out balance evaluation and final user-flow verification.
+- [x] Broader held-out balance evaluation and final user-flow verification.
 
 ## Verification
 
@@ -109,3 +109,9 @@ all original gesture, culling, scrolling and economics assertions are retained.
 Final polish also honors explicit motion overrides, identifies widebodies by
 airframe rather than gameplay seat count, and gives browsers the exact built
 artifact that Pages will publish. README now documents all current systems.
+
+All planned systems are implemented. Final standings sort qualified airlines
+first and explain unmet requirements beside the score. Local validation remains
+221 passing tests and a 176 KiB gzip eager bundle. The final release is gated by
+the hosted 84-case Chromium/WebKit suite against the same build artifact that
+Pages receives; each commit's Actions run is the authoritative browser result.

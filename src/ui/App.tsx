@@ -8,7 +8,7 @@ import { CITIES } from '../data/cities'
 import { AIRCRAFT } from '../data/aircraft'
 import { getEventDef } from '../data/events'
 import { SCENARIOS, SHORT_SCENARIOS, getScenario } from '../data/scenarios'
-import { netWorth, networkCities, objectiveScore, quarterOf, yearOf } from '../engine/queries'
+import { netWorth, networkCities, objectiveQualified, objectiveScore, quarterOf, yearOf } from '../engine/queries'
 import { idleSlotRent, nextExpansion } from '../engine/slots'
 import { CityPanel } from './CityPanel'
 import { CoachMarks } from './CoachMarks'
@@ -513,8 +513,9 @@ function GameOverOverlay({
   // decided the career — with net worth alongside for context.
   const obj = getScenario(state.scenario).objective
   const score = (a: (typeof state.airlines)[number]): number => objectiveScore(a, obj.kind)
+  const qualifies = (a: (typeof state.airlines)[number]): boolean => !a.bankrupt && objectiveQualified(state, a)
   const ranked = [...state.airlines].sort((a, b) =>
-    obj.higherIsBetter ? score(b) - score(a) : score(a) - score(b),
+    Number(qualifies(b)) - Number(qualifies(a)) || (obj.higherIsBetter ? score(b) - score(a) : score(a) - score(b)),
   )
   // The career in numbers — what those decades added up to.
   const me = state.airlines[viewSeat()]!
@@ -574,6 +575,7 @@ function GameOverOverlay({
         <p className="dim" data-testid="objective-name">
           Scored on {obj.label} — target {objectiveValue(obj.target, obj.unit)}
         </p>
+        <p className="dim">{obj.blurb}{rulesOf(state) >= 2 && obj.kind === 'loadFactor' ? ' Qualification requires 1.5M total boardings and three active routes.' : ''}</p>
         <ol data-testid="final-standings">
           {ranked.map((a) => (
             <li key={a.id} className={a.id === viewSeat() ? 'me' : ''}>
@@ -583,6 +585,7 @@ function GameOverOverlay({
               ) : (
                 <>
                   <strong>{objectiveValue(score(a), obj.unit)}</strong>
+                  {!qualifies(a) && <span className="neg"> · qualification not met</span>}
                   {obj.kind !== 'netWorth' && <span className="dim"> · {money(netWorth(a))} net worth</span>}
                 </>
               )}
