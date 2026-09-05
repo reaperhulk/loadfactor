@@ -259,3 +259,8 @@ export function aircraftFamily(type: string): string {
   if (type === 'a320' || type === 'a340') return 'Airbus flight deck'
   return getAircraftType(type).name
 }
+
+// Visual airframe class is independent of the catalog's gameplay seat counts.
+export function isWidebodyAircraft(type: string): boolean {
+  return ['b747_100', 'b747_200', 'dc10_30', 'b767', 'md11', 'a340', 'b777'].includes(type)
+}

@@ -12,7 +12,7 @@ import { getEventDef } from '../data/events'
 import { seasonalBp } from '../engine/market'
 import { Icon } from './Icon'
 import { aircraftGlyph } from './AircraftArt'
-import { useDisplayPreferences, useReducedMotion } from './display'
+import { reducedMotion, useDisplayPreferences, useReducedMotion } from './display'
 import { placeLabels } from './labels'
 import { cityMass, cityTier, rivalColorClass } from './mapStyle'
 import {
@@ -819,7 +819,7 @@ export function MapView({
       paintView(targetRef.current)
       return
     }
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reduced = reducedMotion()
     if (immediate || reduced) {
       stopEase()
       setMoving(false)
@@ -901,7 +901,7 @@ export function MapView({
   const applyGlobe = (next: GlobeView, immediate: boolean): void => {
     immediate = immediate || reduceMotion
     globeTarget.current = clampGlobe(next)
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reduced = reducedMotion()
     if (immediate || reduced) {
       stopGlobeEase()
       if (!gesturing.current) setMoving(false)

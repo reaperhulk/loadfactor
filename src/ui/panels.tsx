@@ -291,7 +291,7 @@ export function RoutesPanel({
       />
     </div>
     <button className="metrics-toggle" aria-pressed={allMetrics} onClick={() => setAllMetrics((value) => !value)}>{allMetrics ? 'Show essential metrics' : 'Show all metrics'}</button>
-    <div className="table-scroll"><table className={`route-table ${allMetrics ? '' : 'route-table-compact'}`}>
+    <div className="table-scroll"><table data-testid="routes-panel-table" className={`route-table ${allMetrics ? '' : 'route-table-compact'}`}>
       <thead>
         <tr>
           {header('name', 'Route')}

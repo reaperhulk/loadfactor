@@ -621,12 +621,10 @@ html.map-gesture * {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .confetti span {
+:root[data-motion=reduced] .confetti span {
     animation: none;
     display: none;
   }
-}
 
 /* Save slots on the menu. */
 .save-row {
@@ -704,11 +702,9 @@ html.map-gesture * {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .negotiating-ring {
+:root[data-motion=reduced] .negotiating-ring {
     animation: none;
   }
-}
 
 /* Year-in-review block on the Q1 report card. */
 .year-review {
@@ -791,11 +787,9 @@ html.map-gesture * {
     transform: scale(1.25);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .selection-ring {
+:root[data-motion=reduced] .selection-ring {
     animation: none;
   }
-}
 
 /* Armed destructive buttons run hot until they decay or fire. */
 .confirm-armed {
@@ -816,11 +810,9 @@ html.map-gesture * {
     opacity: 0.55;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .insolvency-warning {
+:root[data-motion=reduced] .insolvency-warning {
     animation: none;
   }
-}
 
 /* Airline setup on the menu: identity before the first quarter. */
 .airline-setup {
@@ -1788,34 +1780,28 @@ input[type='number'] {
 }
 
 /* Accessibility: honor reduced-motion — rewards land instantly, nothing moves. */
-@media (prefers-reduced-motion: reduce) {
-  .route-new,
-  .route-acquired,
-  .endpoint-pulse,
-  .toast,
-  .event-halo,
-  .gameover-overlay,
-  .gameover-card,
-  .slots-ping {
+:root[data-motion=reduced] .route-new,
+:root[data-motion=reduced] .route-acquired,
+:root[data-motion=reduced] .endpoint-pulse,
+:root[data-motion=reduced] .toast,
+:root[data-motion=reduced] .event-halo,
+:root[data-motion=reduced] .gameover-overlay,
+:root[data-motion=reduced] .gameover-card,
+:root[data-motion=reduced] .slots-ping {
     animation: none;
   }
-
-  .plane {
+:root[data-motion=reduced] .plane {
     display: none;
   }
-
-  .route-new {
+:root[data-motion=reduced] .route-new {
     stroke-dashoffset: 0;
   }
-
-  .endpoint-pulse {
+:root[data-motion=reduced] .endpoint-pulse {
     display: none;
   }
-
-  .lf-fill {
+:root[data-motion=reduced] .lf-fill {
     transition: none;
   }
-}
 
 .table-scroll {
   overflow-x: auto;

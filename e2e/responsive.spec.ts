@@ -106,6 +106,9 @@ test('mobile: fat-finger taps select cities and the chrome stays usable', async 
   await page.getByTestId('start-jet_age').click()
   await expect(page.getByTestId('date')).toHaveText('1960 Q1')
 
+  await expect(page.getByTestId('map')).toBeVisible()
+  await page.getByTestId('map-wrap').scrollIntoViewIfNeeded()
+
   // A tap 12px NORTH of Chicago's (sub-pixel) dot — open water on the
   // rendered map — must still select Chicago via nearest-city resolution.
   const dot = await page.getByTestId('city-ORD').boundingBox()

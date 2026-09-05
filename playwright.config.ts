@@ -21,7 +21,7 @@ export default defineConfig({
     { name: 'mobile-webkit', testMatch: 'modern.spec.ts', use: { ...devices['iPhone 13'], launchOptions: {} } },
   ],
   webServer: {
-    command: 'npm run build && npm run preview',
+    command: process.env.PW_PREBUILT ? 'npm run preview' : 'npm run build && npm run preview',
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

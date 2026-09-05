@@ -99,3 +99,13 @@ Final UI consistency sweep: route/market capacity honors current groundings and
 standby substitutions; map traffic includes secondary rotations; fleet utilization
 sums both legs of shared work; maintenance totals share the commonality factor.
 These are display corrections. The simulation's existing rounding is unchanged.
+
+Stage 5 pushed as de3ae73: all 221 local tests passed. Hosted Chromium/WebKit
+ran 84 browser cases: 75 passed, including every new modern flow on desktop
+and phone Safari. Nine older cases failed because coordinate gestures assumed
+the map was above the fold, or a generic first-table selector hit the new
+workbench. The tests now scroll the map into view and target the route table;
+all original gesture, culling, scrolling and economics assertions are retained.
+Final polish also honors explicit motion overrides, identifies widebodies by
+airframe rather than gameplay seat count, and gives browsers the exact built
+artifact that Pages will publish. README now documents all current systems.

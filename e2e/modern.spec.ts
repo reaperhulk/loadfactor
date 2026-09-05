@@ -42,9 +42,12 @@ test('first launch, full-company planning, atomic undo and report focus', async 
 })
 
 test('display and audio preferences persist; reduced motion removes map traffic', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await start(page)
   await launch(page)
   await page.getByTestId('display-settings').locator('summary').click()
+  await page.getByLabel('motion preference').selectOption('full')
+  await expect(page.locator('.plane').first()).toBeVisible()
   await page.getByLabel('motion preference').selectOption('reduced')
   await page.getByLabel('text size').selectOption('125')
   await page.getByLabel('map traffic density').selectOption('low')

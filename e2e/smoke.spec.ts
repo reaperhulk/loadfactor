@@ -19,6 +19,9 @@ async function startGame(page: Page): Promise<void> {
   // not merely the game shell, before a test starts sampling animation frames
   // or computing gesture coordinates.
   await expect(page.getByTestId('map')).toBeVisible()
+  // Coordinate gestures need the complete map in the viewport; the operations
+  // brief can legitimately put it below the fold.
+  await page.getByTestId('map-wrap').scrollIntoViewIfNeeded()
 }
 
 // Ending a quarter via the UI presents the report card; dismiss it so the
@@ -277,6 +280,8 @@ test('wheel over the map zooms without scrolling the page', async ({ page }) => 
   // The coach mark floats over the map — wheel events on it never reach the
   // SVG listener, so clear it before scrolling.
   await page.getByTestId('coach-dismiss').click()
+  await page.getByTestId('map-wrap').scrollIntoViewIfNeeded()
+  const scrollBefore = await page.evaluate(() => window.scrollY)
   const map = page.getByTestId('map')
   const box = (await map.boundingBox())!
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
@@ -285,7 +290,7 @@ test('wheel over the map zooms without scrolling the page', async ({ page }) => 
   await page.mouse.wheel(0, -600)
   // The map zoomed (a tier-3 field fades in) and the page did not move.
   await expect(page.getByTestId('city-DOH')).toHaveCount(1)
-  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore)
 })
 
 test('the opportunities list plans a route in one click', async ({ page }) => {
@@ -362,7 +367,8 @@ test('the books open: per-route economics, network totals, filters, head-to-head
   await page.getByTestId('tab-routes').click()
 
   // Every route carries its own unit economics, not just a P&L.
-  const routes = page.getByTestId('routes-panel-table').or(page.locator('table').first())
+  await page.getByRole('button', { name: 'Show all metrics', exact: true }).click()
+  const routes = page.getByTestId('routes-panel-table')
   await expect(routes).toContainText('Pax/q')
   await expect(routes).toContainText('Yield')
   await expect(routes).toContainText('Cost/seat')
