@@ -1,5 +1,5 @@
 // Read-only recurring costs. Forecasts and resolution share every rounding step.
-import { getAircraftType } from '../data/aircraft'
+import { aircraftFamily, getAircraftType } from '../data/aircraft'
 import {
   AIRCRAFT_ADMIN_PER_QUARTER,
   AIRLINE_OVERHEAD_PER_QUARTER,
@@ -52,6 +52,14 @@ export function recurringFinancials(state: GameState, airline: Airline, t: {
       ? Math.floor((type.price * LEASE_BP_PER_QUARTER) / 10000)
       : Math.floor((type.price * OWNERSHIP_BP_PER_QUARTER) / 10000)
   }
+  if ((state.rulesVersion ?? 1) >= 2) {
+    const families = new Set(airline.fleet.map((ac) => aircraftFamily(ac.type))).size
+    // A single family earns a spares/training saving; extra families add
+    // complexity to maintenance and administration, capped at +20%.
+    const commonalityBp = families <= 1 ? 9200 : Math.min(12000, 10000 + (families - 2) * 500)
+    maintenance = Math.floor(maintenance * commonalityBp / 10000)
+    admin = Math.floor(admin * commonalityBp / 10000)
+  }
   const routeOverhead = Math.floor(
     (ROUTE_OVERHEAD_QUAD *
       airline.routes.length *
@@ -88,6 +96,7 @@ export function recurringFinancials(state: GameState, airline: Airline, t: {
   // Public-service obligations and other accepted deals bill every quarter
   // until they run out — the price of the gates you took early.
   overhead += dealUpkeep(airline)
+  if ((state.rulesVersion ?? 1) >= 2 && airline.hubMode === 'banked') overhead += inflate(200 * airline.routes.length)
   // Brand spend: priced per level against network size (see constants).
   const marketing =
     airline.marketing *

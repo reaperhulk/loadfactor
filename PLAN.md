@@ -510,3 +510,34 @@ seats are serialized in portable replays. Undo replays the current quarter from
 its immutable boundary; it never needs to resolve the career's earlier quarters.
 Storage failures surface a downloadable current-career export. A passed hot-seat
 and an outgoing link survive reloads.
+
+### Rules 2: passengers, operations and focused mandates
+
+New careers use rules 2; unversioned careers stay on rules 1. Every O/D market
+has one conserved demand pool split into business, leisure and budget travelers.
+Direct flights and all viable one-stop itineraries compete for that pool. Each
+connecting journey consumes capacity on both legs. Route statistics count
+boardings and expose segment counts and connecting revenue. Coordinated banks
+increase connection appeal/willingness, cost $200k per route per quarter before
+inflation, and amplify the commercial impact of poor reliability.
+
+A shared rotation dedicates 60% of an airframe's time to its primary route and
+40% to a connected secondary route. Reserve aircraft cover grounded rotations
+in stable fleet order and can never be double-booked. Planned maintenance costs
+twice base maintenance, grounds the aircraft for one quarter, and reduces its
+failure probability by 75% for the following eight quarters. Fleet-family
+commonality affects maintenance/admin. Replacement orders retire the old frame
+only when a suitable replacement arrives; intervening route changes can instead
+park the delivery safely.
+
+Rivals announce four-quarter campaigns before they begin. Board offers arrive
+on an eight-quarter calendar, with four quarters to decide; multiplayer offers
+are addressed to the correct seat. Four 16–24-quarter mandates add turnaround,
+Atlantic, fuel-crunch and established-hub challenges. Load-factor qualification
+requires 1.5M passengers and three active routes, so a token schedule cannot win.
+
+The rules-1 balance envelope and seven golden careers remain pinned. Rules 2
+adds a scenario/policy/seed distribution gate, itinerary conservation tests,
+operational hour/seat/replacement tests, and a reproducible balance-report CLI.
+A connection-focused policy values complementary spokes as well as direct O/D
+traffic; the cautious reference policy preserves a larger cash buffer.

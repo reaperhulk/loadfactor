@@ -74,6 +74,9 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
   }
   for (const e of events) {
     switch (e.type) {
+      case 'operations_changed':
+        out.push({ kind: 'event', icon: '✈', text: e.detail })
+        break
       case 'command_rejected':
         // Immediate feedback beats a silent no-op — but only for the player's
         // own clicks (rival rejections are engine-internal noise).

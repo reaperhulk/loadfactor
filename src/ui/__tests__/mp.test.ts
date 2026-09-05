@@ -292,3 +292,17 @@ describe('the wire format', () => {
     expect(await decodeTurn('')).toBeNull()
   })
 })
+
+it('rules 2 clients exchange versioned turns and reject a rules mismatch before replay', () => {
+  const alice: MpGame = { ...mkGame(0), rulesVersion: 2, contentVersion: 1 }
+  const bob: MpGame = { ...mkGame(1), rulesVersion: 2, contentVersion: 1 }
+  const opening = buildTurn(alice, [{ seat: 0, command: { type: 'set_marketing', level: 1 } }])
+  const received = applyTurn(bob, opening)
+  expect(received.ok).toBe(true)
+  if (!received.ok) return
+  bob.entries = received.entries
+  alice.entries = received.entries
+  const reply = buildTurn(bob, [{ seat: 1, command: { type: 'end_quarter' } }])
+  expect(applyTurn(alice, reply).ok).toBe(true)
+  expect(applyTurn({ ...alice, rulesVersion: 1 }, reply)).toEqual({ ok: false, reason: 'link uses a different scenario, seed, or rules version' })
+})

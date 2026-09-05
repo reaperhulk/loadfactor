@@ -50,3 +50,12 @@ describe('golden careers', () => {
     })
   }
 })
+
+// Legacy logs remain bit-for-bit identical after new rules ship.
+describe('rules 1 compatibility', () => {
+  const legacy = JSON.parse(readFileSync(join(__dirname, '../../../fixtures/legacy-v1-goldens.json'), 'utf8')) as Record<string, Golden>
+  for (const career of CAREERS) it(`preserves ${career.name}`, () => {
+    const result = runCareer(career.scenario, career.seed, career.bot, career.quarters, 1)
+    expect({ checkpointHashes: result.checkpointHashes, summary: result.summary }).toEqual(legacy[career.name])
+  })
+})

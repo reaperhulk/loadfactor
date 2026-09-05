@@ -13,6 +13,7 @@ import { getAircraftType, typesOnSale } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey } from '../data/cities'
 import {
   AI_MIN_ROUTE_KM,
+  CONNECT_DETOUR_MAX_BP,
   SLOT_WAIT_PATIENCE,
   ROUTE_MEMORY_QUARTERS,
   ROUTE_SPOOL_BP,
@@ -43,6 +44,7 @@ import type { Airline, Command, GameState } from './types'
 // rivals' personalities, the greedy bot, and every fuzz genome all map onto
 // this shape.
 export interface PolicyDials {
+  connectionFocus?: boolean
   fareLevel: number // launch fare posture [-2..2]
   serviceLevel: number // launch service posture [1..3]
   fareFloor: number // yield management never cuts below this
@@ -280,6 +282,26 @@ export function takeoverCommands(
   return []
 }
 
+// Feeder potential values the other leg's passengers when choosing a new
+// destination. A hub operator should seek complementary spokes rather than
+// accidentally building a collection of strong, disconnected O/D markets.
+export function connectionOpportunity(state: GameState, idx: number, from: string, to: string): number {
+  const airline = state.airlines[idx]!
+  let potential = 0
+  for (const route of airline.routes) {
+    for (const [hub, destination] of [[from, to], [to, from]] as const) {
+      const origin = route.from === hub ? route.to : route.to === hub ? route.from : null
+      if (origin === null || origin === destination) continue
+      const total = distanceKm(origin, hub) + distanceKm(hub, destination)
+      if (total * 10000 > distanceKm(origin, destination) * CONNECT_DETOUR_MAX_BP) continue
+      const demand = pairWeeklyDemand(state, origin, destination)
+      const share = Math.floor(demand / (2 + airlinesOnPair(state, origin, destination, idx)))
+      potential += Math.min(share, routeWeeklyCapacity(airline, route))
+    }
+  }
+  return potential
+}
+
 // Expansion score for an unserved pair: weekly demand net of the seats every
 // airline already fields there, scaled by contest appetite. Pure and
 // exported for tests.
@@ -294,6 +316,7 @@ export function bestUnservedPair(
   state: GameState,
   idx: number,
   contestDiscountBp: number,
+  connectionFocus = false,
 ): { from: string; to: string; km: number; score: number } | null {
   const airline = state.airlines[idx]!
   let maxRange = 0
@@ -315,7 +338,7 @@ export function bestUnservedPair(
       const mem = airline.servedUntil[pairKey(a, b)]
       const spoolBp =
         mem !== undefined && state.turn - mem <= ROUTE_MEMORY_QUARTERS ? 10000 : ROUTE_SPOOL_BP[0]!
-      const score = Math.floor(
+      const score = ((state.rulesVersion ?? 1) >= 2 && connectionFocus ? connectionOpportunity(state, idx, a, b) * 2 : 0) + Math.floor(
         (expansionScore(pairWeeklyDemand(state, a, b), pairWeeklySeats(state, a, b), contestDiscountBp) *
           spoolBp) /
           10000,
@@ -342,10 +365,10 @@ export function launchFrequency(state: GameState, from: string, to: string, type
 export function launchCommands(
   state: GameState,
   idx: number,
-  dials: Pick<PolicyDials, 'fareLevel' | 'serviceLevel' | 'expandMinDemand' | 'contestDiscountBp'>,
+  dials: Pick<PolicyDials, 'fareLevel' | 'serviceLevel' | 'expandMinDemand' | 'contestDiscountBp' | 'connectionFocus'>,
 ): { commands: Command[]; usedAircraft: number | null } {
   const airline = state.airlines[idx]!
-  const pair = bestUnservedPair(state, idx, dials.contestDiscountBp)
+  const pair = bestUnservedPair(state, idx, dials.contestDiscountBp, dials.connectionFocus)
   if (!pair || pair.score <= dials.expandMinDemand) return { commands: [], usedAircraft: null }
   const launch = airline.fleet.find(
     (ac) => ac.routeId === null && getAircraftType(ac.type).rangeKm >= pair.km,
@@ -424,7 +447,7 @@ export function orderCommands(
 export function slotTarget(
   state: GameState,
   idx: number,
-  dials: Pick<PolicyDials, 'slotBudgetBp' | 'raidBonus' | 'homeRegionUntil'>,
+  dials: Pick<PolicyDials, 'slotBudgetBp' | 'raidBonus' | 'homeRegionUntil' | 'connectionFocus'>,
 ): string | null {
   const airline = state.airlines[idx]!
   if (airline.cash < 4000) return null
@@ -454,7 +477,7 @@ export function slotTarget(
       if (h === c.id) continue
       const km = distanceKm(c.id, h)
       if (km < AI_MIN_ROUTE_KM || km > reach) continue
-      cityScore = Math.max(cityScore, pairScore(state, c.id, h, idx))
+      cityScore = Math.max(cityScore, pairScore(state, c.id, h, idx) + ((state.rulesVersion ?? 1) >= 2 && dials.connectionFocus ? connectionOpportunity(state, idx, c.id, h) * 2 : 0))
     }
     // Raid appetite: an entrenched leader makes the city up to +30% more
     // attractive (raidBonus 0..12 → +0..30% in pair-score units).
@@ -480,7 +503,7 @@ export function slotTarget(
 export function slotRequestCommands(
   state: GameState,
   idx: number,
-  dials: Pick<PolicyDials, 'slotBudgetBp' | 'raidBonus' | 'homeRegionUntil'>,
+  dials: Pick<PolicyDials, 'slotBudgetBp' | 'raidBonus' | 'homeRegionUntil' | 'connectionFocus'>,
   target: string | null = slotTarget(state, idx, dials),
 ): Command[] {
   const airline = state.airlines[idx]!

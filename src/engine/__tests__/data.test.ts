@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { AIRCRAFT } from '../../data/aircraft'
 import { CITIES, CITY_IDS, distanceKm, getCity } from '../../data/cities'
-import { SCENARIOS } from '../../data/scenarios'
+import { ALL_SCENARIOS as SCENARIOS } from '../../data/scenarios'
 import { WORLD_EVENTS } from '../../data/events'
 
 describe('data integrity', () => {

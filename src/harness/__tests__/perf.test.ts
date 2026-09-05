@@ -3,6 +3,7 @@
 // state for every bot action. The generous ceiling remains a CI tripwire,
 // while the second assertion guards replay throughput directly.
 
+import { identityOf } from '../../engine/version'
 import { describe, expect, it } from 'vitest'
 import { runReplay } from '../../engine'
 import { runCareer } from '../simulate'
@@ -18,7 +19,7 @@ describe('perf budget', () => {
   it('replays an 80-quarter command log within budget', () => {
     const career = runCareer('jet_age', 'perf-replay-seed', 'greedy', 80)
     const start = performance.now()
-    runReplay({ scenario: 'jet_age', seed: 'perf-replay-seed', commands: career.commandLog })
+    runReplay({ ...identityOf(career.state), scenario: 'jet_age', seed: 'perf-replay-seed', commands: career.commandLog })
     const elapsed = performance.now() - start
     expect(elapsed).toBeLessThan(3000)
   })

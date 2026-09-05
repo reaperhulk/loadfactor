@@ -23,6 +23,9 @@ export type ObjectiveKind =
   | 'loadFactor' // seats actually filled across the era — the efficiency war
 
 export interface ScenarioObjective {
+  minimumPax?: number
+  minimumRoutes?: number
+  minimumLongHaul?: number
   kind: ObjectiveKind
   // The qualifying bar: a floor for higher-is-better metrics, a ceiling for
   // costPerSeat. Being #1 is never enough on its own.
@@ -44,6 +47,11 @@ export interface ScenarioRules {
 }
 
 export interface Scenario {
+  short?: boolean
+  startingRoutes?: readonly { from: string; to: string; aircraftIndex: number; frequency: number }[]
+  startingAgeQuarters?: number
+  startingDebtK?: number
+  startingFuelBp?: number
   id: string
   name: string
   description: string
@@ -367,7 +375,50 @@ export const SCENARIOS: readonly Scenario[] = [
   },
 ]
 
-const byId = new Map(SCENARIOS.map((s) => [s.id, s]))
+// Focused board mandates: the same engine with a decision-sized horizon.
+export const SHORT_SCENARIOS: readonly Scenario[] = [
+  {
+    ...SCENARIOS[0]!, id: 'rescue', name: 'The Turnaround', short: true,
+    description: 'An aging fleet, a thin treasury and four years to restore profitability. Repair, replace, or shrink?',
+    quarters: 16, startingAgeQuarters: 44, startingDebtK: 8000,
+    player: { ...SCENARIOS[0]!.player, cash: 12000 },
+    objective: { kind: 'profit', target: 20000, higherIsBetter: true, label: 'turnaround profit', unit: 'money', minimumPax: 300000,
+      blurb: 'Earn $20M cumulative profit and carry 300,000 passengers in four years.' },
+    targetNetWorth: 150000,
+  },
+  {
+    ...SCENARIOS[0]!, id: 'atlantic', name: 'Atlantic Crossing', short: true,
+    description: 'London, 1968. Build a transatlantic operation before the five-year mandate expires.',
+    startYear: 1968, quarters: 20,
+    rivals: [{ ...SCENARIOS[0]!.rivals[0]!, hq: 'JFK', extraSlots: { LHR: 2, ORD: 2, MIA: 2 }, starterFleet: ['dc8_62', 'caravelle'] }, ...SCENARIOS[0]!.rivals.slice(1)],
+    player: { name: 'Northstar Atlantic', hq: 'LHR', hqSlots: 8, cash: 30000, extraSlots: { JFK: 3, BOS: 2, MAD: 2 }, starterFleet: ['dc8_62', 'caravelle'] },
+    objective: { kind: 'pax', target: 1500000, higherIsBetter: true, label: 'passengers carried', unit: 'count', minimumLongHaul: 1,
+      blurb: 'Carry 1.5M passengers and finish with an active route of at least 4,500km.' },
+    targetNetWorth: 250000,
+  },
+  {
+    ...SCENARIOS[1]!, id: 'fuel_crunch', name: 'Sixteen Quarters of Oil', short: true,
+    description: 'Fuel starts at 160% of normal. Keep your airline profitable through a four-year energy squeeze.',
+    quarters: 16, startingFuelBp: 16000,
+    objective: { kind: 'profit', target: 25000, higherIsBetter: true, label: 'crisis profit', unit: 'money', minimumPax: 500000,
+      blurb: 'Earn $25M cumulative profit and carry half a million passengers despite costly fuel.' },
+    targetNetWorth: 200000,
+  },
+  {
+    ...SCENARIOS[3]!, id: 'hub_defense', name: 'Fortress Hub', short: true,
+    player: { ...SCENARIOS[3]!.player, name: 'Meridian Gulf', hq: 'DXB', extraSlots: { IST: 2, BOM: 2, DEL: 2 }, starterFleet: ['a320', 'b767', 'b767'] },
+    rivals: [{ ...SCENARIOS[3]!.rivals[0]!, hq: 'SIN', extraSlots: { HKG: 2, BKK: 2, KUL: 2 } }, ...SCENARIOS[3]!.rivals.slice(1)],
+    startingRoutes: [{ from: 'DXB', to: 'IST', aircraftIndex: 0, frequency: 8 }, { from: 'DXB', to: 'BOM', aircraftIndex: 1, frequency: 8 }, { from: 'DXB', to: 'DEL', aircraftIndex: 2, frequency: 8 }],
+    description: 'Six years to make your hub indispensable. Coordinate connections, protect capacity and outgrow rival networks.',
+    quarters: 24,
+    objective: { kind: 'transfer', target: 1200000, higherIsBetter: true, label: 'connecting boardings', unit: 'count', minimumRoutes: 3,
+      blurb: 'Carry 1.2M connecting boardings and retain at least three active routes.' },
+    targetNetWorth: 350000,
+  },
+]
+export const ALL_SCENARIOS = [...SCENARIOS, ...SHORT_SCENARIOS]
+
+const byId = new Map(ALL_SCENARIOS.map((s) => [s.id, s]))
 
 export function getScenario(id: string): Scenario {
   const s = byId.get(id)

@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { pairKey } from '../data/cities'
 import type { Airline, GameState } from '../engine'
-import { netWorth, routeWeeklyCapacity, slotCities } from '../engine/queries'
+import { netWorth, objectiveScore, objectiveScoreAt, routeWeeklyCapacity, slotCities } from '../engine/queries'
 import { TAKEOVER_BASE_K, TAKEOVER_PREMIUM_BP } from '../data/constants'
 import { getScenario } from '../data/scenarios'
 import { ConfirmButton } from './ConfirmButton'
@@ -159,6 +159,7 @@ function StandingsTable({ state }: { state: GameState }) {
 }
 
 const RACE_METRICS = [
+  { key: 'objective', label: 'scenario objective' },
   { key: 'netWorth', label: 'net worth' },
   { key: 'revenue', label: 'revenue' },
   { key: 'pax', label: 'passengers' },
@@ -251,19 +252,19 @@ function HeadToHead({ state }: { state: GameState }) {
 }
 
 export function RivalsPanel({ state }: { state: GameState }) {
-  const [metric, setMetric] = useState<(typeof RACE_METRICS)[number]['key']>('netWorth')
+  const [metric, setMetric] = useState<(typeof RACE_METRICS)[number]['key']>('objective')
   // Late entrants have shorter histories than the founders. The chart spaces
   // points by index, so pad on the left with zeros — every series then shares
   // one time axis, and an entrant's line correctly starts at the quarter it
   // arrived rather than being stretched across the whole era.
   const span = Math.max(...state.airlines.map((a) => a.history.length), 0)
   const series = state.airlines.map((a, i) => {
-    const own = a.history.map((h) => h[metric])
+    const own = a.history.map((h, index) => metric === 'objective' ? objectiveScoreAt(a, getScenario(state.scenario).objective.kind, index + 1) : h[metric])
     const pad = Array<number>(Math.max(0, span - own.length)).fill(0)
     return {
       label: a.name,
       points: [...pad, ...own],
-      className: i === 0 ? 'race-me' : `race-rival-${i}`,
+      className: i === viewSeat() ? 'race-me' : `race-rival-${i}`,
     }
   })
   const mySeats = fieldedSeats(state.airlines[viewSeat()]!)
@@ -290,13 +291,13 @@ export function RivalsPanel({ state }: { state: GameState }) {
       </h3>
       <RaceChart
         series={series}
-        format={metric === 'pax' ? (v) => v.toLocaleString('en-US') : undefined}
+        format={metric === 'objective' ? (v) => objectiveValue(v, getScenario(state.scenario).objective.unit) : metric === 'pax' ? (v) => v.toLocaleString('en-US') : undefined}
         target={(() => {
           // A duel career races the challenger's ghost — their final net
           // worth as a dashed line the player climbs toward.
-          if (metric !== 'netWorth') return undefined
+          if (metric !== 'objective' && metric !== 'netWorth') return undefined
           const duel = getChallengeTarget()
-          return duel ? { v: duel.worth, label: `⚔ ${duel.by ?? 'challenger'}` } : undefined
+          return duel && (metric === 'objective' ? duel.kind === getScenario(state.scenario).objective.kind : !duel.kind || duel.kind === 'netWorth') ? { v: duel.worth, label: `⚔ ${duel.by ?? 'challenger'}` } : undefined
         })()}
       />
       {(() => {
@@ -308,17 +309,17 @@ export function RivalsPanel({ state }: { state: GameState }) {
         const h = me.history
         const remaining = scenario.quarters - state.turn
         if (h.length < 8 || remaining <= 0) return null
-        const now = h[h.length - 1]!.netWorth
-        const then = h[h.length - 8]!.netWorth
+        const now = objectiveScore(me, scenario.objective.kind)
+        const then = objectiveScoreAt(me, scenario.objective.kind, h.length - 7)
         const slope = Math.floor((now - then) / 7)
-        const projected = now + slope * remaining
+        const projected = Math.max(0, Math.min(scenario.objective.kind === 'loadFactor' ? 10000 : Number.MAX_SAFE_INTEGER, now + slope * remaining))
         const leader = Math.max(
-          ...state.airlines.filter((a) => !a.bankrupt).map((a) => a.history[a.history.length - 1]?.netWorth ?? 0),
+          ...state.airlines.filter((a) => !a.bankrupt).map((a) => objectiveScore(a, scenario.objective.kind)),
         )
         return (
           <p className="dim" data-testid="race-pace">
             Pace: at the current trend you finish ~
-            <strong className={projected >= scenario.targetNetWorth ? 'pos' : 'neg'}>{money(projected)}</strong>{' '}
+            <strong className={projected >= scenario.objective.target ? 'pos' : 'neg'}>{objectiveValue(projected, scenario.objective.unit)}</strong>{' '}
             in {Math.floor(remaining / 4)}y {remaining % 4}q — this era is won on{' '}
             <strong>{scenario.objective.label}</strong> ({objectiveValue(scenario.objective.target, scenario.objective.unit)} plus #1)
             {now < leader && <span className="neg"> (currently behind the leader)</span>}
@@ -351,6 +352,7 @@ export function RivalsPanel({ state }: { state: GameState }) {
                 {rival.name} {rival.bankrupt && <span className="neg">— bankrupt</span>}
               </h4>
               <p className="dim">{PERSONALITY_BLURBS[rival.personality] ?? rival.personality}</p>
+              {rival.campaign && <p className="campaign" data-testid={`campaign-${rival.id}`}><strong>{rival.campaign.kind} campaign · {rival.campaign.city}</strong> · {Math.max(0, rival.campaign.untilTurn - state.turn)}q remaining{rival.campaign.fromTurn > state.turn ? ' · starts next quarter' : ''}</p>}
               {!rival.bankrupt && (
                 <>
                   <p>

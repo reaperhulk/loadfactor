@@ -2,7 +2,7 @@ import { rulesOf, identityOf } from '../engine/version'
 import { lazy, Suspense, useEffect, useReducer, useState, useSyncExternalStore } from 'react'
 import { CITIES } from '../data/cities'
 import { getEventDef } from '../data/events'
-import { SCENARIOS, getScenario } from '../data/scenarios'
+import { SCENARIOS, SHORT_SCENARIOS, getScenario } from '../data/scenarios'
 import { netWorth, networkCities, objectiveScore, quarterOf, yearOf } from '../engine/queries'
 import { idleSlotRent } from '../engine/slots'
 import { CityPanel } from './CityPanel'
@@ -392,6 +392,12 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           />
         </p>
       )}
+      <section className="short-scenarios"><h2>Short-haul sessions</h2><p className="dim">Focused challenges in 16–24 quarters. Every mandate uses the full simulation.</p>
+        {SHORT_SCENARIOS.map((s) => <article className="scenario-card" key={s.id} data-testid={`scenario-${s.id}`}>
+          <h3>{s.name}</h3><p>{s.description}</p><p>{s.objective.blurb}</p>
+          <ConfirmButton label={`Start · ${s.quarters} quarters`} confirmLabel={overwrites ? 'Replace oldest save and start?' : 'Take the mandate?'} onConfirm={() => startGame(s.id, seed.trim() || crypto.randomUUID().slice(0, 8), custom(), undefined, players)} />
+        </article>)}
+      </section>
       {SCENARIOS.map((s, si) => {
         // The unlock chain: each era opens when the previous one is WON —
         // but it's an invitation, not a wall (start anyway, twice).
@@ -510,9 +516,10 @@ function GameOverOverlay({
   const totalPax = me.history.reduce((s, h) => s + h.pax, 0)
   const totalProfit = me.history.reduce((s, h) => s + h.profit, 0)
   const peakWorth = me.history.reduce((s, h) => Math.max(s, h.netWorth), 0)
+  const won = state.winnerSeat === undefined ? state.phase === 'won' : state.winnerSeat === viewSeat()
   return (
     <div className="gameover-overlay" data-testid="gameover-overlay">
-      {state.phase === 'won' && (
+      {won && (
         <div className="confetti" aria-hidden="true" data-testid="confetti">
           {/* Deterministic scatter — index drives position, drift, and delay. */}
           {Array.from({ length: 28 }, (_, i) => (
@@ -529,8 +536,8 @@ function GameOverOverlay({
         </div>
       )}
       <div className="gameover-card">
-        <h2 className={state.phase === 'won' ? 'pos' : 'neg'}>
-          {state.phase === 'won' ? '🏆 VICTORY' : 'DEFEAT'}
+        <h2 className={won ? 'pos' : 'neg'}>
+          {won ? '🏆 VICTORY' : 'DEFEAT'}
         </h2>
         {(() => {
           // The duel verdict: a career started from a challenge link is
@@ -548,7 +555,7 @@ function GameOverOverlay({
             </p>
           )
         })()}
-        {state.phase === 'won' &&
+        {won &&
           (() => {
             const idx = SCENARIOS.findIndex((s) => s.id === state.scenario)
             const next = idx >= 0 ? SCENARIOS[idx + 1] : undefined
@@ -1052,6 +1059,13 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           </div>
         </div>
       )}
+      {(state.rulesVersion ?? 1) >= 2 && <details className="world-outlook" data-testid="world-outlook">
+        <summary>Planning calendar · next board opportunity in {state.turn % 8 === 0 ? 0 : 8 - state.turn % 8}q</summary>
+        <p>Board opportunities arrive every eight quarters with four quarters to decide. Accepted commitments can run for several years.</p>
+        <p>{scenario.objective.blurb} {scenario.objective.kind === 'loadFactor' ? 'Qualification also requires 1.5M total passengers and three active routes.' : ''}</p>
+        <p>Scheduled deliveries: {player.orders.length === 0 ? 'none' : player.orders.map((o) => `${o.type} in ${o.quartersLeft}q${o.replacesAircraftId ? ' (replacement)' : ''}`).join(' · ')}</p>
+        {state.airlines.filter((a) => a.campaign).map((a) => <p key={a.id}>{a.name}: {a.campaign!.kind} campaign at {a.campaign!.city}, through quarter {a.campaign!.untilTurn}.</p>)}
+      </details>}
       <div className="map-area">
         <Suspense
           fallback={

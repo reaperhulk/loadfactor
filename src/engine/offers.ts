@@ -23,27 +23,30 @@ import { effFuelBp } from './worldEvents'
 import type { GameEvent, GameState, WorldOffer } from './types'
 
 // Cost scales with the era so an offer stays meaningful as the money grows.
-function eraScale(state: GameState): number {
-  const player = state.airlines[0]!
+function eraScale(state: GameState, seat = 0): number {
+  const player = state.airlines[seat]!
   const lastCosts = player.history[player.history.length - 1]?.costs ?? 0
   return Math.max(2000, Math.floor(lastCosts / 2))
 }
 
 // Draw at most one offer per quarter. Deterministic in (seed, turn).
 export function maybeOfferDeal(state: GameState, events: GameEvent[]): void {
-  const player = state.airlines[0]!
-  if (player.bankrupt) return
+  const modern = (state.rulesVersion ?? 1) >= 2
+  if (modern && state.turn % 8 !== 0) return
+  const humans = state.airlines.filter((a) => a.controller === 'player' && !a.bankrupt)
+  const player = modern ? humans[Math.floor(state.turn / 8) % Math.max(1, humans.length)] : state.airlines[0]
+  if (!player || player.bankrupt) return
   // One open question at a time — a queue of offers is a chore, not a choice.
   if (state.world.offers.length > 0) return
   const roll = chanceBp(state.rng.offers, OFFER_CHANCE_BP)
   state.rng.offers = roll.rng
-  if (!roll.value) return
+  if (!roll.value && !modern) return
 
   const kindDraw = nextInt(state.rng.offers, 0, 2)
   state.rng.offers = kindDraw.rng
-  const scale = eraScale(state)
+  const scale = eraScale(state, player.id)
   const id = state.world.nextOfferId++
-  const expiresTurn = state.turn + OFFER_DECISION_QUARTERS
+  const expiresTurn = state.turn + (modern ? 4 : OFFER_DECISION_QUARTERS)
 
   let offer: WorldOffer
   if (kindDraw.value === 0) {
@@ -109,6 +112,7 @@ export function maybeOfferDeal(state: GameState, events: GameEvent[]): void {
       detail: `Lock fuel at ${(bp / 100).toFixed(0)}% of baseline plus a ${OFFER_FUEL_PREMIUM_BP / 100}% premium for twelve quarters — three years of certainty in ${yearOf(state)}. A bet that fuel goes up, and a loss if it falls.`,
     }
   }
+  if (modern) offer.airline = player.id
   state.world.offers.push(offer)
   events.push({ type: 'offer_made', offerId: offer.id, kind: offer.kind, headline: offer.headline, expiresTurn })
 }

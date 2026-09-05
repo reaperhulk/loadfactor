@@ -29,8 +29,9 @@ export function runCareer(
   seed: string,
   bot: BotName,
   maxQuarters: number,
+  rulesVersion?: number,
 ): CareerResult {
-  let state = newGame(scenarioId, seed)
+  let state = newGame(scenarioId, seed, undefined, undefined, rulesVersion)
   const commandLog: Command[] = []
   const checkpointHashes: Record<number, string> = {}
 

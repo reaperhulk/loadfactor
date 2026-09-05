@@ -4,7 +4,7 @@ import { recurringFinancials } from './accounting'
 // can reconcile reported profit against the actual cash delta.
 
 import { AIRCRAFT, getAircraftType, typesOnSale } from '../data/aircraft'
-import { CITIES } from '../data/cities'
+import { CITIES, distanceKm } from '../data/cities'
 import {
   INSOLVENCY_QUARTERS_TO_FAIL,
   USED_MARGIN_BP,
@@ -30,11 +30,11 @@ import { getScenario } from '../data/scenarios'
 import { inflationBp, resolveMarket } from './market'
 import { resaleValue, totalDebt } from './queries'
 import { expansionEvents, resolveSlotRequests, slotsRemaining } from './slots'
-import { isGrounded, netWorth, objectiveBeats, objectiveMet, objectiveScore, objectiveScoreAt, yearOf } from './queries'
+import { isGrounded, netWorth, objectiveQualified, objectiveBeats, objectiveMet, objectiveScore, objectiveScoreAt, yearOf } from './queries'
 import { expireOffersAndDeals, maybeOfferDeal } from './offers'
 import { deriveFootholds } from './newGame'
 import { runRivalTurn } from './rivals'
-import type { Airline, EngineResult, GameEvent, GameState } from './types'
+import type { Airline, EngineResult, GameEvent, GameState, OwnedAircraft } from './types'
 import { updateWorld } from './worldEvents'
 
 // This quarter's used-market offers: recently produced types, mid-life ages,
@@ -94,6 +94,7 @@ function restructure(airline: Airline, turn: number): GameEvent {
   const fleetSold = airline.fleet.length - keptFleet.length
   for (const ac of keptFleet) {
     if (ac.routeId !== null && !keptRouteIds.has(ac.routeId)) ac.routeId = null
+    if (ac.secondaryRouteId !== undefined && (!keptRouteIds.has(ac.secondaryRouteId) || ac.routeId === null)) delete ac.secondaryRouteId
   }
   airline.routes = airline.routes.filter((r) => keptRouteIds.has(r.id))
   airline.fleet = keptFleet
@@ -213,13 +214,31 @@ export function endQuarter(prev: GameState): EngineResult {
       if (order.quartersLeft > 0) {
         remaining.push(order)
       } else {
-        const aircraft = {
+        const aircraft: OwnedAircraft = {
           id: airline.nextId++,
           type: order.type,
           ageQuarters: 0,
           routeId: null,
           leased: order.leased,
           cabin: 2,
+        }
+        if (order.replacesAircraftId !== undefined) {
+          const old = airline.fleet.find((a) => a.id === order.replacesAircraftId)
+          if (old) {
+            // Deliver first, then retire; the old aircraft stays in service
+            // throughout the waiting period. If its routes changed beyond
+            // the new type's range, delivery is safely parked for reassignment.
+            const routes = airline.routes.filter((r) => r.id === old.routeId || r.id === old.secondaryRouteId)
+            if (routes.every((r) => distanceKm(r.from, r.to) <= getAircraftType(aircraft.type).rangeKm)) {
+              aircraft.routeId = old.routeId
+              if (old.secondaryRouteId !== undefined) aircraft.secondaryRouteId = old.secondaryRouteId
+              if (old.reserve) aircraft.reserve = true
+              const proceeds = old.leased ? 0 : resaleValue(old.type, old.ageQuarters)
+              airline.cash += proceeds
+              airline.fleet = airline.fleet.filter((a) => a.id !== old.id)
+              events.push({ type: 'aircraft_sold', airline: airline.id, aircraftId: old.id, proceeds })
+            }
+          }
         }
         airline.fleet.push(aircraft)
         events.push({
@@ -293,7 +312,8 @@ export function endQuarter(prev: GameState): EngineResult {
       if (isGrounded(ac, state.turn)) continue
       const over = ac.ageQuarters - GROUNDING_AGE_QUARTERS
       if (over <= 0) continue
-      const riskBp = Math.min(GROUNDING_MAX_BP, over * GROUNDING_BP_PER_QUARTER_OVER)
+      const baseRisk = Math.min(GROUNDING_MAX_BP, over * GROUNDING_BP_PER_QUARTER_OVER)
+      const riskBp = (state.rulesVersion ?? 1) >= 2 && (ac.maintainedUntil ?? 0) > state.turn ? Math.floor(baseRisk / 4) : baseRisk
       // A clean uniform 0..9999 per (seed, turn, airframe): hashNoiseBp is
       // centered on 10000 and would not give an honest probability here.
       const roll = fnv1a(`${state.seed}|${state.turn}|ground:${airline.id}:${ac.id}`) % 10000
@@ -358,15 +378,15 @@ export function endQuarter(prev: GameState): EngineResult {
       } else {
         events.push({ type: 'airline_bankrupt', airline: airline.id })
         if (airline.controller === 'rival') liquidate(airline)
+        else if ((state.rulesVersion ?? 1) >= 2) airline.bankrupt = true
       }
     }
   }
 
   // 9. Milestones on the era's objective: the back half needs a ladder to
   // climb, not just a deadline to wait for.
-  {
+  for (const p0 of ((state.rulesVersion ?? 1) >= 2 ? state.airlines.filter((a) => a.controller === 'player') : [state.airlines[0]!])) {
     const obj = getScenario(state.scenario).objective
-    const p0 = state.airlines[0]!
     if (!p0.bankrupt && obj.higherIsBetter) {
       const score = objectiveScore(p0, obj.kind)
       const prevScore = p0.history.length >= 2 ? objectiveScoreAt(p0, obj.kind, p0.history.length - 1) : 0
@@ -374,7 +394,7 @@ export function endQuarter(prev: GameState): EngineResult {
       for (const pct of ladder) {
         const bar = Math.floor((obj.target * pct) / 100)
         if (prevScore < bar && score >= bar) {
-          events.push({ type: 'milestone_reached', airline: 0, label: obj.label, pctOfTarget: pct })
+          events.push({ type: 'milestone_reached', airline: p0.id, label: obj.label, pctOfTarget: pct })
         }
       }
     }
@@ -403,7 +423,17 @@ export function endQuarter(prev: GameState): EngineResult {
   // among the airlines AND clear the scenario's qualifying target.
   const scenario = getScenario(state.scenario)
   const player = state.airlines[0]!
-  if (player.insolventQuarters >= INSOLVENCY_QUARTERS_TO_FAIL) {
+  const humans = state.airlines.filter((a) => a.controller === 'player')
+  if ((state.rulesVersion ?? 1) >= 2 && humans.length > 1) {
+    if (humans.every((a) => a.bankrupt) || state.turn + 1 >= scenario.quarters) {
+      const ranked = state.airlines.filter((a) => !a.bankrupt && objectiveQualified(state, a))
+        .sort((a, b) => objectiveScore(b, scenario.objective.kind) - objectiveScore(a, scenario.objective.kind))
+      const winner = ranked[0]
+      if (winner && objectiveMet(objectiveScore(winner, scenario.objective.kind), scenario.objective.target, scenario.objective.higherIsBetter)) state.winnerSeat = winner.id
+      state.phase = winner?.controller === 'player' && state.winnerSeat !== undefined ? 'won' : 'lost'
+      events.push({ type: 'game_over', result: state.phase, reason: state.winnerSeat === undefined ? 'No airline qualified' : `${winner!.name} wins on ${scenario.objective.label}` })
+    }
+  } else if (player.insolventQuarters >= INSOLVENCY_QUARTERS_TO_FAIL) {
     state.phase = 'lost'
     events.push({ type: 'game_over', result: 'lost', reason: 'bankruptcy' })
   } else if (state.turn + 1 >= scenario.quarters) {
@@ -414,19 +444,19 @@ export function endQuarter(prev: GameState): EngineResult {
     let bestRival: Airline | null = null
     let bestRivalScore = 0
     for (const rival of state.airlines) {
-      if (rival.id === 0 || rival.bankrupt) continue
+      if (rival.id === 0 || rival.bankrupt || !objectiveQualified(state, rival)) continue
       const score = objectiveScore(rival, obj.kind)
       if (bestRival === null || objectiveBeats(score, bestRivalScore, obj.higherIsBetter)) {
         bestRival = rival
         bestRivalScore = score
       }
     }
-    if (!objectiveMet(myScore, obj.target, obj.higherIsBetter)) {
+    if (!objectiveMet(myScore, obj.target, obj.higherIsBetter) || !objectiveQualified(state, player)) {
       state.phase = 'lost'
       events.push({
         type: 'game_over',
         result: 'lost',
-        reason: `missed the ${obj.label} target`,
+        reason: `missed the ${obj.label} target${(state.rulesVersion ?? 1) >= 2 ? ' or required operating scale' : ''}`,
       })
     } else if (bestRival !== null && !objectiveBeats(myScore, bestRivalScore, obj.higherIsBetter)) {
       state.phase = 'lost'

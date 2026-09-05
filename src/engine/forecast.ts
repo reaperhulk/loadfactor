@@ -3,6 +3,9 @@
 import { applyCommandBatchFor } from './index'
 import { recurringFinancials } from './accounting'
 import { resolveMarket } from './market'
+import { getAircraftType } from '../data/aircraft'
+import { LEASE_BP_PER_QUARTER } from '../data/constants'
+import { currentLoanRateBp, resaleValue } from './queries'
 import { pairKey } from '../data/cities'
 import type { Command, GameEvent, GameState, Route } from './types'
 
@@ -52,4 +55,23 @@ export function forecastDirectRoute(previous: GameState, seat: number, variant: 
   }
   resolveMarket(state, [])
   return state.airlines[seat]!.routes[0]!
+}
+
+export function forecastReplacement(state: GameState, seat: number, aircraftId: number, type: string, leased: boolean, financed = false) {
+  const before = forecastQuarter(state, seat)
+  const variant = structuredClone(state)
+  const ac = variant.airlines[seat]!.fleet.find((a) => a.id === aircraftId)
+  if (!ac) throw new Error('Unknown aircraft')
+  const old = { ...ac }
+  const spec = getAircraftType(type)
+  ac.type = type; ac.ageQuarters = 0; ac.leased = leased; ac.cabin = 2
+  delete ac.groundedUntil; delete ac.maintainedUntil
+  const borrow = financed && !leased ? Math.max(0, spec.price - state.airlines[seat]!.cash) : 0
+  if (borrow > 0) variant.airlines[seat]!.loans.push({ id: -1, principal: borrow, annualRateBp: currentLoanRateBp(state) })
+  const after = forecastQuarter(variant, seat)
+  return { quarterlySaving: after.profit - before.profit, deliveryQuarters: leased ? 1 : spec.deliveryQuarters,
+    purchaseCash: leased ? 0 : spec.price,
+    requiredCash: leased ? Math.floor(spec.price * LEASE_BP_PER_QUARTER / 10000) : spec.price,
+    saleOnDelivery: old.leased ? 0 : resaleValue(old.type, old.ageQuarters + (leased ? 1 : spec.deliveryQuarters)),
+    projectedProfit: after.profit }
 }

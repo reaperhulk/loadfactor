@@ -1,3 +1,4 @@
+import { resolveItineraries, type PassengerSegment } from './itineraries'
 // Route economics: the heart of the game (PLAN.md §2.2). Pure arithmetic plus
 // stateless hash noise — no stream draws, so resolution order can never
 // reshuffle another subsystem's randomness. Resolution has two phases:
@@ -207,7 +208,10 @@ export function routeSpoolBp(airline: Airline, route: Route, turn: number): numb
 // Per-route weekly accumulator, finalized to quarterly numbers at the end.
 // Cost components are tracked separately (inflation already applied) so the
 // quarterly report can attribute every dollar; weeklyCost is their sum.
-interface RouteAcc {
+export interface RouteAcc {
+  weeklyTrips: number
+  segments?: Record<PassengerSegment, number>
+  transferRevenue?: number
   airlineIdx: number
   route: Route
   km: number
@@ -264,6 +268,7 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
   // ---- Phase 1: direct traffic per contested pair ----
   const pairs = new Map<string, Entrant[]>()
   for (const airline of state.airlines) {
+    if (airline.bankrupt) continue
     for (const route of airline.routes) {
       let weeklyRoundTrips = 0
       let weeklyCapacity = 0
@@ -332,7 +337,7 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
 
     for (let i = 0; i < entrants.length; i++) {
       const e = entrants[i]!
-      const weeklyPax = pax[i]!
+      const weeklyPax = (state.rulesVersion ?? 1) >= 2 ? 0 : pax[i]!
       const fare = fareFor(km, e.route.fareLevel)
       const airline = state.airlines[e.airlineIdx]!
       const fuelBp = fuelBpFor(e.airlineIdx)
@@ -351,6 +356,7 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       // Each component inflates and floors separately so attribution sums
       // exactly — the breakdown IS the cost, not an approximation of it.
       accs.set(accKey(e.airlineIdx, e.route.id), {
+        weeklyTrips: e.weeklyRoundTrips,
         airlineIdx: e.airlineIdx,
         route: e.route,
         km,
@@ -367,6 +373,9 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
     }
   }
 
+  if ((state.rulesVersion ?? 1) >= 2) {
+    resolveItineraries(state, [...accs.values()])
+  } else {
   // ---- Phase 2: connecting itineraries over each airline's own network ----
   // A share of unserved O/D demand will take a one-stop over a hub if both
   // legs exist, the detour is tolerable, and spare seats remain. Connecting
@@ -430,6 +439,8 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
     }
   }
 
+  }
+
   // ---- Finalize: quarterly numbers, state, events — stable order ----
   for (const airline of state.airlines) {
     for (const route of airline.routes) {
@@ -451,6 +462,10 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       route.lastRevenue = revenue
       route.lastCost = cost
       route.lastTransferPax = transferPax
+      if (acc.segments) {
+        route.lastSegments = { business: acc.segments.business * WEEKS_PER_QUARTER, leisure: acc.segments.leisure * WEEKS_PER_QUARTER, budget: acc.segments.budget * WEEKS_PER_QUARTER }
+        route.lastTransferRevenue = q(acc.transferRevenue ?? 0)
+      }
       route.history.push({
         turn: state.turn,
         pax: quarterPax,

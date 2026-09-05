@@ -250,3 +250,12 @@ export function isAircraftType(id: string): boolean {
 export function typesOnSale(year: number): readonly AircraftType[] {
   return AIRCRAFT.filter((a) => year >= a.availableFrom && year <= a.availableTo)
 }
+
+// Training/spares families. Similar names alone do not imply commonality.
+export function aircraftFamily(type: string): string {
+  if (type.startsWith('b737')) return '737'
+  if (type.startsWith('b747')) return '747'
+  if (type === 'b757' || type === 'b767') return '757/767'
+  if (type === 'a320' || type === 'a340') return 'Airbus flight deck'
+  return getAircraftType(type).name
+}

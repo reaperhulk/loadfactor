@@ -49,3 +49,20 @@ Stage 1 pushed as 1435497. Stage 2 adds explicit rules/content identity, objecti
 challenge/replay/fame displays, hot-seat exports and active-seat restoration,
 visible quota errors with downloadable recovery, persistent outgoing duel links,
 batched multiplayer replay, and quarter-boundary undo. Four recovery tests added.
+
+Stage 2 pushed as 2130b94; all 192 unit tests and 60 hosted Chromium tests passed.
+Stage 3 implements rules 2: conserved segmented itinerary competition, alternate
+hubs, feeder attribution, coordinated banks, family costs, preventive maintenance,
+reserves, shared rotations, replacement delivery plans, sustained rival campaigns,
+addressed/calendar offers, and four short mandates. Legacy rules/hashes retained.
+New golden fixtures are intentional; the original fixtures remain in
+`fixtures/legacy-v1-goldens.json`. Balance distributions now include naive, greedy
+and cautious policies; the hub policy explicitly values connecting spokes.
+
+Stage 3 verification: 217 tests passed; lint/types/build passed; eager bundle
+168 KiB gzip against 190 KiB budget. The six untouched release seeds across all
+nine scenarios and three policies produced 162 careers: all 108 competent
+careers reached their deadlines, 84 won, and no naive career won. Results are
+checked in as `fixtures/balance-v2-report.json`; the independent CI seed matrix
+also passes. Local browser tests still cannot launch the unavailable executable;
+the hosted Chromium gate validates the pushed build.

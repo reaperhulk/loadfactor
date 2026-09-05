@@ -1,6 +1,6 @@
 // Save schema and simulation rules are different versions. An unversioned log
 // belongs to the original rules forever; future rules must never reinterpret it.
-export const RULES_VERSION = 1
+export const RULES_VERSION = 2
 export const CONTENT_VERSION = 1
 export interface RulesIdentity { rulesVersion?: number; contentVersion?: number }
 export function rulesOf(identity: RulesIdentity): number {

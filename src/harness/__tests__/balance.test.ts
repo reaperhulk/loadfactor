@@ -8,7 +8,10 @@
 // intentionally moves, and say so in the commit.
 
 import { describe, expect, it } from 'vitest'
-import { runCareer } from '../simulate'
+import { runCareer as simulate } from '../simulate'
+// Keep the original seed-by-seed contract for saved rules-1 careers. The
+// rules-2 matrix is separately asserted in balanceV2.test.ts.
+const runCareer: typeof simulate = (scenario, seed, bot, quarters) => simulate(scenario, seed, bot, quarters, 1)
 import { getScenario } from '../../data/scenarios'
 import { objectiveScore } from '../../engine/queries'
 
@@ -19,7 +22,7 @@ const SEEDS = ['alpha', 'beta', 'gamma', 'delta', 'epsilon']
 // printer that reopens the gap trips these before it ships.
 const runawayCap = (scenario: string): number => 10 * getScenario(scenario).targetNetWorth
 
-describe('balance envelope', () => {
+describe('legacy rules 1 balance envelope', () => {
   // Survival is the floor contract: a competent operator always reaches the
   // deadline with a real network and without printing money. WINNING is
   // pinned per seed below — since F1 the field fights back, so a close loss

@@ -7,7 +7,7 @@ import { viewSeat, dispatch } from './session'
 import { money } from './format'
 
 export function OfferCard({ state }: { state: GameState }) {
-  const offer = state.world.offers[0]
+  const offer = state.world.offers.find((o) => (o.airline ?? 0) === viewSeat())
   if (!offer) return null
   const player = state.airlines[viewSeat()]!
   const quartersLeft = offer.expiresTurn - state.turn

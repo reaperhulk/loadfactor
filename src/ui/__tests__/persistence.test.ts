@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hashState } from '../../harness/hash'
 import { runReplay } from '../../engine'
-import { rulesOf } from '../../engine/version'
+import { rulesOf, RULES_VERSION } from '../../engine/version'
 import { dispatch, exportCurrentCareer, getReplay, getSession, getStorageWarning, importSave, passSeat, reset, resumeSave, startGame, undoLastAction, viewSeat } from '../session'
 
 beforeEach(() => {
@@ -22,7 +22,7 @@ describe('career continuity', () => {
     dispatch({ type: 'set_marketing', level: 2 })
     const hash = hashState(getSession()!.state)
     const exported = exportCurrentCareer()!
-    expect(JSON.parse(exported).rulesVersion).toBe(1)
+    expect(JSON.parse(exported).rulesVersion).toBe(RULES_VERSION)
     expect(hashState(runReplay(getReplay()!).state)).toBe(hash)
     reset()
     expect(importSave(exported, 1)).toBe(true)

@@ -18,7 +18,7 @@ import {
 import { distanceKm, pairKey } from '../data/cities'
 import { getScenario } from '../data/scenarios'
 import type { ObjectiveKind } from '../data/scenarios'
-import type { Airline, GameState, Route } from './types'
+import type { Airline, GameState, Route, OwnedAircraft } from './types'
 
 // Today's market rate for a new loan: base plus a spread that widens as the
 // economy sours. One definition, shared by take_loan and the finance panel.
@@ -100,16 +100,29 @@ export function roundTripsPerWeek(type: string, km: number): number {
   return Math.floor(WEEKLY_BLOCK_MINUTES / roundTripMin)
 }
 
-// Most round trips per week the assigned fleet could fly on this route.
-export function maxRouteFrequency(airline: Airline, route: Route, turn = -1): number {
-  const km = distanceKm(route.from, route.to)
-  let max = 0
-  for (const a of airline.fleet) {
-    if (a.routeId !== route.id) continue
-    if (isGrounded(a, turn)) continue
-    max += roundTripsPerWeek(a.type, km)
+// Reserve substitutions are derived globally in stable fleet order so one
+// spare cannot cover two grounded aircraft. They consume the spare's hours.
+export function operatingFleet(airline: Airline, turn: number): OwnedAircraft[] {
+  const out = airline.fleet.filter((a) => !a.reserve && !isGrounded(a, turn))
+  if (turn < 0) return out
+  const reserves = airline.fleet.filter((a) => a.reserve && a.routeId === null && !isGrounded(a, turn))
+  for (const unavailable of airline.fleet) {
+    if (!isGrounded(unavailable, turn) || unavailable.routeId === null) continue
+    const routes = airline.routes.filter((r) => r.id === unavailable.routeId || r.id === unavailable.secondaryRouteId)
+    const at = reserves.findIndex((a) => routes.every((r) => distanceKm(r.from, r.to) <= getAircraftType(a.type).rangeKm))
+    if (at < 0) continue
+    const reserve = reserves.splice(at, 1)[0]!
+    out.push({ ...reserve, routeId: unavailable.routeId, secondaryRouteId: unavailable.secondaryRouteId })
   }
-  return max
+  return out
+}
+function tripsOnRoute(aircraft: OwnedAircraft, route: Route): number {
+  if (aircraft.routeId !== route.id && aircraft.secondaryRouteId !== route.id) return 0
+  const share = aircraft.secondaryRouteId === undefined ? 10000 : aircraft.routeId === route.id ? 6000 : 4000
+  return Math.floor(roundTripsPerWeek(aircraft.type, distanceKm(route.from, route.to)) * share / 10000)
+}
+export function maxRouteFrequency(airline: Airline, route: Route, turn = -1): number {
+  return operatingFleet(airline, turn).reduce((sum, a) => sum + tripsOnRoute(a, route), 0)
 }
 
 // An airframe in the hangar for maintenance flies nothing. `turn` of -1 means
@@ -140,13 +153,11 @@ export interface TripAllocation {
 // Distribute the effective frequency across the assigned fleet in stable
 // fleet order — each airframe flies up to its own weekly maximum.
 export function allocateTrips(airline: Airline, route: Route, turn = -1): TripAllocation[] {
-  const km = distanceKm(route.from, route.to)
   let remaining = effectiveFrequency(airline, route, turn)
   const out: TripAllocation[] = []
-  for (const a of airline.fleet) {
-    if (a.routeId !== route.id) continue
-    if (isGrounded(a, turn)) continue
-    const trips = Math.min(roundTripsPerWeek(a.type, km), remaining)
+  for (const a of operatingFleet(airline, turn)) {
+    if (a.routeId !== route.id && a.secondaryRouteId !== route.id) continue
+    const trips = Math.min(tripsOnRoute(a, route), remaining)
     remaining -= trips
     out.push({ aircraftId: a.id, type: a.type, cabin: a.cabin, seats: cabinSeats(a.type, a.cabin), trips })
   }
@@ -271,4 +282,16 @@ export function reputationAppealBp(airline: Airline): number {
   const rep = airline.reputationBp ?? 10000
   if (rep >= 10000) return 10000
   return 10000 - Math.floor(((10000 - rep) * REPUTATION_APPEAL_WEIGHT_BP) / 10000)
+}
+
+// Scale requirements prevent winning a load-factor race by flying a token
+// schedule. Legacy careers retain their original qualification rules.
+export function objectiveQualified(state: GameState, airline: Airline): boolean {
+  if ((state.rulesVersion ?? 1) < 2) return true
+  const scenario = getScenario(state.scenario)
+  const obj = scenario.objective
+  const minimumPax = obj.minimumPax ?? (obj.kind === 'loadFactor' ? 1500000 : 0)
+  const active = airline.routes.filter((r) => r.lastCapacity > 0)
+  return objectiveScore(airline, 'pax') >= minimumPax && active.length >= (obj.minimumRoutes ?? (obj.kind === 'loadFactor' ? 3 : 0)) &&
+    active.filter((r) => distanceKm(r.from, r.to) >= 4500).length >= (obj.minimumLongHaul ?? 0)
 }

@@ -1,7 +1,8 @@
+import { OperationsPanel } from './OperationsPanel'
 // Management panels: routes, fleet, airports, finance, and the quarterly
 // report. Every button is a Command dispatch — no state is touched directly.
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, pairKey } from '../data/cities'
 import { MIN_ROUTE_KM } from '../data/constants'
@@ -38,10 +39,10 @@ import {
   yearOf,
 } from '../engine/queries'
 import { Shop } from './Shop'
-import { assignAllIdle, assignAndSchedule, balanceSchedules, balancedScheduleCommands } from './assign'
+import { assignAllIdle, assignAndSchedule, balancedScheduleCommands } from './assign'
 import { sortHeaderFactory } from './sortHeader'
 import { ConfirmButton } from './ConfirmButton'
-import { viewSeat, dispatch } from './session'
+import { viewSeat, dispatch, dispatchBatch } from './session'
 import { copyTsv, money } from './format'
 import { Icon } from './Icon'
 import {
@@ -90,6 +91,8 @@ export function RoutesPanel({
   const [sortAsc, setSortAsc] = useState(false)
   const [filter, setFilter] = useState<RouteFilter>('all')
   const [routeQuery, setRouteQuery] = useState('')
+  const seat = viewSeat()
+  const schedulePlan = useMemo(() => balancedScheduleCommands(state, seat), [state, seat])
   if (player.routes.length === 0) {
     // Even before the first route, the opportunities list is the guidance
     // that matters most.
@@ -235,9 +238,9 @@ export function RoutesPanel({
       <button
         className="link-btn"
         data-testid="balance-schedules"
-        disabled={balancedScheduleCommands(state, viewSeat()).length === 0}
+        disabled={schedulePlan.length === 0}
         title="right-size every route to forecast demand; undo restores the previous schedules"
-        onClick={() => balanceSchedules(state)}
+        onClick={() => dispatchBatch(schedulePlan)}
       >
         <Icon name="balance" /> Balance schedules
       </button>
@@ -621,6 +624,7 @@ export function FleetPanel({ state }: { state: GameState }) {
   })
   return (
     <div>
+      <OperationsPanel state={state} />
       {player.fleet.some((a) => a.routeId === null) && player.routes.length > 0 && (
         <button
           data-testid="assign-all-idle"

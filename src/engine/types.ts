@@ -22,6 +22,9 @@ export interface Loan {
 }
 
 export interface OwnedAircraft {
+  secondaryRouteId?: number
+  reserve?: boolean
+  maintainedUntil?: number
   id: number
   type: string // AircraftType id
   ageQuarters: number
@@ -38,6 +41,7 @@ export interface OwnedAircraft {
 }
 
 export interface AircraftOrder {
+  replacesAircraftId?: number
   id: number
   type: string
   quartersLeft: number
@@ -69,6 +73,8 @@ export interface RouteQuarter {
 }
 
 export interface Route {
+  lastSegments?: { business: number; leisure: number; budget: number }
+  lastTransferRevenue?: number
   id: number
   from: string // city id, lexicographically < to
   to: string
@@ -129,6 +135,8 @@ export interface QuarterStats {
 }
 
 export interface Airline {
+  campaign?: { kind: 'price' | 'premium' | 'defend' | 'expand'; city: string; fromTurn: number; untilTurn: number }
+  hubMode?: 'flexible' | 'banked'
   id: number // index into GameState.airlines; 0 = player
   name: string
   controller: 'player' | 'rival'
@@ -176,6 +184,7 @@ export interface ActiveEvent {
 // now for a payoff later, take an asset and carry the obligation, bet on the
 // fuel curve. They expire if ignored.
 export interface WorldOffer {
+  airline?: number
   id: number
   kind: 'capacity_commitment' | 'regulator_slots' | 'fuel_contract'
   city: string | null
@@ -214,6 +223,7 @@ export interface WorldState {
 }
 
 export interface GameState {
+  winnerSeat?: number
   rulesVersion?: number
   contentVersion?: number
   scenario: string
@@ -228,6 +238,11 @@ export interface GameState {
 // Player actions. Serializable, validated by applyCommand; invalid commands
 // reject with a command_rejected event, never throw.
 export type Command =
+  | { type: 'order_replacement'; aircraftId: number; aircraftType: string; leased: boolean }
+  | { type: 'set_rotation'; aircraftId: number; secondaryRouteId: number | null }
+  | { type: 'set_reserve'; aircraftId: number; reserve: boolean }
+  | { type: 'plan_maintenance'; aircraftId: number }
+  | { type: 'set_hub_mode'; mode: 'flexible' | 'banked' }
   | {
       type: 'open_route'
       from: string
@@ -265,6 +280,7 @@ export type Command =
 // Observable effects — the only channel out of the engine. The UI report,
 // tests, and bot telemetry are all built from these.
 export type GameEvent =
+  | { type: 'operations_changed'; airline: number; detail: string }
   | { type: 'command_rejected'; airline: number; command: Command; reason: string }
   | { type: 'route_opened'; airline: number; routeId: number; from: string; to: string }
   | { type: 'route_closed'; airline: number; routeId: number }

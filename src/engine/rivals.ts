@@ -112,7 +112,27 @@ const PERSONALITIES: Record<string, Personality> = {
 export function runRivalTurn(state: GameState, idx: number, events: GameEvent[]): void {
   const airline = state.airlines[idx]
   if (!airline || airline.bankrupt) return
-  const personality = PERSONALITIES[airline.personality] ?? PERSONALITIES['balanced']!
+  let personality = PERSONALITIES[airline.personality] ?? PERSONALITIES['balanced']!
+  if ((state.rulesVersion ?? 1) >= 2) {
+    const campaign = airline.campaign
+    if (campaign && state.turn >= campaign.fromTurn && state.turn < campaign.untilTurn) {
+      personality = { ...personality,
+        marketing: campaign.kind === 'defend' ? Math.max(2, personality.marketing) : personality.marketing,
+        fareFloor: campaign.kind === 'price' ? -2 : personality.fareFloor,
+        serviceLevel: campaign.kind === 'premium' ? 3 : personality.serviceLevel,
+        raidBonus: campaign.kind === 'expand' ? personality.raidBonus + 5 : personality.raidBonus,
+      }
+      for (const r of airline.routes.filter((r) => r.from === campaign.city || r.to === campaign.city)) {
+        if (campaign.kind === 'price') apply(state, idx, { type: 'set_fare', routeId: r.id, fareLevel: -1 }, events)
+        if (campaign.kind === 'premium') apply(state, idx, { type: 'set_service', routeId: r.id, serviceLevel: 3 }, events)
+      }
+    }
+    if (!campaign || state.turn >= campaign.untilTurn) {
+      const kind = airline.personality === 'price_war' ? 'price' : airline.personality === 'premium' ? 'premium' : airline.personality === 'fortress' ? 'defend' : 'expand'
+      airline.campaign = { kind, city: airline.slotInterest ?? airline.hq, fromTurn: state.turn + 1, untilTurn: state.turn + 5 }
+      events.push({ type: 'operations_changed', airline: idx, detail: `${airline.name} announces a four-quarter ${kind} campaign at ${airline.campaign.city}, starting next quarter` })
+    }
+  }
 
   applyAll(state, idx, treasuryCommands(state, idx), events)
   applyAll(state, idx, marketingCommands(state, idx, personality.marketing), events)

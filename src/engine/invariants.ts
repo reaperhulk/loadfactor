@@ -39,6 +39,8 @@ export function checkInvariants(state: GameState): void {
 
     for (const ac of airline.fleet) {
       assertInv(isAircraftType(ac.type), `aircraft ${ac.id} type exists`)
+      assertInv(ac.secondaryRouteId === undefined || (routeIds.has(ac.secondaryRouteId) && ac.routeId !== ac.secondaryRouteId), `aircraft ${ac.id} rotation valid`)
+      assertInv(!ac.reserve || ac.routeId === null, `aircraft ${ac.id} reserve is idle`)
       assertInv(ac.ageQuarters >= 0, `aircraft ${ac.id} age non-negative`)
       assertInv(ac.routeId === null || routeIds.has(ac.routeId), `aircraft ${ac.id} assigned to a real route`)
     }

@@ -26,7 +26,7 @@ import {
 import { getScenario } from '../data/scenarios'
 import type { Command, GameState } from '../engine/types'
 
-export type BotName = 'naive' | 'greedy'
+export type BotName = 'naive' | 'greedy' | 'cautious'
 
 // Re-exports: the fuzzer and tests address these through the bot surface.
 export { launchFrequency, pairScore, bestUnservedPair } from '../engine/policy'
@@ -73,7 +73,7 @@ export function dialsFor(scenarioId: string): { dials: PolicyDials; cabin: numbe
       // Connecting traffic rides spare seats over a dense hub: expand
       // aggressively and keep the product attractive enough to win the
       // contested legs a hub is built from.
-      return { dials: { ...GREEDY_DIALS, expandMinDemand: 180, marketing: 2 }, cabin: 2 }
+      return { dials: { ...GREEDY_DIALS, expandMinDemand: 180, marketing: 2, connectionFocus: true }, cabin: 2 }
     default:
       return { dials: GREEDY_DIALS, cabin: 2 }
   }
@@ -116,6 +116,7 @@ function naiveCommands(state: GameState): Command[] {
 function greedyCommands(state: GameState): Command[] {
   const { dials, cabin } = dialsFor(state.scenario)
   const commands: Command[] = []
+  if ((state.rulesVersion ?? 1) >= 2 && getScenario(state.scenario).objective.kind === 'transfer' && state.airlines[0]!.routes.length >= 3 && state.airlines[0]!.hubMode !== 'banked') commands.push({ type: 'set_hub_mode', mode: 'banked' })
   commands.push(...treasuryCommands(state, 0))
   commands.push(...hedgeCommands(state, 0))
   commands.push(...scheduleCommands(state, 0))
@@ -142,5 +143,12 @@ function greedyCommands(state: GameState): Command[] {
 }
 
 export function botCommands(state: GameState, bot: BotName): Command[] {
-  return bot === 'naive' ? naiveCommands(state) : greedyCommands(state)
+  if (bot === 'naive') return naiveCommands(state)
+  const commands = greedyCommands(state)
+  if (bot !== 'cautious') return commands
+  const airline = state.airlines[0]!
+  const buffer = Math.max(12000, (airline.history.at(-1)?.costs ?? 0) * 2)
+  return commands.filter((command) => command.type !== 'acquire_rival' &&
+    !(airline.cash < buffer && (command.type === 'order_aircraft' || command.type === 'request_slots')))
+
 }

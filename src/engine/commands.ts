@@ -22,6 +22,7 @@ import {
 import { slotFee, slotQueue } from './slots'
 import { effFuelBp } from './worldEvents'
 import {
+  isGrounded,
   currentLoanRateBp,
   debtCeiling,
   netWorth,
@@ -52,6 +53,60 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
   if (airline.bankrupt) return reject(airlineIdx, command, 'airline is bankrupt')
 
   switch (command.type) {
+    case 'order_replacement': {
+      if ((state.rulesVersion ?? 1) < 2) return reject(airlineIdx, command, 'requires rules 2')
+      const ac = airline.fleet.find((a) => a.id === command.aircraftId)
+      if (!ac || !isAircraftType(command.aircraftType) || typeof command.leased !== 'boolean') return reject(airlineIdx, command, 'invalid replacement')
+      if (airline.orders.some((o) => o.replacesAircraftId === ac.id)) return reject(airlineIdx, command, 'replacement already ordered')
+      const type = getAircraftType(command.aircraftType)
+      if (airline.routes.filter((r) => r.id === ac.routeId || r.id === ac.secondaryRouteId).some((r) => distanceKm(r.from, r.to) > type.rangeKm))
+        return reject(airlineIdx, command, 'replacement lacks range for the rotation')
+      const result = applyPlanningCommand(state, airlineIdx, { type: command.leased ? 'lease_aircraft' : 'order_aircraft', aircraftType: type.id })
+      if (!result.events.some((e) => e.type === 'command_rejected')) airline.orders[airline.orders.length - 1]!.replacesAircraftId = ac.id
+      return result
+    }
+    case 'set_hub_mode': {
+      if ((state.rulesVersion ?? 1) < 2) return reject(airlineIdx, command, 'requires rules 2')
+      if (command.mode !== 'flexible' && command.mode !== 'banked') return reject(airlineIdx, command, 'invalid hub mode')
+      airline.hubMode = command.mode
+      return { events: [{ type: 'operations_changed', airline: airlineIdx, detail: `Connections: ${command.mode}` }] }
+    }
+    case 'set_rotation': {
+      if ((state.rulesVersion ?? 1) < 2) return reject(airlineIdx, command, 'requires rules 2')
+      const ac = airline.fleet.find((a) => a.id === command.aircraftId)
+      if (!ac || ac.routeId === null) return reject(airlineIdx, command, 'assign a primary route first')
+      if (command.secondaryRouteId === null) delete ac.secondaryRouteId
+      else {
+        const primary = findRoute(airline, ac.routeId)!
+        const second = findRoute(airline, command.secondaryRouteId)
+        if (!second || second.id === primary.id || ![primary.from, primary.to].some((c) => c === second.from || c === second.to))
+          return reject(airlineIdx, command, 'rotation routes must share an airport')
+        if (distanceKm(second.from, second.to) > getAircraftType(ac.type).rangeKm) return reject(airlineIdx, command, 'aircraft lacks range')
+        if (Math.floor(roundTripsPerWeek(ac.type, distanceKm(second.from, second.to)) * 0.4) < 1)
+          return reject(airlineIdx, command, 'not enough hours for a second route')
+        ac.secondaryRouteId = second.id
+      }
+      return { events: [{ type: 'operations_changed', airline: airlineIdx, detail: 'Aircraft rotation updated: 60% primary, 40% secondary' }] }
+    }
+    case 'set_reserve': {
+      if ((state.rulesVersion ?? 1) < 2) return reject(airlineIdx, command, 'requires rules 2')
+      const ac = airline.fleet.find((a) => a.id === command.aircraftId)
+      if (!ac || ac.routeId !== null || typeof command.reserve !== 'boolean') return reject(airlineIdx, command, 'reserve aircraft must be idle')
+      ac.reserve = command.reserve
+      return { events: [{ type: 'operations_changed', airline: airlineIdx, detail: command.reserve ? 'Aircraft placed on standby' : 'Aircraft released from standby' }] }
+    }
+    case 'plan_maintenance': {
+      if ((state.rulesVersion ?? 1) < 2) return reject(airlineIdx, command, 'requires rules 2')
+      const ac = airline.fleet.find((a) => a.id === command.aircraftId)
+      if (!ac || isGrounded(ac, state.turn)) return reject(airlineIdx, command, 'aircraft unavailable')
+      if ((ac.maintainedUntil ?? 0) > state.turn) return reject(airlineIdx, command, 'aircraft is already covered by preventive maintenance')
+      const cost = getAircraftType(ac.type).maintBase * 2
+      if (airline.cash < cost) return reject(airlineIdx, command, 'insufficient cash')
+      airline.cash -= cost
+      ac.groundedUntil = state.turn + 1
+      ac.maintainedUntil = state.turn + 9
+      return { events: [{ type: 'operations_changed', airline: airlineIdx, detail: `Maintenance booked: $${cost}k, one quarter offline, eight quarters of reduced failure risk` }] }
+    }
     case 'open_route': {
       const { from, to } = command
       if (!isCity(from) || !isCity(to) || from === to) return reject(airlineIdx, command, 'invalid city pair')
@@ -72,6 +127,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       const aircraft = airline.fleet.find((ac) => ac.id === command.aircraftId)
       if (!aircraft) return reject(airlineIdx, command, 'no such aircraft')
       if (aircraft.routeId !== null) return reject(airlineIdx, command, 'aircraft is already assigned')
+      if ((state.rulesVersion ?? 1) >= 2 && (aircraft.reserve || isGrounded(aircraft, state.turn))) return reject(airlineIdx, command, 'release standby or wait for maintenance before launching')
       if (getAircraftType(aircraft.type).rangeKm < km)
         return reject(airlineIdx, command, 'aircraft lacks the range for this route')
       const maxFreq = roundTripsPerWeek(aircraft.type, km)
@@ -100,6 +156,8 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       }
       airline.routes.push(route)
       aircraft.routeId = route.id
+      delete aircraft.secondaryRouteId
+      delete aircraft.reserve
       return {
         events: [
           { type: 'route_opened', airline: airlineIdx, routeId: route.id, from: a, to: b },
@@ -123,7 +181,10 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
     case 'close_route': {
       const route = findRoute(airline, command.routeId)
       if (!route) return reject(airlineIdx, command, 'no such route')
-      for (const ac of airline.fleet) if (ac.routeId === route.id) ac.routeId = null
+      for (const ac of airline.fleet) {
+        if (ac.routeId === route.id) { ac.routeId = null; delete ac.secondaryRouteId }
+        if (ac.secondaryRouteId === route.id) delete ac.secondaryRouteId
+      }
       airline.routes = airline.routes.filter((r) => r.id !== route.id)
       // Market memory: a flown pair stays known for a while — re-entry
       // within the window skips the spool-up.
@@ -165,6 +226,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       if (!aircraft) return reject(airlineIdx, command, 'no such aircraft')
       if (command.routeId === null) {
         aircraft.routeId = null
+        delete aircraft.secondaryRouteId
         return { events: [{ type: 'aircraft_assigned', airline: airlineIdx, aircraftId: aircraft.id, routeId: null }] }
       }
       const route = findRoute(airline, command.routeId)
@@ -173,6 +235,8 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       if (getAircraftType(aircraft.type).rangeKm < km)
         return reject(airlineIdx, command, 'aircraft lacks the range for this route')
       aircraft.routeId = route.id
+      delete aircraft.secondaryRouteId
+      delete aircraft.reserve
       return {
         events: [{ type: 'aircraft_assigned', airline: airlineIdx, aircraftId: aircraft.id, routeId: route.id }],
       }
@@ -318,7 +382,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
     case 'accept_offer': {
       const offer = state.world.offers.find((o) => o.id === command.offerId)
       if (!offer) return reject(airlineIdx, command, 'that offer is no longer on the table')
-      if (airlineIdx !== 0) return reject(airlineIdx, command, 'offers are made to the player')
+      if (airlineIdx !== (offer.airline ?? 0)) return reject(airlineIdx, command, 'this offer belongs to another airline')
       if (airline.cash < offer.costK)
         return reject(airlineIdx, command, `not enough cash — this costs $${offer.costK}k up front`)
       airline.cash -= offer.costK
@@ -361,6 +425,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
     case 'decline_offer': {
       const offer = state.world.offers.find((o) => o.id === command.offerId)
       if (!offer) return reject(airlineIdx, command, 'that offer is no longer on the table')
+      if ((state.rulesVersion ?? 1) >= 2 && airlineIdx !== (offer.airline ?? 0)) return reject(airlineIdx, command, 'this offer belongs to another airline')
       state.world.offers = state.world.offers.filter((o) => o.id !== offer.id)
       return { events: [{ type: 'offer_declined', offerId: offer.id }] }
     }
@@ -400,11 +465,13 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         routesMoved++
       }
       for (const ac of target.fleet) {
-        airline.fleet.push({
-          ...ac,
-          id: airline.nextId++,
-          routeId: ac.routeId === null ? null : (routeIdMap.get(ac.routeId) ?? null),
-        })
+        const moved = { ...ac, id: airline.nextId++, routeId: ac.routeId === null ? null : (routeIdMap.get(ac.routeId) ?? null) }
+        if (ac.secondaryRouteId !== undefined) {
+          const secondary = routeIdMap.get(ac.secondaryRouteId)
+          if (moved.routeId !== null && secondary != null) moved.secondaryRouteId = secondary
+          else delete moved.secondaryRouteId
+        }
+        airline.fleet.push(moved)
       }
       for (const o of target.orders) {
         airline.orders.push({ ...o, id: airline.nextId++ })

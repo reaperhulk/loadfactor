@@ -141,6 +141,11 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
         </span>
       </header>
 
+      {route.lastSegments && <section className="segment-results"><h3>Who flies with you</h3>
+        <p>Business {route.lastSegments.business.toLocaleString()} · Leisure {route.lastSegments.leisure.toLocaleString()} · Budget {route.lastSegments.budget.toLocaleString()}</p>
+        <p>Connections contribute {money(route.lastTransferRevenue ?? 0)} of route revenue. Removing a feeder also removes its connecting traffic from the other leg.</p>
+        <p className="dim">Passengers choose among direct flights and every viable one-stop. One connecting journey uses a seat on each leg; reported passengers count boardings.</p>
+      </section>}
       <h3>Trend (last {route.history.length}q)</h3>
       <div className="trend-row">
         <span className="dim">load</span>

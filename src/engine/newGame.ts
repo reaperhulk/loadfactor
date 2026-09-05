@@ -1,3 +1,5 @@
+import { applyPlanningCommand } from './commands'
+import { pairKey } from '../data/cities'
 import { RULES_VERSION, rulesOf } from './version'
 import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity } from '../data/cities'
@@ -86,6 +88,10 @@ export function newGame(
     playerSetup = { ...playerSetup, hq: player.hq, extraSlots: deriveFootholds(player.hq) }
   }
   const airlines = [makeAirline(0, playerSetup, 'player')]
+  if (rulesVersion >= 2) {
+    if (scenario.startingAgeQuarters) for (const ac of airlines[0]!.fleet) ac.ageQuarters = scenario.startingAgeQuarters
+    if (scenario.startingDebtK) airlines[0]!.loans.push({ id: airlines[0]!.nextId++, principal: scenario.startingDebtK, annualRateBp: 600 })
+  }
   // Multiplayer: extra HUMAN seats take over rival slots. A human-controlled
   // airline keeps its scenario identity (name, HQ, footholds) but the rival
   // AI never moves it — turn resolution only drives controller === 'rival'.
@@ -93,7 +99,7 @@ export function newGame(
   scenario.rivals.forEach((r, i) =>
     airlines.push(makeAirline(i + 1, r, humans.has(i + 1) ? 'player' : 'rival')),
   )
-  return {
+  const state: GameState = {
     ...(rulesVersion > 1 ? { rulesVersion, contentVersion: 1 } : {}),
     scenario: scenarioId,
     seed,
@@ -109,7 +115,7 @@ export function newGame(
     },
     world: {
       economyBp: 10000,
-      fuelBp: 10000,
+      fuelBp: rulesVersion >= 2 ? (scenario.startingFuelBp ?? 10000) : 10000,
       events: [],
       usedMarket: [],
       indexHistory: [],
@@ -118,4 +124,14 @@ export function newGame(
     },
     airlines,
   }
+  if (rulesVersion >= 2 && (!player?.hq || player.hq === scenario.player.hq)) {
+    for (const route of scenario.startingRoutes ?? []) {
+      const ac = airlines[0]!.fleet[route.aircraftIndex]!
+      const result = applyPlanningCommand(state, 0, { type: 'open_route', from: route.from, to: route.to, aircraftId: ac.id, frequency: route.frequency })
+      if (result.events.some((e) => e.type === 'command_rejected')) throw new Error(`Invalid starter route in ${scenario.id}`)
+      airlines[0]!.servedUntil[pairKey(route.from, route.to)] = 0
+    }
+  }
+  return state
+
 }

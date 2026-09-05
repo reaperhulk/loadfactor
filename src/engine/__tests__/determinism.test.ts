@@ -1,6 +1,7 @@
 // The keystone suite (PLAN.md §5.2): the sim is a pure function of
 // (scenario, seed, commands), and state survives JSON round-trips losslessly.
 
+import { identityOf } from '../version'
 import { describe, expect, it } from 'vitest'
 import { botCommands } from '../../harness/bots'
 import { hashState } from '../../harness/hash'
@@ -42,7 +43,7 @@ describe('determinism', () => {
 
   it('a replay of the command log reproduces the exact final state', () => {
     const career = runCareer('jet_age', 'det-replay', 'greedy', 25)
-    const replayed = runReplay({ scenario: 'jet_age', seed: 'det-replay', commands: career.commandLog })
+    const replayed = runReplay({ ...identityOf(career.state), scenario: 'jet_age', seed: 'det-replay', commands: career.commandLog })
     expect(hashState(replayed.state)).toBe(hashState(career.state))
   })
 
