@@ -115,3 +115,7 @@ first and explain unmet requirements beside the score. Local validation remains
 221 passing tests and a 176 KiB gzip eager bundle. The final release is gated by
 the hosted 84-case Chromium/WebKit suite against the same build artifact that
 Pages receives; each commit's Actions run is the authoritative browser result.
+
+Final hosted run: 83/84 passed. The remaining ocean-fill probe landed on the
+upper-right map display selector. It now samples the same right edge below
+that control, preserving the sea-fill assertion; the release gate is rerun.

@@ -1238,7 +1238,7 @@ test('the globe sits on sea all the way to the edge of the frame', async ({ page
     const probes: Array<[number, number]> = [
       [0.5, 0.02],
       [0.5, 0.98],
-      [0.97, 0.05],
+      [0.97, 0.25], // Below the map display selector in the upper-right corner.
       [0.97, 0.95],
     ]
     return probes.map(([fx, fy]) => {
