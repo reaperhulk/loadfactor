@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { hashState } from '../../harness/hash'
+import { newGame } from '../../engine'
+import { forecastQuarter } from '../../engine/forecast'
 import { balancedScheduleCommands } from '../assign'
 import {
   canUndo,
@@ -46,6 +48,11 @@ describe('reversible planning', () => {
 })
 
 describe('schedule delegation', () => {
+  it('does not sacrifice company profit to improve direct-route schedules', () => {
+    const state = newGame('hub_defense', 'feeder-schedules')
+    const commands = balancedScheduleCommands(state, 0)
+    expect(forecastQuarter(state, 0, commands).profit).toBeGreaterThanOrEqual(forecastQuarter(state, 0).profit)
+  })
   it('produces only valid schedule changes and commits them as one undo step', () => {
     startGame('jet_age', 'balance-schedules')
     const initial = getSession()!.state

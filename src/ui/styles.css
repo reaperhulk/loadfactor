@@ -2290,7 +2290,7 @@ th { font-size:.78rem; letter-spacing:.02em; }
 .plan-inputs input,.plan-inputs select { width:100%; min-height:36px; }
 .staged-changes { display:flex; flex-wrap:wrap; gap:8px 26px; font-size:.85rem; }
 .forecast-comparison { margin:16px 0; width:100%; }
-.route-table-compact :is(th,td):is(:nth-child(2),:nth-child(4),:nth-child(5),:nth-child(9),:nth-child(10),:nth-child(11),:nth-child(12),:nth-child(13),:nth-child(14)) { display:none; }
+.route-table-compact :is(thead,tbody) :is(th,td):is(:nth-child(2),:nth-child(4),:nth-child(5),:nth-child(9),:nth-child(10),:nth-child(11),:nth-child(12),:nth-child(13),:nth-child(14)) { display:none; }
 .audio-settings,.display-settings { position:relative; font-size:.8rem; }
 .audio-settings[open],.display-settings[open] { border:1px solid var(--rule); background:var(--panel); padding:8px 12px; border-radius:8px; max-width:330px; }
 .audio-settings label,.display-settings label { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 0; }
@@ -2313,7 +2313,7 @@ th { font-size:.78rem; letter-spacing:.02em; }
 .map-area:has(.city-panel) { display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:12px; align-items:start; }
 .map-area .city-panel { position:relative; top:auto; right:auto; width:auto; max-height:72vh; background:var(--panel); border-color:var(--rule); font-size:.88rem; backdrop-filter:none; }
 .map-area .map-wrap { min-width:0; }
-.map-data-control { position:absolute; left:12px; top:10px; z-index:3; max-width:calc(100% - 80px); background:#102b3eee; border:1px solid #4b6878; border-radius:6px; padding:5px 8px; font-size:.73rem; color:#e7edf0; }
+.map-data-control { position:absolute; right:12px; left:auto; top:10px; z-index:3; max-width:calc(100% - 80px); background:#102b3eee; border:1px solid #4b6878; border-radius:6px; padding:5px 8px; font-size:.73rem; color:#e7edf0; }
 .map-data-control select { font-size:.74rem; max-width:140px; }
 .map-data-legend { display:flex; flex-wrap:wrap; gap:9px; margin-top:6px; }
 .route-player.lens-mid { stroke-dasharray:7 3; }
@@ -2347,7 +2347,7 @@ th { font-size:.78rem; letter-spacing:.02em; }
   .brief-grid article p { margin:8px 0; }
   .scenario-card { padding:20px; }
   .hud-objective { min-width:150px; }
-  .map-data-control { left:6px; top:6px; }
+  .map-data-control { right:6px; left:auto; top:6px; }
   .audio-settings[open],.display-settings[open] { flex-basis:100%; max-width:100%; }
   .gameover-card { max-height:88dvh; overflow-y:auto; }
 }

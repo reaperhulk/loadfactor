@@ -34,6 +34,8 @@ import {
 import type { GameState, Route } from '../engine'
 import {
   effectiveFrequency,
+  isGrounded,
+  operatingFleet,
   networkCities,
   routeWeeklyCapacity,
   slotsAllocated,
@@ -47,8 +49,8 @@ import { viewSeat } from './session'
 // Arc weight tells capacity: seats/wk drive stroke width, so the map itself
 // shows where an airline's hardware is concentrated. Fed to CSS as a custom
 // property so hover/transition rules still win.
-function capWidth(airline: Airline, route: Route, thin: boolean): number {
-  const cap = routeWeeklyCapacity(airline, route)
+function capWidth(airline: Airline, route: Route, thin: boolean, turn: number): number {
+  const cap = routeWeeklyCapacity(airline, route, turn)
   const w = (thin ? 0.4 : 0.7) + Math.sqrt(cap) / (thin ? 90 : 40)
   return Math.min(thin ? 1.4 : 4, Math.max(thin ? 0.4 : 0.9, w))
 }
@@ -958,7 +960,8 @@ export function MapView({
     cachedRoutePath(projKey, isGlobe ? globe : null, fromId, toId)
   const tripPathFor = (fromId: string, toId: string): string | null =>
     cachedTripPath(projKey, isGlobe ? globe : null, fromId, toId)
-  const flownRoutes = player.routes.filter((r) => player.fleet.some((a) => a.routeId === r.id))
+  const flyingFleet = operatingFleet(player, state.turn)
+  const flownRoutes = player.routes.filter((r) => effectiveFrequency(player, r, state.turn) > 0)
   const network = networkCities(player)
   // How full each airport is, 0..1 — the slot model's scarcity, made visible
   // on the board where expansion decisions are actually taken.
@@ -970,7 +973,7 @@ export function MapView({
   // idle aircraft's range shouldn't light up at all.
   let idleReachKm = 0
   for (const a of player.fleet) {
-    if (a.routeId === null) idleReachKm = Math.max(idleReachKm, getAircraftType(a.type).rangeKm)
+    if (a.routeId === null && !a.reserve && !isGrounded(a, state.turn)) idleReachKm = Math.max(idleReachKm, getAircraftType(a.type).rangeKm)
   }
   const [showRivals, setShowRivals] = useState(true)
   // Hub glow: each route's connecting pax land on both endpoints, so the
@@ -1023,7 +1026,7 @@ export function MapView({
             key={`${airline.id}-${r.id}`}
             d={d}
             className={`route-rival ${rivalColorClass(airline.id)}`}
-            style={{ '--cap-w': capWidth(airline, r, true) } as React.CSSProperties}
+            style={{ '--cap-w': capWidth(airline, r, true, state.turn) } as React.CSSProperties}
           />
         )
       }),
@@ -1048,7 +1051,7 @@ export function MapView({
             className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}${isAcquired ? ' route-acquired' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
             style={
               {
-                '--cap-w': capWidth(player, r, false),
+                '--cap-w': capWidth(player, r, false, state.turn),
                 // Two more facts ride the same line: how full it flies (opacity
                 // — a limp route is literally faint) and whether it earns (a
                 // losing arc goes red). Width was already seats/wk, so an arc
@@ -1084,7 +1087,7 @@ export function MapView({
     let remaining = display.traffic === 'low' ? 8 : 24
     return flownRoutes.flatMap((r) => {
       const km = distanceKm(r.from, r.to)
-      const freq = effectiveFrequency(player, r)
+      const freq = effectiveFrequency(player, r, state.turn)
       const planes = Math.min(remaining, Math.max(1, Math.min(4, Math.round(freq / 8))))
       if (!planes) return []
       const path = tripPathFor(r.from, r.to)
@@ -1096,7 +1099,7 @@ export function MapView({
       let biggestSeats = 0
       let fastestKmh = 0
       let aircraftType = 'caravelle'
-      for (const ac of player.fleet) {
+      for (const ac of flyingFleet) {
         if (ac.routeId !== r.id && ac.secondaryRouteId !== r.id) continue
         const t = getAircraftType(ac.type)
         if (t.seats > biggestSeats) aircraftType = ac.type

@@ -632,6 +632,7 @@ function ObjectiveBar({ value, target }: { value: number; target: number }) {
 
 function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const session = getSession()!
+  useEffect(() => { window.scrollTo(0, 0) }, [])
   const [tab, setTab] = useState<Tab>('routes')
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<number | null>(null)
@@ -1119,7 +1120,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             state={state}
             cityId={selectedCity}
             routeFrom={routeFrom}
-            onPlanRoute={(from) => setRouteFrom(routeFrom === from ? null : from)}
+            onPlanRoute={(from) => { setRouteFrom(routeFrom === from ? null : from); setSelectedCity(null) }}
             onPlanPair={(from, to) => {
               setSelectedCity(null)
               setRouteFrom(null)

@@ -36,9 +36,9 @@ function fleetSummary(airline: Airline): string {
 
 // Total weekly seats an airline fields across its whole network — the
 // hardware race behind the money race.
-function fieldedSeats(airline: Airline): number {
+function fieldedSeats(airline: Airline, turn: number): number {
   let seats = 0
-  for (const r of airline.routes) seats += routeWeeklyCapacity(airline, r)
+  for (const r of airline.routes) seats += routeWeeklyCapacity(airline, r, turn)
   return seats
 }
 
@@ -65,7 +65,7 @@ function StandingsTable({ state }: { state: GameState }) {
       marginBp: last && last.revenue > 0 ? Math.floor((last.profit * 10000) / last.revenue) : 0,
       pax: last?.pax ?? 0,
       shareBp: worldPax > 0 ? Math.floor(((last?.pax ?? 0) * 10000) / worldPax) : 0,
-      seats: fieldedSeats(a),
+      seats: fieldedSeats(a, state.turn),
       routes: a.routes.length,
       cities: slotCities(a).length,
       fleet: a.fleet.length,
@@ -267,7 +267,7 @@ export function RivalsPanel({ state }: { state: GameState }) {
       className: i === viewSeat() ? 'race-me' : `race-rival-${i}`,
     }
   })
-  const mySeats = fieldedSeats(state.airlines[viewSeat()]!)
+  const mySeats = fieldedSeats(state.airlines[viewSeat()]!, state.turn)
 
   return (
     <div data-testid="rivals-panel">
@@ -372,10 +372,10 @@ export function RivalsPanel({ state }: { state: GameState }) {
                     )}
                   </p>
                   <p className="dim">
-                    Fields {fieldedSeats(rival).toLocaleString('en-US')} seats/wk{' '}
+                    Fields {fieldedSeats(rival, state.turn).toLocaleString('en-US')} seats/wk{' '}
                     {mySeats > 0 && (
                       <span title="their weekly seats vs yours">
-                        ({Math.round((fieldedSeats(rival) * 100) / mySeats)}% of your capacity)
+                        ({Math.round((fieldedSeats(rival, state.turn) * 100) / mySeats)}% of your capacity)
                       </span>
                     )}
                     {(() => {

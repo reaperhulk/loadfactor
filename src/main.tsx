@@ -13,7 +13,9 @@ installSounds()
 // Offline shell for the PWA — production only, dev servers stay uncached.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`)
+    void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
+      // Online play and local saves remain available if offline installation fails.
+    })
   })
 }
 

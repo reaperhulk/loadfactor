@@ -3,7 +3,7 @@ import { getAircraftType } from '../data/aircraft'
 import { distanceKm, getCity } from '../data/cities'
 import type { GameState } from '../engine'
 import { forecastQuarter } from '../engine/forecast'
-import { pairWeeklyDemand } from '../engine/market'
+import { estimateAircraftQuarterCost, estimateWeeklySeats, pairWeeklyDemand } from '../engine/market'
 import { cabinSeats, isGrounded, roundTripsPerWeek, slotsFree } from '../engine/queries'
 import { viewSeat } from './session'
 import { money } from './format'
@@ -18,8 +18,13 @@ export function ManagementBrief({ state, onTab, onInspect, onPlan }: { state: Ga
     const candidates = a.routes.length === 0 && idle ? Object.keys(a.slots).filter((to) => to !== a.hq && slotsFree(a, to) > 0 && distanceKm(a.hq, to) <= getAircraftType(idle.type).rangeKm)
       .sort((x, y) => pairWeeklyDemand(state, a.hq, y) - pairWeeklyDemand(state, a.hq, x)).slice(0, 2) : []
     const firstFlights = candidates.map((to) => {
-      const frequency = Math.max(1, Math.min(roundTripsPerWeek(idle!.type, distanceKm(a.hq, to)), Math.ceil(pairWeeklyDemand(state, a.hq, to) * 0.7 / (cabinSeats(idle!.type, idle!.cabin) * 2))))
-      const quote = forecastQuarter(state, seat, [{ type: 'open_route', from: a.hq, to, aircraftId: idle!.id, frequency }])
+      const km = distanceKm(a.hq, to)
+      const launch = a.fleet.filter((f) => f.routeId === null && !f.reserve && !isGrounded(f, state.turn) && getAircraftType(f.type).rangeKm >= km).sort((x,y) => {
+        const perSeat = (f: typeof x) => Math.floor(estimateAircraftQuarterCost(state, f.type, km) * 1000 / Math.max(1, estimateWeeklySeats(f.type, km) * 13))
+        return perSeat(x)-perSeat(y) || x.id-y.id
+      })[0]!
+      const frequency = Math.max(1, Math.min(roundTripsPerWeek(launch.type, distanceKm(a.hq, to)), Math.ceil(pairWeeklyDemand(state, a.hq, to) * 0.7 / (cabinSeats(launch.type, launch.cabin) * 2))))
+      const quote = forecastQuarter(state, seat, [{ type: 'open_route', from: a.hq, to, aircraftId: launch.id, frequency }])
       return { from: a.hq, to, quote }
     }).filter((choice) => choice.quote.errors.length === 0)
     return { forecast, firstFlights }

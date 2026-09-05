@@ -554,3 +554,10 @@ AudioScore composes original 96-bar arrangements across five historical palettes
 with separate music/ambience/effects buses, financial tension, bounded voices,
 alert ducking and gesture-only context activation. Hidden and muted sessions
 suspend the context and scheduler. These systems do not enter simulation state.
+
+Release gate: CI runs lint, types, deterministic/balance tests, production build
+and the 190 KiB eager-bundle budget. Chromium covers the complete suite; WebKit
+covers planning, mobile layout, preferences and hot-seat recovery. The artifact
+from the checked commit reaches Pages only after both jobs succeed. Offline
+HTML is network-first; immutable app assets use a bounded 48-entry cache. Only
+Load Factor cache namespaces are removed on activation.

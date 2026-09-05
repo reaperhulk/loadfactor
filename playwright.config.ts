@@ -15,7 +15,11 @@ export default defineConfig({
       ? { executablePath: process.env.PW_CHROMIUM_PATH }
       : {},
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'webkit', testMatch: ['modern.spec.ts', 'responsive.spec.ts', 'multiplayer.spec.ts'], grepInvert: /link duel:/, use: { ...devices['Desktop Safari'], launchOptions: {} } },
+    { name: 'mobile-webkit', testMatch: 'modern.spec.ts', use: { ...devices['iPhone 13'], launchOptions: {} } },
+  ],
   webServer: {
     command: 'npm run build && npm run preview',
     url: 'http://localhost:4173',

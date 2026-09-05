@@ -387,7 +387,7 @@ export function FinancePanel({ state }: { state: GameState }) {
         // Where the player sits against regulatory scrutiny right now.
         const seatsOf = (a: (typeof state.airlines)[number]): number => {
           let n = 0
-          for (const r of a.routes) n += routeWeeklyCapacity(a, r)
+          for (const r of a.routes) n += routeWeeklyCapacity(a, r, state.turn)
           return n
         }
         const mine = seatsOf(player)

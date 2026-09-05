@@ -6,6 +6,16 @@ import { distanceKm } from '../data/cities'
 import { money } from './format'
 import { viewSeat } from './session'
 
+export function FuelExposure({ state, routeId }: { state: GameState; routeId: number }) {
+  const seat = viewSeat()
+  const change = useMemo(() => {
+    const before = forecastQuarter(state, seat).routes.find((r) => r.id === routeId)
+    const after = forecastQuarter(state, seat, [], { fuelBp: Math.floor(state.world.fuelBp * 1.2) }).routes.find((r) => r.id === routeId)
+    return (after?.lastCost ?? 0) - (before?.lastCost ?? 0)
+  }, [state, seat, routeId])
+  return <span data-testid="fuel-exposure"> · A 20% fuel-index increase changes this route's costs by {money(change)}/q, including current hedges and supply contracts.</span>
+}
+
 export function RouteWhatIf({ state, route, mode }: { state: GameState; route: Route; mode: 'fare' | 'service' | 'closure' }) {
   const [expanded, setExpanded] = useState(false)
   const seat = viewSeat()

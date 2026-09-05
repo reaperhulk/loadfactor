@@ -89,8 +89,8 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
             km,
             demand,
             marketK: Math.floor((demand * baseFare(km)) / 1000), // $k/wk
-            competitors: airlinesOnPair(state, cityId, c.id, 0),
-            mine: airlinesOnPair(state, cityId, c.id) - airlinesOnPair(state, cityId, c.id, 0) > 0,
+            competitors: airlinesOnPair(state, cityId, c.id, viewSeat()),
+            mine: airlinesOnPair(state, cityId, c.id) - airlinesOnPair(state, cityId, c.id, viewSeat()) > 0,
             openable:
               (network.has(cityId) || network.has(c.id)) &&
               slotsFree(player, cityId) > 0 &&

@@ -9,6 +9,7 @@ import { CITIES, distanceKm, pairKey } from '../data/cities'
 import { MIN_ROUTE_KM } from '../data/constants'
 import { getScenario } from '../data/scenarios'
 import type { GameState } from '../engine'
+import { fleetCommonalityBp } from '../engine/accounting'
 import { baseFare, fareFor, pairWeeklyDemand, routeSpoolBp, seasonalBp } from '../engine/market'
 import {
   GROUNDING_AGE_QUARTERS,
@@ -24,6 +25,7 @@ import { inflationBp } from '../engine/market'
 import { cityPool, nextExpansion, slotFee, slotQueue, slotRent, slotsRemaining } from '../engine/slots'
 import {
   airlinesOnPair,
+  isGrounded,
   allocateTrips,
   networkCities,
   cabinSeats,
@@ -117,7 +119,7 @@ export function RoutesPanel({
     const prev = r.history.length >= 2 ? r.history[r.history.length - 2] : undefined
     const profit = r.lastRevenue - r.lastCost
     const km = distanceKm(r.from, r.to)
-    const seats = routeWeeklyCapacity(player, r)
+    const seats = routeWeeklyCapacity(player, r, state.turn)
     // lastCapacity is seats flown across the QUARTER; weekly capacity is what
     // the schedule offers now. Mixing the two is how a load factor comes out
     // at 1300%.
@@ -312,7 +314,7 @@ export function RoutesPanel({
       </thead>
       <tbody>
         {rows.map(({ route: r, km, planes, rivals: rivalsHere, profit, marginBp, profitTrend, pax, transfer, yieldPerPax, costPerSeat, cost, ramping }) => {
-          const freq = `${effectiveFrequency(player, r)}/${maxRouteFrequency(player, r)}`
+          const freq = `${effectiveFrequency(player, r, state.turn)}/${maxRouteFrequency(player, r)}`
           return (
             <tr key={r.id} data-testid={`route-${r.from}-${r.to}`}>
               <td>
@@ -407,12 +409,18 @@ export function RoutesPanel({
       </tbody>
       {/* The aggregate of what is on screen: filter to the losers and this row
           tells you what the losers cost, not what the network earns. */}
+      {!allMetrics ? <tfoot><tr data-testid="routes-totals">
+        <td><strong>{rows.length === allRows.length ? 'Network' : `${rows.length} shown`}</strong></td>
+        <td colSpan={3} className="dim">{totals.seats.toLocaleString('en-US')} seats/wk</td>
+        <td>{(totalLoadBp / 100).toFixed(0)}%</td>
+        <td className={totals.profit >= 0 ? 'pos' : 'neg'}><strong>{money(totals.profit)}</strong></td><td />
+      </tr></tfoot> : (
       <tfoot>
         <tr data-testid="routes-totals">
           <td>
             <strong>{rows.length === allRows.length ? 'Network' : `${rows.length} shown`}</strong>
           </td>
-          <td colSpan={5} className="dim">
+          <td colSpan={6} className="dim">
             {totals.seats.toLocaleString('en-US')} seats/wk
           </td>
           <td>{(totalLoadBp / 100).toFixed(0)}%</td>
@@ -439,6 +447,7 @@ export function RoutesPanel({
           <td />
         </tr>
       </tfoot>
+      )}
     </table></div>
     <ServiceLegend />
     <Opportunities state={state} onPlan={onPlan} />
@@ -455,7 +464,7 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
   const served = new Set(player.routes.map((r) => pairKey(r.from, r.to)))
   let idleReach = 0
   for (const a of player.fleet) {
-    if (a.routeId === null) idleReach = Math.max(idleReach, getAircraftType(a.type).rangeKm)
+    if (a.routeId === null && !a.reserve && !isGrounded(a, state.turn)) idleReach = Math.max(idleReach, getAircraftType(a.type).rangeKm)
   }
   const rows: {
     from: string
@@ -476,7 +485,7 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
       const km = distanceKm(a, b)
       if (km < MIN_ROUTE_KM) continue
       const demand = pairWeeklyDemand(state, a, b)
-      const rivals = airlinesOnPair(state, a, b, 0)
+      const rivals = airlinesOnPair(state, a, b, viewSeat())
       // What the headline number does not say. A ranked list with no risk
       // column makes the top row automatically right; these are the reasons
       // it might not be.
@@ -614,7 +623,7 @@ export function FleetPanel({ state }: { state: GameState }) {
       )
       total += Math.floor((aged * inflationBp(state.turn + turnsAhead)) / 10000)
     }
-    return total
+    return Math.floor(total * fleetCommonalityBp(state, player) / 10000)
   }
   const geriatricNow = player.fleet.filter((a) => a.ageQuarters >= 48).length
   const geriatricSoon = player.fleet.filter((a) => a.ageQuarters >= 40 && a.ageQuarters < 48).length
@@ -629,7 +638,7 @@ export function FleetPanel({ state }: { state: GameState }) {
   return (
     <div>
       <OperationsPanel state={state} />
-      {player.fleet.some((a) => a.routeId === null) && player.routes.length > 0 && (
+      {player.fleet.some((a) => a.routeId === null && !a.reserve && !isGrounded(a, state.turn)) && player.routes.length > 0 && (
         <button
           data-testid="assign-all-idle"
           title="assign every idle airframe to the in-range route most starved for seats"
@@ -657,7 +666,7 @@ export function FleetPanel({ state }: { state: GameState }) {
       })()}
       {player.fleet.length > 0 && (
         <p className="dim" data-testid="renewal-forecast">
-          Fleet upkeep {money(maintAt(0))}/q now → {money(maintAt(8))}/q in 2 years on the same metal
+          Fleet maintenance {money(maintAt(0))}/q now → {money(maintAt(8))}/q in 2 years on the same metal
           {geriatricNow > 0 && <span className="neg"> · {geriatricNow} geriatric</span>}
           {geriatricSoon > 0 && <span> · {geriatricSoon} more turn geriatric within 2y</span>}{' '}
           <button
@@ -698,9 +707,11 @@ export function FleetPanel({ state }: { state: GameState }) {
         const fleetRows = player.fleet.map((a) => {
           const type = getAircraftType(a.type)
           const route = player.routes.find((r) => r.id === a.routeId)
-          const alloc = route ? allocateTrips(player, route).find((x) => x.aircraftId === a.id) : undefined
-          const maxTrips = route ? roundTripsPerWeek(a.type, distanceKm(route.from, route.to)) : 0
-          const utilBp = alloc && maxTrips > 0 ? Math.floor((alloc.trips * 10000) / maxTrips) : 0
+          const utilBp = Math.min(10000, player.routes.reduce((total, r) => {
+            const alloc = allocateTrips(player, r, state.turn).find((x) => x.aircraftId === a.id)
+            const maxTrips = roundTripsPerWeek(a.type, distanceKm(r.from, r.to))
+            return total + (alloc && maxTrips > 0 ? Math.floor(alloc.trips * 10000 / maxTrips) : 0)
+          }, 0))
           const maint = Math.floor(
             (Math.floor((type.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * a.ageQuarters)) / 10000) *
               inflationBp(state.turn)) /
@@ -731,8 +742,8 @@ export function FleetPanel({ state }: { state: GameState }) {
           <tr>
             {fheader('type', 'Aircraft')}
             {fheader('age', 'Age')}
-            {fheader('util', 'Utilization', 'round trips flown vs what this airframe could fly on its route')}
-            {fheader('maint', 'Maint/q', 'this quarter’s maintenance — escalates with age and inflation')}
+            {fheader('util', 'Utilization', 'weekly utilization across primary, secondary and standby-cover assignments')}
+            {fheader('maint', 'Maint/q', 'maintenance before fleet commonality; the fleet total above includes the family adjustment')}
             {fheader('value', 'Value')}
             <th>Cabin</th>
             <th>Assignment</th>
@@ -751,7 +762,7 @@ export function FleetPanel({ state }: { state: GameState }) {
                   {(a.ageQuarters / 4).toFixed(1)}y
                 </td>
                 <td>
-                  {route ? (
+                  {route || utilBp > 0 ? (
                     <>
                       <span className="lf-bar">
                         <span className="lf-fill" style={{ width: `${utilBp / 100}%` }} />
@@ -761,17 +772,18 @@ export function FleetPanel({ state }: { state: GameState }) {
                   ) : (
                     <>
                       <span className="neg" title="idle metal still draws salaries and ownership">
-                        parked
+                        {a.reserve ? 'standby' : isGrounded(a, state.turn) ? 'maintenance' : 'parked'}
                       </span>
                       {(() => {
                         // Best use for this airframe: the in-range route most
                         // starved for seats — one click assigns and schedules.
+                        if (a.reserve || isGrounded(a, state.turn)) return null
                         let bestRoute: (typeof player.routes)[number] | null = null
                         let bestGap = 0
                         for (const r of player.routes) {
                           const rkm = distanceKm(r.from, r.to)
                           if (rkm > type.rangeKm) continue
-                          const gap = pairWeeklyDemand(state, r.from, r.to) - routeWeeklyCapacity(player, r)
+                          const gap = pairWeeklyDemand(state, r.from, r.to) - routeWeeklyCapacity(player, r, state.turn)
                           if (gap > bestGap) {
                             bestGap = gap
                             bestRoute = r
@@ -815,7 +827,7 @@ export function FleetPanel({ state }: { state: GameState }) {
                         : assignAndSchedule(state, a.id, Number(e.target.value))
                     }
                   >
-                    <option value="">— idle —</option>
+                    <option value="">{a.reserve ? (utilBp > 0 ? '— standby cover —' : '— standby —') : '— idle —'}</option>
                     {player.routes.map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.from}–{r.to}

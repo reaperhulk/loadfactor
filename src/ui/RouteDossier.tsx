@@ -6,10 +6,8 @@ import { getAircraftType } from '../data/aircraft'
 import { distanceKm, pairKey } from '../data/cities'
 import { FARE_DEMAND_BP, ROUTE_MEMORY_QUARTERS } from '../data/constants'
 import type { GameState } from '../engine'
-import { fareFor, fuelInflationBp, pairWeeklyDemand, routeShareWeight, routeSpoolBp, seasonalBp } from '../engine/market'
-import { effFuelBp } from '../engine/worldEvents'
+import { fareFor, pairWeeklyDemand, routeShareWeight, routeSpoolBp, seasonalBp } from '../engine/market'
 import {
-  allocateTrips,
   isGrounded,
   cabinSeats,
   effectiveFrequency,
@@ -20,7 +18,7 @@ import {
 import { ConfirmButton } from './ConfirmButton'
 import { Sparkline } from './Sparkline'
 import { assignAndSchedule } from './assign'
-import { RouteWhatIf } from './RouteWhatIf'
+import { FuelExposure, RouteWhatIf } from './RouteWhatIf'
 import { rulesOf } from '../engine/version'
 import { HubLegend, SpoolLegend } from './legends'
 import { viewSeat, dispatch } from './session'
@@ -50,7 +48,7 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
       return {
         name: airline.name,
         me: airline.id === viewSeat(),
-        capacity: routeWeeklyCapacity(airline, theirRoute),
+        capacity: routeWeeklyCapacity(airline, theirRoute, state.turn),
         pax: theirRoute.lastPax,
         fare: fareFor(km, theirRoute.fareLevel),
         serviceLevel: theirRoute.serviceLevel,
@@ -162,29 +160,10 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
       </div>
 
       <div className="dim" data-testid="route-economics-notes">
-        Connecting pax last quarter: {route.lastTransferPax} · fare posture{' '}
-        {elasticityBp >= 10000 ? 'attracts' : 'sheds'} {Math.abs((elasticityBp - 10000) / 100).toFixed(0)}% of demand
-        {(() => {
-          // Fuel exposure: this route's estimated fuel bill at today's index
-          // (honoring a hedge), and what a 20% spike would add.
-          const base = player.fuelHedge !== null ? player.fuelHedge.bp : effFuelBp(state.world)
-          const fuelBp = Math.floor((base * fuelInflationBp(state.turn)) / 10000)
-          let weeklyFuel = 0
-          for (const alloc of allocateTrips(player, route)) {
-            weeklyFuel += Math.floor(
-              (alloc.trips * 2 * km * getAircraftType(alloc.type).fuelPerKm * fuelBp) / 10000,
-            )
-          }
-          const quarterFuelK = Math.floor((weeklyFuel * 13) / 1000)
-          if (quarterFuelK <= 0) return null
-          return (
-            <span data-testid="fuel-exposure">
-              {' '}
-              · fuel ~{money(quarterFuelK)}/q{player.fuelHedge !== null ? ' (hedged)' : ''} — a 20% index
-              spike adds {money(Math.floor(quarterFuelK / 5))}
-            </span>
-          )
-        })()}
+        Connecting boardings last quarter: {route.lastTransferPax} · {rulesOf(state) === 1
+          ? `fare posture ${elasticityBp >= 10000 ? 'attracts' : 'sheds'} ${Math.abs((elasticityBp - 10000) / 100).toFixed(0)}% of demand`
+          : 'business, leisure and budget passengers respond differently to fares and service'}
+        <FuelExposure state={state} routeId={route.id} />
       </div>
 
       {route.history.length >= 2 && (
@@ -234,7 +213,7 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
           >
             −
           </button>{' '}
-          {effectiveFrequency(player, route)}/{maxRouteFrequency(player, route)} rt/wk{' '}
+          {effectiveFrequency(player, route, state.turn)}/{maxRouteFrequency(player, route)} rt/wk{' '}
           <button
             disabled={route.frequency >= maxRouteFrequency(player, route)}
             onClick={() => dispatch({ type: 'set_frequency', routeId: route.id, frequency: route.frequency + 1 })}

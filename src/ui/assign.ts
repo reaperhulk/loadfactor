@@ -8,7 +8,8 @@ import { distanceKm } from '../data/cities'
 import type { Command, GameState } from '../engine'
 import { pairWeeklyDemand } from '../engine/market'
 import { isGrounded, maxRouteFrequency, roundTripsPerWeek, routeWeeklyCapacity } from '../engine/queries'
-import { forecastDirectRoute } from '../engine/forecast'
+import { forecastDirectRoute, forecastQuarter } from '../engine/forecast'
+import { rulesOf } from '../engine/version'
 import { viewSeat, dispatchBatch, getSession } from './session'
 
 export function assignAndSchedule(state: GameState, aircraftId: number, routeId: number): void {
@@ -40,7 +41,7 @@ export function balancedScheduleCommands(state: GameState, airlineIdx: number): 
   if (!airline) return []
   const commands: Command[] = []
   for (const route of airline.routes) {
-    const max = maxRouteFrequency(airline, route)
+    const max = maxRouteFrequency(airline, route, state.turn)
     if (max < 1) continue
     // Maximize the route's contribution against the actual competing schedules.
     // Bound candidate count for very large fleets, then refine around the winner.
@@ -64,6 +65,9 @@ export function balancedScheduleCommands(state: GameState, airlineIdx: number): 
       commands.push({ type: 'set_frequency', routeId: route.id, frequency })
     }
   }
+  // A direct-market improvement can damage feeder traffic. Reject a batch
+  // whose full-network contribution is worse under the same conditions.
+  if (rulesOf(state) >= 2 && commands.length && forecastQuarter(state, airlineIdx, commands).profit < forecastQuarter(state, airlineIdx).profit) return []
   return commands
 }
 
@@ -86,7 +90,7 @@ export function assignAllIdle(): void {
     let bestGap = 0
     for (const r of p.routes) {
       if (distanceKm(r.from, r.to) > range) continue
-      const gap = pairWeeklyDemand(s, r.from, r.to) - routeWeeklyCapacity(p, r)
+      const gap = pairWeeklyDemand(s, r.from, r.to) - routeWeeklyCapacity(p, r, s.turn)
       if (gap > bestGap) {
         bestGap = gap
         bestRoute = r

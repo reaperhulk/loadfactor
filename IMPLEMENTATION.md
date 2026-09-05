@@ -5,23 +5,23 @@ validated commits to main. Preserve quarterly, deterministic, headless play.
 
 ## Delivery checklist
 
-- [ ] Shared, seat-aware forecasts; route contribution/company profit reconciliation;
+- [x] Shared, seat-aware forecasts; route contribution/company profit reconciliation;
       accurate launch and scheduling previews; objective-aware results everywhere.
-- [ ] Rules/content versions for careers and multiplayer; legacy recovery;
+- [x] Rules/content versions for careers and multiplayer; legacy recovery;
       visible storage failures; export/import and hot-seat restoration.
-- [ ] Three-quarter introduction, actionable management brief, compare-and-commit
+- [x] Three-quarter introduction, actionable management brief, compare-and-commit
       planning, clearer reports and compact default route tables.
-- [ ] Airline-era visual identity, aircraft silhouettes/cards, responsive map and
+- [x] Airline-era visual identity, aircraft silhouettes/cards, responsive map and
       dossiers, explicit overlay controls, accessible colors/focus/text/motion.
-- [ ] Era music, ambience and effects with separate volumes, variations,
+- [x] Era music, ambience and effects with separate volumes, variations,
       transitions, priorities and hidden-tab suspension.
-- [ ] Passenger segments and a shared direct/connecting itinerary market;
+- [x] Passenger segments and a shared direct/connecting itinerary market;
       alternative hubs, coordination and feeder-route effects.
-- [ ] Fleet commonality, planned maintenance, reserve capacity, replacement
+- [x] Fleet commonality, planned maintenance, reserve capacity, replacement
       forecasts and simple multi-route utilization.
-- [ ] Sustained rival campaigns, announced multi-quarter opportunities,
+- [x] Sustained rival campaigns, announced multi-quarter opportunities,
       short scenarios and meaningful objective qualification.
-- [ ] Quarter-boundary undo, batched replay, browser rendering/animation budgets,
+- [x] Quarter-boundary undo, batched replay, browser rendering/animation budgets,
       startup budgets enforced in CI, Chromium and WebKit coverage.
 - [ ] Broader held-out balance evaluation and final user-flow verification.
 
@@ -75,3 +75,27 @@ navy operations screens and paper reports, responsive dossiers, a three-quarter
 introduction, actionable brief, an atomic planning workbench, lazy full-network
 fare/service/closure comparisons, public aircraft/airport calendar, and two new
 milestones. Five new end-to-end flows cover these controls and recovery.
+
+Stage 4 pushed as 21de6d1. The live layout review verified the hub scenario,
+quarter report and working controls; it found and fixed an overlapping map
+selector, initial scroll position, and compact totals alignment. Local checks:
+217 tests passed; eager bundle 176 KiB gzip. Hosted browser validation ongoing.
+
+Stage 5 adds desktop/mobile WebKit coverage, enforces the 190 KiB startup gate
+in hosted CI, deploys the exact checked artifact only after all browser tests,
+and replaces unbounded stale HTML caching with fresh documents and a bounded
+48-entry offline shell. Offline contract tests preserve other same-origin apps.
+Schedule delegation now rejects a batch that would lower full-network profit.
+Hedge-aware fuel exposure uses shared forecasts; idle recommendations preserve
+standby aircraft; city market comparisons use the active multiplayer seat.
+
+Profiling: 20/40/65-quarter Jet Age states held 13/19/25 routes and 14/22/34
+frames. Full forecast p95 was 2.5/3.6/2.6 ms; schedule search 15/11/10 ms before
+the two full-network safety evaluations. The repeatable command is
+`npx vite-node tools/profile-planning.ts`. These are local measurements, not a
+promise for every device. Simulation and replay timing remain gated in tests.
+
+Final UI consistency sweep: route/market capacity honors current groundings and
+standby substitutions; map traffic includes secondary rotations; fleet utilization
+sums both legs of shared work; maintenance totals share the commonality factor.
+These are display corrections. The simulation's existing rounding is unchanged.
