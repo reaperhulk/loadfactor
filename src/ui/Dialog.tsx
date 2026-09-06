@@ -4,7 +4,8 @@ export function Dialog({ children, label, className, onClose, testId }: { childr
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null
     const node = root.current
-    node?.querySelector<HTMLElement>('button:not(:disabled), input, select, textarea, [tabindex="0"]')?.focus()
+    const initial = node?.querySelector<HTMLElement>('[data-dialog-initial-focus]') ?? node?.querySelector<HTMLElement>('button:not(:disabled), input, select, textarea, [tabindex="0"]')
+    initial?.focus()
     return () => { if (previous?.isConnected) previous.focus() }
   }, [])
   return <div ref={root} role="dialog" aria-modal="true" aria-label={label} className={className} data-testid={testId} onClick={(e) => { if (e.target === e.currentTarget) onClose() }} onKeyDown={(e) => {

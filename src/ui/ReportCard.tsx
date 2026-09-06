@@ -80,7 +80,7 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
         {/* The quarter's headline, not its ledger. A profit figure the size of
             a poster, its direction, and the margin behind it — the table below
             is the supporting detail, which is the order a reader wants it in. */}
-        <div className="report-hero" data-testid="report-hero">
+        <div className="report-hero" data-testid="report-hero" data-dialog-initial-focus tabIndex={-1}>
           <div className="report-hero-label">
             {yearOf({ ...state, turn: now.turn })} Q{quarterOf({ ...state, turn: now.turn })} · {now.profit >= 0 ? 'profit' : 'loss'}
           </div>

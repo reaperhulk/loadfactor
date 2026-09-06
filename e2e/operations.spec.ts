@@ -64,6 +64,8 @@ for (const [width, height] of [
     await expect(page.getByTestId('report-card').getByTestId('operations-summary')).toContainText(
       'Operations this quarter',
     )
+    await expect(page.getByTestId('report-hero')).toBeFocused()
+    expect(await page.getByTestId('report-card').locator('.report-card').evaluate(el => el.scrollTop)).toBeLessThan(5)
     const stats = await page.evaluate(
       () => window.__harness.getState()!.airlines[0]!.history.at(-1)!.operations!,
     )
