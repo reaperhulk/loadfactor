@@ -284,7 +284,7 @@ export function globeUnproject(g: GlobeView, X: number, Y: number): { lon: numbe
 // azimuth is numerically meaningless and used to fling chords across the
 // disc), and consecutive limb points bridge along the limb ARC in short
 // steps instead of a straight chord.
-function globeLandPath(
+export function globeLandPath(
   g: GlobeView,
   rings: readonly (readonly (readonly [number, number])[])[],
 ): string {
@@ -293,16 +293,21 @@ function globeLandPath(
   const cy = H / 2
   const parts: string[] = []
   for (const ring of rings) {
+    const points = ring.map(([lon, lat]) => globeProjectFull(g, lon, lat))
+    const start = points.findIndex((p) => p.cosc > 0.001)
+    if (start < 0) continue
+    // A ring has no privileged first vertex. Start on the visible coastline
+    // so every hidden run (including one spanning the stored ring's seam)
+    // goes through the limb-arc bridge below. Otherwise SVG's closing Z
+    // joins two limb points with a chord and fills a wedge of ocean.
     let d = ''
-    let anyVisible = false
     let prevLimbAz: number | null = null
     const emit = (px: number, py: number): void => {
       d += `${d === '' ? 'M' : 'L'}${px.toFixed(1)} ${py.toFixed(1)}`
     }
-    for (const [lon, lat] of ring) {
-      const p = globeProjectFull(g, lon, lat)
+    for (let i = 0; i < points.length; i++) {
+      const p = points[(start + i) % points.length]!
       if (p.cosc > 0.001) {
-        anyVisible = true
         emit(p.X, p.Y)
         prevLimbAz = null
         continue
@@ -323,7 +328,7 @@ function globeLandPath(
       emit(cx + R * Math.cos(az), cy + R * Math.sin(az))
       prevLimbAz = az
     }
-    if (anyVisible && d !== '') parts.push(d + 'Z')
+    parts.push(d + 'Z')
   }
   return parts.join('')
 }
