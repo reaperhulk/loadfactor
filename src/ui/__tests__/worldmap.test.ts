@@ -7,6 +7,7 @@
 // coordinates, not against a previous render.
 
 import { describe, expect, it } from 'vitest'
+import { WORLD_RINGS } from '../../data/globemap.gen'
 import { CITIES, getCity } from '../../data/cities'
 import {
   BORDERS_PATH,
@@ -18,7 +19,6 @@ import {
   ISLET_CITIES,
   WORLD_PATH,
   WORLD_PATH_FINE,
-  WORLD_RINGS,
   projectLat,
   projectLon,
 } from '../../data/worldmap.gen'

@@ -639,6 +639,12 @@ function ObjectiveBar({ value, target }: { value: number; target: number }) {
   )
 }
 
+// Keep animation state in the two text leaves. Updating a balance must not
+// reconcile the map and every retained workspace page on each animation frame.
+function AnimatedMoney({ value }: { value: number }) {
+  return money(useCountUp(value))
+}
+
 function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const session = getSession()!
   const state = session.state, seat = viewSeat(), player = state.airlines[seat]!
@@ -664,7 +670,6 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const [showHelp, setShowHelp] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const forecast = planningForecast(state, seat)
-  const shownCash = useCountUp(player.cash), shownWorth = useCountUp(netWorth(player))
   const attentionCount = player.fleet.filter((a) => a.routeId === null && !a.reserve).length +
     player.routes.filter((r) => r.history.length > 0 && r.lastRevenue < r.lastCost).length +
     (forecast.cashAfter < 0 ? 1 : 0) + player.fleet.filter((a) => isGrounded(a,state.turn)).length + state.world.offers.filter((o) => (o.airline ?? 0) === seat).length
@@ -807,13 +812,13 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
 
     </div>
     <section className="status-bar" aria-label="Airline status" data-testid="status-bar">
-      <span className="hud-stat hud-figure" data-label="Cash now" data-testid="cash">{money(shownCash)}</span>
+      <span className="hud-stat hud-figure" data-label="Cash now" data-testid="cash"><AnimatedMoney value={player.cash} /></span>
       <span className={`hud-stat hud-figure planned-profit ${forecast.profit >= 0 ? 'pos' : 'neg'}`} data-label="Planned net profit / q" data-testid="planned-profit">{money(forecast.profit)}</span>
       <button className="hud-stat hud-figure planned-cash" data-label="Planned ending cash" onClick={() => setShowReview(true)}>{money(forecast.cashAfter)}</button>
         <span className="hud-stat hud-figure hud-objective" data-label="Objective" data-testid="networth">
           {scenario.objective.kind === 'netWorth' ? (
             <>
-              {money(shownWorth)} <span className="hud-target">/ {money(scenario.objective.target)}</span>
+              <AnimatedMoney value={netWorth(player)} /> <span className="hud-target">/ {money(scenario.objective.target)}</span>
               <ObjectiveBar value={netWorth(player)} target={scenario.objective.target} />
             </>
           ) : (

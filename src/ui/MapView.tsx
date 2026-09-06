@@ -24,10 +24,6 @@ import {
   MAP_W,
   WORLD_PATH,
   WORLD_PATH_FINE,
-  BORDER_LINES,
-  ISLET_POINTS,
-  WORLD_RINGS,
-  WORLD_RINGS_FINE,
   projectLat,
   projectLon,
 } from '../data/worldmap.gen'
@@ -543,7 +539,20 @@ export function MapView({
   const [projection, setProjection] = useState<'flat' | 'globe'>(() => {
     try { return localStorage.getItem('loadfactor:projection') === 'globe' ? 'globe' : 'flat' } catch { return 'flat' }
   })
-  const isGlobe = projection === 'globe'
+  const [globeGeometry, setGlobeGeometry] = useState<typeof import('../data/globemap.gen') | null>(null)
+  const [globeError, setGlobeError] = useState(false)
+  const [globeRetry, setGlobeRetry] = useState(0)
+  useEffect(() => {
+    if (projection !== 'globe' || globeGeometry) return
+    let cancelled = false
+    import('../data/globemap.gen').then((geometry) => {
+      if (!cancelled) { setGlobeGeometry(geometry); setGlobeError(false) }
+    }).catch(() => { if (!cancelled) setGlobeError(true) })
+    return () => { cancelled = true }
+  }, [projection, globeGeometry, globeRetry])
+  // The flat map remains usable while the optional globe chunk is in flight.
+  const isGlobe = projection === 'globe' && globeGeometry !== null
+  const globeLoading = projection === 'globe' && !globeGeometry && !globeError
 
   // A finger drag must track the finger, and moving the map by rewriting the
   // SVG's viewBox does not — not on WebKit. A viewBox change re-resolves the
@@ -930,12 +939,12 @@ export function MapView({
       globeRaf.current = requestAnimationFrame(settleGlobe)
     }
   }
-  // 'g' flips the projection from anywhere (except form fields).
+  // Projection shortcuts belong to the visible map, outside forms/dialogs.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'g' && e.key !== 'G') return
+      if (!active || e.ctrlKey || e.metaKey || e.altKey || (e.key !== 'g' && e.key !== 'G')) return
       const target = e.target as HTMLElement | null
-      if (target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return
+      if (target?.closest('input, select, textarea, [role=dialog], [contenteditable=true]')) return
       setProjection((p) => {
         const next = p === 'globe' ? 'flat' : 'globe'
         try { localStorage.setItem('loadfactor:projection', next) } catch { /* session preference */ }
@@ -944,7 +953,7 @@ export function MapView({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [active])
   const clampGlobe = (g: GlobeView): GlobeView => ({
     cLon: ((g.cLon + 540) % 360) - 180,
     cLat: Math.min(80, Math.max(-80, g.cLat)),
@@ -1189,9 +1198,9 @@ export function MapView({
   const globeLand = useMemo(
     () =>
       isGlobe
-        ? globeLandPath(globe, globe.s >= 1.8 && !rotating ? WORLD_RINGS_FINE : WORLD_RINGS)
+        ? globeLandPath(globe, globe.s >= 1.8 && !rotating ? globeGeometry!.WORLD_RINGS_FINE : globeGeometry!.WORLD_RINGS)
         : '',
-    [isGlobe, globe, rotating],
+    [isGlobe, globe, rotating, globeGeometry],
   )
 
   // Culling follows the ANCHOR — the window the layer is actually painted
@@ -1664,9 +1673,9 @@ export function MapView({
               <path d={globeLand} className="map-coast-glow" />
               <path d={globeLand} className="map-land" data-testid="globe-land" />
               {globe.s >= 1.35 && !rotating && (
-                <path d={globeLinesPath(globe, BORDER_LINES)} className="map-border" />
+                <path d={globeLinesPath(globe, globeGeometry!.BORDER_LINES)} className="map-border" />
               )}
-              {ISLET_POINTS.map(([lon, lat]) => {
+              {globeGeometry!.ISLET_POINTS.map(([lon, lat]) => {
                 const p = globeProjectFull(globe, lon, lat)
                 if (p.cosc <= 0.001) return null
                 // The flat islet is r=1.6 in a map where 360 degrees is 960
@@ -1968,11 +1977,12 @@ export function MapView({
         </button>
         <button
           data-testid="map-projection"
-          aria-label={isGlobe ? 'switch to flat map' : 'switch to globe'}
+          aria-label={projection === 'globe' ? 'switch to flat map' : 'switch to globe'}
+          aria-busy={globeLoading}
           title={isGlobe ? 'flat map' : 'globe'}
           className={isGlobe ? 'active' : ''}
           onClick={() => {
-            const next = isGlobe ? 'flat' : 'globe'
+            const next = projection === 'globe' ? 'flat' : 'globe'
             setProjection(next)
             try { localStorage.setItem('loadfactor:projection', next) } catch { /* session preference */ }
           }}
@@ -1989,6 +1999,10 @@ export function MapView({
         </button>
 
       </div>
+      {globeLoading && <div className="map-load-status" role="status">Loading globe…</div>}
+      {projection === 'globe' && globeError && <div className="map-load-status" role="status">
+        Globe unavailable. <button onClick={() => { setGlobeError(false); setGlobeRetry((n) => n + 1) }}>Try again</button>
+      </div>}
       <div className="map-data-control">
         <label>Map colors <select aria-label="map colors" value={lens} onChange={(e) => setLens(e.target.value as typeof lens)}>
           <option value="none">Ownership</option><option value="load">Load factor</option><option value="profit">Route margin</option><option value="season">Season</option>

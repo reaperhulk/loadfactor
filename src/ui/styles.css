@@ -2344,3 +2344,5 @@ th { font-size:.78rem; letter-spacing:.02em; }
 .operations-panel { background:var(--panel); border:1px solid var(--rule); padding:14px 18px; border-radius:8px; margin:16px 0; }
 .operations-panel label { display:block; margin:10px 0; }
 .operations-panel p { font-size:.87rem; }
+
+.map-load-status { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:4; max-width:calc(100% - 24px); padding:8px 12px; border:1px solid var(--rule); border-radius:6px; background:var(--panel); font-size:.8rem; }

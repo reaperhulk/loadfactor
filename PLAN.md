@@ -580,3 +580,13 @@ inputs. Unapplied inspector/workbench edits are UI state; quarter review explici
 excludes them. A shared immutable-snapshot forecast cache feeds the shell and
 planning surfaces. Browser density tests use a real 24-quarter bot career at
 eight viewport sizes, plus 125% text, and assert viewport geometry directly.
+
+### Graphics and rendering performance (2026-09-06)
+
+Animated money values own their animation state in text-only components, so
+650 ms balance roll-ups do not rerender every retained workspace page. Globe
+coordinates live in a separate generated module fetched only on demand; the
+flat map remains interactive while it loads, with visible failure/retry state.
+Both outputs of gen:worldmap share the same source geometry and projection.
+The flat map has a 95 KiB gzip budget alongside the 190 KiB shell budget.
+Projection shortcuts only operate in the visible map outside dialogs/forms.
