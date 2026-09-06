@@ -603,3 +603,18 @@ The globe loader shares successful/in-flight requests, discards failed requests,
 and retries with fetch. This avoids the browser's cached failed-module imports.
 The worker caches the versioned geometry URL for offline use after the first
 successful load; unrelated JSON requests remain outside its scope.
+
+### Milestones and inbox (2026-09-06)
+
+Delivery and route-opening event batches receive a bounded 3.8-second perspective
+runway scene. Skip/Escape dismisses the whole batch; display preferences can
+permanently disable scenes, and reduced motion suppresses them. Events are
+consumed once, including while disabled; saves and seat changes do not replay
+old scenes. Deliveries precede the quarterly report. All timing remains UI-only.
+Globe gestures omit both player and rival traffic until release/cancellation,
+preventing paused SVG motion transforms from drifting off reprojected routes.
+
+The inbox badge counts unseen operational items. Visiting Desk acknowledges them
+without resolving or hiding the underlying work. Acknowledgements persist per
+scenario/seed/seat, bounded to 12 careers and the current quarter; new issues and
+new quarterly reviews can raise the badge again.

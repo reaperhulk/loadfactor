@@ -1,4 +1,5 @@
-import { isGrounded } from '../engine/queries'
+import { useInbox } from './inbox'
+import { Celebration, useCelebration } from './Celebration'
 import { planningForecast } from './forecast'
 import { AREA_PAGES, PAGE_LABELS, areaFor, type WorkspaceArea, type WorkspacePage } from './workspace'
 import { QuarterReview } from './QuarterReview'
@@ -648,6 +649,7 @@ function AnimatedMoney({ value }: { value: number }) {
 function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const session = getSession()!
   const state = session.state, seat = viewSeat(), player = state.airlines[seat]!
+  const celebration = useCelebration(session.lastEvents, seat, state.phase === 'planning')
   const scenario = getScenario(state.scenario)
   const [tab, setTabState] = useState<WorkspacePage>('map')
   const [visited, setVisited] = useState<ReadonlySet<WorkspacePage>>(new Set(['map']))
@@ -670,9 +672,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const [showHelp, setShowHelp] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const forecast = planningForecast(state, seat)
-  const attentionCount = player.fleet.filter((a) => a.routeId === null && !a.reserve).length +
-    player.routes.filter((r) => r.history.length > 0 && r.lastRevenue < r.lastCost).length +
-    (forecast.cashAfter < 0 ? 1 : 0) + player.fleet.filter((a) => isGrounded(a,state.turn)).length + state.world.offers.filter((o) => (o.airline ?? 0) === seat).length
+  const attentionCount = useInbox(state, seat, forecast.cashAfter, tab === 'desk')
   const handleCityClick = (cityId: string): void => {
     setSelectedRoute(null)
     if (routeFrom !== null && routeFrom !== cityId) {
@@ -734,7 +734,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     <header className="app-header" data-testid="app-header">
       <div className="airline-brand"><Icon name="aircraft" /><div><h1 title={player.name}>{player.name}</h1><small>Load Factor</small></div></div>
       <span className="app-date"><span data-testid="date">{yearOf(state)} Q{quarterOf(state)}</span><small data-testid="race-clock">{Math.max(0, scenario.quarters - state.turn)}q left</small></span>
-      <button className="inbox-button" data-testid="open-inbox" onClick={() => setTab('desk')}><Icon name="inbox" /><span>Inbox</span>{attentionCount > 0 && <b aria-label={`${attentionCount} items need attention`}>{attentionCount}</b>}</button>
+      <button className="inbox-button" data-testid="open-inbox" title="New items since your last Desk visit. Opening the Desk marks them as seen." onClick={() => setTab('desk')}><Icon name="inbox" /><span>Inbox</span>{attentionCount > 0 && <b aria-label={`${attentionCount} unseen items`}>{attentionCount}</b>}</button>
       <button className="settings-button" data-testid="open-settings" aria-label="Open settings" onClick={() => setShowSettings(true)}><Icon name="settings" /></button>
     </header>
     <div className="turn-actions" data-testid="turn-actions"><span className="mobile-profit"><small>Planned net profit</small><strong className={forecast.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.profit)}</strong></span>
@@ -1020,9 +1020,10 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         {visited.has('report') && <section className="workspace-page" hidden={tab !== 'report'} data-testid="page-report"><ReportPanel state={state} archive={session.reportArchive} /></section>}
       </div>
     </section>
+    {celebration.milestones.length > 0 && <Celebration milestones={celebration.milestones} state={state} onClose={celebration.dismiss} />}
     <ToastStack events={session.lastEvents} state={state} unlocks={session.lastUnlocks} onOpenRoute={inspectRoute} />
     {showReview && <QuarterReview state={state} forecast={forecast} onClose={() => setShowReview(false)} onConfirm={endQuarter} />}
-    {showReport && session.reportEvents.length > 0 && <ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} />}
+    {showReport && !celebration.milestones.length && session.reportEvents.length > 0 && <ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} />}
     {pendingRoute !== null && <RouteSetupDialog state={state} from={pendingRoute.from} to={pendingRoute.to} onClose={() => setPendingRoute(null)} />}
     {state.phase !== 'planning' && <GameOverOverlay state={state} earned={session.careerUnlocks} onWatchReplay={onWatchReplay} />}
     {showSettings && <Dialog label="Settings" className="gameover-overlay" testId="settings-dialog" onClose={() => setShowSettings(false)}><div className="settings-card"><div className="dialog-heading"><h2>Settings</h2><button onClick={() => setShowSettings(false)} aria-label="Close settings">×</button></div>

@@ -49,6 +49,6 @@ export function ManagementBrief({ state, onTab, onInspect, onPlan, onAircraft }:
     <div className="brief-heading"><h2>Needs attention</h2><span>Planned quarter: <strong className={forecast.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.profit)} net profit</strong></span></div>
     {firstFlights.length > 0 ? <div className="brief-grid">{firstFlights.map((choice) => <article key={choice.to}><span className="eyebrow">Your first market</span><h3>{getCity(choice.to).name}</h3><p>{choice.from}–{choice.to} · {getCity(choice.to).tour >= getCity(choice.to).biz ? 'Leisure appeal' : 'Business demand'}</p><p>Estimated company profit {money(choice.quote.profit)}/q.</p><button onClick={() => onPlan(choice.from, choice.to)}>Compare this launch</button></article>)}</div>
       : <div className="brief-list">{items.sort((a,b)=>b.priority-a.priority).slice(0,5).map((item) => <article key={item.title}><div><h3>{item.title}</h3><p>{item.detail}</p></div><button onClick={item.run}>{item.action} <span aria-hidden="true">→</span></button></article>)}</div>}
-    <p className="brief-assumptions">Planning forecast at current fuel, demand and rival schedules. Review a proposal before committing cash.</p>
+    <p className="brief-assumptions">Inbox items marked as seen. Operational issues stay here until resolved. Planning forecast uses current fuel, demand and rival schedules.</p>
   </section>
 }

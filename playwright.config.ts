@@ -18,7 +18,7 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'webkit', testMatch: ['modern.spec.ts', 'responsive.spec.ts', 'multiplayer.spec.ts', 'density.spec.ts', 'graphics.spec.ts'], grepInvert: /link duel:/, use: { ...devices['Desktop Safari'], launchOptions: {} } },
+    { name: 'webkit', testMatch: ['modern.spec.ts', 'responsive.spec.ts', 'multiplayer.spec.ts', 'density.spec.ts', 'graphics.spec.ts', 'celebrations.spec.ts'], grepInvert: /link duel:/, use: { ...devices['Desktop Safari'], launchOptions: {} } },
     { name: 'mobile-webkit', testMatch: 'modern.spec.ts', use: { ...devices['iPhone 13'], launchOptions: {} } },
   ],
   webServer: {

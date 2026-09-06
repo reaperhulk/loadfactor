@@ -1116,7 +1116,7 @@ export function MapView({
   }, [state, seat, isGlobe, globe, projKey, newRouteIds, acquiredRouteIds, lens, pulseUi, onRouteClick, selectedRouteId])
 
   const playerPlanesLayer = useMemo(() => {
-    if (reduceMotion) return []
+    if (reduceMotion || (isGlobe && rotating)) return []
     let remaining = display.traffic === 'low' ? 8 : 24
     return flownRoutes.flatMap((r) => {
       const km = distanceKm(r.from, r.to)
@@ -1167,10 +1167,10 @@ export function MapView({
       ))
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, seat, isGlobe, globe, projKey, glyphUi, reduceMotion, display.traffic])
+  }, [state, seat, isGlobe, globe, projKey, glyphUi, reduceMotion, display.traffic, rotating])
 
   const rivalPlanesLayer = useMemo(() => {
-    if (reduceMotion || !showRivals) return null
+    if (reduceMotion || !showRivals || (isGlobe && rotating)) return null
     return state.airlines
       .filter((a) => a.id !== viewSeat())
       .flatMap((airline) => airline.routes.map((r) => ({ airline, r })))
@@ -1197,7 +1197,7 @@ export function MapView({
         )
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, seat, showRivals, isGlobe, globe, projKey, glyphUi, reduceMotion, display.traffic])
+  }, [state, seat, showRivals, isGlobe, globe, projKey, glyphUi, reduceMotion, display.traffic, rotating])
 
   // Visibility only changes when the game state, selection, an LOD threshold
   // crossing, or the visible window changes — not on every animation frame of

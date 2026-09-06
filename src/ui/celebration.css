@@ -1,0 +1,36 @@
+.celebration-overlay { position:fixed; inset:0; z-index:150; display:grid; place-items:center; padding:16px; background:#061322d9; }
+.celebration-card { width:min(760px,100%); max-height:calc(100dvh - 32px); overflow:auto; color:#f4f4df; background:#102637; border:1px solid #91bcba70; box-shadow:0 24px 90px #0009; position:relative; }
+.celebration-card header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 22px; }
+.celebration-card button { color:#eaf6eb; border:1px solid #91bcba80; background:#142f40; padding:9px 12px; font-size:12px; cursor:pointer; }
+.celebration-card button:focus-visible { outline:3px solid #f6d68a; outline-offset:3px; }
+.celebration-card .eyebrow { color:#a3ccc8; font-size:11px; letter-spacing:.13em; }
+.celebration-scene { height:clamp(180px,32vh,300px); position:relative; overflow:hidden; background:linear-gradient(#153654 0%,#638c9a 44%,#efc291 68%,#d8ad86 69%); isolation:isolate; }
+.celebration-scene::after { content:''; position:absolute; inset:0; pointer-events:none; background:repeating-linear-gradient(transparent 0 3px,#061b3020 3px 4px); }
+.celebration-sun { position:absolute; width:82px; height:82px; border-radius:50%; background:#ffe3a7; left:69%; top:15%; }
+.celebration-hills { position:absolute; top:49%; height:22%; width:100%; background:#486e79; clip-path:polygon(0 65%,12% 19%,21% 48%,35% 5%,49% 63%,61% 23%,76% 54%,89% 11%,100% 62%,100% 100%,0 100%); }
+.celebration-perspective { position:absolute; top:65%; bottom:0; width:100%; perspective:180px; perspective-origin:50% 0; }
+.celebration-ground { position:absolute; width:250%; left:-75%; height:1000px; top:0; transform-origin:50% 0; transform:rotateX(68deg); background:repeating-linear-gradient(0deg,#6e977e 0 70px,#7ca188 70px 140px); animation:celebration-ground 700ms linear infinite; }
+.celebration-runway { position:absolute; width:24%; left:38%; height:100%; background:#354c55; border-inline:8px solid #d7cfac; }
+.celebration-runway::after { content:''; position:absolute; width:8px; height:100%; left:calc(50% - 4px); background:repeating-linear-gradient(0deg,#fff0cb 0 50px,transparent 50px 140px); }
+.celebration-plane { position:absolute; width:74%; left:7%; top:25%; animation:celebration-arrival 3.8s cubic-bezier(.2,.5,.35,1) both; }
+.celebration-plane .aircraft-art { width:100%; height:auto; }
+.celebration-plane .aircraft-art svg { height:auto; background:none; border-radius:0; }
+.celebration-plane .aircraft-art :is(figcaption,text,.aircraft-apron,.aircraft-shadow,.aircraft-datum) { display:none; }
+.celebration-runway::after { animation:celebration-ground 700ms linear infinite; }
+.celebration-shadow { position:absolute; left:25%; top:79%; width:42%; height:6%; background:#152b4260; border-radius:50%; transform:skewX(-35deg); animation:celebration-shadow 3.8s ease-out both; }
+.inauguration .celebration-plane { animation-name:celebration-departure; }
+.inauguration .celebration-ground { background-color:#588982; }
+.celebration-scene-label { position:absolute; left:22px; bottom:14px; font:11px monospace; letter-spacing:.2em; color:#fff2cd; }
+.celebration-copy { padding:24px 28px 20px; }
+.celebration-copy h2 { margin:8px 0; font-size:clamp(24px,4vw,38px); letter-spacing:-.03em; color:#fff1d0; }
+.celebration-copy p { margin:0; font-size:clamp(15px,2.5vw,21px); }
+.celebration-footer { margin-top:22px; display:flex; align-items:center; justify-content:space-between; gap:16px; font-size:12px; color:#acc5cd; }
+.celebration-footer button { flex-shrink:0; background:transparent; }
+.celebration-progress { height:3px; background:#f3cb82; transform-origin:left; animation:celebration-progress 3.8s linear both; }
+@keyframes celebration-ground { to { background-position:0 140px; } }
+@keyframes celebration-arrival { from { transform:translate(-55%,-20%) scale(.6); } 65%,to { transform:translate(5%,8%) scale(1); } }
+@keyframes celebration-departure { from { transform:translate(-20%,35%) scale(.85); } 45% { transform:translate(5%,8%) rotate(-3deg); } to { transform:translate(56%,-80%) rotate(-8deg) scale(.7); } }
+@keyframes celebration-shadow { from { opacity:0; transform:translateX(-80%) scale(.5); } 60% { opacity:1; } to { opacity:.25; transform:translateX(60%) scale(.7); } }
+@keyframes celebration-progress { to { transform:scaleX(0); } }
+@media(max-width:540px) { .celebration-card header { padding:12px; } .celebration-copy { padding:20px; } .celebration-footer { align-items:flex-start; flex-direction:column; gap:12px; } .celebration-card header .eyebrow { max-width:48%; line-height:1.6; } }
+html[data-motion=reduced] .celebration-card * { animation:none; }

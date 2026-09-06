@@ -92,3 +92,29 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
     await info.attach(`${width}-aircraft-catalog`, { body: await page.screenshot(), contentType: 'image/png' })
   })
 }
+
+test('globe traffic disappears during rotation and returns on release or cancellation', async ({ page }) => {
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await page.evaluate((snapshot) => {
+    Object.assign(window.__harness.getState()!, snapshot)
+    const route = snapshot.airlines[0]!.routes[0]!
+    window.__harness.dispatch({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel })
+  }, mature)
+  await page.getByTestId('map-projection').click()
+  await expect(page.getByTestId('globe-land')).toBeVisible()
+  const map = page.getByTestId('map'), planes = map.locator('.plane')
+  await expect.poll(() => planes.count()).toBeGreaterThan(0)
+  const box = (await map.boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width / 2 + 20, box.y + box.height / 2, { steps: 4 })
+  await expect(planes).toHaveCount(0)
+  await page.mouse.up()
+  await expect.poll(() => planes.count()).toBeGreaterThan(0)
+  await map.dispatchEvent('pointerdown', { pointerId: 91, pointerType: 'touch', clientX: box.x + box.width / 2, clientY: box.y + box.height / 2 })
+  await map.dispatchEvent('pointermove', { pointerId: 91, pointerType: 'touch', clientX: box.x + box.width / 2 + 20, clientY: box.y + box.height / 2 })
+  await expect(planes).toHaveCount(0)
+  await map.dispatchEvent('pointercancel', { pointerId: 91, pointerType: 'touch' })
+  await expect.poll(() => planes.count()).toBeGreaterThan(0)
+})
