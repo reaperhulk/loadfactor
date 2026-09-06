@@ -30,7 +30,7 @@ for (const [width, height] of [
       recovery: true,
     })
     await info.attach(`${width}-operations-policy`, {
-      body: await page.screenshot(),
+      body: await page.screenshot({ animations: 'disabled' }),
       contentType: 'image/png',
     })
     await page.getByTestId('inspect-aircraft-1').click()
@@ -42,7 +42,7 @@ for (const [width, height] of [
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(
       1,
     )
-    await info.attach(`${width}-aircraft-check`, { body: await page.screenshot(), contentType: 'image/png' })
+    await info.attach(`${width}-aircraft-check`, { body: await page.screenshot({ animations: 'disabled' }), contentType: 'image/png' })
     await dossier.getByRole('button', { name: 'Cancel check booking', exact: true }).click()
     await expect(dossier.getByRole('button', { name: /Book check/ })).toBeVisible()
     await dossier.getByRole('button', { name: /Book check/ }).click()
@@ -54,7 +54,7 @@ for (const [width, height] of [
     await review.getByTestId('operations-route-detail').locator('summary').click()
     await expect(review.getByTestId('operations-route-detail')).toContainText('JFK–ORD')
     await info.attach(`${width}-operations-review`, {
-      body: await page.screenshot(),
+      body: await page.screenshot({ animations: 'disabled' }),
       contentType: 'image/png',
     })
     await page.getByTestId('confirm-quarter').click()
@@ -70,7 +70,7 @@ for (const [width, height] of [
     expect(stats.completedTrips + stats.cancelledTrips).toBe(stats.scheduledTrips)
     expect(stats.checkCost).toBeGreaterThan(0)
     await info.attach(`${width}-operations-report`, {
-      body: await page.screenshot(),
+      body: await page.screenshot({ animations: 'disabled' }),
       contentType: 'image/png',
     })
     await page.reload()

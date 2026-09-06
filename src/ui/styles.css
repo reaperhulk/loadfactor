@@ -2380,13 +2380,13 @@ th { font-size:.78rem; letter-spacing:.02em; }
 @media(pointer:coarse) { .route-hit { stroke-width:36px; } }
 
 .operations-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem; margin:.8rem 0; }
-.operations-metrics > div { border:1px solid var(--border); border-radius:8px; padding:.65rem; min-width:0; }
+.operations-metrics > div { border:1px solid var(--rule); border-radius:8px; padding:.65rem; min-width:0; }
 .operations-metrics dt { font-size:.75rem; opacity:.75; }
 .operations-metrics dd { margin:.3rem 0 0; font-size:1.15rem; font-variant-numeric:tabular-nums; }
 .operations-metrics small { font-size:.75rem; font-weight:normal; }
-.operations-summary { border-top:1px solid var(--border); margin-top:1rem; padding-top:.5rem; }
+.operations-summary { border-top:1px solid var(--rule); margin-top:1rem; padding-top:.5rem; }
 .operations-pools { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:.5rem; margin:1rem 0; }
-.operations-pools > div { display:flex; flex-direction:column; gap:.25rem; border:1px solid var(--border); border-radius:8px; padding:.7rem; font-size:.8rem; }
+.operations-pools > div { display:flex; flex-direction:column; gap:.25rem; border:1px solid var(--rule); border-radius:8px; padding:.7rem; font-size:.8rem; }
 .operations-upgrade { border:1px solid var(--accent); border-radius:8px; padding:.8rem; }
 .aircraft-readiness label { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; margin:.7rem 0; }
 .aircraft-readiness select { max-width:100%; }
