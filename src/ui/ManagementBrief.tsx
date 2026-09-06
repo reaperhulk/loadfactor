@@ -1,3 +1,4 @@
+import { checkDueIn } from '../engine/operations'
 import { useMemo } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm, getCity } from '../data/cities'
@@ -33,11 +34,14 @@ export function ManagementBrief({ state, onTab, onInspect, onPlan, onAircraft }:
   }, [state, seat])
   const airline = state.airlines[seat]!
   const worst = [...airline.routes].filter((r) => r.lastCapacity > 0).sort((a,b) => (a.lastRevenue-a.lastCost) - (b.lastRevenue-b.lastCost))[0]
+  const due = airline.fleet.filter(a => airline.operationsPolicy && checkDueIn(airline, a, state.turn) === 0 && a.operations?.checkStart === undefined)
   const grounded = airline.fleet.filter((a) => isGrounded(a, state.turn)).length
   const idle = airline.fleet.filter((a) => a.routeId === null && !a.reserve && !isGrounded(a, state.turn)).length
   const campaign = state.airlines.find((a) => a.id !== seat && a.campaign)
   const items: { priority: number; title: string; detail: string; action: string; run: () => void }[] = []
   if (forecast.cashAfter < 0) items.push({ priority: 100, title: 'Protect the treasury', detail: `This plan ends the quarter at ${money(forecast.cashAfter)} cash. Review borrowing, leases and unproductive costs before advancing.`, action: 'Review finances', run: () => onTab('finance') })
+  if (forecast.operations?.cancelledTrips) items.push({ priority: 92, title: `${forecast.operations.cancelledTrips} round trips need cover`, detail: 'Known checks or an undersupplied schedule leave gaps. Stagger checks, adjust frequencies or review reserve cover.', action: 'Review operations', run: () => onTab('fleet') })
+  if (due.length) items.push({ priority: 89, title: `${due.length} aircraft checks due`, detail: 'Checks will be staggered automatically. Choose the start week yourself to manage cover and cost.', action: 'Schedule checks', run: () => onAircraft(due[0]!.id) })
   if (grounded) items.push({ priority: 90, title: `${grounded} aircraft unavailable`, detail: 'Review maintenance and standby cover before flying the schedule.', action: 'Open operations', run: () => onAircraft(airline.fleet.find((a) => isGrounded(a,state.turn))!.id) })
   if (worst && worst.lastRevenue < worst.lastCost) items.push({ priority: 80, title: `${worst.from}–${worst.to} needs attention`, detail: `Lost ${money(worst.lastCost-worst.lastRevenue)} before fixed company costs. Compare its schedule, fare and connecting revenue.`, action: 'Inspect route', run: () => onInspect(worst.id) })
   if (idle) items.push({ priority: 60, title: `${idle} idle aircraft`, detail: 'Crew and ownership costs continue. Assign useful work, keep a deliberate reserve, or sell surplus capacity.', action: 'Review fleet', run: () => onAircraft(airline.fleet.find((a) => a.routeId === null && !a.reserve && !isGrounded(a,state.turn))!.id) })

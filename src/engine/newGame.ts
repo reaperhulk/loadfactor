@@ -1,3 +1,5 @@
+import { maxRouteFrequency } from './queries'
+import { enableOperations } from './operations'
 import { applyPlanningCommand } from './commands'
 import { pairKey } from '../data/cities'
 import { RULES_VERSION, rulesOf } from './version'
@@ -131,6 +133,10 @@ export function newGame(
       if (result.events.some((e) => e.type === 'command_rejected')) throw new Error(`Invalid starter route in ${scenario.id}`)
       airlines[0]!.servedUntil[pairKey(route.from, route.to)] = 0
     }
+  }
+  if (rulesVersion >= 3) {
+    enableOperations(state)
+    for (const a of state.airlines) for (const r of a.routes) r.frequency = Math.max(1, Math.min(r.frequency, maxRouteFrequency(a, r)))
   }
   return state
 

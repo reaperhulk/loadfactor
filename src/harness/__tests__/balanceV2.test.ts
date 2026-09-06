@@ -5,7 +5,7 @@ import { runCareer } from '../simulate'
 
 // Distribution gates, separate from exact legacy pins. An occasional loss is
 // healthy; a whole scenario with no viable operating policy is not.
-describe('rules 2 balance across independent seeds and operating styles', () => {
+describe('current rules balance across independent seeds and operating styles', () => {
   for (const scenario of ALL_SCENARIOS) it(`${scenario.id}: playable, winnable and bounded`, () => {
     const careers = ['greedy', 'cautious'].flatMap((bot) =>
       Array.from({ length: 3 }, (_, i) => runCareer(scenario.id, `balance-v2-${i}`, bot as 'greedy' | 'cautious', scenario.quarters)))
@@ -13,7 +13,7 @@ describe('rules 2 balance across independent seeds and operating styles', () => 
     expect(careers.some((c) => c.summary.phase === 'won'), 'at least one competent operating style can win').toBe(true)
     for (const career of careers) {
       expect(career.summary.netWorth).toBeLessThan(scenario.targetNetWorth * 10)
-      expect(career.state.airlines.some((a) => a.controller === 'rival' && !a.bankrupt)).toBe(true)
+      expect(career.state.airlines.some((a) => a.controller === 'rival' && !a.bankrupt), JSON.stringify(career.summary)).toBe(true)
     }
     if (scenario.objective.kind === 'loadFactor') {
       const naive = runCareer(scenario.id, 'balance-v2-0', 'naive', scenario.quarters)

@@ -22,6 +22,7 @@ export interface Loan {
 }
 
 export interface OwnedAircraft {
+  operations?: AircraftOperations
   secondaryRouteId?: number
   reserve?: boolean
   maintainedUntil?: number
@@ -38,6 +39,36 @@ export interface OwnedAircraft {
   // Grounded for maintenance until this turn: the airframe still draws crew
   // salaries and ownership, it just cannot fly. Old metal breaks (F2).
   groundedUntil?: number
+}
+
+export interface AircraftOperations {
+  base: string
+  flightMinutes: number
+  cycles: number
+  sinceCheckMinutes: number
+  sinceCheckCycles: number
+  checkedTurn: number
+  storedQuarters: number
+  checkStart?: number // absolute calendar minutes
+  checkEnd?: number
+  repairUntil?: number
+}
+export interface OperationsPolicy { reserveBp: number; recovery: boolean }
+export interface OperationsSummary {
+  turn: number
+  scheduledTrips: number
+  completedTrips: number
+  disruptedTrips: number
+  coveredTrips: number
+  charterTrips: number
+  cancelledTrips: number
+  affectedPassengers: number // estimate, not additional carried passengers
+  repairCost: number
+  checkCost: number
+  recoveryCost: number
+  availabilityBp: number
+  routes: { routeId: number; scheduled: number; completed: number; covered: number; cancelled: number; unservedSeats: number }[]
+  aircraft: { aircraftId: number; unavailableMinutes: number; flightMinutes: number; cycles: number; spareMinutes: number }[]
 }
 
 export interface AircraftOrder {
@@ -121,6 +152,7 @@ export interface CostBreakdown {
 }
 
 export interface QuarterStats {
+  operations?: OperationsSummary
   turn: number
   cash: number
   revenue: number
@@ -135,6 +167,7 @@ export interface QuarterStats {
 }
 
 export interface Airline {
+  operationsPolicy?: OperationsPolicy
   campaign?: { kind: 'price' | 'premium' | 'defend' | 'expand'; city: string; fromTurn: number; untilTurn: number }
   hubMode?: 'flexible' | 'banked'
   id: number // index into GameState.airlines; 0 = player
@@ -238,10 +271,14 @@ export interface GameState {
 // Player actions. Serializable, validated by applyCommand; invalid commands
 // reject with a command_rejected event, never throw.
 export type Command =
+  | { type: 'upgrade_operations' }
+  | { type: 'set_operations_policy'; reserveBp: number; recovery: boolean }
+  | { type: 'set_aircraft_base'; aircraftId: number; city: string }
+  | { type: 'cancel_maintenance'; aircraftId: number }
   | { type: 'order_replacement'; aircraftId: number; aircraftType: string; leased: boolean }
   | { type: 'set_rotation'; aircraftId: number; secondaryRouteId: number | null }
   | { type: 'set_reserve'; aircraftId: number; reserve: boolean }
-  | { type: 'plan_maintenance'; aircraftId: number }
+  | { type: 'plan_maintenance'; aircraftId: number; startWeek?: number }
   | { type: 'set_hub_mode'; mode: 'flexible' | 'banked' }
   | {
       type: 'open_route'
@@ -281,6 +318,7 @@ export type Command =
 // Observable effects — the only channel out of the engine. The UI report,
 // tests, and bot telemetry are all built from these.
 export type GameEvent =
+  | { type: 'operations_report'; airline: number; summary: OperationsSummary }
   | { type: 'operations_changed'; airline: number; detail: string }
   | { type: 'command_rejected'; airline: number; command: Command; reason: string }
   | { type: 'route_opened'; airline: number; routeId: number; from: string; to: string }

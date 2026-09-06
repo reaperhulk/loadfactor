@@ -1,3 +1,4 @@
+import { enableOperations, modernOperations, resolveOperations } from './operations'
 import { recurringFinancials } from './accounting'
 // Quarter resolution — the fixed order documented in PLAN.md §3.3. Every cash
 // movement in this file flows through the quarterly P&L so the accounting test
@@ -262,7 +263,9 @@ export function endQuarter(prev: GameState): EngineResult {
   state.world.usedMarket = rollUsedMarket(state)
 
   // 5. Route economics.
-  const totals = resolveMarket(state, events)
+  if (modernOperations(state)) enableOperations(state)
+  const operations = new Map(state.airlines.filter(a => a.operationsPolicy && !a.bankrupt).map(a => [a.id, resolveOperations(state, a, 'actual')]))
+  const totals = resolveMarket(state, events, operations)
 
   // 6. Financials. Every cost lands in a named breakdown bucket; the total
   // is the sum of the buckets, never a separate number.
@@ -309,7 +312,7 @@ export function endQuarter(prev: GameState): EngineResult {
     // rather than a stream draw. A grounded airframe still draws salaries and
     // ownership — that is the whole point of deferring renewal being a gamble.
     for (const ac of airline.fleet) {
-      if (isGrounded(ac, state.turn)) continue
+      if (airline.operationsPolicy || isGrounded(ac, state.turn)) continue
       const over = ac.ageQuarters - GROUNDING_AGE_QUARTERS
       if (over <= 0) continue
       const baseRisk = Math.min(GROUNDING_MAX_BP, over * GROUNDING_BP_PER_QUARTER_OVER)
@@ -334,6 +337,15 @@ export function endQuarter(prev: GameState): EngineResult {
         repairK,
       })
     }
+    const resolved = operations.get(airline.id)
+    if (resolved) {
+      for (const ac of airline.fleet) ac.operations = resolved.aircraft.get(ac.id)!
+      if (resolved.summary.affectedPassengers > 0) {
+        const penalty = Math.min(1500, Math.floor(resolved.summary.affectedPassengers * 10000 / Math.max(1, t.pax + resolved.summary.affectedPassengers)))
+        airline.reputationBp = Math.max(REPUTATION_MIN_BP, (airline.reputationBp ?? 10000) - penalty)
+      }
+      events.push({ type: 'operations_report', airline: airline.id, summary: resolved.summary })
+    }
     // Reputation heals slowly toward spotless.
     airline.reputationBp = Math.min(10000, (airline.reputationBp ?? 10000) + REPUTATION_RECOVERY_BP)
     if (airline.fuelHedge !== null) {
@@ -355,6 +367,7 @@ export function endQuarter(prev: GameState): EngineResult {
       capacity: t.capacity,
       netWorth: netWorth(airline),
       breakdown,
+      ...(t.operations ? { operations: t.operations } : {}),
     })
 
     events.push({

@@ -1,3 +1,4 @@
+import { OperationsSummary } from './OperationsSummary'
 // The report newspaper, split out of panels.tsx: the quarter archive, the
 // filterable wire, and the annual review.
 
@@ -41,6 +42,8 @@ function describeEvent(state: GameState, e: GameEvent): string | null {
       return `${name(e.airline)} restructured — ${money(e.debtWiped)} of debt written off, ${e.routesClosed} routes closed, ${e.fleetSold} aircraft sold`
     case 'airline_entered':
       return `${e.name} enters the market from ${e.hq}`
+    case 'operations_report':
+      return e.airline === viewSeat() && e.summary.affectedPassengers > 0 ? `Operations: ${e.summary.cancelledTrips} round trips cancelled; ${e.summary.coveredTrips} covered by other aircraft` : null
     case 'aircraft_grounded':
       return e.airline === viewSeat()
         ? `${getAircraftType(e.aircraftType).name} grounded for maintenance — ${money(e.repairK)} repair`
@@ -93,6 +96,7 @@ function eventSection(e: GameEvent): LogFilter {
     case 'aircraft_delivered':
     case 'order_cancelled':
     case 'cabin_refit':
+    case 'operations_report':
     case 'aircraft_grounded':
       return 'fleet'
     case 'world_event_started':
@@ -125,6 +129,7 @@ function QuarterPage({ state, events }: { state: GameState; events: GameEvent[] 
       (e): e is Extract<GameEvent, { type: 'route_result' }> => e.type === 'route_result' && e.airline === viewSeat(),
     )
     .sort((a, b) => b.revenue - b.cost - (a.revenue - a.cost))
+  const ops = events.find((e): e is Extract<GameEvent, { type: 'operations_report' }> => e.type === 'operations_report' && e.airline === viewSeat())
   const player = state.airlines[viewSeat()]!
   const routeName = (routeId: number): string => {
     const r = player.routes.find((x) => x.id === routeId)
@@ -132,6 +137,7 @@ function QuarterPage({ state, events }: { state: GameState; events: GameEvent[] 
   }
   return (
     <div>
+      {ops && <OperationsSummary summary={ops.summary} />}
       {results.length > 0 && (
         <div className="table-scroll">
           <table data-testid="report-results">

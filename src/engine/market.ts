@@ -1,3 +1,4 @@
+import { modernOperations, resolveOperations, type OperationsResult } from './operations'
 import { resolveItineraries, type PassengerSegment } from './itineraries'
 // Route economics: the heart of the game (PLAN.md §2.2). Pure arithmetic plus
 // stateless hash noise — no stream draws, so resolution order can never
@@ -49,7 +50,7 @@ import { dealAppealBp } from './offers'
 import { hashNoiseBp } from './rng'
 import { allocateTrips, reputationAppealBp, roundTripsPerWeek } from './queries'
 import { cityDemandModBp, effEconomyBp, effFuelBp } from './worldEvents'
-import type { Airline, GameEvent, GameState, Route } from './types'
+import type { Airline, GameEvent, GameState, Route, OperationsSummary } from './types'
 
 function cityMass(cityId: string): number {
   const c = getCity(cityId)
@@ -227,6 +228,7 @@ export interface RouteAcc {
 }
 
 interface AirlineTotals {
+  operations?: OperationsSummary
   revenue: number // $k per quarter
   cost: number // $k per quarter (route-level costs only)
   pax: number // per quarter
@@ -242,7 +244,12 @@ interface AirlineTotals {
 // each airline's own network, writes each route's last* results, emits
 // route_result events, and returns per-airline totals. Mutates state
 // (callers clone at the entry point).
-export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTotals[] {
+export function resolveMarket(state: GameState, events: GameEvent[], prepared?: Map<number, OperationsResult>, mode: 'forecast' | 'adverse' = 'forecast'): AirlineTotals[] {
+  const modern = modernOperations(state)
+  const operations = prepared ?? new Map(modern ? state.airlines.filter(a => !a.bankrupt).map(a => [a.id, resolveOperations(state, a, mode)]) : [])
+  const periodWeeks = modern ? WEEKS_PER_QUARTER : 1
+  const multiplier = modern ? 1 : WEEKS_PER_QUARTER
+  const tripsFor = (airline: Airline, route: Route) => modern ? operations.get(airline.id)?.allocations.get(route.id) ?? [] : allocateTrips(airline, route, state.turn)
   const totals: AirlineTotals[] = state.airlines.map(() => ({
     revenue: 0,
     cost: 0,
@@ -273,7 +280,7 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       let weeklyRoundTrips = 0
       let weeklyCapacity = 0
       let yieldNum = 0 // Σ seats × cabin yield — capacity-weighted revenue/pax
-      for (const alloc of allocateTrips(airline, route, state.turn)) {
+      for (const alloc of tripsFor(airline, route)) {
         weeklyRoundTrips += alloc.trips
         weeklyCapacity += alloc.seats * alloc.trips * 2
         yieldNum += alloc.seats * alloc.trips * 2 * CABIN_YIELD_BP[alloc.cabin - 1]!
@@ -303,7 +310,7 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
     const first = entrants[0]!
     const { from, to } = first.route
     const km = distanceKm(from, to)
-    const demand = pairWeeklyDemand(state, from, to)
+    const demand = pairWeeklyDemand(state, from, to) * periodWeeks
 
     // Split demand by attractiveness, shaped by fare elasticity (gouging
     // sheds pax even in a monopoly). Cap at capacity, then one spill pass.
@@ -344,7 +351,7 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
       let weeklyFuel = 0
       let weeklyFees = 0
       let weeklyCrewMin = 0
-      for (const alloc of allocateTrips(airline, e.route, state.turn)) {
+      for (const alloc of tripsFor(airline, e.route)) {
         const t = getAircraftType(alloc.type)
         weeklyFuel += Math.floor((alloc.trips * 2 * km * t.fuelPerKm * fuelBp) / 10000)
         // Fees bill the physical airframe, not the cabin fit.
@@ -374,7 +381,7 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
   }
 
   if ((state.rulesVersion ?? 1) >= 2) {
-    resolveItineraries(state, [...accs.values()])
+    resolveItineraries(state, [...accs.values()], periodWeeks)
   } else {
   // ---- Phase 2: connecting itineraries over each airline's own network ----
   // A share of unserved O/D demand will take a one-stop over a hub if both
@@ -446,24 +453,24 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
     for (const route of airline.routes) {
       const acc = accs.get(accKey(airline.id, route.id))
       if (!acc) continue
-      const revenue = Math.floor((acc.weeklyRevenue * WEEKS_PER_QUARTER) / 1000)
-      const q = (weekly: number) => Math.floor((weekly * WEEKS_PER_QUARTER) / 1000)
+      const revenue = Math.floor((acc.weeklyRevenue * multiplier) / 1000)
+      const q = (weekly: number) => Math.floor((weekly * multiplier) / 1000)
       const fuel = q(acc.weeklyFuel)
       const fees = q(acc.weeklyFees)
       const flightPay = q(acc.weeklyFlightPay)
       const service = q(acc.weeklyService)
       const cost = fuel + fees + flightPay + service
-      const quarterPax = acc.weeklyPax * WEEKS_PER_QUARTER
-      const transferPax = acc.weeklyTransfer * WEEKS_PER_QUARTER
+      const quarterPax = acc.weeklyPax * multiplier
+      const transferPax = acc.weeklyTransfer * multiplier
       route.lastPax = quarterPax
-      route.lastCapacity = acc.weeklyCapacity * WEEKS_PER_QUARTER
+      route.lastCapacity = acc.weeklyCapacity * multiplier
       route.lastLoadFactorBp =
         acc.weeklyCapacity === 0 ? 0 : Math.floor((acc.weeklyPax * 10000) / acc.weeklyCapacity)
       route.lastRevenue = revenue
       route.lastCost = cost
       route.lastTransferPax = transferPax
       if (acc.segments) {
-        route.lastSegments = { business: acc.segments.business * WEEKS_PER_QUARTER, leisure: acc.segments.leisure * WEEKS_PER_QUARTER, budget: acc.segments.budget * WEEKS_PER_QUARTER }
+        route.lastSegments = { business: acc.segments.business * multiplier, leisure: acc.segments.leisure * multiplier, budget: acc.segments.budget * multiplier }
         route.lastTransferRevenue = q(acc.transferRevenue ?? 0)
       }
       route.history.push({
@@ -499,5 +506,18 @@ export function resolveMarket(state: GameState, events: GameEvent[]): AirlineTot
     }
   }
 
+  for (const airline of state.airlines) {
+    const ops = operations.get(airline.id)?.summary
+    if (!ops) continue
+    // Estimate passengers whose scheduled seats were cancelled. These are
+    // reported separately from the market's actually carried passengers.
+    for (const r of ops.routes) {
+      const route = airline.routes.find(route => route.id === r.routeId)!
+      const seats = allocateTrips(airline, route).reduce((n, a) => n + a.seats * a.trips * 2, 0)
+      const demand = Math.min(seats, pairWeeklyDemand(state, route.from, route.to)) * WEEKS_PER_QUARTER
+      ops.affectedPassengers += seats ? Math.floor(r.unservedSeats * demand / (seats * WEEKS_PER_QUARTER)) : 0
+    }
+    totals[airline.id]!.operations = ops
+  }
   return totals
 }

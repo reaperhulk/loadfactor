@@ -1,6 +1,8 @@
 # Proposed operations redesign
 
-Status: proposal. The existing grounding simulation has not been changed by this
+Status: implemented for rules 3, with an explicit upgrade for rules-2 solo careers. The original proposal follows; implementation details and tradeoffs are recorded in PLAN.md under “Rules 3: fractional operations”.
+
+Original status: proposal. The existing grounding simulation had not been changed by this
 review. Same-quarter purchase refunds are implemented separately.
 
 ## Problem

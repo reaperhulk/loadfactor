@@ -1,3 +1,4 @@
+import { weeklyPlan } from './operations'
 // Pure derived values over GameState. Shared by command validation, quarter
 // resolution, rival policies, and the UI — one definition of every number.
 
@@ -94,10 +95,10 @@ export function slotsAllocated(state: GameState, city: string): number {
 }
 
 // Weekly round trips one airframe can fly on a route of this distance.
-export function roundTripsPerWeek(type: string, km: number): number {
+export function roundTripsPerWeek(type: string, km: number, reserveBp = 0): number {
   const t = getAircraftType(type)
   const roundTripMin = 2 * (Math.floor((km * 60) / t.speedKmh) + t.turnaroundMin)
-  return Math.floor(WEEKLY_BLOCK_MINUTES / roundTripMin)
+  return Math.floor(Math.floor(WEEKLY_BLOCK_MINUTES * (10000 - reserveBp) / 10000) / roundTripMin)
 }
 
 // Reserve substitutions are derived globally in stable fleet order so one
@@ -122,6 +123,7 @@ function tripsOnRoute(aircraft: OwnedAircraft, route: Route): number {
   return Math.floor(roundTripsPerWeek(aircraft.type, distanceKm(route.from, route.to)) * share / 10000)
 }
 export function maxRouteFrequency(airline: Airline, route: Route, turn = -1): number {
+  if (airline.operationsPolicy) return (weeklyPlan(airline, { ...route, frequency: 1000000 }).get(route.id) ?? []).reduce((n, a) => n + a.trips, 0)
   return operatingFleet(airline, turn).reduce((sum, a) => sum + tripsOnRoute(a, route), 0)
 }
 
@@ -153,6 +155,7 @@ export interface TripAllocation {
 // Distribute the effective frequency across the assigned fleet in stable
 // fleet order — each airframe flies up to its own weekly maximum.
 export function allocateTrips(airline: Airline, route: Route, turn = -1): TripAllocation[] {
+  if (airline.operationsPolicy) return weeklyPlan(airline, route).get(route.id) ?? []
   let remaining = effectiveFrequency(airline, route, turn)
   const out: TripAllocation[] = []
   for (const a of operatingFleet(airline, turn)) {

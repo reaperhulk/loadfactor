@@ -118,6 +118,7 @@ export const CREW_COST_PER_BLOCK_HOUR = 150 // $
 // fuel and fees, not the payroll.
 export const CREW_SALARY_BP_PER_QUARTER = 300
 // Maintenance escalates with age: base * (10000 + AGE_BP*ageQuarters)/10000.
+export const OPERATIONS_MAINT_AGE_BP_PER_QUARTER = 150 // gradual aging: +6% of base maintenance per year
 export const MAINT_AGE_BP_PER_QUARTER = 300
 // Quarterly ownership cost (depreciation+insurance) as bp of list price.
 export const OWNERSHIP_BP_PER_QUARTER = 400

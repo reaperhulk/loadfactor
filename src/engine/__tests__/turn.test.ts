@@ -172,7 +172,7 @@ describe('quarter resolution', () => {
 
 describe('stakes that scale (F2)', () => {
   it('old metal breaks: a grounded airframe stops flying but keeps costing', () => {
-    let state: GameState = newGame('jet_age', 'grounding-seed')
+    let state: GameState = newGame('jet_age', 'grounding-seed', undefined, undefined, 2)
     state = applyCommand(state, {
       type: 'open_route',
       from: 'JFK',
@@ -202,7 +202,7 @@ describe('stakes that scale (F2)', () => {
   })
 
   it('a grounded airframe is removed from the schedule it was flying', () => {
-    let state: GameState = newGame('jet_age', 'ground-capacity')
+    let state: GameState = newGame('jet_age', 'ground-capacity', undefined, undefined, 2)
     state = applyCommand(state, {
       type: 'open_route',
       from: 'JFK',

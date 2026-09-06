@@ -18,6 +18,9 @@ export function checkInvariants(state: GameState): void {
 
   for (const airline of state.airlines) {
     assertInv(Number.isSafeInteger(airline.cash), `airline ${airline.id} cash is an integer`)
+    if (airline.operationsPolicy) {
+      assertInv([0,500,1000,1500].includes(airline.operationsPolicy.reserveBp) && typeof airline.operationsPolicy.recovery === 'boolean', 'valid operations policy')
+    }
     const routeIds = new Set(airline.routes.map((r) => r.id))
     assertInv(routeIds.size === airline.routes.length, `airline ${airline.id} route ids unique`)
 
@@ -38,6 +41,14 @@ export function checkInvariants(state: GameState): void {
     }
 
     for (const ac of airline.fleet) {
+      if (ac.operations) {
+        const o = ac.operations
+        assertInv(isCity(o.base), 'aircraft base exists')
+        for (const n of [o.flightMinutes, o.cycles, o.sinceCheckMinutes, o.sinceCheckCycles, o.storedQuarters]) assertInv(Number.isSafeInteger(n) && n >= 0, 'aircraft wear uses non-negative integers')
+        assertInv(Number.isSafeInteger(o.checkedTurn), 'check history uses integer turns')
+        assertInv(o.checkStart === undefined ? o.checkEnd === undefined : Number.isSafeInteger(o.checkStart) && Number.isSafeInteger(o.checkEnd) && o.checkEnd! > o.checkStart, 'check interval valid')
+        assertInv(o.repairUntil === undefined || Number.isSafeInteger(o.repairUntil), 'repair interval valid')
+      }
       assertInv(isAircraftType(ac.type), `aircraft ${ac.id} type exists`)
       assertInv(ac.secondaryRouteId === undefined || (routeIds.has(ac.secondaryRouteId) && ac.routeId !== ac.secondaryRouteId), `aircraft ${ac.id} rotation valid`)
       assertInv(!ac.reserve || ac.routeId === null, `aircraft ${ac.id} reserve is idle`)

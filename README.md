@@ -9,7 +9,7 @@ through fuel shocks, recessions and changing aviation eras.
 The simulation is deterministic and runs without a browser. A career records its
 scenario, seed, rules/content versions and commands. Saves, replays, multiplayer
 turn links, bot playtesting and golden tests all use that same record. Existing
-unversioned careers keep their original rules; new careers use rules 2.
+unversioned careers keep their original rules; new careers use rules 3. Rules-2 solo careers can opt into improved operations in Fleet policy.
 
 ## Playing
 
@@ -36,7 +36,7 @@ npm run dev     # http://localhost:5173
   arrival banks improve connections but add costs and depend on reliability.
 - **Manage the metal.** Order, lease or buy used aircraft; choose cabins, share
   an airframe between two routes, keep standby cover and book preventive
-  maintenance. Fleet commonality changes upkeep. Replacement plans preview costs
+  maintenance. Repairs now remove hours or days, with reserve hours and compatible standby aircraft covering disrupted flights. Book 7–10-day checks, choose reserve hours and optional paid recovery in Fleet policy and aircraft details. Fleet commonality changes upkeep. Replacement plans preview costs
   and keep the old aircraft working until its successor arrives.
 - **Read the competition.** Rivals announce sustained campaigns. The planning
   calendar shows upcoming opportunities, aircraft introductions, airport

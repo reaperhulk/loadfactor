@@ -1,3 +1,4 @@
+import { checkDueIn } from '../engine/operations'
 import { PlanningWorkbench } from './PlanningWorkbench'
 import { OperationsPanel } from './OperationsPanel'
 // Management panels: routes, fleet, airports, finance, and the quarterly
@@ -16,6 +17,7 @@ import {
   ROUTE_MEMORY_QUARTERS,
   ROUTE_SPOOL_BP,
   MAINT_AGE_BP_PER_QUARTER,
+  OPERATIONS_MAINT_AGE_BP_PER_QUARTER,
   SLOTS_PER_GRANT,
   ROUTE_OVERHEAD_QUAD,
 } from '../data/constants'
@@ -557,7 +559,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
     for (const a of player.fleet) {
       const t = getAircraftType(a.type)
       const aged = Math.floor(
-        (t.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * (a.ageQuarters + turnsAhead))) / 10000,
+        (t.maintBase * (10000 + (player.operationsPolicy ? OPERATIONS_MAINT_AGE_BP_PER_QUARTER : MAINT_AGE_BP_PER_QUARTER) * (a.ageQuarters + turnsAhead))) / 10000,
       )
       total += Math.floor((aged * inflationBp(state.turn + turnsAhead)) / 10000)
     }
@@ -577,7 +579,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
     <div>
       <div className="page-heading"><h2>{view === 'fleet' ? 'Owned aircraft' : view === 'orders' ? 'Orders & deliveries' : 'Aircraft market'}</h2><span className="dim">{year}</span></div>
       {view === 'fleet' && <>
-      <details className="fleet-policy-disclosure"><summary>Fleet policy & actions</summary><OperationsPanel state={state} mode="policy" /><ReliabilityLegend />
+      <details className="fleet-policy-disclosure"><summary>Fleet policy & actions</summary><OperationsPanel state={state} mode="policy" /><ReliabilityLegend modern={!!player.operationsPolicy} />
       {player.fleet.some((a) => a.routeId === null && !a.reserve && !isGrounded(a, state.turn)) && player.routes.length > 0 && (
         <button
           data-testid="assign-all-idle"
@@ -589,7 +591,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
       )}
       {player.fleet.length > 0 && (() => {
         const rep = player.reputationBp ?? 10000
-        const atRisk = player.fleet.filter((a) => a.ageQuarters >= GROUNDING_AGE_QUARTERS).length
+        const atRisk = player.operationsPolicy ? 0 : player.fleet.filter((a) => a.ageQuarters >= GROUNDING_AGE_QUARTERS).length
         if (atRisk === 0 && rep >= 10000) return null
         return (
           <p className={rep < 9500 ? 'neg' : 'dim'} data-testid="reliability-note">
@@ -600,15 +602,15 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
               </>
             )}
             Reputation {(rep / 100).toFixed(0)}%
-            {rep < 10000 && ' — repeated groundings cost you appeal on contested pairs'}
+            {rep < 10000 && (player.operationsPolicy ? ' — uncovered passenger disruption reduces appeal' : ' — repeated groundings cost you appeal on contested pairs')}
           </p>
         )
       })()}
       {player.fleet.length > 0 && (
         <p className="dim" data-testid="renewal-forecast">
           Fleet maintenance {money(maintAt(0))}/q now → {money(maintAt(8))}/q in 2 years on the same metal
-          {geriatricNow > 0 && <span className="neg"> · {geriatricNow} geriatric</span>}
-          {geriatricSoon > 0 && <span> · {geriatricSoon} more turn geriatric within 2y</span>}{' '}
+          {!player.operationsPolicy && geriatricNow > 0 && <span className="neg"> · {geriatricNow} geriatric</span>}
+          {!player.operationsPolicy && geriatricSoon > 0 && <span> · {geriatricSoon} more turn geriatric within 2y</span>}{' '}
           <button
             className="link-btn"
             data-testid="copy-fleet"
@@ -626,7 +628,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
                     a.leased ? 1 : 0,
                     a.cabin,
                     Math.floor(
-                      (Math.floor((t.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * a.ageQuarters)) / 10000) *
+                      (Math.floor((t.maintBase * (10000 + (player.operationsPolicy ? OPERATIONS_MAINT_AGE_BP_PER_QUARTER : MAINT_AGE_BP_PER_QUARTER) * a.ageQuarters)) / 10000) *
                         inflationBp(state.turn)) /
                         10000,
                     ),
@@ -658,7 +660,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
             return total + (alloc && maxTrips > 0 ? Math.floor(alloc.trips * 10000 / maxTrips) : 0)
           }, 0))
           const maint = Math.floor(
-            (Math.floor((type.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * a.ageQuarters)) / 10000) *
+            (Math.floor((type.maintBase * (10000 + (player.operationsPolicy ? OPERATIONS_MAINT_AGE_BP_PER_QUARTER : MAINT_AGE_BP_PER_QUARTER) * a.ageQuarters)) / 10000) *
               inflationBp(state.turn)) /
               10000,
           )
@@ -689,6 +691,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
             {fheader('age', 'Age')}
             {fheader('util', 'Utilization', 'weekly utilization across primary, secondary and standby-cover assignments')}
             {fheader('maint', 'Maint/q', 'maintenance before fleet commonality; the fleet total above includes the family adjustment')}
+            {player.operationsPolicy && <th>Readiness</th>}
             {fheader('value', 'Value')}
             <th>Cabin</th>
             <th>Assignment</th>
@@ -696,7 +699,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
         </thead>
         <tbody>
           {fleetRows.map(({ a, type, route, utilBp, maint, value }) => {
-            const geriatric = a.ageQuarters >= 48
+            const geriatric = !player.operationsPolicy && a.ageQuarters >= 48
             return (
               <tr key={a.id} className={selectedAircraftId === a.id ? 'selected-row' : undefined}>
                 <td>
@@ -750,6 +753,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
                   )}
                 </td>
                 <td className={geriatric ? 'neg' : 'dim'}>{money(maint)}</td>
+                {player.operationsPolicy && <td><span className="dim">{a.operations?.checkStart !== undefined ? 'Check booked' : checkDueIn(player, a, state.turn) === 0 ? 'Check due' : `Check in ${checkDueIn(player, a, state.turn)}q`}</span></td>}
                 <td className="dim">{a.leased ? '—' : money(value)}</td>
                 <td>{['','Dense','Standard','Premium'][a.cabin]}</td>
                 <td>{route ? `${route.from}–${route.to}` : a.reserve ? 'Standby' : isGrounded(a,state.turn) ? 'Maintenance' : 'Unassigned'}</td>
@@ -783,7 +787,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
               </tr>
             )
           })}</tbody></table></div>}</>}
-      {view === 'catalog' && <><ReliabilityLegend /><Shop state={state} /></>}
+      {view === 'catalog' && <><ReliabilityLegend modern={!!player.operationsPolicy} /><Shop state={state} /></>}
     </div>
   )
 }

@@ -1,3 +1,4 @@
+import { aircraftOperations, enableOperations, maintenanceQuote, QUARTER_MINUTES, WEEK_MINUTES } from './operations'
 // Planning-phase command validation and application, used identically by the
 // player (via applyCommand) and rival policies (via turn.ts). Invalid commands
 // reject with a command_rejected event — engine entry points never throw on
@@ -95,10 +96,51 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       ac.reserve = command.reserve
       return { events: [{ type: 'operations_changed', airline: airlineIdx, detail: command.reserve ? 'Aircraft placed on standby' : 'Aircraft released from standby' }] }
     }
+    case 'upgrade_operations': {
+      if ((state.rulesVersion ?? 1) < 2 || state.airlines.filter(a => a.controller === 'player').length !== 1)
+        return reject(airlineIdx, command, 'upgrade is available in rules 2 solo careers')
+      if (airline.operationsPolicy) return reject(airlineIdx, command, 'operations already upgraded')
+      enableOperations(state)
+      for (const a of state.airlines) for (const r of a.routes) r.frequency = Math.max(1, Math.min(r.frequency, maxRouteFrequency(a, r)))
+      return { events: [{ type: 'operations_changed', airline: airlineIdx, detail: 'Operations upgraded: short repairs, reserve hours and scheduled checks. Earlier quarters retain their original rules.' }] }
+    }
+    case 'set_operations_policy': {
+      if (!airline.operationsPolicy || ![0, 500, 1000, 1500].includes(command.reserveBp) || typeof command.recovery !== 'boolean')
+        return reject(airlineIdx, command, 'invalid operations policy')
+      airline.operationsPolicy = { reserveBp: command.reserveBp, recovery: command.recovery }
+      for (const r of airline.routes) r.frequency = Math.max(1, Math.min(r.frequency, maxRouteFrequency(airline, r)))
+      return { events: [{ type: 'operations_changed', airline: airlineIdx, detail: `Reserve hours: ${command.reserveBp / 100}%; paid recovery ${command.recovery ? 'enabled' : 'disabled'}. Schedules capped to available hours.` }] }
+    }
+    case 'set_aircraft_base': {
+      const ac = airline.fleet.find(a => a.id === command.aircraftId)
+      if (!airline.operationsPolicy || !ac || !isCity(command.city) || !(airline.slots[command.city] ?? 0))
+        return reject(airlineIdx, command, 'choose an airport where you hold slots')
+      if (ac.routeId !== null && airline.routes.filter(r => r.id === ac.routeId || r.id === ac.secondaryRouteId).some(r => r.from !== command.city && r.to !== command.city))
+        return reject(airlineIdx, command, 'base must serve every assigned rotation')
+      ac.operations = { ...aircraftOperations(airline, ac, state.turn), base: command.city }
+      return { events: [{ type: 'operations_changed', airline: airlineIdx, detail: `Aircraft #${ac.id} based at ${command.city}` }] }
+    }
+    case 'cancel_maintenance': {
+      const ac = airline.fleet.find(a => a.id === command.aircraftId)
+      if (!airline.operationsPolicy || !ac?.operations || ac.operations.checkStart === undefined || ac.operations.checkStart < state.turn * QUARTER_MINUTES)
+        return reject(airlineIdx, command, 'no upcoming check to cancel')
+      delete ac.operations.checkStart; delete ac.operations.checkEnd
+      return { events: [{ type: 'operations_changed', airline: airlineIdx, detail: 'Check booking cancelled; overdue checks are still scheduled automatically' }] }
+    }
     case 'plan_maintenance': {
       if ((state.rulesVersion ?? 1) < 2) return reject(airlineIdx, command, 'requires rules 2')
       const ac = airline.fleet.find((a) => a.id === command.aircraftId)
       if (!ac || isGrounded(ac, state.turn)) return reject(airlineIdx, command, 'aircraft unavailable')
+      if (airline.operationsPolicy) {
+        const week = command.startWeek ?? 0
+        const o = aircraftOperations(airline, ac, state.turn)
+        if (!Number.isInteger(week) || week < 0 || week > 12) return reject(airlineIdx, command, 'start week must be 0..12')
+        if (o.checkStart !== undefined && o.checkStart < state.turn * QUARTER_MINUTES) return reject(airlineIdx, command, 'check already in progress')
+        const quote = maintenanceQuote(ac)
+        const start = state.turn * QUARTER_MINUTES + week * WEEK_MINUTES
+        ac.operations = { ...o, checkStart: start, checkEnd: start + quote.days * 1440 }
+        return { events: [{ type: 'operations_changed', airline: airlineIdx, detail: `Check booked for week ${week + 1}: ${quote.days} days; $${quote.cost}k charged when work starts` }] }
+      }
       if ((ac.maintainedUntil ?? 0) > state.turn) return reject(airlineIdx, command, 'aircraft is already covered by preventive maintenance')
       const cost = getAircraftType(ac.type).maintBase * 2
       if (airline.cash < cost) return reject(airlineIdx, command, 'insufficient cash')
@@ -156,6 +198,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       }
       airline.routes.push(route)
       aircraft.routeId = route.id
+      if (airline.operationsPolicy) route.frequency = Math.max(1, Math.min(route.frequency, maxRouteFrequency(airline, route)))
       delete aircraft.secondaryRouteId
       delete aircraft.reserve
       return {

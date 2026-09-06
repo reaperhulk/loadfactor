@@ -7,6 +7,7 @@
 import { applyPlanningCommand } from './commands'
 import {
   assignmentCommands,
+  cashBufferFor,
   hedgeCommands,
   launchCommands,
   marketingCommands,
@@ -134,6 +135,12 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
     }
   }
 
+  if (airline.operationsPolicy) {
+    const reserveBp = airline.personality === 'premium' || airline.personality === 'fortress' ? 1000 : 500
+    const recovery = (airline.history.at(-1)?.operations?.cancelledTrips ?? 0) > 0 && airline.cash > cashBufferFor(airline) * 2
+    if (reserveBp !== airline.operationsPolicy.reserveBp || recovery !== airline.operationsPolicy.recovery)
+      apply(state, idx, { type: 'set_operations_policy', reserveBp, recovery }, events)
+  }
   applyAll(state, idx, treasuryCommands(state, idx), events)
   applyAll(state, idx, marketingCommands(state, idx, personality.marketing), events)
   applyAll(state, idx, takeoverCommands(state, idx, true), events)

@@ -8,6 +8,7 @@ import {
   MARKETING_BASE_PER_LEVEL,
   MARKETING_PER_ROUTE_PER_LEVEL,
   MAINT_AGE_BP_PER_QUARTER,
+  OPERATIONS_MAINT_AGE_BP_PER_QUARTER,
   OWNERSHIP_BP_PER_QUARTER,
   ROUTE_OVERHEAD_QUAD,
   LOAN_AMORT_BP,
@@ -20,7 +21,7 @@ import { inflationBp } from './market'
 import { routeWeeklyCapacity } from './queries'
 import { slotRentTotal } from './slots'
 import { dealUpkeep } from './offers'
-import type { Airline, GameState } from './types'
+import type { Airline, GameState, OperationsSummary } from './types'
 
 function fieldedSeats(airline: Airline): number {
   return airline.routes.reduce((sum, route) => sum + routeWeeklyCapacity(airline, route), 0)
@@ -33,7 +34,7 @@ export function fleetCommonalityBp(state: GameState, airline: Airline): number {
 }
 
 export function recurringFinancials(state: GameState, airline: Airline, t: {
-  revenue: number; cost: number; fuel: number; fees: number; flightPay: number; service: number
+  operations?: OperationsSummary; revenue: number; cost: number; fuel: number; fees: number; flightPay: number; service: number
 }) {
   // Overhead, maintenance, admin, and salaries inflate with the era
   // (market.ts inflates the per-route operating costs); ownership and
@@ -46,7 +47,7 @@ export function recurringFinancials(state: GameState, airline: Airline, t: {
   for (const ac of airline.fleet) {
     const type = getAircraftType(ac.type)
     maintenance += inflate(
-      Math.floor((type.maintBase * (10000 + MAINT_AGE_BP_PER_QUARTER * ac.ageQuarters)) / 10000),
+      Math.floor((type.maintBase * (10000 + (airline.operationsPolicy ? OPERATIONS_MAINT_AGE_BP_PER_QUARTER : MAINT_AGE_BP_PER_QUARTER) * ac.ageQuarters)) / 10000),
     )
     admin += inflate(AIRCRAFT_ADMIN_PER_QUARTER)
     // Crews are salaried per airframe whether it flies or not — parking
@@ -60,6 +61,8 @@ export function recurringFinancials(state: GameState, airline: Airline, t: {
   }
   const commonalityBp = fleetCommonalityBp(state, airline)
   maintenance = Math.floor(maintenance * commonalityBp / 10000)
+  maintenance += (t.operations?.repairCost ?? 0) + (t.operations?.checkCost ?? 0)
+  const recovery = t.operations?.recoveryCost ?? 0
   admin = Math.floor(admin * commonalityBp / 10000)
   const routeOverhead = Math.floor(
     (ROUTE_OVERHEAD_QUAD *
@@ -121,7 +124,7 @@ export function recurringFinancials(state: GameState, airline: Airline, t: {
   const slotRent = slotRentTotal(airline)
   const breakdown = {
     fuel: t.fuel,
-    fees: t.fees,
+    fees: t.fees + recovery,
     flightPay: t.flightPay,
     service: t.service,
     salaries,
@@ -135,7 +138,7 @@ export function recurringFinancials(state: GameState, airline: Airline, t: {
   }
   const revenue = t.revenue
   const costs =
-    t.cost + salaries + ownership + maintenance + admin + slotRent + overhead + marketing + interest
+    t.cost + recovery + salaries + ownership + maintenance + admin + slotRent + overhead + marketing + interest
   const profit = revenue - costs
   return { revenue, costs, profit, debtPayment, breakdown }
 }

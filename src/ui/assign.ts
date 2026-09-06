@@ -24,7 +24,7 @@ export function assignAndSchedule(state: GameState, aircraftId: number, routeId:
     dispatchBatch([{ type: 'assign_aircraft', aircraftId, routeId }])
     return
   }
-  const trips = roundTripsPerWeek(aircraft.type, km)
+  const trips = roundTripsPerWeek(aircraft.type, km, player.operationsPolicy?.reserveBp)
   // maxRouteFrequency is computed pre-assign, so the new plane's trips are
   // added by hand; the requested schedule grows by what the plane can fly.
   const target = Math.min(maxRouteFrequency(player, route) + trips, route.frequency + trips)

@@ -279,7 +279,11 @@ export function RivalryLegend() {
   )
 }
 
-export function ReliabilityLegend() {
+export function ReliabilityLegend({ modern = false }: { modern?: boolean }) {
+  if (modern) return <details className="game-legend" data-testid="reliability-legend"><summary className="dim">How do maintenance and reserve cover work?</summary>
+    <p className="dim">Wear follows flight hours, cycles and time since the last check. Age raises costs and repair risk gradually; maintained 15–20-year-old aircraft can remain useful. Most repairs take hours or a few days. Heavy checks take 7–10 days and are due every eight quarters or sooner with high usage.</p>
+    <p className="dim">Spare hours and compatible standby aircraft cover affected trips when range, base and crew limits allow. Only uncovered passenger disruption affects reputation. Book checks and choose reserve hours in Fleet policy and aircraft details.</p>
+  </details>
   return (
     <details className="game-legend" data-testid="reliability-legend">
       <summary className="dim">Why do my old planes keep breaking?</summary>

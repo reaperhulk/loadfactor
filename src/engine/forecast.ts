@@ -1,3 +1,4 @@
+import { aircraftOperations } from './operations'
 // A planning forecast holds today's world and rival schedules fixed. It uses
 // real market resolution and accounting, never next quarter's hidden RNG draws.
 import { applyCommandBatchFor } from './index'
@@ -10,6 +11,7 @@ import { pairKey } from '../data/cities'
 import type { Command, GameEvent, GameState, Route } from './types'
 
 export interface ForecastAssumptions {
+  operations?: 'forecast' | 'adverse'
   economyBp?: number
   fuelBp?: number
 }
@@ -30,10 +32,11 @@ export function forecastQuarter(
   const airline = state.airlines[seat]
   if (!airline) throw new Error('Unknown forecast airline')
   const events: GameEvent[] = []
-  const totals = resolveMarket(state, events)[seat]!
+  const totals = resolveMarket(state, events, undefined, assumptions.operations ?? 'forecast')[seat]!
   const financials = recurringFinancials(state, airline, totals)
   return {
     ...financials,
+    operations: totals.operations,
     cashRequired: previous.airlines[seat]!.cash - airline.cash,
     cashAfter: airline.cash + financials.profit - financials.debtPayment,
     routes: airline.routes,
@@ -65,6 +68,8 @@ export function forecastReplacement(state: GameState, seat: number, aircraftId: 
   const old = { ...ac }
   const spec = getAircraftType(type)
   ac.type = type; ac.ageQuarters = 0; ac.leased = leased; ac.cabin = 2
+  delete ac.operations
+  if (variant.airlines[seat]!.operationsPolicy) ac.operations = aircraftOperations(variant.airlines[seat]!, ac, state.turn)
   delete ac.groundedUntil; delete ac.maintainedUntil
   const borrow = financed && !leased ? Math.max(0, spec.price - state.airlines[seat]!.cash) : 0
   if (borrow > 0) variant.airlines[seat]!.loans.push({ id: -1, principal: borrow, annualRateBp: currentLoanRateBp(state) })

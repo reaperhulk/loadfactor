@@ -513,7 +513,7 @@ and an outgoing link survive reloads.
 
 ### Rules 2: passengers, operations and focused mandates
 
-New careers use rules 2; unversioned careers stay on rules 1. Every O/D market
+Rules-2 careers retain this model; unversioned careers stay on rules 1. See rules 3 below for new careers. Every O/D market
 has one conserved demand pool split into business, leisure and budget travelers.
 Direct flights and all viable one-stop itineraries compete for that pool. Each
 connecting journey consumes capacity on both legs. Route statistics count
@@ -635,3 +635,50 @@ Runway celebration aircraft use dedicated front/rear vector portraits aligned
 to the scene's depth axis. Their screen-space center remains on the runway
 centerline while scale and altitude change; fleet/catalog art stays side-on.
 Browser tests sample both timelines at three points on desktop and mobile.
+
+
+### Rules 3: fractional operations
+
+New careers use rules 3. Rules-1 and rules-2 golden outcomes remain pinned in
+separate fixtures. A rules-2 solo career may issue `upgrade_operations` during
+planning. This initializes every carrier's policy and wear records without
+changing the replay header: older commands still replay under their original
+rules, with the transition recorded at its actual position in the log.
+
+`operations.ts` resolves thirteen weeks of whole round trips before a single
+passenger-market pass. Integer calendar intervals protect preferred flights,
+then allocate recovery from compatible aircraft with spare hours and finally
+standby. Type-rated crew families, range, base, a 1,000 km ferry limit, ferry
+time, overlapping commitments and the 6,000-minute weekly budget constrain
+substitutions. The preferred route assignment never moves. Covered trips use
+the donor's real cabin capacity; smaller aircraft can displace passengers.
+
+Default reserve hours are 5%, configurable to 0/5/10/15%. Increasing reserves
+caps schedules to the new budget; reducing them frees hours without silently
+adding flights. Optional paid recovery is capped at 10% of planned round trips
+and bills normal flight costs plus a premium. The forecast shows known downtime
+and a separately labelled three-day-repair stress case, never future defect RNG.
+
+Wear records accumulate block minutes, cycles and check history; stored quarters
+add no flight wear. Gradual age costs replace the seven-year cliff. Deterministic
+per-aircraft defects usually take 4–8 hours, sometimes 1–3 days, rarely 7–21 days.
+Checks take 7 days for narrowbodies and 10 for widebodies, due every eight quarters
+or 480,000 block minutes / 4,000 cycles. Unbooked due checks are staggered across
+the quarter. Checks can be booked in weeks 1–13, rescheduled or cancelled before
+starting, charge once when work starts, and carry remaining downtime across a
+quarter boundary. Completion resets check wear while preserving lifetime wear.
+
+The market uses actual quarterly trips and capacity for rules 3; historical
+rules retain weekly resolution and their original rounding. Repairs/checks bill
+the maintenance bucket, recovery the fees bucket. Completed, covered, cancelled,
+displaced passengers and aircraft availability appear in forecasts and reports.
+Reputation responds only to uncovered passenger disruption. Rival policies keep
+5–10% reserve hours, use paid recovery when disruption and cash justify it, and
+replace older aircraft for operating savings while retaining them until delivery.
+
+The operations regression suite covers overlapping repairs, incompatible crews,
+remote bases, standby checks, quarter boundaries, smaller substitute aircraft,
+whole-trip accounting, forecasts, replay upgrades and maintained old aircraft.
+Browser tests exercise policy, maintenance, report and save continuity at desktop
+and phone sizes. Quarter review/report UI is deferred then warmed after startup to preserve the existing
+190 KiB eager-bundle budget; map hit targets are 24 CSS pixels / 36 for coarse pointers.

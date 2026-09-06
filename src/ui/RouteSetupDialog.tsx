@@ -36,9 +36,9 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
     })
   const [aircraftId, setAircraftId] = useState<number | null>(candidates[0]?.id ?? null)
   const chosen = candidates.find((ac) => ac.id === aircraftId) ?? null
-  const maxFreq = chosen ? roundTripsPerWeek(chosen.type, km) : 0
+  const maxFreq = chosen ? roundTripsPerWeek(chosen.type, km, player.operationsPolicy?.reserveBp) : 0
   const demand = pairWeeklyDemand(state, from, to)
-  const suggestedFrequency = (ac: (typeof candidates)[number]) => Math.max(1, Math.min(roundTripsPerWeek(ac.type, km), Math.ceil(demand * 0.7 / (cabinSeats(ac.type, ac.cabin) * 2))))
+  const suggestedFrequency = (ac: (typeof candidates)[number]) => Math.max(1, Math.min(roundTripsPerWeek(ac.type, km, player.operationsPolicy?.reserveBp), Math.ceil(demand * 0.7 / (cabinSeats(ac.type, ac.cabin) * 2))))
   const [frequency, setFrequency] = useState(chosen ? suggestedFrequency(chosen) : 1)
   const [fareLevel, setFareLevel] = useState(0)
   const [serviceLevel, setServiceLevel] = useState(2)
@@ -86,7 +86,7 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
                   const t = getAircraftType(ac.type)
                   return (
                     <option key={ac.id} value={ac.id}>
-                      {t.name} ({t.seats} seats, max {roundTripsPerWeek(ac.type, km)} rt/wk)
+                      {t.name} ({t.seats} seats, max {roundTripsPerWeek(ac.type, km, player.operationsPolicy?.reserveBp)} rt/wk)
                     </option>
                   )
                 })}

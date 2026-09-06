@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { SLOTS_PER_GRANT } from '../../data/constants'
 import { applyCommand, newGame, type GameEvent, type GameState } from '../index'
 import { applyPlanningCommand } from '../commands'
-import { currentLoanRateBp } from '../queries'
+import { currentLoanRateBp, maxRouteFrequency } from '../queries'
 import { cityPool, resolveSlotRequests, slotFee, slotQueue } from '../slots'
 
 function expectRejected(events: GameEvent[], reasonPart: string): void {
@@ -53,16 +53,17 @@ describe('command validation', () => {
   it('set_frequency is capped by the assigned fleet', () => {
     let r = applyCommand(fresh(), { type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: 1, frequency: 5 })
     const routeId = r.state.airlines[0]!.routes[0]!.id
-    r = applyCommand(r.state, { type: 'set_frequency', routeId, frequency: 22 })
-    expect(r.state.airlines[0]!.routes[0]!.frequency).toBe(22)
+    const max = maxRouteFrequency(r.state.airlines[0]!, r.state.airlines[0]!.routes[0]!)
+    r = applyCommand(r.state, { type: 'set_frequency', routeId, frequency: max })
+    expect(r.state.airlines[0]!.routes[0]!.frequency).toBe(max)
     expectRejected(
-      applyCommand(r.state, { type: 'set_frequency', routeId, frequency: 23 }).events,
-      'frequency must be 1..22',
+      applyCommand(r.state, { type: 'set_frequency', routeId, frequency: max + 1 }).events,
+      `frequency must be 1..${max}`,
     )
     // Assigning the second Caravelle doubles the ceiling.
     r = applyCommand(r.state, { type: 'assign_aircraft', aircraftId: 2, routeId })
-    r = applyCommand(r.state, { type: 'set_frequency', routeId, frequency: 44 })
-    expect(r.state.airlines[0]!.routes[0]!.frequency).toBe(44)
+    r = applyCommand(r.state, { type: 'set_frequency', routeId, frequency: max * 2 })
+    expect(r.state.airlines[0]!.routes[0]!.frequency).toBe(max * 2)
   })
 
   it('canonicalizes the pair ordering', () => {

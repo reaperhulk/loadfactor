@@ -22,7 +22,7 @@ export interface MarketAudit { pair: string; demand: number; carried: number; co
 
 // Exporting the audit lets tests prove conservation without storing a giant
 // O/D matrix in every save. The UI receives compact per-route segment totals.
-export function resolveItineraries(state: GameState, legs: RouteAcc[]): MarketAudit[] {
+export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWeeks = 1): MarketAudit[] {
   const markets = new Map<string, Itinerary[]>()
   const add = (from: string, to: string, itinerary: Itinerary) => {
     const key = pairKey(from, to)
@@ -66,7 +66,7 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[]): MarketAu
   for (const key of [...markets.keys()].sort()) {
     const choices = markets.get(key)!
     const [from, to] = key.split('-') as [string, string]
-    const demand = pairWeeklyDemand(state, from, to)
+    const demand = pairWeeklyDemand(state, from, to) * periodWeeks
     const mix = segmentMix(from, to)
     const directFare = fareFor(distanceKm(from, to), 0)
     let carried = 0, connecting = 0, apportioned = 0
@@ -79,9 +79,10 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[]): MarketAu
         const cabin = Math.floor(it.legs.reduce((sum, l) => sum + l.yieldBp, 0) / it.legs.length)
         const ratio = Math.min(24000, Math.floor(it.fare * 10000 / Math.max(1, directFare)))
         const priceAppeal = Math.max(1200, 21000 - ratio)
+        const frequency = Math.floor(it.trips / periodWeeks)
         let weight = segment === 'business'
-          ? Math.max(1, it.trips) * (6500 + service * 1700) * cabin / 10000
-          : (6 + Math.min(24, it.trips)) * (segment === 'budget' ? priceAppeal * priceAppeal / 10000 : priceAppeal)
+          ? Math.max(1, frequency) * (6500 + service * 1700) * cabin / 10000
+          : (6 + Math.min(24, frequency)) * (segment === 'budget' ? priceAppeal * priceAppeal / 10000 : priceAppeal)
         if (it.legs.length === 2) {
           const banked = airline.hubMode === 'banked'
           const base = segment === 'business' ? 2000 : segment === 'leisure' ? 4500 : 6500

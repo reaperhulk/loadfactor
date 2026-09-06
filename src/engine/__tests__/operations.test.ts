@@ -7,7 +7,7 @@ import { allocateTrips, objectiveQualified, routeWeeklyCapacity } from '../queri
 import { checkInvariants } from '../invariants'
 
 function network() {
-  let s = newGame('jet_age', 'operations')
+  let s = newGame('jet_age', 'operations', undefined, undefined, 2)
   s = applyCommand(s, { type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: 1, frequency: 8 }).state
   s = applyCommand(s, { type: 'open_route', from: 'JFK', to: 'MIA', aircraftId: 2, frequency: 8 }).state
   return s

@@ -21,7 +21,7 @@ import {
   TAKEOVER_BASE_K,
   TAKEOVER_PREMIUM_BP,
 } from '../data/constants'
-import { pairWeeklyDemand, routeSpoolBp } from './market'
+import { estimateAircraftQuarterCost, pairWeeklyDemand, routeSpoolBp } from './market'
 import { nextExpansion, slotFee, slotsRemaining } from './slots'
 import {
   airlinesOnPair,
@@ -209,8 +209,30 @@ export function distressCommands(state: GameState, idx: number): Command[] {
 export function renewalCommands(state: GameState, idx: number, renewAge = 48): Command[] {
   const airline = state.airlines[idx]!
   if (airline.fleet.length <= 2) return []
+  if (airline.operationsPolicy) {
+    const commands: Command[] = []
+    let availableCash = airline.cash - cashBufferFor(airline)
+    for (const ac of [...airline.fleet].sort((a,b) => b.ageQuarters-a.ageQuarters || a.id-b.id)) {
+      if (ac.ageQuarters < Math.max(60, renewAge) || ac.routeId === null || airline.orders.some(o => o.replacesAircraftId === ac.id)) continue
+      const routes = airline.routes.filter(r => r.id === ac.routeId || r.id === ac.secondaryRouteId)
+      const km = Math.max(...routes.map(r => distanceKm(r.from, r.to)))
+      const current = estimateAircraftQuarterCost(state, ac.type, km)
+      const candidate = typesOnSale(yearOf(state)).filter(t => t.id !== ac.type && t.rangeKm >= km && t.seats >= getAircraftType(ac.type).seats * 3 / 4)
+        .map(t => ({ t, cost: estimateAircraftQuarterCost(state, t.id, km) }))
+        .filter(x => x.cost < current).sort((a,b) => a.cost-b.cost || a.t.price-b.t.price)[0]
+      if (!candidate) continue
+      const leased = availableCash < candidate.t.price
+      const required = leased ? Math.floor(candidate.t.price * 600 / 10000) : candidate.t.price
+      // Keep maintained older aircraft unless fuel savings pay for renewal.
+      if (availableCash < required || (leased && current - candidate.cost <= Math.floor(candidate.t.price * 200 / 10000))) continue
+      commands.push({ type: 'order_replacement', aircraftId: ac.id, aircraftType: candidate.t.id, leased })
+      availableCash -= required
+      if (commands.length === 2) break
+    }
+    return commands
+  }
   const geriatric = airline.fleet
-    .filter((a) => a.ageQuarters >= renewAge && !a.leased)
+    .filter((a) => a.ageQuarters >= (airline.operationsPolicy ? Math.max(80, renewAge) : renewAge) && !a.leased)
     .sort((a, b) => b.ageQuarters - a.ageQuarters || a.id - b.id)
     .slice(0, Math.min(2, airline.fleet.length - 2))
   return geriatric.map((ac) => ({ type: 'sell_aircraft', aircraftId: ac.id }))
@@ -223,7 +245,7 @@ export function surplusCommands(state: GameState, idx: number): Command[] {
   if (airline.cash >= cashBufferFor(airline) || airline.fleet.length <= 3) return []
   let surplus: Airline['fleet'][number] | null = null
   for (const ac of airline.fleet) {
-    if (ac.routeId !== null || ac.leased) continue
+    if (ac.routeId !== null || ac.leased || (airline.operationsPolicy && ac.reserve)) continue
     if (surplus === null || ac.ageQuarters > surplus.ageQuarters) surplus = ac
   }
   return surplus ? [{ type: 'sell_aircraft', aircraftId: surplus.id }] : []
@@ -352,9 +374,9 @@ export function bestUnservedPair(
 // Size a launch schedule to the MARKET, not the airframe: a widebody at full
 // frequency floods a thin pair and burns fuel on empty seats. ~70% of weekly
 // demand, at least 2 round trips, at most what the airframe can fly.
-export function launchFrequency(state: GameState, from: string, to: string, typeId: string): number {
+export function launchFrequency(state: GameState, from: string, to: string, typeId: string, reserveBp = 0): number {
   const km = distanceKm(from, to)
-  const maxFreq = roundTripsPerWeek(typeId, km)
+  const maxFreq = roundTripsPerWeek(typeId, km, reserveBp)
   const seats = getAircraftType(typeId).seats
   const demand = pairWeeklyDemand(state, from, to)
   const wanted = Math.ceil((demand * 7) / 10 / Math.max(1, seats * 2))
@@ -371,7 +393,7 @@ export function launchCommands(
   const pair = bestUnservedPair(state, idx, dials.contestDiscountBp, dials.connectionFocus)
   if (!pair || pair.score <= dials.expandMinDemand) return { commands: [], usedAircraft: null }
   const launch = airline.fleet.find(
-    (ac) => ac.routeId === null && getAircraftType(ac.type).rangeKm >= pair.km,
+    (ac) => ac.routeId === null && !(airline.operationsPolicy && ac.reserve) && getAircraftType(ac.type).rangeKm >= pair.km,
   )
   if (!launch) return { commands: [], usedAircraft: null }
   return {
@@ -381,7 +403,7 @@ export function launchCommands(
         from: pair.from,
         to: pair.to,
         aircraftId: launch.id,
-        frequency: launchFrequency(state, pair.from, pair.to, launch.type),
+        frequency: launchFrequency(state, pair.from, pair.to, launch.type, airline.operationsPolicy?.reserveBp),
         fareLevel: dials.fareLevel,
         serviceLevel: dials.serviceLevel,
       },
@@ -534,7 +556,7 @@ export function slotReleaseCommands(state: GameState, idx: number): Command[] {
   // Metal on the way means the positions have a purpose: an idle airframe or
   // an outstanding order is a route about to open. Shedding capacity in that
   // window would just buy it back next quarter, fee and all.
-  if (airline.fleet.some((a) => a.routeId === null) || airline.orders.length > 0) return []
+  if (airline.fleet.some((a) => a.routeId === null && !(airline.operationsPolicy && a.reserve)) || airline.orders.length > 0) return []
   for (const city of slotCities(airline)) {
     if (city === airline.hq || touched.has(city)) continue
     if (city === airline.slotInterest) continue // the declared plan
@@ -564,7 +586,7 @@ export function assignmentCommands(state: GameState, idx: number, skip?: Readonl
   const pendingCapacity = new Map<number, number>()
   const pendingTrips = new Map<number, number>()
   for (const ac of airline.fleet) {
-    if (ac.routeId !== null || skip?.has(ac.id)) continue
+    if (ac.routeId !== null || skip?.has(ac.id) || (airline.operationsPolicy && ac.reserve)) continue
     const type = getAircraftType(ac.type)
     let bestRoute: (typeof airline.routes)[number] | null = null
     let bestGap = 0
@@ -582,7 +604,7 @@ export function assignmentCommands(state: GameState, idx: number, skip?: Readonl
     }
     if (bestRoute !== null) {
       const km = distanceKm(bestRoute.from, bestRoute.to)
-      const trips = roundTripsPerWeek(ac.type, km)
+      const trips = roundTripsPerWeek(ac.type, km, airline.operationsPolicy?.reserveBp)
       commands.push({ type: 'assign_aircraft', aircraftId: ac.id, routeId: bestRoute.id })
       const newMax = maxRouteFrequency(airline, bestRoute) + (pendingTrips.get(bestRoute.id) ?? 0) + trips
       const demand = pairWeeklyDemand(state, bestRoute.from, bestRoute.to)

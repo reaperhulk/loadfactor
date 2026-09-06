@@ -1,3 +1,4 @@
+import { checkDueIn } from '../engine/operations'
 import { useEffect, useState } from 'react'
 import type { GameState } from '../engine'
 import { isGrounded } from '../engine/queries'
@@ -21,6 +22,8 @@ export function inboxItems(state: GameState, seat: number, cashAfter: number): s
     ...a.fleet.filter((f) => isGrounded(f, state.turn)).map((f) => `grounded-${f.id}`),
     ...a.routes.filter((r) => r.lastCapacity > 0 && r.lastRevenue < r.lastCost).map((r) => `loss-${r.id}`),
     ...state.world.offers.filter((o) => (o.airline ?? 0) === seat).map((o) => `offer-${o.id}`),
+    ...a.fleet.filter(f => a.operationsPolicy && checkDueIn(a, f, state.turn) === 0 && f.operations?.checkStart === undefined).map(f => `check-due-${f.id}`),
+    ...((a.history.at(-1)?.operations?.affectedPassengers ?? 0) > 0 ? ['service-disruption'] : []),
     ...(cashAfter < 0 ? ['cash'] : []),
     ...(idleSlotRent(a) > 0 ? ['unused-slots'] : []),
     ...(a.fuelHedge?.quartersLeft === 1 ? ['hedge-expiry'] : []),

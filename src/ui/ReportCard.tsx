@@ -1,3 +1,4 @@
+import { OperationsSummary } from './OperationsSummary'
 import { Dialog } from './Dialog'
 // The quarterly report card: what just happened, at a glance — shown after
 // every End Quarter. Built purely from the session's reportEvents plus the
@@ -103,6 +104,7 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
           {' '}− fleet, airport and company costs {money(now.costs - now.breakdown.fuel - now.breakdown.fees - now.breakdown.flightPay - now.breakdown.service)}
           {' '}= airline net profit {money(now.profit)}.
         </p>
+        {now.operations && <OperationsSummary summary={now.operations} />}
         <table className="report-lines">
           <tbody>
             <tr>

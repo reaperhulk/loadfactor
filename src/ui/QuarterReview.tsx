@@ -1,5 +1,7 @@
 import type { GameState } from '../engine'
-import type { forecastQuarter } from '../engine/forecast'
+import { useMemo } from 'react'
+import { OperationsSummary } from './OperationsSummary'
+import { forecastQuarter } from '../engine/forecast'
 import { isGrounded, quarterOf, yearOf } from '../engine/queries'
 import { usePlanningDraftCount } from './planningDrafts'
 import { Dialog } from './Dialog'
@@ -9,6 +11,7 @@ import { viewSeat } from './session'
 export function QuarterReview({ state, forecast, onClose, onConfirm }: {
   state: GameState; forecast: ReturnType<typeof forecastQuarter>; onClose: () => void; onConfirm: () => void
 }) {
+  const adverse = useMemo(() => state.airlines[viewSeat()]!.operationsPolicy ? forecastQuarter(state, viewSeat(), [], { operations: 'adverse' }) : undefined, [state])
   const drafts = usePlanningDraftCount()
   const airline = state.airlines[viewSeat()]!
   const idle = airline.fleet.filter((a) => a.routeId === null && !a.reserve && !isGrounded(a, state.turn)).length
@@ -29,6 +32,8 @@ export function QuarterReview({ state, forecast, onClose, onConfirm }: {
         {idle > 0 && <p>{idle} unassigned aircraft still incur crew and ownership costs.</p>}
         {losing > 0 && <p>{losing} routes forecast a loss before fixed company costs.</p>}
       </section>}
+      {forecast.operations && <OperationsSummary summary={forecast.operations} forecast />}
+      {adverse?.operations && <p className="review-attention" data-testid="operations-adverse">Stress case · one additional three-day repair: {adverse.operations.cancelledTrips} cancelled round trips; {money(adverse.profit)} company profit. This is an illustration, not a prediction of the next repair.</p>}
       <p className="hint">Forecast at current fuel, demand and rival schedules. Deliveries, competitor moves and disruptions can change the result.</p>
       <div className="dialog-actions"><button onClick={onClose}>Back to planning</button><button className="end-quarter" data-testid="confirm-quarter" onClick={onConfirm}>Fly this quarter <span aria-hidden="true">→</span></button></div>
     </div>
