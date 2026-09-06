@@ -1,6 +1,7 @@
 import type { GameState } from '../engine'
 import type { forecastQuarter } from '../engine/forecast'
 import { isGrounded, quarterOf, yearOf } from '../engine/queries'
+import { usePlanningDraftCount } from './planningDrafts'
 import { Dialog } from './Dialog'
 import { money } from './format'
 import { viewSeat } from './session'
@@ -8,12 +9,14 @@ import { viewSeat } from './session'
 export function QuarterReview({ state, forecast, onClose, onConfirm }: {
   state: GameState; forecast: ReturnType<typeof forecastQuarter>; onClose: () => void; onConfirm: () => void
 }) {
+  const drafts = usePlanningDraftCount()
   const airline = state.airlines[viewSeat()]!
   const idle = airline.fleet.filter((a) => a.routeId === null && !a.reserve && !isGrounded(a, state.turn)).length
   const losing = forecast.routes.filter((r) => r.lastRevenue < r.lastCost).length
   return <Dialog label="Review quarter" className="gameover-overlay" testId="quarter-review" onClose={onClose}>
     <div className="report-card quarter-review">
       <div className="dialog-heading"><div><span className="eyebrow">{yearOf(state)} Q{quarterOf(state)} · planning</span><h2>Review your next quarter</h2></div><button onClick={onClose} aria-label="Close quarter review">×</button></div>
+      {drafts > 0 && <p role="status" className="draft-warning">{drafts} unapplied changes are excluded from this forecast and will not fly. Return to planning to apply or discard them.</p>}
       <p className="review-profit"><small>Planned company net profit</small><strong className={forecast.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.profit)}</strong></p>
       <dl className="cash-bridge" data-testid="review-cash-bridge">
         <div><dt>Cash now</dt><dd>{money(airline.cash)}</dd></div>

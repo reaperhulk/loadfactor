@@ -3,6 +3,8 @@ import type { Command, GameState } from '../engine'
 import { forecastQuarter } from '../engine/forecast'
 import { maxRouteFrequency } from '../engine/queries'
 import { dispatchBatch, viewSeat } from './session'
+import { planningForecast } from './forecast'
+import { usePlanningDraftNotice } from './planningDrafts'
 import { money } from './format'
 
 export function PlanningWorkbench({ state, suggestions }: { state: GameState; suggestions: Command[] }) {
@@ -12,10 +14,11 @@ export function PlanningWorkbench({ state, suggestions }: { state: GameState; su
   const [service, setService] = useState(airline.routes[0]?.serviceLevel ?? 2)
   const [frequency, setFrequency] = useState(airline.routes[0]?.frequency ?? 1)
   const [draft, setDraft] = useState<Command[]>([])
+  usePlanningDraftNotice(draft.length)
   const [stress, setStress] = useState(false)
   const route = airline.routes.find((r) => r.id === routeId) ?? airline.routes[0]
   const forecast = useMemo(() => {
-    const before = forecastQuarter(state, seat)
+    const before = planningForecast(state, seat)
     const after = draft.length ? forecastQuarter(state, seat, draft) : before
     const headwind = stress ? forecastQuarter(state, seat, draft, { fuelBp: Math.floor(state.world.fuelBp * 1.2), economyBp: Math.floor(state.world.economyBp * 0.9) }) : null
     return { before, after, headwind }

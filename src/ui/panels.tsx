@@ -547,6 +547,8 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
   const year = yearOf(state)
   const [fleetSort, setFleetSort] = useState<FleetSortKey>('type')
   const [fleetAsc, setFleetAsc] = useState(true)
+  const [fleetQuery,setFleetQuery] = useState('')
+  const [idleOnly,setIdleOnly] = useState(false)
   // Renewal forecast: what the fleet costs to keep today, what the same
   // metal will cost in two years of aging and inflation, and how many
   // airframes cross into geriatric territory on the way.
@@ -640,9 +642,13 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
           </button>
         </p>
       )}
+      <div className="fleet-filters"><input type="search" aria-label="Find aircraft" placeholder="Find aircraft or route…" value={fleetQuery} onChange={(e)=>setFleetQuery(e.target.value)} /><label><input type="checkbox" checked={idleOnly} onChange={(e)=>setIdleOnly(e.target.checked)} /> Unassigned only</label></div>
       {(() => {
         // Row models first so sorting works on exactly what the cells show.
-        const fleetRows = player.fleet.map((a) => {
+        const fleetRows = player.fleet.filter((a) => {
+          const r=player.routes.find((r)=>r.id===a.routeId)
+          return (!idleOnly || a.routeId===null && !a.reserve && !isGrounded(a,state.turn)) && `${a.id} ${getAircraftType(a.type).name} ${r ? `${r.from}-${r.to}` : ''}`.toLowerCase().includes(fleetQuery.toLowerCase())
+        }).map((a) => {
           const type = getAircraftType(a.type)
           const route = player.routes.find((r) => r.id === a.routeId)
           const utilBp = Math.min(10000, player.routes.reduce((total, r) => {

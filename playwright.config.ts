@@ -9,6 +9,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4173',
     trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
     // Sandboxed dev environments ship a system Chromium instead of the
     // Playwright-managed download; point PW_CHROMIUM_PATH at it to reuse it.
     launchOptions: process.env.PW_CHROMIUM_PATH
@@ -17,7 +18,7 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'webkit', testMatch: ['modern.spec.ts', 'responsive.spec.ts', 'multiplayer.spec.ts'], grepInvert: /link duel:/, use: { ...devices['Desktop Safari'], launchOptions: {} } },
+    { name: 'webkit', testMatch: ['modern.spec.ts', 'responsive.spec.ts', 'multiplayer.spec.ts', 'density.spec.ts'], grepInvert: /link duel:/, use: { ...devices['Desktop Safari'], launchOptions: {} } },
     { name: 'mobile-webkit', testMatch: 'modern.spec.ts', use: { ...devices['iPhone 13'], launchOptions: {} } },
   ],
   webServer: {

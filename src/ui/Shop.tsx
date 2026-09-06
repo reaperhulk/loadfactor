@@ -38,7 +38,7 @@ export function Shop({ state }: { state: GameState }) {
         </select>
       </label>
       <div className="table-scroll">
-        <table data-testid="shop-table">
+        <table data-testid="shop-table" className="shop-table">
           <thead>
             <tr>
               <th>Type</th>
@@ -83,22 +83,22 @@ export function Shop({ state }: { state: GameState }) {
               return rows.map(({ t, cost, seats, outOfRange, perSeat, breakevenBp }) => (
                 <tr key={t.id} className={outOfRange ? 'dim' : ''}>
                   <td><strong>{t.name}</strong><AircraftArt type={t.id} /></td>
-                  <td>{t.seats}</td>
-                  <td>{t.rangeKm}km</td>
-                  <td>{t.speedKmh}km/h</td>
-                  <td>${t.fuelPerKm}</td>
-                  <td>{money(t.maintBase)}</td>
-                  <td>{t.deliveryQuarters}q</td>
-                  <td>{money(t.price)}</td>
-                  {km !== null && <td>{outOfRange ? 'out of range' : money(cost!)}</td>}
-                  {km !== null && <td>{outOfRange ? '—' : seats}</td>}
+                  <td data-label="Seats">{t.seats}</td>
+                  <td data-label="Range">{t.rangeKm}km</td>
+                  <td data-label="Speed">{t.speedKmh}km/h</td>
+                  <td data-label="Fuel / km">${t.fuelPerKm}</td>
+                  <td data-label="Maintenance / q">{money(t.maintBase)}</td>
+                  <td data-label="Delivery">{t.deliveryQuarters}q</td>
+                  <td data-label="Price">{money(t.price)}</td>
+                  {km !== null && <td data-label="Est. cost / q">{outOfRange ? 'out of range' : money(cost!)}</td>}
+                  {km !== null && <td data-label="Seats / wk">{outOfRange ? '—' : seats}</td>}
                   {km !== null && (
-                    <td className={perSeat !== null && perSeat === bestPerSeat ? 'pos' : ''}>
+                    <td data-label="Cost / seat" className={perSeat !== null && perSeat === bestPerSeat ? 'pos' : ''}>
                       {perSeat === null ? '—' : `$${perSeat}`}
                     </td>
                   )}
                   {km !== null && (
-                    <td
+                    <td data-label="Break-even load"
                       className={
                         breakevenBp === null
                           ? ''

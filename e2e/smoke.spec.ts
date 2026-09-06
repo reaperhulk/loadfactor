@@ -461,7 +461,7 @@ test('airline identity: name, livery, and a custom HQ with derived footholds', a
   expect(me.hq).toBe('LAX')
   expect(Object.keys(me.slots).length).toBe(4) // HQ + three footholds
   // The livery recolors the accent, and the standings sheet knows the name.
-  await expect(page.locator('main.game')).toHaveAttribute('style', /--accent/)
+  await expect(page.locator('main.game')).toHaveAttribute('style', /--livery/)
   await openPanel(page, 'rivals')
   await expect(page.getByTestId('standings')).toContainText('Pan Galactic (you)')
   await expect(page.getByTestId('standings')).toContainText('Albion Airways')
@@ -789,7 +789,7 @@ test('dragging off the map edge selects no text, and selection returns after', a
   // And the lock comes off, so text is copyable again the rest of the time.
   await expect(page.locator('html.map-gesture')).toHaveCount(0)
   const copyable = await page.evaluate(() => {
-    const el = document.querySelector('.key-hints')!
+    const el = document.querySelector('.app-header h1')!
     const r = document.createRange()
     r.selectNodeContents(el)
     const sel = window.getSelection()!
@@ -799,7 +799,7 @@ test('dragging off the map edge selects no text, and selection returns after', a
     sel.removeAllRanges()
     return got
   })
-  expect(copyable, 'page text is still selectable after the gesture').toContain('end quarter')
+  expect(copyable, 'page text is still selectable after the gesture').toBeTruthy()
 })
 
 // The stutter you feel while dragging is a re-centre: the layer runs out of
@@ -1128,7 +1128,7 @@ test('an aircraft order cancels for the partial refund', async ({ page }) => {
   await cancel.click()
   await expect(cancel).toHaveText('sure?')
   await cancel.click()
-  await expect(page.locator('text=on order')).toHaveCount(0)
+  await expect(page.getByTestId('page-orders').locator('[data-testid^=cancel-order-]')).toHaveCount(0)
   // 80% of the purchase price comes back (ORDER_CANCEL_REFUND_BP).
   const cashFinal = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)
   expect(cashFinal).toBe(cashAfterOrder + Math.floor(price * 0.8))

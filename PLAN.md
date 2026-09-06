@@ -573,3 +573,10 @@ traffic pauses. Desktop inspectors sit beside their lists; mobile detail views
 return to the same list position. A quarter review exposes projected profit,
 loan principal and ending cash before the player resolves the simulation.
 UI-REDESIGN.md tracks delivery and the viewport acceptance contract.
+
+The operations Desk prioritizes entity-specific decisions and upcoming deliveries
+and expiries. Route controls forecast a single atomic command batch beside the
+inputs. Unapplied inspector/workbench edits are UI state; quarter review explicitly
+excludes them. A shared immutable-snapshot forecast cache feeds the shell and
+planning surfaces. Browser density tests use a real 24-quarter bot career at
+eight viewport sizes, plus 125% text, and assert viewport geometry directly.

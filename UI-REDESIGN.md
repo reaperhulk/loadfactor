@@ -9,12 +9,12 @@ main. Preserve deterministic simulation, legacy careers and multiplayer.
 - [x] Task-specific workspaces; map camera and mounted list state survive navigation.
 - [x] Persistent cash/profit/objective status and a quarter review with a cash bridge.
 - [x] Settings leave the main header; fleet ownership, orders and market are separate.
-- [ ] Compact actionable desk with entity-specific destinations and timeline.
+- [x] Compact actionable desk with entity-specific destinations and timeline.
 - [x] Route list/inspector, explicit periods, not-flown states and immediate forecasts.
 - [x] Aircraft list/inspector with assignment, maintenance, replacement and artwork.
-- [ ] Denser responsive tables, mobile essentials and coherent visual tokens.
-- [ ] One map lens control; coordinated route selection and quiet background networks.
-- [ ] Viewport contracts for desktop, tablet, mobile, mature airlines and larger text.
+- [x] Denser responsive tables, mobile essentials and coherent visual tokens.
+- [x] One map lens control; coordinated route selection and quiet background networks.
+- [x] Viewport contracts for desktop, tablet, mobile, mature airlines and larger text.
 - [ ] Hosted Chromium/WebKit gates and live deployment verification.
 
 ## Acceptance

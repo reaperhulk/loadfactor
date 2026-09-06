@@ -6,6 +6,7 @@ import { fareFor } from '../engine/market'
 import { effectiveFrequency, maxRouteFrequency } from '../engine/queries'
 import { dispatchBatch, viewSeat } from './session'
 import { planningForecast } from './forecast'
+import { usePlanningDraftNotice } from './planningDrafts'
 import { money } from './format'
 
 export function RoutePlanner({ state, route }: { state: GameState; route: Route }) {
@@ -21,6 +22,7 @@ export function RoutePlanner({ state, route }: { state: GameState; route: Route 
     if (frequency !== route.frequency) commands.push({ type: 'set_frequency', routeId: route.id, frequency })
     return { commands, after: commands.length ? forecastQuarter(state, seat, commands) : before }
   }, [state, seat, route, fare, service, frequency, before])
+  usePlanningDraftNotice(commands.length)
   const prior = before.routes.find((r) => r.id === route.id)!, projected = after.routes.find((r) => r.id === route.id)!
   const change = after.profit - before.profit
   const km = distanceKm(route.from, route.to)

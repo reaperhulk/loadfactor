@@ -61,6 +61,21 @@ Four shorter mandates use the full simulation:
 | Sixteen Quarters of Oil | 16 quarters | Earn profits with fuel starting at 160% |
 | Fortress Hub | 24 quarters | Grow connecting traffic through an established hub |
 
+## Your workspace
+
+Four persistent destinations keep navigation, cash, objectives and quarter review
+on screen: **Desk** for prioritized decisions and upcoming commitments,
+**Network** for the map, routes and airports, **Fleet** for owned aircraft,
+orders and the market, and **Company** for finance, rivals and reports.
+
+Routes and aircraft use compact comparison lists with focused inspectors. Route
+fare, service and frequency edits show company profit and ending cash before one
+undoable apply. Quarter review warns about unapplied drafts. New routes show
+“Not flown yet”; actual results and next-quarter forecasts are labeled separately.
+Desktop uses a navigation rail and adjacent inspectors; mobile uses bottom
+navigation, full-width inspectors and catalog cards. List filters, scroll and
+map position survive workspace navigation.
+
 ## Sound, display and controls
 
 Original generative music follows five era palettes and responds to financial
@@ -71,9 +86,9 @@ Mute silences everything. Audio starts after a gesture and suspends when hidden.
 Motion follows the device preference by default. Map colors directly select
 ownership, load factor, route margin or season; metric lines also use patterns.
 Reports and launch dialogs support keyboard focus and Escape. On phones, city
-and route dossiers open as sheets with their own scrolling area.
+and route inspectors fill the workspace and keep their own scrolling area.
 
-Space or E ends a quarter; 1–6 selects a panel; Escape closes the current overlay
+Space or E opens quarter review; 1–6 selects a panel; Escape closes the current overlay
 or selection; Ctrl/Cmd+Z undoes a planning action. Shortcuts stay out of form
 controls. Saves are automatic, with export/import and visible recovery when
 browser storage is unavailable. Visit once online to install the offline shell.

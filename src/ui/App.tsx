@@ -1,3 +1,4 @@
+import { isGrounded } from '../engine/queries'
 import { planningForecast } from './forecast'
 import { AREA_PAGES, PAGE_LABELS, areaFor, type WorkspaceArea, type WorkspacePage } from './workspace'
 import { QuarterReview } from './QuarterReview'
@@ -12,13 +13,14 @@ import { AIRCRAFT } from '../data/aircraft'
 import { getEventDef } from '../data/events'
 import { SCENARIOS, SHORT_SCENARIOS, getScenario } from '../data/scenarios'
 import { netWorth, networkCities, objectiveQualified, objectiveScore, quarterOf, yearOf } from '../engine/queries'
-import { idleSlotRent, nextExpansion } from '../engine/slots'
+import { nextExpansion } from '../engine/slots'
 import { CityPanel } from './CityPanel'
 import { CoachMarks } from './CoachMarks'
 import { ConfirmButton } from './ConfirmButton'
 import { useCountUp } from './countUp'
 import { isMuted, setMuted } from './sounds'
 import { ActiveDeals, OfferCard } from './OfferCard'
+import { DeskTimeline } from './DeskTimeline'
 import { AircraftDossier } from './AircraftDossier'
 import { AirportsPanel, FinancePanel, FleetPanel, ReportPanel, RoutesPanel } from './panels'
 import { ReportCard } from './ReportCard'
@@ -665,7 +667,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const shownCash = useCountUp(player.cash), shownWorth = useCountUp(netWorth(player))
   const attentionCount = player.fleet.filter((a) => a.routeId === null && !a.reserve).length +
     player.routes.filter((r) => r.history.length > 0 && r.lastRevenue < r.lastCost).length +
-    (forecast.cashAfter < 0 ? 1 : 0) + state.world.offers.filter((o) => o.airline === undefined || o.airline === seat).length
+    (forecast.cashAfter < 0 ? 1 : 0) + player.fleet.filter((a) => isGrounded(a,state.turn)).length + state.world.offers.filter((o) => (o.airline ?? 0) === seat).length
   const handleCityClick = (cityId: string): void => {
     setSelectedRoute(null)
     if (routeFrom !== null && routeFrom !== cityId) {
@@ -690,7 +692,13 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     const onKey = (e: KeyboardEvent): void => {
       const target = e.target as HTMLElement | null
       if (target?.closest('[role=dialog]')) return
-      if (target && ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(target.tagName)) return
+      if (e.key === 'Escape') {
+        setSelectedRoute(null); setSelectedAircraft(null); setPendingRoute(null)
+        setRouteFrom((armed) => { if (armed === null) setSelectedCity(null); return null })
+        return
+      }
+      if (target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return
+      if (target?.tagName === 'BUTTON' && [' ', 'e', 'E'].includes(e.key)) return
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         if (undoLastAction()) e.preventDefault()
       } else if ([' ', 'e', 'E'].includes(e.key)) {
@@ -706,10 +714,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         setSelectedCity((cur) => { const idx = cur !== null ? cities.indexOf(cur) : step > 0 ? -1 : 0; return cities[(idx + step + cities.length) % cities.length]! })
       } else if (e.key >= '1' && e.key <= String(TABS.length)) setTab(TABS[Number(e.key) - 1]!)
       else if (e.key === '?') setShowHelp((h) => !h)
-      else if (e.key === 'Escape') {
-        setShowHelp(false); setShowReport(false); setShowReview(false); setSelectedRoute(null); setPendingRoute(null)
-        setRouteFrom((armed) => { if (armed === null) setSelectedCity(null); return null })
-      }
+
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -720,7 +725,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     <header className="app-header" data-testid="app-header">
       <div className="airline-brand"><Icon name="aircraft" /><div><h1 title={player.name}>{player.name}</h1><small>Load Factor</small></div></div>
       <span className="app-date"><span data-testid="date">{yearOf(state)} Q{quarterOf(state)}</span><small data-testid="race-clock">{Math.max(0, scenario.quarters - state.turn)}q left</small></span>
-      <button className="inbox-button" data-testid="open-inbox" onClick={() => setTab('desk')}><Icon name="inbox" /><span>Inbox</span>{attentionCount > 0 && <b>{attentionCount}</b>}</button>
+      <button className="inbox-button" data-testid="open-inbox" onClick={() => setTab('desk')}><Icon name="inbox" /><span>Inbox</span>{attentionCount > 0 && <b aria-label={`${attentionCount} items need attention`}>{attentionCount}</b>}</button>
       <button className="settings-button" data-testid="open-settings" aria-label="Open settings" onClick={() => setShowSettings(true)}><Icon name="settings" /></button>
     </header>
     <div className="turn-actions" data-testid="turn-actions"><span className="mobile-profit"><small>Planned net profit</small><strong className={forecast.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.profit)}</strong></span>
@@ -886,34 +891,10 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             ⚠ INSOLVENT — {player.insolventQuarters > 0 ? 'one more losing quarter folds the airline' : 'end the quarter in the red and the clock starts'}
           </span>
         )}
-<CoachMarks state={state} />
-      {(() => {
-        // Needs attention: money leaking or about to. Each chip jumps to the
-        // tab where the fix lives.
-        const idlePlanes = player.fleet.filter((a) => a.routeId === null && !a.reserve).length
-        // Rent on capacity nothing flies: the bill that quietly grows when a
-        // network of positions outruns the fleet that was meant to use them.
-        const idleRent = idleSlotRent(player)
-        const hedgeExpiring = player.fuelHedge !== null && player.fuelHedge.quartersLeft === 1
-        const chips: { key: string; text: string; tab: Tab }[] = []
-        if (idlePlanes > 0)
-          chips.push({ key: 'idle', text: `🛩 ${idlePlanes} idle plane${idlePlanes > 1 ? 's' : ''}`, tab: 'fleet' })
-        if (idleRent > 0)
-          chips.push({ key: 'slots', text: `🕳 ${money(idleRent)}/q rent on unused slots`, tab: 'airports' })
-        if (hedgeExpiring) chips.push({ key: 'hedge', text: '⛽ fuel hedge expires next quarter', tab: 'finance' })
-        if (chips.length === 0) return null
-        return (
-          <div className="events-strip attention-strip" data-testid="attention-strip" aria-live="polite">
-            {chips.map((c) => (
-              <button key={c.key} className="event-chip attention-chip" onClick={() => setTab(c.tab)}>
-                {c.text}
-              </button>
-            ))}
-          </div>
-        )
-      })()}
+      <div className="desk-columns"><div className="desk-priorities">
+      {state.phase === 'planning' && <ManagementBrief state={state} onTab={setTab} onAircraft={(id) => { setSelectedAircraft(id); setTab('fleet') }} onInspect={(id) => { setSelectedRoute(id); setTab('routes') }} onPlan={(from, to) => setPendingRoute({ from, to })} />}
       <OfferCard state={state} />
-      <ActiveDeals state={state} />
+      </div><aside className="desk-agenda"><h2>Coming up</h2><DeskTimeline state={state} onTab={setTab} /><ActiveDeals state={state} />
       {state.world.events.length > 0 && (
         <div className="events-strip" data-testid="events-strip">
           {state.world.events.map((e) => {
@@ -945,7 +926,8 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         <p>Airport programmes on your network: {[...new Set([...Object.keys(player.slots), ...player.slotRequests.map((r) => r.city)])].map((city) => ({ city, ...nextExpansion(state, city) })).filter((e) => e.quartersAway <= 8).sort((a,b) => a.quartersAway-b.quartersAway).map((e) => `${e.city}: +${e.slots} slots in ${e.quartersAway}q`).join(' · ') || 'none opening in the next eight quarters'}.</p>
         {state.airlines.filter((a) => a.campaign).map((a) => <p key={a.id}>{a.name}: {a.campaign!.kind} campaign at {a.campaign!.city}, through quarter {a.campaign!.untilTurn}.</p>)}
       </details>}
-      {state.phase === 'planning' && <ManagementBrief state={state} onTab={setTab} onInspect={inspectRoute} onPlan={(from, to) => setPendingRoute({ from, to })} />}
+      </aside></div>
+      <CoachMarks state={state} />
 
         </section>
         <section className="workspace-page map-page" hidden={tab !== 'map'} data-testid="page-map">
@@ -958,6 +940,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           }
         >
           <MapView
+          selectedRouteId={inspectedRoute?.id}
             state={state}
             active={tab === "map"}
             selected={selectedCity}
@@ -1088,7 +1071,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
               <tbody>
                 <tr>
                   <td>Space / E</td>
-                  <td>end the quarter (and dismiss the report)</td>
+                  <td>review the next quarter before flying</td>
                 </tr>
                 <tr>
                   <td>1–6</td>

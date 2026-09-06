@@ -18,6 +18,7 @@ import type { CostBreakdown, GameState } from '../engine'
 import { inflationBp } from '../engine/market'
 import { currentLoanRateBp, debtCeiling, routeWeeklyCapacity, totalDebt } from '../engine/queries'
 import { HedgeLegend, MarketingLegend, RivalryLegend } from './legends'
+import { planningForecast } from './forecast'
 import { Sparkline } from './Sparkline'
 import { viewSeat, dispatch } from './session'
 import { COST_LABELS, money } from './format'
@@ -132,6 +133,7 @@ function CostStructure({ state }: { state: GameState }) {
 
 export function FinancePanel({ state }: { state: GameState }) {
   const player = state.airlines[viewSeat()]!
+  const plan = planningForecast(state,viewSeat())
   const hedgePremium = (quarters: number): number =>
     Math.floor(
       (HEDGE_PREMIUM_PER_AIRCRAFT *
@@ -168,7 +170,9 @@ export function FinancePanel({ state }: { state: GameState }) {
     return ` ${d > 0 ? '▲' : '▼'}`
   }
   return (
-    <div>
+    <div className="finance-page">
+      <div className="page-heading"><h2>Finance</h2><span className="dim">Company totals</span></div>
+      <dl className="company-summary"><div><dt>Cash now</dt><dd>{money(player.cash)}</dd></div><div><dt>Last quarter · net profit</dt><dd>{last ? money(last.profit) : 'Not flown yet'}</dd></div><div><dt>Next quarter · planned profit</dt><dd className={plan.profit >= 0 ? 'pos':'neg'}>{money(plan.profit)}</dd></div><div><dt>Next quarter · ending cash</dt><dd>{money(plan.cashAfter)}</dd></div></dl>
       {u && (
         <div data-testid="unit-economics">
           <h3>Unit economics — last quarter</h3>

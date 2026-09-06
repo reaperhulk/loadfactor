@@ -206,3 +206,108 @@ main.game-shell {
   .game-shell .filter-bar .segmented { flex-wrap:wrap; }
   .game-shell .filter-bar .segment { font-size:.72rem; padding:4px 8px; }
 }
+/* A shared visual rhythm across workspaces. */
+main.game-shell { --bg:#10232c; --panel:#19333e; --ink:#ede9de; --dim:#a4b4b9; --rule:#36505a; --pos:#83d6ac; --neg:#ff9c90; }
+.game-shell .primary-nav { background:#0d2029; }
+.game-shell .workspace-tabs { background:#142c36; }
+.game-shell .workspace-page { background:var(--bg); }
+.game-shell .workspace-page :is(input,select) { border-color:var(--rule); color:var(--ink); background:#102630; border-radius:4px; }
+.game-shell .workspace-page :is(h2,h3) { color:var(--ink); }
+.game-shell :is(td,dd,.hud-figure) { font-variant-numeric:tabular-nums; }
+.game-shell .workspace-page table { border-collapse:collapse; }
+.game-shell .workspace-page th { color:var(--dim); font-weight:500; font-size:.72rem; text-transform:none; letter-spacing:0; }
+.game-shell .workspace-page thead { background:var(--bg); }
+.game-shell .workspace-page :is(th,td) { border-color:var(--rule); }
+.game-shell .workspace-page tbody tr:hover { background:color-mix(in srgb,var(--accent) 5%,transparent); }
+.game-shell .eyebrow { font-size:.64rem; letter-spacing:.09em; font-weight:500; color:var(--dim); }
+.desk-columns { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(260px,1fr); gap:28px; }
+.desk-columns > * { min-width:0; }
+.game-shell .desk-columns .management-brief { background:transparent; border:0; border-radius:0; padding:0; margin:0; }
+.game-shell .brief-heading { display:block; margin:0 0 12px; }
+.game-shell .brief-heading h2,.desk-agenda h2 { font-size:.95rem; margin:0 0 6px; }
+.game-shell .brief-heading > span { font-size:.73rem; color:var(--dim); }
+.brief-list article { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:18px; border-top:1px solid var(--rule); padding:16px 0; }
+.brief-list h3 { margin:0 0 5px; font-size:.88rem; font-weight:600; }
+.brief-list p { margin:0; color:var(--dim); font-size:.78rem; line-height:1.5; max-width:62ch; }
+.brief-list button { background:transparent; border:0; font-size:.72rem; text-align:right; max-width:140px; }
+.game-shell .brief-assumptions { font-size:.69rem; color:var(--dim); margin:12px 0; }
+.game-shell .brief-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.game-shell .brief-grid article { background:var(--panel); border:1px solid var(--rule); padding:16px; border-radius:5px; }
+.game-shell .brief-grid h3 { font-size:1.1rem; margin:8px 0; }
+.game-shell .brief-grid p { font-size:.78rem; }
+.desk-agenda { border-left:1px solid var(--rule); padding-left:24px; }
+.desk-timeline { padding:0; margin:12px 0 24px; list-style:none; }
+.desk-timeline li { border-top:1px solid var(--rule); padding:12px 0; display:grid; gap:4px; }
+.desk-timeline li > span { font-size:.67rem; color:var(--dim); font-variant-numeric:tabular-nums; }
+.desk-timeline button { padding:0; border:0; text-align:left; font-size:.82rem; }
+.desk-timeline small { font-size:.7rem; color:var(--dim); }
+.game-shell .desk-agenda .world-outlook { padding:12px 0; background:transparent; border:0; font-size:.75rem; }
+.game-shell .desk-agenda .event-chip { white-space:normal; font-size:.72rem; }
+.game-shell .desk-priorities .offer-card { width:100%; max-width:none; padding:16px; border:1px solid var(--rule); border-radius:5px; }
+.game-shell .offer-card h2 { font-size:1.05rem; }
+.game-shell .offer-card p { font-size:.82rem; }
+.game-shell .coach { font-size:.78rem; border:0; border-top:1px solid var(--rule); border-radius:0; background:transparent; }
+.game-shell .route-selected { stroke:#f6ebcc; stroke-width:3.4px; opacity:1; }
+.game-shell .map-wrap:has(.route-selected) .route-player:not(.route-selected) { opacity:.32; }
+.game-shell .route-rival { opacity:.25; }
+.game-shell .map-data-control { border-color:var(--rule); background:#102b3eeb; border-radius:4px; }
+.game-shell .map-data-control label { font-size:.72rem; }
+.game-shell .map-data-control select { font-size:.76rem; min-height:32px; }
+.company-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; padding:0 0 18px; margin:0 0 18px; border-bottom:1px solid var(--rule); }
+.company-summary dt { color:var(--dim); font-size:.72rem; }
+.company-summary dd { font-size:1.25rem; margin:5px 0 0; }
+.game-shell .finance-page .unit-table { width:100%; max-width:720px; }
+.game-shell .finance-page .city-negotiate { background:transparent; border:0; border-top:1px solid var(--rule); border-radius:0; padding:16px 0; }
+.game-shell .finance-page .cost-structure { max-width:900px; }
+.game-shell .shop-table { width:100%; }
+.game-shell .shop-table .aircraft-art { width:140px; height:55px; }
+.game-shell .shop-table :is(th,td) { padding:10px 8px; }
+.game-shell .shop-table td:last-child { white-space:normal; min-width:130px; }
+.game-shell .shop-table td:last-child button { margin:3px 0; }
+.fleet-filters { display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; font-size:.78rem; }
+.fleet-filters input[type=search] { flex:1; min-width:130px; }
+@media(min-width:1600px) {
+  .split-view.has-inspector,.game-shell .map-area:has(.city-panel) { grid-template-columns:minmax(0,1fr) 420px; }
+  .desk-columns { grid-template-columns:minmax(0,2fr) minmax(300px,1fr); gap:40px; }
+  .workspace-page,.split-list { padding:24px 28px; }
+  .workspace-page:is(.map-page,.route-page,.fleet-page) { padding:0; }
+}
+@media(max-width:1100px) {
+  .desk-columns { grid-template-columns:1fr; gap:24px; }
+  .desk-agenda { padding:20px 0 0; border-left:0; border-top:1px solid var(--rule); }
+}
+@media(max-width:700px) {
+  .brief-list article { grid-template-columns:1fr; gap:6px; padding:12px 0; }
+  .brief-list button { max-width:none; text-align:left; padding:0; justify-self:start; }
+  .game-shell .brief-grid { grid-template-columns:1fr; }
+  .game-shell .brief-grid article { padding:12px; }
+  .company-summary { grid-template-columns:1fr 1fr; gap:16px; }
+  .company-summary dd { font-size:1.12rem; }
+  .game-shell .map-data-control label { font-size:0; }
+  .game-shell .map-data-control select { min-height:40px; font-size:.78rem; }
+  .game-shell .map-data-legend { font-size:.64rem; flex-wrap:wrap; }
+  .game-shell .shop-table,.game-shell .shop-table tbody { display:block; }
+  .game-shell .shop-table thead { display:none; }
+  .game-shell .shop-table tr { display:grid; grid-template-columns:1fr 1fr; gap:0 16px; padding:14px 0; border-bottom:1px solid var(--rule); }
+  .game-shell .shop-table td { display:block; padding:5px 0; border:0; white-space:normal; font-size:.8rem; }
+  .game-shell .shop-table td::before { content:attr(data-label); display:block; color:var(--dim); font-size:.67rem; margin-bottom:3px; }
+  .game-shell .shop-table td:first-child,.game-shell .shop-table td:last-child { grid-column:1/-1; }
+  .game-shell .shop-table td:first-child { display:flex; align-items:center; justify-content:space-between; font-size:1rem; }
+  .game-shell .shop-table td:first-child::before,.game-shell .shop-table td:last-child::before { display:none; }
+  .game-shell .shop-table td:last-child { display:flex; gap:8px; margin-top:8px; }
+  .game-shell .shop-table td:last-child button { flex:1; }
+  .game-shell [data-testid=used-market] :is(table,tbody) { width:100%; }
+  .game-shell [data-testid=used-market] tr { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:12px 0; border-bottom:1px solid var(--rule); }
+  .game-shell [data-testid=used-market] td { white-space:normal; padding:0; border:0; }
+  .game-shell [data-testid=used-market] td:first-child { grid-column:1/-1; }
+  .game-shell [data-testid=used-market] .aircraft-art { display:none; }
+  .game-shell [data-testid=used-market] td:last-child { grid-column:1/-1; }
+  .game-shell [data-testid=airports-panel] table { width:100%; }
+  .game-shell [data-testid=airports-panel] :is(th,td):is(:nth-child(3),:nth-child(5),:nth-child(6),:nth-child(7)) { display:none; }
+  .game-shell [data-testid=airports-panel] :is(th,td) { white-space:normal; padding:8px 4px; font-size:.72rem; }
+  .game-shell [data-testid=airports-panel] td button { font-size:.7rem; }
+  .game-shell [data-testid=airports-search] { width:100%; margin-top:10px; }
+  .game-shell :is(input:not([type=checkbox],[type=range]),select) { font-size:16px; min-height:44px; }
+  .game-shell .workspace-page .table-scroll { max-width:100%; }
+}
+.draft-warning { padding:10px 12px; border-left:3px solid #e7c782; background:#e7c78212; font-size:.82rem; line-height:1.45; }

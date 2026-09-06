@@ -87,9 +87,9 @@ const H = MAP_H
 // was 48 of them instead of 12, to remove only two thirds of the re-centres.
 const SPAN_MIN = 1.5
 const SPAN_WHOLE_WORLD_UP_TO = 2.5
-const layerSpan = (viewW: number): number => {
+const layerSpan = (viewW: number, frameAspect: number): number => {
   const whole = W / viewW
-  return whole <= SPAN_WHOLE_WORLD_UP_TO ? Math.max(SPAN_MIN, whole) : SPAN_MIN
+  return whole <= SPAN_WHOLE_WORLD_UP_TO && frameAspect >= 1.5 ? Math.max(SPAN_MIN, whole * Math.max(1, (W/H)/frameAspect, frameAspect/(W/H))) : SPAN_MIN
 }
 
 const x = projectLon
@@ -461,6 +461,7 @@ function clampView(v: ViewBox): ViewBox {
 }
 
 interface MapViewProps {
+  selectedRouteId?: number
   active?: boolean
   state: GameState
   selected: string | null // city shown in the dossier panel
@@ -476,6 +477,7 @@ interface MapViewProps {
 
 export function MapView({
   active = true,
+  selectedRouteId,
   state,
   selected,
   routeFrom,
@@ -494,7 +496,7 @@ export function MapView({
   // Desktop keeps the full world, where the box already carries the viewBox's
   // aspect and nothing is cropped at all.
   const homeView = (): ViewBox => {
-    if (typeof window === 'undefined' || window.innerWidth > 640) return FULL_VIEW
+    if (typeof window === 'undefined' || window.innerWidth > 1100) return FULL_VIEW
     const hq = getCity(state.airlines[viewSeat()]!.hq)
     const w = W / 2.2
     const h = (w * H) / W
@@ -517,6 +519,17 @@ export function MapView({
   const [anchor, setAnchor] = useState<ViewBox>(homeView)
   const svgRef = useRef<SVGSVGElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const [frameAspect, setFrameAspect] = useState(W/H)
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry!.contentRect
+      if (width > 0 && height > 0) setFrameAspect(width/height)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
   const drag = useRef<{ px: number; py: number; moved: boolean } | null>(null)
   // Zoom eases toward targetRef via exponential smoothing in a rAF loop;
   // panning writes through immediately. Wheel/button handlers mutate the
@@ -755,7 +768,7 @@ export function MapView({
   useLayoutEffect(() => {
     baseRef.current = anchor
     globeBaseRef.current = globe
-    spanRef.current = isGlobe ? SPAN_MIN : layerSpan(anchor.w)
+    spanRef.current = isGlobe ? SPAN_MIN : layerSpan(anchor.w, frameAspect)
     // A render can land mid-ease — starting one drops detail, and a quarter
     // can resolve underneath it. The ease repaints the transform from its own
     // rAF every frame, so this effect must not paint the committed view over
@@ -1050,7 +1063,7 @@ export function MapView({
             d={d}
             pathLength={1}
             data-acquired={isAcquired || undefined}
-            className={`route-player ${haulClass(km)}${isNew ? ' route-new' : ''}${isAcquired ? ' route-acquired' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
+            className={`route-player ${haulClass(km)}${r.id === selectedRouteId ? ' route-selected' : ''}${isNew ? ' route-new' : ''}${isAcquired ? ' route-acquired' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
             style={
               {
                 '--cap-w': capWidth(player, r, false, state.turn),
@@ -1082,7 +1095,7 @@ export function MapView({
       )
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, seat, isGlobe, globe, projKey, newRouteIds, acquiredRouteIds, lens, pulseUi, onRouteClick])
+  }, [state, seat, isGlobe, globe, projKey, newRouteIds, acquiredRouteIds, lens, pulseUi, onRouteClick, selectedRouteId])
 
   const playerPlanesLayer = useMemo(() => {
     if (reduceMotion) return []
@@ -1187,7 +1200,7 @@ export function MapView({
   // the pan-commit path exists to keep.
   const cull = anchor
   // The globe re-projects rather than panning, so it needs no overhang.
-  const span = isGlobe ? SPAN_MIN : layerSpan(anchor.w)
+  const span = isGlobe ? SPAN_MIN : layerSpan(anchor.w, frameAspect)
   const { visible, labeled } = useMemo(() => {
     // Cities the player has a stake in stay visible at any zoom.
     const stakes = new Set<string>()
@@ -1208,7 +1221,7 @@ export function MapView({
     // whole overhang with room to spare, so nothing culled here can be
     // revealed by a gesture before the layer re-centres and this runs again.
     // The globe does its own culling, by hemisphere.
-    const pad = (layerSpan(cull.w) - 1) / 2 + 0.1
+    const pad = (layerSpan(cull.w, frameAspect) - 1) / 2 + 0.1
     const inFrame = (c: City): boolean =>
       isGlobe ||
       (x(c.lon) >= cull.x - cull.w * pad &&
@@ -1221,7 +1234,7 @@ export function MapView({
       labeled: new Set(vis.filter((c) => cityTier(c) === 1 || lodKey >= 1 || stakes.has(c.id)).map((c) => c.id)),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, seat, selected, lodKey, isGlobe, cull.x, cull.y, cull.w, cull.h])
+  }, [state, seat, selected, lodKey, isGlobe, cull.x, cull.y, cull.w, cull.h, frameAspect])
 
   // Cursor-anchored zoom, computed in TARGET space so consecutive wheel
   // events compound on where the view is heading, not where it is.
@@ -1974,15 +1987,7 @@ export function MapView({
         >
           <Icon name="rivals" />
         </button>
-        <button
-          data-testid="map-lens"
-          aria-label={`data lens: ${lens === 'none' ? 'off' : lens === 'load' ? 'load factor' : lens === 'profit' ? 'profit' : 'season'} — click to cycle`}
-          title={`lens: ${lens === 'none' ? 'off' : lens === 'load' ? 'load factor' : lens === 'profit' ? 'P&L' : 'season'}`}
-          className={lens !== 'none' ? 'active' : ''}
-          onClick={() => setLens(lens === 'none' ? 'load' : lens === 'load' ? 'profit' : lens === 'profit' ? 'season' : 'none')}
-        >
-          {lens === 'profit' ? '$' : <Icon name={lens === 'season' ? 'sun' : 'lens'} />}
-        </button>
+
       </div>
       <div className="map-data-control">
         <label>Map colors <select aria-label="map colors" value={lens} onChange={(e) => setLens(e.target.value as typeof lens)}>
