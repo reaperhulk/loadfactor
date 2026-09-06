@@ -37,7 +37,9 @@ test('first launch, full-company planning, atomic undo and report focus', async 
   expect([restored.fareLevel, restored.serviceLevel, restored.frequency]).toEqual([before.fareLevel, before.serviceLevel, before.frequency])
   await flyQuarter(page)
   await expect(page.getByRole('dialog', { name: 'Quarterly report' })).toBeVisible()
-  await expect(page.getByTestId('report-card-close')).toBeFocused()
+  // A long report starts at its headline; focusing the bottom button would
+  // scroll the operational summary and profit out of view.
+  await expect(page.getByTestId('report-hero')).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('report-card')).toHaveCount(0)
   await expect(page.getByTestId('end-quarter')).toBeFocused()
