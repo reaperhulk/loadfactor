@@ -355,7 +355,7 @@ html.map-gesture * {
 }
 
 .map-land {
-  fill: var(--land, #1c2739);
+  fill: url(#landRelief);
   stroke: var(--coast, #2c3a54);
   stroke-width: 0.6;
   vector-effect: non-scaling-stroke;
@@ -937,13 +937,15 @@ button.toast {
 
 .route-long {
   stroke-dasharray: 7 3;
-  filter: drop-shadow(0 0 2px #4fa3ff66);
+
 }
 
 .plane {
   fill: #cfe3ff;
   pointer-events: none;
-  filter: drop-shadow(0 0 3px #4fa3ff88);
+  stroke: #0b2332;
+  stroke-width: .6;
+  paint-order: stroke;
 }
 
 .slots-ping {
@@ -2286,15 +2288,16 @@ th { font-size:.78rem; letter-spacing:.02em; }
 .audio-settings p { max-width:30ch; }
 .display-settings select { max-width:190px; }
 .aircraft-art { margin:8px 0 0; width:190px; }
-.aircraft-art svg { width:100%; height:70px; background:linear-gradient(150deg,#26414f,#142b37); border-radius:8px; }
+.aircraft-art svg { display:block; width:100%; height:70px; background:radial-gradient(ellipse at 65% 25%,#345965,#193642 70%); border-radius:6px; }
 .aircraft-art figcaption { font-size:.65rem; color:var(--dim); white-space:normal; }
-.aircraft-metal { fill:#dbe1df; stroke:#7d919a; stroke-width:.6; }
-.aircraft-stripe,.aircraft-tail { fill:#d49b55; }
-.aircraft-wing,.aircraft-tailplane { fill:#97aeb7; stroke:#dbe1df; stroke-width:.7; }
+
+.aircraft-tail { fill:var(--livery,var(--accent,#d49b55)); }
+.aircraft-stripe { fill:none; stroke:var(--livery,var(--accent,#d49b55)); }
+
 .aircraft-cockpit,.aircraft-window { fill:#244457; }
 .aircraft-shadow { fill:#071923; opacity:.7; }
-.aircraft-engine { fill:#bbc8ca; stroke:#738d98; }
-.aircraft-prop { stroke:#dbe1df; stroke-width:2; }
+
+.aircraft-prop { stroke:#c2d4d8; stroke-width:.8; fill:#244655; }
 .aircraft-art text { fill:#b1c6cf; font:7px system-ui; letter-spacing:2px; }
 .map-area:has(.city-panel) { display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:12px; align-items:start; }
 .map-area .city-panel { position:relative; top:auto; right:auto; width:auto; max-height:72vh; background:var(--panel); border-color:var(--rule); font-size:.88rem; backdrop-filter:none; }
@@ -2346,3 +2349,26 @@ th { font-size:.78rem; letter-spacing:.02em; }
 .operations-panel p { font-size:.87rem; }
 
 .map-load-status { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:4; max-width:calc(100% - 24px); padding:8px 12px; border:1px solid var(--rule); border-radius:6px; background:var(--panel); font-size:.8rem; }
+
+/* Lit vector surfaces: gradients/strokes survive compositor pans without
+   off-screen blur buffers. Keep the decade's ink distinct from the ocean. */
+.map-ocean { fill:url(#seaDepth); }
+.land-stop-light { stop-color:var(--land-light,#344759); }
+.land-stop-base { stop-color:var(--land,#1c2739); }
+.map.era-1960 { --sea:#091b25; --sea-shallow:#173642; --land-light:#626653; --land:#343e38; --coast:#84917a; --coast-glow:#849a8f; --border-line:#98a18a; --graticule:#52828d; }
+.map.era-1970 { --sea:#091a22; --sea-shallow:#19353e; --land-light:#5b6050; --land:#353b35; --coast:#849383; --coast-glow:#7d9b8e; --border-line:#8f9c88; --graticule:#52818c; }
+.map.era-1980 { --sea:#091523; --sea-shallow:#193344; --land-light:#435967; --land:#273c4d; --coast:#648a9c; --coast-glow:#79a0b0; --border-line:#81a1ad; --graticule:#496b88; }
+.map.era-1990 { --sea:#071924; --sea-shallow:#15394a; --land-light:#355d68; --land:#203e51; --coast:#588b9b; --coast-glow:#6ca2b3; --border-line:#7598aa; --graticule:#46798b; }
+.map.era-2000 { --sea:#071625; --sea-shallow:#103549; --land-light:#315766; --land:#19384e; --coast:#4b809b; --coast-glow:#679db7; --border-line:#638fa6; --graticule:#426f8c; }
+.map-coast-glow { stroke-opacity:.25; }
+.map-border { stroke-opacity:.38; }
+.map-graticule { stroke-opacity:.24; }
+.city-dot { fill:#80939a; }
+.city-dot.slotted { fill:var(--livery,var(--accent)); }
+.city-network-ring { stroke:var(--livery,var(--accent)); vector-effect:non-scaling-stroke; }
+.city-label { fill:#d6e4e5; stroke:#102431; stroke-width:2; vector-effect:non-scaling-stroke; font-weight:600; }
+.aircraft-apron { fill:none; stroke:#678995; stroke-width:.5; opacity:.25; }
+.aircraft-seam { fill:none; stroke:#577783; stroke-width:.65; opacity:.65; }
+.aircraft-datum { fill:none; stroke:#91b0b8; stroke-width:.6; opacity:.5; }
+
+.map-ocean-label { fill:#89adb8; opacity:.35; pointer-events:none; font-weight:500; }

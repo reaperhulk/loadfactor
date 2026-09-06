@@ -590,3 +590,11 @@ flat map remains interactive while it loads, with visible failure/retry state.
 Both outputs of gen:worldmap share the same source geometry and projection.
 The flat map has a 95 KiB gzip budget alongside the 190 KiB shell budget.
 Projection shortcuts only operate in the visible map outside dialogs/forms.
+
+Map symbols now use the measured SVG-to-CSS scale, including `slice` in tall
+viewports: market-sized airport dots and labels remain readable at every zoom.
+The independent 28 px nearest-city tap resolver preserves touch reach. Land,
+sea and globe lighting use gradients/strokes; animated aircraft and long-haul
+routes no longer allocate blur filters. Memoized vector fleet portraits carry
+airframe-specific proportions, engines, tails and the player's livery. Windows
+and seams are batched paths, with no raster downloads or animation in the shop.

@@ -515,13 +515,14 @@ export function MapView({
   const [anchor, setAnchor] = useState<ViewBox>(homeView)
   const svgRef = useRef<SVGSVGElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
-  const [frameAspect, setFrameAspect] = useState(W/H)
+  const [frame, setFrame] = useState({ width: W, height: H })
+  const frameAspect = frame.width / frame.height
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
     const observer = new ResizeObserver(([entry]) => {
       const { width, height } = entry!.contentRect
-      if (width > 0 && height > 0) setFrameAspect(width/height)
+      if (width > 0 && height > 0) setFrame({ width, height })
     })
     observer.observe(el)
     return () => observer.disconnect()
@@ -963,11 +964,13 @@ export function MapView({
   const seat = viewSeat()
   const player = state.airlines[seat]!
   const scale = isGlobe ? globe.s : W / view.w
-  // Screen-size compensation. On the flat map the viewBox shrinks as you
-  // zoom, so sizes divide by scale to stay constant on screen. The globe
-  // keeps a FIXED viewBox and grows R instead — dividing there would shrink
-  // labels and dots as you zoom in.
-  const uiScale = isGlobe ? 1 : scale
+  // Normalize decorations to actual CSS pixels, including the SVG's slice
+  // scaling in tall workspaces. Zoom alone is insufficient: the same world
+  // view can fill a 350 px strip or a 750 px tall desktop frame. City hit
+  // testing still uses its independent 28 CSS-pixel nearest-city resolver.
+  const frameScale = Math.max(frame.width / W, frame.height / H)
+  const uiScale = (isGlobe ? 1 : scale) * frameScale
+  const dotRadius = (c: City) => (2.3 + cityMass(c) / 28) / uiScale
   // One projection call for every feature on the map.
   const pt = (lon: number, lat: number): GlobePoint =>
     isGlobe ? globeProject(globe, lon, lat) : { X: x(lon), Y: y(lat), vis: true }
@@ -984,9 +987,9 @@ export function MapView({
     cachedRoutePath(projKey, isGlobe ? globe : null, fromId, toId)
   const tripPathFor = (fromId: string, toId: string): string | null =>
     cachedTripPath(projKey, isGlobe ? globe : null, fromId, toId)
-  const flyingFleet = operatingFleet(player, state.turn)
-  const flownRoutes = player.routes.filter((r) => effectiveFrequency(player, r, state.turn) > 0)
-  const network = networkCities(player)
+  const flyingFleet = useMemo(() => operatingFleet(player, state.turn), [player, state.turn])
+  const flownRoutes = useMemo(() => player.routes.filter((r) => effectiveFrequency(player, r, state.turn) > 0), [player, state.turn])
+  const network = useMemo(() => networkCities(player), [player])
   // How full each airport is, 0..1 — the slot model's scarcity, made visible
   // on the board where expansion decisions are actually taken.
   const pressure = (cityId: string): number => {
@@ -1629,6 +1632,10 @@ export function MapView({
           {/* Pinned to the world, not to the rect that carries it: the sea
               rect overscans the frame (see below) and a bounding-box gradient
               would stretch and re-centre with it. */}
+          <linearGradient id="landRelief" x1="0" y1="0" x2="0.25" y2="1">
+            <stop offset="0" className="land-stop-light" />
+            <stop offset="1" className="land-stop-base" />
+          </linearGradient>
           <radialGradient
             id="seaDepth"
             gradientUnits="userSpaceOnUse"
@@ -1651,7 +1658,7 @@ export function MapView({
               layer now bleeds past the frame so a drag reveals painted world.
               A sea of exactly W x H left both unpainted, and the globe sat in
               a black rectangle narrower than the window. */}
-          <rect x={-W} y={-H} width={W * 3} height={H * 3} className="map-sea" fill="url(#seaDepth)" />
+          <rect x={-W} y={-H} width={W * 3} height={H * 3} className="map-sea map-ocean" />
           {!isGlobe && <path d={graticulePath()} className="graticule map-graticule" />}
           {isGlobe ? (
             <>
@@ -1661,6 +1668,11 @@ export function MapView({
                   <stop offset="0%" stopColor="#1b2a45" />
                   <stop offset="70%" stopColor="#111b2e" />
                   <stop offset="100%" stopColor="#0b111e" />
+                </radialGradient>
+                <radialGradient id="globeLighting" cx="32%" cy="25%" r="78%">
+                  <stop offset="0" stopColor="#d9f3ef" stopOpacity=".12" />
+                  <stop offset=".5" stopColor="#06121e" stopOpacity="0" />
+                  <stop offset="1" stopColor="#030b15" stopOpacity=".65" />
                 </radialGradient>
               </defs>
               <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} fill="url(#globeShade)" className="globe-disc" />
@@ -1691,6 +1703,7 @@ export function MapView({
                   />
                 )
               })}
+              <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} fill="url(#globeLighting)" pointerEvents="none" />
               <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} className="globe-limb" />
             </>
           ) : (
@@ -1704,21 +1717,33 @@ export function MapView({
                   worst frame during a drag. A stroke is just another path
                   pass, cheap on every engine, and at 2.5 non-scaling pixels
                   it reads the same. */}
-              <path d={scale >= 1.8 ? WORLD_PATH_FINE : WORLD_PATH} className="map-coast-glow" />
+              <path d={uiScale >= 1.8 ? WORLD_PATH_FINE : WORLD_PATH} className="map-coast-glow" />
               {/* Detail that resolves: the coarse coastline is a smear at 3x,
                   and the fine one is wasted bytes of curve at world view. The
                   swap happens at a committed render, once per threshold
                   crossing — never mid-gesture. */}
-              <path d={scale >= 1.8 ? WORLD_PATH_FINE : WORLD_PATH} className="map-land" />
+              <path d={uiScale >= 1.8 ? WORLD_PATH_FINE : WORLD_PATH} className="map-land" />
               {/* Country borders come from a separate mesh, so they are the
                   borders themselves and never a second copy of the coast. */}
-              {scale >= 1.35 && <path d={BORDERS_PATH} className="map-border" />}
+              {uiScale >= 1.35 && <path d={BORDERS_PATH} className="map-border" />}
               {/* Islands with an airport but too small to survive 1:50m
                   generalisation — without these, Guam is an airport in open
                   ocean. */}
               <path d={ISLETS_PATH} className="map-land map-islet" />
             </>
           )}
+          {/* Geographic labels sit below the operating network, never in its hit layer. */}
+          {[
+            { name: 'NORTH ATLANTIC', lon: -40, lat: 28 },
+            { name: 'SOUTH ATLANTIC', lon: -20, lat: -28 },
+            { name: 'INDIAN OCEAN', lon: 77, lat: -24 },
+            { name: 'NORTH PACIFIC', lon: -151, lat: 27 },
+            { name: 'SOUTH PACIFIC', lon: -132, lat: -25 },
+          ].map((ocean) => {
+            const p = pt(ocean.lon, ocean.lat)
+            return p.vis && <text key={ocean.name} x={p.X} y={p.Y} textAnchor="middle" fontSize={10 / uiScale}
+              className="map-ocean-label" style={{ letterSpacing: 2 / uiScale }}>{ocean.name}</text>
+          })}
           {/* Transfer hubs glow in proportion to the connecting pax flowing
               over them last quarter. */}
           {[...hubVolume.entries()]
@@ -1830,7 +1855,7 @@ export function MapView({
               )
             const p = pt(c.lon, c.lat)
             if (!p.vis) return null
-            const r = (1.7 + cityMass(c) / 13) / Math.sqrt(uiScale)
+            const r = dotRadius(c)
             return (
               <g
                 key={c.id}
@@ -1870,7 +1895,7 @@ export function MapView({
                     x={p.X}
                     y={p.Y - r - 4 / uiScale}
                     className="hq-marker"
-                    fontSize={9 / uiScale}
+                    fontSize={11 / uiScale}
                     textAnchor="middle"
                     data-testid="hq-marker"
                   >
@@ -1909,7 +1934,7 @@ export function MapView({
               1.8x zoom, where tier-3 cities unlock but the frame still holds
               most of the world. */}
           {(() => {
-            const fs = 9 / uiScale
+            const fs = 11 / uiScale
             const gap = 3 / uiScale
             const sites = visible
               .filter((c) => labeled.has(c.id))
@@ -1920,7 +1945,7 @@ export function MapView({
                 id: c.id,
                 x: p.X,
                 y: p.Y,
-                r: (1.7 + cityMass(c) / 13) / Math.sqrt(uiScale),
+                r: dotRadius(c),
                 w: c.id.length * fs * 0.66,
               }))
             return placeLabels(sites, fs, gap).map((l) => (
