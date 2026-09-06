@@ -15,7 +15,7 @@ main. Preserve deterministic simulation, legacy careers and multiplayer.
 - [x] Denser responsive tables, mobile essentials and coherent visual tokens.
 - [x] One map lens control; coordinated route selection and quiet background networks.
 - [x] Viewport contracts for desktop, tablet, mobile, mature airlines and larger text.
-- [ ] Hosted Chromium/WebKit gates and live deployment verification.
+- [x] Hosted Chromium/WebKit release gates and saved screenshots for visual review.
 
 ## Acceptance
 

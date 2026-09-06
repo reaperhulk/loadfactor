@@ -1,4 +1,4 @@
-import { flyQuarter } from './workspace'
+import { flyQuarter, openPanel } from './workspace'
 import { expect, test, type Page } from '@playwright/test'
 
 // MP0 + MP1 (PLAN.md §10): hot-seat at one device, and the async duel where
@@ -55,6 +55,16 @@ test('hot-seat: two players share a device, planning in rotation', async ({ page
   // Space must not resolve the quarter from the first planner's seat.
   await page.keyboard.press(' ')
   await expect(page.getByTestId('date')).toHaveText('1960 Q2')
+})
+
+test('hot-seat: inspectors close when the device changes hands', async ({ page }) => {
+  await startHotseat(page)
+  await openPanel(page,'fleet')
+  await page.locator('[data-testid^=inspect-aircraft-]').first().click()
+  await expect(page.getByTestId('aircraft-dossier')).toBeVisible()
+  await page.getByTestId('pass-seat').click()
+  await expect(page.getByTestId('aircraft-dossier')).toHaveCount(0)
+  await expect(page.getByTestId('fleet-table')).toBeVisible()
 })
 
 test('hot-seat: the game survives a reload as a v2 save', async ({ page }) => {

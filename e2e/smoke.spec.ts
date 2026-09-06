@@ -105,9 +105,9 @@ test('every scenario starts from its menu card', async ({ page }) => {
   await expect(page.getByTestId('start-open_skies')).toContainText('start anyway')
   await page.getByTestId('start-open_skies').click()
   await expect(page.getByTestId('date')).toHaveText('1995 Q1')
-  // The desk nudges toward the parked starter fleet.
+  // The desk proposes useful first markets for the starter fleet.
   await openPanel(page, 'desk')
-  await expect(page.getByTestId('attention-strip')).toContainText('idle plane')
+  await expect(page.getByTestId('management-brief').getByRole('button',{name:'Compare this launch'}).first()).toBeVisible()
   // The fifth era sits at the end of the same chain and starts the same way.
   await page.goto('/')
   await expect(page.getByTestId('locked-lcc_wars')).toBeVisible()
@@ -230,6 +230,7 @@ test('the quarterly report reflects the resolved quarter', async ({ page }) => {
     window.__harness.dispatch({ type: 'assign_aircraft', aircraftId: s.airlines[0]!.fleet[0]!.id, routeId: null })
   })
   await openPanel(page, 'fleet')
+  await page.locator('.fleet-policy-disclosure > summary').click()
   await page.getByTestId('assign-all-idle').click()
   const idleLeft = await page.evaluate(
     () => window.__harness.getState()!.airlines[0]!.fleet.filter((a) => a.routeId === null).length,

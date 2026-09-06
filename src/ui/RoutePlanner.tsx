@@ -45,7 +45,11 @@ export function RoutePlanner({ state, route }: { state: GameState; route: Route 
       </dl>
     </div>
     {after.errors.length > 0 && <p role="alert" className="neg">{after.errors.map((e) => e.reason).join(' · ')}</p>}
-    <div className="entity-plan-actions"><button className="primary-action" data-testid="apply-route-plan" disabled={!commands.length || after.errors.length > 0} onClick={() => dispatchBatch(commands)}>Apply route changes</button><button disabled={!commands.length} onClick={() => { setFare(route.fareLevel); setService(route.serviceLevel); setFrequency(route.frequency) }}>Reset</button></div>
+    <div className="entity-plan-actions"><button className="primary-action" data-testid="apply-route-plan" disabled={!commands.length || after.errors.length > 0} onClick={(e) => {
+      const inspector = e.currentTarget.closest('.route-dossier')
+      dispatchBatch(commands)
+      requestAnimationFrame(() => inspector?.querySelector<HTMLSelectElement>('[aria-label="Route fare"]')?.focus({ preventScroll:true }))
+    }}>Apply route changes</button><button disabled={!commands.length} onClick={() => { setFare(route.fareLevel); setService(route.serviceLevel); setFrequency(route.frequency) }}>Reset</button></div>
     <p className="hint">Includes connections and fixed company costs. Fuel, demand and rival schedules held at current conditions. Apply is one undoable action.</p>
   </section>
 }

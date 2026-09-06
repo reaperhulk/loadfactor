@@ -684,8 +684,12 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     setSelectedRoute(null)
     if (r) requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-testid="inspect-${r.from}-${r.to}"]`)?.focus({ preventScroll: true }))
   }
+  const clearSelection = (): void => {
+    setSelectedRoute(null); setSelectedAircraft(null); setSelectedCity(null); setRouteFrom(null)
+  }
   const endQuarter = (): void => {
     if (getSession()?.state.phase !== 'planning' || !canEndQuarter()) return
+    if (getSession()?.mode === 'hotseat') clearSelection()
     setShowReview(false); dispatch({ type: 'end_quarter' }); setShowReport(true)
   }
   useEffect(() => {
@@ -745,7 +749,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
                     <button
                       className="end-quarter"
                       data-testid="pass-seat"
-                      onClick={() => passSeat()}
+                      onClick={() => { clearSelection(); passSeat() }}
                     >
                       Done — pass to {state.airlines[next]!.name} ▶
                     </button>

@@ -311,3 +311,24 @@ main.game-shell { --bg:#10232c; --panel:#19333e; --ink:#ede9de; --dim:#a4b4b9; -
   .game-shell .workspace-page .table-scroll { max-width:100%; }
 }
 .draft-warning { padding:10px 12px; border-left:3px solid #e7c782; background:#e7c78212; font-size:.82rem; line-height:1.45; }
+/* Keep the information in the viewport usable, including transient feedback. */
+.game-shell .toast-stack { top:auto; bottom:18px; max-width:min(360px,calc(100vw - 24px)); }
+.game-shell button.toast { font-size:.8rem; padding:8px 12px; line-height:1.35; border-radius:5px; }
+.game-shell .workspace-page :is(h2,h3) { font-family:inherit; }
+.desk-timeline button { justify-content:flex-start; text-align:left; }
+.game-shell .route-table-compact :is(th,td) { padding:4px 8px; }
+.game-shell .route-table .link-btn,.game-shell .fleet-table .link-btn { text-decoration:none; }
+.game-shell .filter-bar .metrics-toggle { margin:0; flex-shrink:0; }
+.game-shell .fleet-policy-disclosure { margin-bottom:10px; }
+@media(max-width:700px) {
+  .game-shell .toast-stack { bottom:calc(124px + env(safe-area-inset-bottom)); }
+  .game-shell .filter-bar .segmented { flex-basis:100%; }
+  .game-shell .filter-bar .filter-input { min-width:100px; width:0; }
+  .game-shell .filter-bar .metrics-toggle { font-size:.7rem; padding:6px 8px; }
+  .game-shell .route-table-compact th { padding:0 4px; }
+  .game-shell .route-table-compact td { padding:2px 4px; font-size:.82rem; }
+  .game-shell .fleet-table :is(th,td) { padding:2px 4px; font-size:.8rem; }
+}
+.game-shell .shop-table .aircraft-art { height:auto; margin:6px 0 0; }
+.game-shell .shop-table .aircraft-art svg { display:block; height:auto; border-radius:4px; }
+.game-shell .shop-table .aircraft-art figcaption { display:none; }

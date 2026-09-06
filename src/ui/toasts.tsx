@@ -226,7 +226,7 @@ export function ToastStack({
   const pushBatch = (fresh: Omit<Toast, 'id'>[]): void => {
     if (fresh.length === 0) return
     const stamped = fresh.map((t) => ({ ...t, id: nextId.current++ }))
-    setToasts((prev) => [...prev, ...stamped].slice(-4)) // keep the stack short
+    setToasts((prev) => [...prev, ...stamped].slice(-2)) // keep the stack short
     const ids = new Set(stamped.map((t) => t.id))
     timers.current.push(
       window.setTimeout(() => {
@@ -248,12 +248,14 @@ export function ToastStack({
     if (seen.current === events) return // only react to a new engine result
     seen.current = events
     const fresh = toastsFor(events, state)
-    for (const a of unlocks ?? []) {
-      fresh.push({ kind: 'achievement', icon: a.icon, text: `Achievement unlocked — ${a.name}` })
+    if (unlocks?.length === 1) {
+      fresh.push({ kind:'achievement',icon:unlocks[0]!.icon,text:`Achievement unlocked — ${unlocks[0]!.name}` })
+    } else if (unlocks && unlocks.length > 1) {
+      fresh.push({ kind:'achievement',icon:'★',text:`${unlocks.length} achievements unlocked · ${unlocks.map((a)=>a.name).join(' · ')}` })
     }
     if (fresh.length === 0) return
     const stamped = fresh.map((t) => ({ ...t, id: nextId.current++ }))
-    setToasts((prev) => [...prev, ...stamped].slice(-4)) // keep the stack short
+    setToasts((prev) => [...prev, ...stamped].slice(-2)) // keep the stack short
     const ids = new Set(stamped.map((t) => t.id))
     // Each batch owns its removal timer. Cancelling it when the next batch
     // arrived (the old cleanup) left earlier toasts on screen forever.

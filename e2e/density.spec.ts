@@ -16,6 +16,11 @@ async function inside(locator: Locator, page: Page) {
   expect(b!.y).toBeGreaterThanOrEqual(-1)
   expect(b!.x+b!.width).toBeLessThanOrEqual(viewport.width+1)
   expect(b!.y+b!.height).toBeLessThanOrEqual(viewport.height+1)
+  expect(await locator.evaluate(el=>{
+    if(el.tagName!=='BUTTON') return true
+    const r=el.getBoundingClientRect(), hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)
+    return hit===el || el.contains(hit)
+  }),'visible controls are not covered by notifications or other chrome').toBe(true)
 }
 async function startMature(page: Page) {
   await page.goto('/')
@@ -84,6 +89,7 @@ test('route plan previews without mutation and applies with atomic undo',async({
   await expect(page.getByTestId('quarter-review')).toContainText('unapplied changes are excluded')
   await page.keyboard.press('Escape')
   await page.getByTestId('apply-route-plan').click()
+  await expect(page.getByLabel('Route fare',{exact:true})).toBeFocused()
   expect(await page.evaluate(()=>window.__harness.getState())).not.toEqual(before)
   await page.getByTestId('undo-action').click()
   expect(await page.evaluate(()=>window.__harness.getState())).toEqual(before)

@@ -251,8 +251,8 @@ export function RoutesPanel({
         data-testid="route-search"
         aria-label="filter routes by city code"
       />
-    </div>
     <button className="metrics-toggle" aria-pressed={allMetrics} onClick={() => setAllMetrics((value) => !value)}>{allMetrics ? 'Show essential metrics' : 'Show all metrics'}</button>
+    </div>
     <div className="table-scroll"><table data-testid="routes-panel-table" className={`route-table ${allMetrics ? '' : 'route-table-compact'}`}>
       <thead>
         <tr>
@@ -577,7 +577,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
     <div>
       <div className="page-heading"><h2>{view === 'fleet' ? 'Owned aircraft' : view === 'orders' ? 'Orders & deliveries' : 'Aircraft market'}</h2><span className="dim">{year}</span></div>
       {view === 'fleet' && <>
-      <details className="fleet-policy-disclosure"><summary>Fleet policy & reliability</summary><OperationsPanel state={state} mode="policy" /><ReliabilityLegend /></details>
+      <details className="fleet-policy-disclosure"><summary>Fleet policy & actions</summary><OperationsPanel state={state} mode="policy" /><ReliabilityLegend />
       {player.fleet.some((a) => a.routeId === null && !a.reserve && !isGrounded(a, state.turn)) && player.routes.length > 0 && (
         <button
           data-testid="assign-all-idle"
@@ -642,6 +642,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
           </button>
         </p>
       )}
+      </details>
       <div className="fleet-filters"><input type="search" aria-label="Find aircraft" placeholder="Find aircraft or route…" value={fleetQuery} onChange={(e)=>setFleetQuery(e.target.value)} /><label><input type="checkbox" checked={idleOnly} onChange={(e)=>setIdleOnly(e.target.checked)} /> Unassigned only</label></div>
       {(() => {
         // Row models first so sorting works on exactly what the cells show.
