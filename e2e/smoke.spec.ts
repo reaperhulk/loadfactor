@@ -1,3 +1,4 @@
+import { openPanel, flyQuarter } from './workspace'
 // Browser smoke suite: the real UI drives the real engine, plus the
 // window.__harness hooks the docs promise (CLAUDE.md “Browser playtesting”).
 
@@ -27,7 +28,7 @@ async function startGame(page: Page): Promise<void> {
 // Ending a quarter via the UI presents the report card; dismiss it so the
 // next interaction isn't behind the overlay.
 async function endQuarterUI(page: Page): Promise<void> {
-  await page.getByTestId('end-quarter').click()
+  await flyQuarter(page)
   await page.getByTestId('report-card-close').click()
 }
 
@@ -40,7 +41,7 @@ test('scenario starts and quarters advance deterministically', async ({ page }) 
   await endQuarterUI(page)
   await endQuarterUI(page)
   // The fourth quarter closes the year: its report card carries the digest.
-  await page.getByTestId('end-quarter').click()
+  await flyQuarter(page)
   await expect(page.getByTestId('year-review')).toContainText('1960 in review')
   await page.getByTestId('report-card-close').click()
   await expect(page.getByTestId('date')).toHaveText('1961 Q1')
@@ -57,11 +58,13 @@ test('routes open via the city panel plan-route flow with a launch schedule', as
     const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
     window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
   })
+  await openPanel(page, 'map')
   await page.getByTestId('city-MIA').click()
   await expect(page.getByTestId('city-panel')).toBeVisible()
   await page.getByTestId('plan-route').click()
   // Planning mode draws the idle-fleet reach ring around the origin.
   await expect(page.getByTestId('range-ring')).toBeVisible()
+  await openPanel(page, 'map')
   await page.getByTestId('city-ORD').click()
   // The launch dialog: aircraft + frequency (bounded by distance) + fare.
   await expect(page.getByTestId('route-setup')).toBeVisible()
@@ -69,7 +72,7 @@ test('routes open via the city panel plan-route flow with a launch schedule', as
   await expect(page.getByTestId('route-setup-freq')).toContainText('rt/wk')
   await page.getByTestId('route-setup-confirm').click()
   await expect(page.getByTestId('route-setup')).toHaveCount(0)
-  await page.getByTestId('tab-routes').click()
+  await openPanel(page, 'routes')
   await expect(page.getByTestId('route-MIA-ORD')).toBeVisible()
 })
 
@@ -102,7 +105,8 @@ test('every scenario starts from its menu card', async ({ page }) => {
   await expect(page.getByTestId('start-open_skies')).toContainText('start anyway')
   await page.getByTestId('start-open_skies').click()
   await expect(page.getByTestId('date')).toHaveText('1995 Q1')
-  // The attention strip nudges toward the parked starter fleet.
+  // The desk nudges toward the parked starter fleet.
+  await openPanel(page, 'desk')
   await expect(page.getByTestId('attention-strip')).toContainText('idle plane')
   // The fifth era sits at the end of the same chain and starts the same way.
   await page.goto('/')
@@ -127,12 +131,14 @@ test('a challenge link opens the same world for whoever follows it', async ({ pa
     window.__harness.endQuarter()
     window.__harness.endQuarter()
   })
-  await page.getByTestId('tab-rivals').click()
+  await openPanel(page, 'rivals')
   await expect(page.getByTestId('race-target')).toBeVisible()
   await expect(page.getByTestId('rivals-panel')).toContainText('Ghost Air')
   // The in-game share button hands out a link that carries YOUR net worth.
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page.getByTestId('open-settings').click()
   await page.getByTestId('share-challenge').click()
+  await page.getByRole('button', { name: 'Close settings', exact: true }).click()
   const link = await page.evaluate(() => navigator.clipboard.readText())
   expect(link).toContain('scenario=open_skies')
   expect(link).toContain('seed=challenge-seed')
@@ -142,6 +148,7 @@ test('a challenge link opens the same world for whoever follows it', async ({ pa
 
 test('the city panel shows stats and joins the slot queue in context', async ({ page }) => {
   await startGame(page)
+  await openPanel(page, 'map')
   await page.getByTestId('city-LAX').click()
   const panel = page.getByTestId('city-panel')
   await expect(panel).toBeVisible()
@@ -163,6 +170,7 @@ test('the city panel shows stats and joins the slot queue in context', async ({ 
   const after = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)
   expect(after).toBeGreaterThan(before)
   await expect(page.getByTestId('panel-request-slots')).toBeVisible()
+  await openPanel(page, 'map')
   await page.getByTestId('city-panel-close').click()
   await expect(page.getByTestId('city-panel')).toHaveCount(0)
 })
@@ -170,7 +178,7 @@ test('the city panel shows stats and joins the slot queue in context', async ({ 
 test('slots are rented: unused capacity bills, and handing it back stops the bill', async ({ page }) => {
   await startGame(page)
   // The airports board prices every position and publishes every programme.
-  await page.getByTestId('tab-airports').click()
+  await openPanel(page, 'airports')
   const board = page.getByTestId('airports-panel')
   await expect(board).toContainText('Rent/q')
   await expect(board).toContainText('Next build')
@@ -221,26 +229,26 @@ test('the quarterly report reflects the resolved quarter', async ({ page }) => {
     const s = window.__harness.getState()!
     window.__harness.dispatch({ type: 'assign_aircraft', aircraftId: s.airlines[0]!.fleet[0]!.id, routeId: null })
   })
-  await page.getByTestId('tab-fleet').click()
+  await openPanel(page, 'fleet')
   await page.getByTestId('assign-all-idle').click()
   const idleLeft = await page.evaluate(
     () => window.__harness.getState()!.airlines[0]!.fleet.filter((a) => a.routeId === null).length,
   )
   expect(idleLeft).toBe(0)
-  await page.getByTestId('tab-routes').click()
+  await openPanel(page, 'routes')
   // Ending the quarter presents the report card with the P&L…
-  await page.getByTestId('end-quarter').click()
+  await flyQuarter(page)
   await expect(page.getByTestId('report-card')).toBeVisible()
   await expect(page.getByTestId('report-card')).toContainText('Profit')
   await expect(page.getByTestId('report-card')).toContainText('Best route')
   await page.getByTestId('report-card-close').click()
   await expect(page.getByTestId('report-card')).toHaveCount(0)
   // …and the report tab leads with the structured results table plus the log.
-  await page.getByTestId('tab-report').click()
+  await openPanel(page, 'report')
   await expect(page.getByTestId('report-results')).toContainText('JFK–ORD')
   await expect(page.getByTestId('report')).toContainText('Quarter closed')
   // The finance tab attributes every cost dollar, and the HUD shows the race.
-  await page.getByTestId('tab-finance').click()
+  await openPanel(page, 'finance')
   await expect(page.getByTestId('cost-structure')).toContainText('Fuel')
   await expect(page.getByTestId('rank')).toContainText(/#\d+\/\d+/)
   const loadFactor = await page.evaluate(
@@ -261,14 +269,16 @@ test('opening a route triggers the reward animation and toast', async ({ page })
   // A fresh browser has no achievements — the very first route is a career
   // milestone and earns the gold unlock toast alongside the route reward.
   await expect(page.getByTestId('toasts')).toContainText('Achievement unlocked — First flight')
+  await openPanel(page, 'map')
   await page.getByTestId('city-MIA').click()
   await page.getByTestId('plan-route').click()
+  await openPanel(page, 'map')
   await page.getByTestId('city-ORD').click()
   await page.getByTestId('route-setup-confirm').click()
   await expect(page.getByTestId('toasts')).toContainText('Route opened: MIA – ORD')
   await expect(page.getByTestId('route-line-new')).toHaveCount(1)
   // The reward is transient: the draw-in class clears on the next action.
-  await page.getByTestId('end-quarter').click()
+  await flyQuarter(page)
   await expect(page.getByTestId('route-line-new')).toHaveCount(0)
 })
 
@@ -277,9 +287,7 @@ test('wheel over the map zooms without scrolling the page', async ({ page }) => 
   // wheel event would visibly scroll it.
   await page.setViewportSize({ width: 900, height: 460 })
   await startGame(page)
-  // The coach mark floats over the map — wheel events on it never reach the
-  // SVG listener, so clear it before scrolling.
-  await page.getByTestId('coach-dismiss').click()
+  // Navigation and status are fixed; wheel input must stay inside the map.
   await page.getByTestId('map-wrap').scrollIntoViewIfNeeded()
   const scrollBefore = await page.evaluate(() => window.scrollY)
   const map = page.getByTestId('map')
@@ -295,7 +303,7 @@ test('wheel over the map zooms without scrolling the page', async ({ page }) => 
 
 test('the opportunities list plans a route in one click', async ({ page }) => {
   await startGame(page)
-  await page.getByTestId('tab-routes').click()
+  await openPanel(page, 'routes')
   await expect(page.getByTestId('opportunities')).toContainText('JFK–ORD')
   await expect(page.getByTestId('negotiation-targets')).toContainText('Worth queueing for')
   await page.getByTestId('plan-JFK-ORD').click()
@@ -317,7 +325,7 @@ test('previews report bands, opportunities carry risks, rival intent is visible'
   // The what-if table quotes ranges, and says out loud whether the spread is
   // wide enough to hide the answer — it never silently crowns a winner that
   // demand noise could overturn.
-  await page.getByTestId('tab-routes').click()
+  await openPanel(page, 'routes')
   await page.getByTestId('inspect-JFK-ORD').click()
   await page.getByTestId('fare-whatif').locator('summary').click()
   await expect(page.getByTestId('fare-whatif').locator('tbody tr')).toHaveCount(5)
@@ -349,6 +357,7 @@ test('previews report bands, opportunities carry risks, rival intent is visible'
   const ring = page.locator('[data-testid^="rival-negotiating-"]').first()
   await expect(ring).toHaveCount(1)
   const ringed = (await ring.getAttribute('data-testid'))!.replace('rival-negotiating-', '')
+  await openPanel(page, 'map')
   await page.getByTestId(`city-${ringed}`).click()
   await expect(page.getByTestId('rival-negotiating-note')).toContainText('announced a campaign')
 })
@@ -364,7 +373,7 @@ test('the books open: per-route economics, network totals, filters, head-to-head
     }
     for (let q = 0; q < 4; q++) window.__harness.endQuarter()
   })
-  await page.getByTestId('tab-routes').click()
+  await openPanel(page, 'routes')
 
   // Every route carries its own unit economics, not just a P&L.
   await page.getByRole('button', { name: 'Show all metrics', exact: true }).click()
@@ -393,7 +402,7 @@ test('the books open: per-route economics, network totals, filters, head-to-head
 
   // Unit economics on the finance tab: what a seat costs against what a
   // passenger pays.
-  await page.getByTestId('tab-finance').click()
+  await openPanel(page, 'finance')
   await expect(page.getByTestId('unit-economics')).toContainText('Revenue / pax')
   await expect(page.getByTestId('unit-economics')).toContainText('Cost / seat')
   await page.getByTestId('quarter-ledger').locator('summary').click()
@@ -401,7 +410,7 @@ test('the books open: per-route economics, network totals, filters, head-to-head
 
   // Competitor intelligence: the standings say who is bigger, head-to-head
   // says who is taking your passengers.
-  await page.getByTestId('tab-rivals').click()
+  await openPanel(page, 'rivals')
   const h2h = page.getByTestId('head-to-head').or(page.getByTestId('head-to-head-empty'))
   await expect(h2h).toBeVisible()
 })
@@ -417,7 +426,7 @@ test('the quarter lands as a headline, and the era colours the whole shell', asy
     window.__harness.dispatch({ type: 'open_route', from: me.hq, to: 'ORD', aircraftId: idle.id, frequency: 6 })
     window.__harness.endQuarter()
   })
-  await page.getByTestId('end-quarter').click()
+  await flyQuarter(page)
   // The report leads with the quarter's result at poster size, with its
   // margin and direction — the ledger is the detail underneath it.
   const hero = page.getByTestId('report-hero')
@@ -453,7 +462,7 @@ test('airline identity: name, livery, and a custom HQ with derived footholds', a
   expect(Object.keys(me.slots).length).toBe(4) // HQ + three footholds
   // The livery recolors the accent, and the standings sheet knows the name.
   await expect(page.locator('main.game')).toHaveAttribute('style', /--accent/)
-  await page.getByTestId('tab-rivals').click()
+  await openPanel(page, 'rivals')
   await expect(page.getByTestId('standings')).toContainText('Pan Galactic (you)')
   await expect(page.getByTestId('standings')).toContainText('Albion Airways')
   // The identity survives a reload through the save — and the replay viewer
@@ -959,7 +968,7 @@ test('the route dossier and rivals intel expose the numbers', async ({ page }) =
     window.__harness.endQuarter()
   })
   // Route dossier from the routes table.
-  await page.getByTestId('tab-routes').click()
+  await openPanel(page, 'routes')
   await page.getByTestId('inspect-JFK-ORD').click()
   await expect(page.getByTestId('route-dossier')).toBeVisible()
   await expect(page.getByTestId('route-dossier')).toContainText('The pair')
@@ -978,7 +987,7 @@ test('the route dossier and rivals intel expose the numbers', async ({ page }) =
   await page.getByTestId('route-dossier-close').click()
   await expect(page.getByTestId('route-dossier')).toHaveCount(0)
   // Rivals intel tab.
-  await page.getByTestId('tab-rivals').click()
+  await openPanel(page, 'rivals')
   await expect(page.getByTestId('rivals-panel')).toContainText('Albion Airways')
   // Copy-as-spreadsheet writes formula-ready TSV to the clipboard.
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
@@ -992,6 +1001,7 @@ test('the route dossier and rivals intel expose the numbers', async ({ page }) =
   await expect(page.getByTestId('standings')).toContainText('Meridian Air (you)')
   // Rival networks draw on the map (rivals expanded during the two resolved
   // quarters) and the toggle hides them.
+  await openPanel(page, 'map')
   await expect(page.locator('.route-rival').first()).toBeVisible()
   await page.getByTestId('toggle-rivals').click()
   await expect(page.locator('.route-rival')).toHaveCount(0)
@@ -1000,8 +1010,9 @@ test('the route dossier and rivals intel expose the numbers', async ({ page }) =
 test('the shop estimates per-route economics, coach marks guide, mute persists', async ({ page }) => {
   await startGame(page)
   // The shop teases airframes entering the market in the next few years.
-  await page.getByTestId('tab-fleet').click()
+  await openPanel(page, 'catalog')
   await expect(page.getByTestId('shop-horizon')).toContainText('On the horizon')
+  await openPanel(page, 'desk')
   // Coach mark points at the first move and is dismissable forever.
   await expect(page.getByTestId('coach')).toContainText('Open route from here')
   await page.getByTestId('coach-dismiss').click()
@@ -1014,7 +1025,7 @@ test('the shop estimates per-route economics, coach marks guide, mute persists',
       window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
     }
   })
-  await page.getByTestId('tab-fleet').click()
+  await openPanel(page, 'catalog')
   await expect(page.getByTestId('shop-table')).toContainText('Sud Caravelle')
   await page.getByTestId('shop-route').selectOption({ label: 'JFK–ORD' })
   await expect(page.getByTestId('shop-table')).toContainText('Est. cost/q here')
@@ -1024,10 +1035,12 @@ test('the shop estimates per-route economics, coach marks guide, mute persists',
   await expect(page.getByTestId('cash')).toContainText('$11.2M')
 
   // Mute toggle flips and persists across reload.
+  await page.getByTestId('open-settings').click()
   await page.getByTestId('mute-toggle').click()
   await expect(page.getByTestId('mute-toggle')).toHaveAttribute('aria-label', 'unmute sounds')
   await page.reload()
   await page.getByTestId('continue-save').click()
+  await page.getByTestId('open-settings').click()
   await expect(page.getByTestId('mute-toggle')).toHaveAttribute('aria-label', 'unmute sounds')
   // The dismissed coach never returns either.
   await expect(page.getByTestId('coach')).toHaveCount(0)
@@ -1080,14 +1093,16 @@ test('M2 tools: daily challenge, leasing, used market, fuel hedge', async ({ pag
   await page.getByTestId('start-daily').click()
   await expect(page.getByTestId('date')).toHaveText('1960 Q1')
   // Lease from the shop: no capex, delivers next quarter.
-  await page.getByTestId('tab-fleet').click()
+  await openPanel(page, 'catalog')
   await page.getByTestId('lease-caravelle').click()
   await expect(page.getByTestId('cash')).toContainText('$18.0M')
   await page.evaluate(() => window.__harness.endQuarter())
+  await openPanel(page, 'fleet')
   await expect(page.locator('text=(leased)')).toBeVisible()
   // The used market rotated in offers; the fuel hedge is armable in finance.
+  await openPanel(page, 'catalog')
   await expect(page.getByTestId('used-market')).toBeVisible()
-  await page.getByTestId('tab-finance').click()
+  await openPanel(page, 'finance')
   await page.getByTestId('hedge-4').click()
   await expect(page.getByTestId('hedge-panel')).toContainText('Fuel hedged')
   // Brand: setting a marketing level sticks in the engine state.
@@ -1099,9 +1114,10 @@ test('M2 tools: daily challenge, leasing, used market, fuel hedge', async ({ pag
 
 test('an aircraft order cancels for the partial refund', async ({ page }) => {
   await startGame(page)
-  await page.getByTestId('tab-fleet').click()
+  await openPanel(page, 'catalog')
   const cashBefore = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)
   await page.getByTestId('order-cv240').click()
+  await openPanel(page, 'orders')
   await expect(page.locator('text=on order')).toBeVisible()
   const cashAfterOrder = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)
   const price = cashBefore - cashAfterOrder
@@ -1338,7 +1354,7 @@ test('the report archive pages back through quarters and files an annual review'
     window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
     for (let i = 0; i < 5; i++) window.__harness.endQuarter()
   })
-  await page.getByTestId('tab-report').click()
+  await openPanel(page, 'report')
   // Latest edition first; the arrows browse the morgue and 'latest' returns.
   await expect(page.getByTestId('report-date')).toHaveText('1961 Q1')
   await page.getByTestId('report-prev').click()
@@ -1437,10 +1453,10 @@ test('the handbook teaches every system, and legends live where they are used', 
   await page.keyboard.press('Escape')
   // In context: the finance tab explains marketing and hedging where the
   // buttons are; rivals intel explains takeovers next to the buy buttons.
-  await page.getByTestId('tab-finance').click()
+  await openPanel(page, 'finance')
   await expect(page.getByTestId('marketing-legend')).toBeAttached()
   await expect(page.getByTestId('hedge-legend')).toBeAttached()
-  await page.getByTestId('tab-rivals').click()
+  await openPanel(page, 'rivals')
   await expect(page.getByTestId('takeover-legend')).toBeAttached()
 })
 
@@ -1451,7 +1467,9 @@ test('the share loop closes: copy feedback, duel HUD, and preserved careers', as
   await page.getByTestId('start-challenge').click()
   await expect(page.getByTestId('duel-chip')).toContainText('behind Ghost')
   // Copying the challenge link confirms via toast instead of silence.
+  await page.getByTestId('open-settings').click()
   await page.getByTestId('share-challenge').click()
+  await page.getByRole('button', { name: 'Close settings', exact: true }).click()
   await expect(page.getByTestId('toasts')).toContainText('Challenge link copied')
   // Ride the idle airline to game over: the finished career must SURVIVE
   // "New game" — it is the only replayable record of those decades.
@@ -1502,7 +1520,7 @@ test('the race stays a race: bounded field, scrutiny surfaced, rules explained',
   expect(field.after).toBe(field.before)
   // Dominance has a visible price, and the rivalry rules are explained where
   // the player meets them.
-  await page.getByTestId('tab-finance').click()
+  await openPanel(page, 'finance')
   await expect(page.getByTestId('scrutiny-note')).toContainText('scrutiny starts at')
   await expect(page.getByTestId('rivalry-legend')).toBeAttached()
 })
@@ -1548,6 +1566,7 @@ test('the world asks questions: an offer can be taken or passed', async ({ page 
     // Nudge the session to re-render with the mutated world.
     window.__harness.dispatch({ type: 'set_marketing', level: 0 })
   })
+  await openPanel(page, 'desk')
   const card = page.getByTestId('offer-card')
   await expect(card).toContainText('London')
   await expect(page.getByTestId('offer-deadline')).toContainText('quarters to decide')
@@ -1570,7 +1589,7 @@ test('stakes scale with the airline: groundings, reputation, milestones', async 
     for (const ac of s.airlines[0]!.fleet) ac.ageQuarters = 60
     window.__harness.dispatch({ type: 'set_marketing', level: 0 })
   })
-  await page.getByTestId('tab-fleet').click()
+  await openPanel(page, 'fleet')
   await expect(page.getByTestId('reliability-note')).toContainText('old metal breaks')
   await expect(page.getByTestId('reliability-legend')).toBeAttached()
 })

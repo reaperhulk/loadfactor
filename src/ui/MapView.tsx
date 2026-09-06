@@ -461,6 +461,7 @@ function clampView(v: ViewBox): ViewBox {
 }
 
 interface MapViewProps {
+  active?: boolean
   state: GameState
   selected: string | null // city shown in the dossier panel
   routeFrom: string | null // armed origin: next city click opens a route
@@ -474,6 +475,7 @@ interface MapViewProps {
 }
 
 export function MapView({
+  active = true,
   state,
   selected,
   routeFrom,
@@ -575,7 +577,7 @@ export function MapView({
       svg.pauseAnimations() // SMIL: the planes, which ignore CSS entirely
       paused.current = svg.getAnimations({ subtree: true }).filter((a) => a.playState === 'running')
       for (const a of paused.current) a.pause() // CSS: selection ring, target blink
-    } else if (!document.hidden && !reduceMotion) {
+    } else if (active && !document.hidden && !reduceMotion) {
       svg.unpauseAnimations()
       for (const a of paused.current) a.play()
       paused.current = []
@@ -585,13 +587,13 @@ export function MapView({
     const visibility = () => {
       const svg = svgRef.current
       if (!svg) return
-      if (document.hidden || reduceMotion || movingRef.current) svg.pauseAnimations()
+      if (!active || document.hidden || reduceMotion || movingRef.current) svg.pauseAnimations()
       else svg.unpauseAnimations()
     }
     visibility()
     document.addEventListener('visibilitychange', visibility)
     return () => document.removeEventListener('visibilitychange', visibility)
-  }, [reduceMotion])
+  }, [reduceMotion, active])
   const layerRef = useRef<HTMLDivElement>(null)
   const minimapRef = useRef<HTMLDivElement>(null)
   // The viewBox actually in the DOM. The transform maps it to the live view.

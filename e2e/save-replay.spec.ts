@@ -1,3 +1,4 @@
+import { flyQuarter } from './workspace'
 // Save/resume and the replay viewer: a save is (scenario, seed, commands),
 // so resuming and replaying are both just deterministic refolds.
 
@@ -43,7 +44,7 @@ test('a game auto-saves and resumes across a page reload', async ({ page }) => {
   const after = await page.evaluate(() => JSON.stringify(window.__harness.getState()))
   expect(after).toBe(before)
   // …and the resumed game keeps playing.
-  await page.getByTestId('end-quarter').click()
+  await flyQuarter(page)
   await expect(page.getByTestId('date')).toHaveText('1960 Q4')
 })
 

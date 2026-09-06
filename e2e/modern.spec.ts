@@ -1,3 +1,4 @@
+import { openPanel, flyQuarter } from './workspace'
 import { expect, test, type Page } from '@playwright/test'
 
 async function start(page: Page) {
@@ -7,10 +8,12 @@ async function start(page: Page) {
   await expect(page.getByTestId('map')).toBeVisible()
 }
 async function launch(page: Page) {
+  await openPanel(page, 'desk')
   await page.getByTestId('management-brief').getByRole('button', { name: 'Compare this launch' }).first().click()
   await expect(page.getByRole('dialog', { name: /^Plan / })).toBeVisible()
   await page.getByTestId('route-setup-confirm').click()
   await expect(page.getByTestId('route-setup')).toHaveCount(0)
+  await openPanel(page, 'map')
 }
 
 test('first launch, full-company planning, atomic undo and report focus', async ({ page }) => {
@@ -19,7 +22,7 @@ test('first launch, full-company planning, atomic undo and report focus', async 
   await start(page)
   await launch(page)
   const before = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.routes[0]!)
-  await page.getByTestId('tab-routes').click()
+  await openPanel(page, 'routes')
   await page.getByTestId('planning-workbench').locator('summary').click()
   await page.getByLabel('plan fare', { exact: true }).selectOption('2')
   await page.getByLabel('plan service', { exact: true }).selectOption('3')
@@ -32,7 +35,7 @@ test('first launch, full-company planning, atomic undo and report focus', async 
   await page.getByTestId('undo-action').click()
   const restored = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.routes[0]!)
   expect([restored.fareLevel, restored.serviceLevel, restored.frequency]).toEqual([before.fareLevel, before.serviceLevel, before.frequency])
-  await page.getByTestId('end-quarter').click()
+  await flyQuarter(page)
   await expect(page.getByRole('dialog', { name: 'Quarterly report' })).toBeVisible()
   await expect(page.getByTestId('report-card-close')).toBeFocused()
   await page.keyboard.press('Escape')
@@ -45,6 +48,7 @@ test('display and audio preferences persist; reduced motion removes map traffic'
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await start(page)
   await launch(page)
+  await page.getByTestId('open-settings').click()
   await page.getByTestId('display-settings').locator('summary').click()
   await page.getByLabel('motion preference').selectOption('full')
   await expect(page.locator('.plane').first()).toBeVisible()
@@ -58,6 +62,7 @@ test('display and audio preferences persist; reduced motion removes map traffic'
   await page.getByLabel('effects volume').press('End')
   await page.reload()
   await page.getByTestId('continue-save').click()
+  await page.getByTestId('open-settings').click()
   await page.getByTestId('display-settings').locator('summary').click()
   await expect(page.getByLabel('motion preference')).toHaveValue('reduced')
   await expect(page.getByLabel('text size')).toHaveValue('125')
@@ -72,7 +77,7 @@ test('map metrics, route what-ifs and optional detail are explicit', async ({ pa
   await launch(page)
   await page.getByLabel('map colors', { exact: true }).selectOption('profit')
   await expect(page.getByTestId('map-data-legend')).toContainText('Loss')
-  await page.getByTestId('tab-routes').click()
+  await openPanel(page, 'routes')
   await expect(page.locator('.route-table').getByText('Cost/seat', { exact: true })).toBeHidden()
   await page.getByRole('button', { name: 'Show all metrics', exact: true }).click()
   await expect(page.locator('.route-table').getByText('Cost/seat', { exact: true })).toBeVisible()
@@ -85,7 +90,7 @@ test('map metrics, route what-ifs and optional detail are explicit', async ({ pa
 
 test('maintenance and standby are deliberate fleet decisions', async ({ page }) => {
   await start(page)
-  await page.getByTestId('tab-fleet').click()
+  await openPanel(page, 'fleet')
   await page.getByTestId('operations-panel').locator('summary').click()
   await page.getByLabel('Keep on standby', { exact: false }).check()
   expect(await page.evaluate(() => window.__harness.getState()!.airlines[0]!.fleet[0]!.reserve)).toBe(true)
@@ -104,6 +109,7 @@ test('short mandate starts with an established hub and declared objective', asyn
   const state = await page.evaluate(() => window.__harness.getState()!)
   expect(state.scenario).toBe('hub_defense')
   expect(state.airlines[0]!.routes).toHaveLength(3)
+  await openPanel(page, 'desk')
   await page.getByTestId('world-outlook').locator('summary').click()
   await expect(page.getByTestId('world-outlook')).toContainText('Airport programmes')
 })

@@ -1,3 +1,4 @@
+import { flyQuarter } from './workspace'
 import { expect, test, type Page } from '@playwright/test'
 
 // MP0 + MP1 (PLAN.md §10): hot-seat at one device, and the async duel where
@@ -44,7 +45,7 @@ test('hot-seat: two players share a device, planning in rotation', async ({ page
   expect(routes.p0).toBe(0)
 
   // The last planner resolves. Next quarter the rotation flips: seat 1 first.
-  await page.getByTestId('end-quarter').click()
+  await flyQuarter(page)
   await expect(page.getByTestId('report-card')).toContainText('Best route')
   await expect(page.getByTestId('report-card')).not.toContainText('Best route: closed route')
   await page.getByTestId('report-card-close').click()
@@ -59,7 +60,7 @@ test('hot-seat: two players share a device, planning in rotation', async ({ page
 test('hot-seat: the game survives a reload as a v2 save', async ({ page }) => {
   await startHotseat(page)
   await page.getByTestId('pass-seat').click()
-  await page.getByTestId('end-quarter').click()
+  await flyQuarter(page)
   await page.getByTestId('report-card-close').click()
   await expect(page.getByTestId('date')).toHaveText('1960 Q2')
 
@@ -108,7 +109,7 @@ test('link duel: two browsers exchange turn links and stay in lockstep', async (
       window.__harness.dispatch({ type: 'open_route', from: me.hq, to, aircraftId: idle.id, frequency: 4 })
     }
   })
-  await b.getByTestId('end-quarter').click()
+  await flyQuarter(b)
   await b.getByTestId('report-card-close').click()
   await expect(b.getByTestId('date')).toHaveText('1960 Q2')
   // Alice's opening really reached Bob's world.

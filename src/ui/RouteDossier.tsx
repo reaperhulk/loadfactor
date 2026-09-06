@@ -2,6 +2,7 @@
 // picture on the pair, controls, and the fleet flying it. Opens from the
 // Routes table or by clicking an arc on the map.
 
+import { useEffect, useRef } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm, pairKey } from '../data/cities'
 import { FARE_DEMAND_BP, ROUTE_MEMORY_QUARTERS } from '../data/constants'
@@ -32,6 +33,8 @@ interface RouteDossierProps {
 }
 
 export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDossierProps) {
+  const panel = useRef<HTMLElement>(null)
+  useEffect(() => { panel.current?.scrollTo(0, 0); panel.current?.querySelector<HTMLButtonElement>('[data-testid=route-dossier-close]')?.focus({ preventScroll: true }) }, [routeId])
   const player = state.airlines[viewSeat()]!
   const route = player.routes.find((r) => r.id === routeId)
   if (!route) return null
@@ -70,7 +73,7 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
   const lfTrend = route.history.map((h) => h.loadFactorBp)
 
   return (
-    <aside className="city-panel route-dossier" data-testid="route-dossier">
+    <aside ref={panel} className="city-panel route-dossier" data-testid="route-dossier">
       <header className="city-panel-head">
         <div>
           <h2>

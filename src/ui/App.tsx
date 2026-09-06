@@ -1,9 +1,12 @@
+import { planningForecast } from './forecast'
+import { AREA_PAGES, PAGE_LABELS, areaFor, type WorkspaceArea, type WorkspacePage } from './workspace'
+import { QuarterReview } from './QuarterReview'
 import { DisplaySettings } from './DisplaySettings'
 import { Dialog } from './Dialog'
 import { AudioSettings } from './AudioSettings'
 import { ManagementBrief } from './ManagementBrief'
 import { rulesOf, identityOf } from '../engine/version'
-import { lazy, Suspense, useEffect, useReducer, useState, useSyncExternalStore } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react'
 import { CITIES } from '../data/cities'
 import { AIRCRAFT } from '../data/aircraft'
 import { getEventDef } from '../data/events'
@@ -635,49 +638,50 @@ function ObjectiveBar({ value, target }: { value: number; target: number }) {
 
 function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const session = getSession()!
-  useEffect(() => { window.scrollTo(0, 0) }, [])
-  const [tab, setTab] = useState<Tab>('routes')
+  const state = session.state, seat = viewSeat(), player = state.airlines[seat]!
+  const scenario = getScenario(state.scenario)
+  const [tab, setTabState] = useState<WorkspacePage>('map')
+  const [visited, setVisited] = useState<ReadonlySet<WorkspacePage>>(new Set(['map']))
+  const lastPage = useRef<Record<WorkspaceArea, WorkspacePage>>({ desk: 'desk', network: 'map', fleet: 'fleet', company: 'finance' })
+  const setTab = useCallback((page: WorkspacePage) => {
+    lastPage.current[areaFor(page)] = page
+    setVisited((old) => old.has(page) ? old : new Set([...old, page]))
+    setTabState(page)
+  }, [])
+  const area = areaFor(tab)
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<number | null>(null)
   const [routeFrom, setRouteFrom] = useState<string | null>(null)
   const [pendingRoute, setPendingRoute] = useState<{ from: string; to: string } | null>(null)
   const [showReport, setShowReport] = useState(false)
+  const [showReview, setShowReview] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
-  const state = session.state
-  const player = state.airlines[viewSeat()]!
-  const scenario = getScenario(state.scenario)
-
-  // Map interaction: a click selects a city (dossier panel). With a route
-  // armed from the panel, the next click is the destination.
+  const [showSettings, setShowSettings] = useState(false)
+  const forecast = planningForecast(state, seat)
+  const shownCash = useCountUp(player.cash), shownWorth = useCountUp(netWorth(player))
+  const attentionCount = player.fleet.filter((a) => a.routeId === null && !a.reserve).length +
+    player.routes.filter((r) => r.history.length > 0 && r.lastRevenue < r.lastCost).length +
+    (forecast.cashAfter < 0 ? 1 : 0) + state.world.offers.filter((o) => o.airline === undefined || o.airline === seat).length
   const handleCityClick = (cityId: string): void => {
     setSelectedRoute(null)
     if (routeFrom !== null && routeFrom !== cityId) {
-      // Destination picked: configure the launch (aircraft, frequency, fare).
-      setPendingRoute({ from: routeFrom, to: cityId })
-      setRouteFrom(null)
-    } else if (routeFrom === cityId) {
-      setRouteFrom(null) // clicking the armed origin disarms it
-    } else {
-      setSelectedCity(selectedCity === cityId ? null : cityId)
-    }
+      setPendingRoute({ from: routeFrom, to: cityId }); setRouteFrom(null)
+    } else if (routeFrom === cityId) setRouteFrom(null)
+    else setSelectedCity(selectedCity === cityId ? null : cityId)
   }
-
   const inspectRoute = (routeId: number): void => {
-    setSelectedCity(null)
-    setRouteFrom(null)
-    setSelectedRoute(routeId)
+    setSelectedCity(null); setRouteFrom(null); setSelectedRoute(routeId)
+    if (tab !== 'map') setTab('routes')
   }
-
+  const closeRoute = (): void => {
+    const r = player.routes.find((r) => r.id === selectedRoute)
+    setSelectedRoute(null)
+    if (r) requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-testid="inspect-${r.from}-${r.to}"]`)?.focus({ preventScroll: true }))
+  }
   const endQuarter = (): void => {
-    if (getSession()?.state.phase !== 'planning') return
-    if (!canEndQuarter()) return // hot-seat: not the last planner; link: not the closer
-    dispatch({ type: 'end_quarter' })
-    setShowReport(true)
+    if (getSession()?.state.phase !== 'planning' || !canEndQuarter()) return
+    setShowReview(false); dispatch({ type: 'end_quarter' }); setShowReport(true)
   }
-
-  // Keyboard shortcuts: Space/E end the quarter (or dismiss the report card),
-  // 1–6 switch panels, Esc backs out of route mode, then the panel. Ignored
-  // while typing in a form control.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const target = e.target as HTMLElement | null
@@ -685,104 +689,114 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       if (target && ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(target.tagName)) return
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         if (undoLastAction()) e.preventDefault()
-      } else if (e.key === ' ' || e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
+      } else if ([' ', 'e', 'E'].includes(e.key)) {
         e.preventDefault()
-        setShowReport((open) => {
-          if (open) return false
-          if (e.key !== 'Enter') {
-            // End the quarter only when no report card was in the way — and
-            // only for whoever may: in hot-seat that is the last planner, in
-            // a link duel the quarter's closer. Space is not a bypass.
-            if (getSession()?.state.phase === 'planning' && canEndQuarter()) {
-              dispatch({ type: 'end_quarter' })
-              return true
-            }
-          }
-          return open
-        })
+        if (getSession()?.state.phase === 'planning' && canEndQuarter()) setShowReview(true)
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-        // Cycle the dossier through the network's cities — the keyboard's
-        // answer to hunting for dots on a dense map.
         const s = getSession()?.state
         if (!s) return
         const cities = [...networkCities(s.airlines[viewSeat()]!)].sort()
-        if (cities.length === 0) return
-        e.preventDefault()
+        if (!cities.length) return
+        e.preventDefault(); setTab('map'); setSelectedRoute(null)
         const step = e.key === 'ArrowRight' ? 1 : -1
-        setSelectedCity((cur) => {
-          const idx = cur !== null ? cities.indexOf(cur) : step > 0 ? -1 : 0
-          return cities[(idx + step + cities.length) % cities.length]!
-        })
-      } else if (e.key >= '1' && e.key <= String(TABS.length)) {
-        setTab(TABS[Number(e.key) - 1]!)
-      } else if (e.key === '?') {
-        setShowHelp((h) => !h)
-      } else if (e.key === 'Escape') {
-        setShowHelp(false)
-        setShowReport(false)
-        setSelectedRoute(null)
-        setPendingRoute(null)
-        setRouteFrom((armed) => {
-          if (armed === null) setSelectedCity(null)
-          return null
-        })
+        setSelectedCity((cur) => { const idx = cur !== null ? cities.indexOf(cur) : step > 0 ? -1 : 0; return cities[(idx + step + cities.length) % cities.length]! })
+      } else if (e.key >= '1' && e.key <= String(TABS.length)) setTab(TABS[Number(e.key) - 1]!)
+      else if (e.key === '?') setShowHelp((h) => !h)
+      else if (e.key === 'Escape') {
+        setShowHelp(false); setShowReport(false); setShowReview(false); setSelectedRoute(null); setPendingRoute(null)
+        setRouteFrom((armed) => { if (armed === null) setSelectedCity(null); return null })
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
-
-  const shownCash = useCountUp(player.cash)
-  const shownWorth = useCountUp(netWorth(player))
-
-  // The chosen livery recolors the player's accent everywhere — arcs, dots,
-  // bars, chips — via the CSS custom property the whole UI already uses.
+  }, [setTab])
   const livery = getPlayerColor()
-  return (
-    <main
-      className={`game era-${Math.min(2000, Math.max(1960, Math.floor(yearOf(state) / 10) * 10))}`}
-      style={livery ? ({ '--accent': livery } as React.CSSProperties) : undefined}
-    >
-      <SaveWarning />
-      <header>
-        <h1>Load Factor</h1>
-        <span className="hud-stat" data-label="Quarter" data-testid="date">
-          {yearOf(state)} Q{quarterOf(state)}
-        </span>
-        <span
-          className="hud-stat dim"
-          data-label="Remaining"
-          data-testid="race-clock"
-          title="quarters until the race is scored"
-        >
-          {Math.max(0, scenario.quarters - state.turn)}q left
-        </span>
-        {(() => {
-          // The duel, always on screen: a challenge career shows the number
-          // to beat in the HUD, not just on a chart two tabs away.
-          const duel = getChallengeTarget()
-          if (!duel) return null
-          const mine = objectiveScore(player, duel.kind ?? 'netWorth')
-          const duelValue = (n: number) => objectiveValue(n, duel.kind ? scenario.objective.unit : 'money')
-          const ahead = mine > duel.worth
-          return (
-            <span
-              className={ahead ? 'pos' : 'neg'}
-              data-testid="duel-chip"
-              title={`challenge target: beat ${duel.by ?? 'the challenger'}'s ${duelValue(duel.worth)}`}
-            >
-              ⚔ {ahead ? 'ahead of' : 'behind'} {duel.by ?? 'challenger'} by {duelValue(Math.abs(mine - duel.worth))}
-            </span>
-          )
-        })()}
-        {(player.insolventQuarters > 0 || player.cash < 0) && state.phase === 'planning' && (
-          <span className="neg insolvency-warning" data-testid="insolvency-warning">
-            ⚠ INSOLVENT — {player.insolventQuarters > 0 ? 'one more losing quarter folds the airline' : 'end the quarter in the red and the clock starts'}
-          </span>
-        )}
-        <span className="hud-stat hud-figure" data-label="Cash" data-testid="cash">
-          {money(shownCash)}
-        </span>
+  return <main className={`game game-shell era-${Math.min(2000, Math.max(1960, Math.floor(yearOf(state) / 10) * 10))}`} style={livery ? ({ '--livery': livery } as React.CSSProperties) : undefined}>
+    <SaveWarning />
+    <header className="app-header" data-testid="app-header">
+      <div className="airline-brand"><Icon name="aircraft" /><div><h1 title={player.name}>{player.name}</h1><small>Load Factor</small></div></div>
+      <span className="app-date"><span data-testid="date">{yearOf(state)} Q{quarterOf(state)}</span><small data-testid="race-clock">{Math.max(0, scenario.quarters - state.turn)}q left</small></span>
+      <button className="inbox-button" data-testid="open-inbox" onClick={() => setTab('desk')}><Icon name="inbox" /><span>Inbox</span>{attentionCount > 0 && <b>{attentionCount}</b>}</button>
+      <button className="settings-button" data-testid="open-settings" aria-label="Open settings" onClick={() => setShowSettings(true)}><Icon name="settings" /></button>
+    </header>
+    <div className="turn-actions" data-testid="turn-actions"><span className="mobile-profit"><small>Planned net profit</small><strong className={forecast.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.profit)}</strong></span>
+        {state.phase === 'planning' &&
+          (() => {
+            const sess = getSession()!
+            if (sess.mode === 'hotseat') {
+              const order = seatOrder()
+              const at = order.indexOf(sess.activeSeat)
+              const next = order[at + 1]
+              return (
+                <span className="hotseat-controls">
+                  <span className="seat-chip" data-testid="active-seat">
+                    🎮 {state.airlines[sess.activeSeat]!.name}
+                  </span>
+                  {next !== undefined ? (
+                    <button
+                      className="end-quarter"
+                      data-testid="pass-seat"
+                      onClick={() => passSeat()}
+                    >
+                      Done — pass to {state.airlines[next]!.name} ▶
+                    </button>
+                  ) : (
+                    <button className="end-quarter" data-testid="end-quarter" onClick={() => setShowReview(true)}>
+                      Review quarter →
+                    </button>
+                  )}
+                </span>
+              )
+            }
+            if (sess.mode === 'link') {
+              const st = mpStatus()
+              if (!st) return null
+              if (!st.yourSitting) {
+                return (
+                  <span className="hotseat-controls" data-testid="mp-waiting">
+                    ✉ waiting for opponent
+                    {getLastSentLink() !== null && (
+                      <button onClick={() => copyText(getLastSentLink()!, 'Turn link')}>
+                        copy link again
+                      </button>
+                    )}
+                  </span>
+                )
+              }
+              return (
+                <span className="hotseat-controls">
+                  {canEndQuarter() && (
+                    <button className="end-quarter" data-testid="end-quarter" onClick={() => setShowReview(true)}>
+                      Review quarter →
+                    </button>
+                  )}
+                  <button
+                    className="end-quarter"
+                    data-testid="mp-send"
+                    title="package everything since their last look into a link — send it to them over any channel"
+                    onClick={() => {
+                      void sendSitting().then((url) => {
+                        if (url) copyText(url, 'Turn link')
+                      })
+                    }}
+                  >
+                    ✉ Send turn
+                  </button>
+                </span>
+              )
+            }
+            return (
+              <button className="end-quarter" data-testid="end-quarter" onClick={() => setShowReview(true)}>
+                Review quarter →
+              </button>
+            )
+          })()}
+
+    </div>
+    <section className="status-bar" aria-label="Airline status" data-testid="status-bar">
+      <span className="hud-stat hud-figure" data-label="Cash now" data-testid="cash">{money(shownCash)}</span>
+      <span className={`hud-stat hud-figure planned-profit ${forecast.profit >= 0 ? 'pos' : 'neg'}`} data-label="Planned net profit / q" data-testid="planned-profit">{money(forecast.profit)}</span>
+      <button className="hud-stat hud-figure planned-cash" data-label="Planned ending cash" onClick={() => setShowReview(true)}>{money(forecast.cashAfter)}</button>
         <span className="hud-stat hud-figure hud-objective" data-label="Objective" data-testid="networth">
           {scenario.objective.kind === 'netWorth' ? (
             <>
@@ -831,109 +845,44 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             </span>
           )
         })()}
-        <button
-          className="undo-action"
-          data-testid="undo-action"
-          disabled={!canUndo()}
-          title="undo the last planning action (Ctrl/⌘ Z)"
-          onClick={() => undoLastAction()}
-        >
-          <Icon name="undo" /> Undo
-        </button>
-        <button
-          data-testid="share-challenge"
-          title="copy a challenge link — same scenario, same seed, same world for whoever opens it"
-          aria-label="copy challenge link"
-          onClick={() => {
-            // The link carries your current net worth as the number to beat —
-            // sharing mid-career throws down where you stand right now.
-            const me = state.airlines[viewSeat()]!
-            const url =
-              `${window.location.origin}${window.location.pathname}?scenario=${encodeURIComponent(
-                state.scenario,
-              )}&seed=${encodeURIComponent(state.seed)}` +
-              `&target=${objectiveScore(me, scenario.objective.kind)}&metric=${scenario.objective.kind}&rules=${identityOf(state).rulesVersion}&by=${encodeURIComponent(me.name)}`
-            copyText(url, 'Challenge link')
-          }}
-        >
-          <Icon name="share" /> share
-        </button>
-        <MuteToggle />
-        <AudioSettings />
-        <DisplaySettings />
-        {state.phase === 'planning' &&
-          (() => {
-            const sess = getSession()!
-            if (sess.mode === 'hotseat') {
-              const order = seatOrder()
-              const at = order.indexOf(sess.activeSeat)
-              const next = order[at + 1]
-              return (
-                <span className="hotseat-controls">
-                  <span className="seat-chip" data-testid="active-seat">
-                    🎮 {state.airlines[sess.activeSeat]!.name}
-                  </span>
-                  {next !== undefined ? (
-                    <button
-                      className="end-quarter"
-                      data-testid="pass-seat"
-                      onClick={() => passSeat()}
-                    >
-                      Done — pass to {state.airlines[next]!.name} ▶
-                    </button>
-                  ) : (
-                    <button className="end-quarter" data-testid="end-quarter" onClick={endQuarter}>
-                      End Quarter ▶
-                    </button>
-                  )}
-                </span>
-              )
-            }
-            if (sess.mode === 'link') {
-              const st = mpStatus()
-              if (!st) return null
-              if (!st.yourSitting) {
-                return (
-                  <span className="hotseat-controls" data-testid="mp-waiting">
-                    ✉ waiting for opponent
-                    {getLastSentLink() !== null && (
-                      <button onClick={() => copyText(getLastSentLink()!, 'Turn link')}>
-                        copy link again
-                      </button>
-                    )}
-                  </span>
-                )
-              }
-              return (
-                <span className="hotseat-controls">
-                  {canEndQuarter() && (
-                    <button className="end-quarter" data-testid="end-quarter" onClick={endQuarter}>
-                      End Quarter ▶
-                    </button>
-                  )}
-                  <button
-                    className="end-quarter"
-                    data-testid="mp-send"
-                    title="package everything since their last look into a link — send it to them over any channel"
-                    onClick={() => {
-                      void sendSitting().then((url) => {
-                        if (url) copyText(url, 'Turn link')
-                      })
-                    }}
-                  >
-                    ✉ Send turn
-                  </button>
-                </span>
-              )
-            }
-            return (
-              <button className="end-quarter" data-testid="end-quarter" onClick={endQuarter}>
-                End Quarter ▶
-              </button>
-            )
-          })()}
-      </header>
-      <CoachMarks state={state} />
+
+    </section>
+    <nav className="primary-nav" aria-label="Game areas" data-testid="primary-nav">
+      {(['desk', 'network', 'fleet', 'company'] as const).map((item) => <button key={item} data-testid={`nav-${item}`} aria-current={area === item ? 'page' : undefined} className={area === item ? 'active' : ''} onClick={() => setTab(lastPage.current[item])}><Icon name={item === 'fleet' ? 'aircraft' : item} /><span>{item === 'desk' ? 'Desk' : item === 'network' ? 'Network' : item === 'fleet' ? 'Fleet' : 'Company'}</span></button>)}
+      <div className="nav-footer"><button className="link-btn" onClick={() => setShowHelp(true)}>Handbook <span aria-hidden="true">?</span></button><small>{scenario.name}</small><BuildStamp /></div>
+    </nav>
+    <section className="workspace" data-testid="workspace">
+      <nav className="workspace-tabs tabs" aria-label={`${area} views`} data-testid="workspace-tabs">
+        {AREA_PAGES[area].map((page) => <button key={page} data-testid={`tab-${page}`} aria-current={tab === page ? 'page' : undefined} className={tab === page ? 'active' : ''} onClick={() => setTab(page)}>{PAGE_LABELS[page]}</button>)}
+        <button className="undo-action" data-testid="undo-action" disabled={!canUndo()} aria-label="Undo last planning action" onClick={() => undoLastAction()}><Icon name="undo" /><span>Undo</span></button>
+      </nav>
+      <div className="workspace-pages">
+        <section className="workspace-page desk-page" hidden={tab !== 'desk'} data-testid="page-desk">
+          <div className="page-heading"><div><span className="eyebrow">{yearOf(state)} Q{quarterOf(state)}</span><h2>Operations desk</h2></div><span className="dim">{scenario.name}</span></div>
+        {(() => {
+          // The duel, always on screen: a challenge career shows the number
+          // to beat in the HUD, not just on a chart two tabs away.
+          const duel = getChallengeTarget()
+          if (!duel) return null
+          const mine = objectiveScore(player, duel.kind ?? 'netWorth')
+          const duelValue = (n: number) => objectiveValue(n, duel.kind ? scenario.objective.unit : 'money')
+          const ahead = mine > duel.worth
+          return (
+            <span
+              className={ahead ? 'pos' : 'neg'}
+              data-testid="duel-chip"
+              title={`challenge target: beat ${duel.by ?? 'the challenger'}'s ${duelValue(duel.worth)}`}
+            >
+              ⚔ {ahead ? 'ahead of' : 'behind'} {duel.by ?? 'challenger'} by {duelValue(Math.abs(mine - duel.worth))}
+            </span>
+          )
+        })()}
+        {(player.insolventQuarters > 0 || player.cash < 0) && state.phase === 'planning' && (
+          <span className="neg insolvency-warning" data-testid="insolvency-warning">
+            ⚠ INSOLVENT — {player.insolventQuarters > 0 ? 'one more losing quarter folds the airline' : 'end the quarter in the red and the clock starts'}
+          </span>
+        )}
+<CoachMarks state={state} />
       {(() => {
         // Needs attention: money leaking or about to. Each chip jumps to the
         // tab where the fix lives.
@@ -983,20 +932,126 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           })}
         </div>
       )}
-      {showReport && session.reportEvents.length > 0 && (
-        <ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} />
-      )}
-      {pendingRoute !== null && (
-        <RouteSetupDialog
-          state={state}
-          from={pendingRoute.from}
-          to={pendingRoute.to}
-          onClose={() => setPendingRoute(null)}
-        />
-      )}
-      {state.phase !== 'planning' && (
-        <GameOverOverlay state={state} earned={session.careerUnlocks} onWatchReplay={onWatchReplay} />
-      )}
+      {(state.rulesVersion ?? 1) >= 2 && <details className="world-outlook" data-testid="world-outlook">
+        <summary>Planning calendar · next board opportunity in {state.turn % 8 === 0 ? 0 : 8 - state.turn % 8}q</summary>
+        <p>Board opportunities arrive every eight quarters with four quarters to decide. Accepted commitments can run for several years.</p>
+        <p>{scenario.objective.blurb} {scenario.objective.kind === 'loadFactor' ? 'Qualification also requires 1.5M total passengers and three active routes.' : ''}</p>
+        <p>Scheduled deliveries: {player.orders.length === 0 ? 'none' : player.orders.map((o) => `${o.type} in ${o.quartersLeft}q${o.replacesAircraftId ? ' (replacement)' : ''}`).join(' · ')}</p>
+        <p>Aircraft entering the market within two years: {AIRCRAFT.filter((t) => t.availableFrom > yearOf(state) && t.availableFrom <= yearOf(state) + 2).map((t) => `${t.name} (${t.availableFrom})`).join(' · ') || 'none announced'}.</p>
+        <p>Airport programmes on your network: {[...new Set([...Object.keys(player.slots), ...player.slotRequests.map((r) => r.city)])].map((city) => ({ city, ...nextExpansion(state, city) })).filter((e) => e.quartersAway <= 8).sort((a,b) => a.quartersAway-b.quartersAway).map((e) => `${e.city}: +${e.slots} slots in ${e.quartersAway}q`).join(' · ') || 'none opening in the next eight quarters'}.</p>
+        {state.airlines.filter((a) => a.campaign).map((a) => <p key={a.id}>{a.name}: {a.campaign!.kind} campaign at {a.campaign!.city}, through quarter {a.campaign!.untilTurn}.</p>)}
+      </details>}
+      {state.phase === 'planning' && <ManagementBrief state={state} onTab={setTab} onInspect={inspectRoute} onPlan={(from, to) => setPendingRoute({ from, to })} />}
+
+        </section>
+        <section className="workspace-page map-page" hidden={tab !== 'map'} data-testid="page-map">
+      <div className={`map-area split-view${selectedCity !== null || selectedRoute !== null ? " has-inspector" : ""}`}>
+        <Suspense
+          fallback={
+            <div className="map-wrap map-loading" data-testid="map-loading" aria-busy="true">
+              <span>Loading route map…</span>
+            </div>
+          }
+        >
+          <MapView
+            state={state}
+            active={tab === "map"}
+            selected={selectedCity}
+            routeFrom={routeFrom}
+            onCityClick={handleCityClick}
+            onRouteClick={inspectRoute}
+            newRouteIds={
+              new Set(
+                session.lastEvents
+                  .filter((e) => e.type === 'route_opened' && e.airline === viewSeat())
+                  .map((e) => (e.type === 'route_opened' ? e.routeId : -1)),
+              )
+            }
+            newSlotCities={
+              new Set(
+                session.lastEvents
+                  .filter((e) => e.type === 'slots_granted' && e.airline === viewSeat())
+                  .map((e) => (e.type === 'slots_granted' ? e.city : '')),
+              )
+            }
+            acquiredRouteIds={(() => {
+              // A takeover appends the target's routes with fresh ids — the
+              // last `routes` entries are the ones that just changed flags.
+              const deal = session.lastEvents.find((e) => e.type === 'rival_acquired' && e.airline === viewSeat())
+              if (!deal || deal.type !== 'rival_acquired' || deal.routes === 0) return new Set<number>()
+              return new Set(player.routes.slice(-deal.routes).map((r) => r.id))
+            })()}
+          />
+        </Suspense>
+        {tab === "map" && selectedCity !== null && (
+          <CityPanel
+            state={state}
+            cityId={selectedCity}
+            routeFrom={routeFrom}
+            onPlanRoute={(from) => { setRouteFrom(routeFrom === from ? null : from); setSelectedCity(null) }}
+            onPlanPair={(from, to) => {
+              setSelectedCity(null)
+              setRouteFrom(null)
+              setPendingRoute({ from, to })
+            }}
+            onClose={() => {
+              setSelectedCity(null)
+              setRouteFrom(null)
+            }}
+          />
+        )}
+        {tab === "map" && selectedRoute !== null && (
+          <RouteDossier
+            state={state}
+            routeId={selectedRoute}
+            onClose={() => setSelectedRoute(null)}
+            onSelectRoute={setSelectedRoute}
+          />
+        )}
+      </div>
+
+        </section>
+        {visited.has('routes') && <section className={`workspace-page route-page split-view${selectedRoute !== null ? ' has-inspector' : ''}`} hidden={tab !== 'routes'} data-testid="page-routes">
+          <div className="split-list"><div className="page-heading"><div><span className="eyebrow">Network</span><h2>Routes <span>{player.routes.length}</span></h2></div><span className="dim">Last quarter’s results</span></div><RoutesPanel state={state} onInspect={inspectRoute} onPlan={(from, to) => setPendingRoute({ from, to })} /></div>
+          {tab === 'routes' && selectedRoute !== null && <RouteDossier state={state} routeId={selectedRoute} onClose={closeRoute} onSelectRoute={setSelectedRoute} />}
+        </section>}
+        {visited.has('fleet') && <section className="workspace-page" hidden={tab !== 'fleet'} data-testid="page-fleet"><FleetPanel state={state} /></section>}
+        {visited.has('orders') && <section className="workspace-page" hidden={tab !== 'orders'} data-testid="page-orders"><FleetPanel state={state} view="orders" /></section>}
+        {visited.has('catalog') && <section className="workspace-page" hidden={tab !== 'catalog'} data-testid="page-catalog"><FleetPanel state={state} view="catalog" /></section>}
+        {visited.has('airports') && <section className="workspace-page" hidden={tab !== 'airports'} data-testid="page-airports"><div className="page-heading"><h2>Airports</h2></div><AirportsPanel state={state} /></section>}
+        {visited.has('rivals') && <section className="workspace-page" hidden={tab !== 'rivals'} data-testid="page-rivals"><RivalsPanel state={state} /></section>}
+        {visited.has('finance') && <section className="workspace-page" hidden={tab !== 'finance'} data-testid="page-finance"><FinancePanel state={state} /></section>}
+        {visited.has('report') && <section className="workspace-page" hidden={tab !== 'report'} data-testid="page-report"><ReportPanel state={state} archive={session.reportArchive} /></section>}
+      </div>
+    </section>
+    <ToastStack events={session.lastEvents} state={state} unlocks={session.lastUnlocks} onOpenRoute={inspectRoute} />
+    {showReview && <QuarterReview state={state} forecast={forecast} onClose={() => setShowReview(false)} onConfirm={endQuarter} />}
+    {showReport && session.reportEvents.length > 0 && <ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} />}
+    {pendingRoute !== null && <RouteSetupDialog state={state} from={pendingRoute.from} to={pendingRoute.to} onClose={() => setPendingRoute(null)} />}
+    {state.phase !== 'planning' && <GameOverOverlay state={state} earned={session.careerUnlocks} onWatchReplay={onWatchReplay} />}
+    {showSettings && <Dialog label="Settings" className="gameover-overlay" testId="settings-dialog" onClose={() => setShowSettings(false)}><div className="settings-card"><div className="dialog-heading"><h2>Settings</h2><button onClick={() => setShowSettings(false)} aria-label="Close settings">×</button></div>
+        <button
+          data-testid="share-challenge"
+          title="copy a challenge link — same scenario, same seed, same world for whoever opens it"
+          aria-label="copy challenge link"
+          onClick={() => {
+            // The link carries your current net worth as the number to beat —
+            // sharing mid-career throws down where you stand right now.
+            const me = state.airlines[viewSeat()]!
+            const url =
+              `${window.location.origin}${window.location.pathname}?scenario=${encodeURIComponent(
+                state.scenario,
+              )}&seed=${encodeURIComponent(state.seed)}` +
+              `&target=${objectiveScore(me, scenario.objective.kind)}&metric=${scenario.objective.kind}&rules=${identityOf(state).rulesVersion}&by=${encodeURIComponent(me.name)}`
+            copyText(url, 'Challenge link')
+          }}
+        >
+          <Icon name="share" /> share
+        </button>
+        <MuteToggle />
+        <AudioSettings />
+        <DisplaySettings />
+<button onClick={() => { setShowSettings(false); setShowHelp(true) }}>Open handbook</button></div></Dialog>}
       {showHelp && (
         <Dialog label="Airline handbook" className="gameover-overlay" testId="help-overlay" onClose={() => setShowHelp(false)}>
           <div className="gameover-card report-card handbook" onClick={(e) => e.stopPropagation()}>
@@ -1071,118 +1126,8 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           </div>
         </Dialog>
       )}
-      {(state.rulesVersion ?? 1) >= 2 && <details className="world-outlook" data-testid="world-outlook">
-        <summary>Planning calendar · next board opportunity in {state.turn % 8 === 0 ? 0 : 8 - state.turn % 8}q</summary>
-        <p>Board opportunities arrive every eight quarters with four quarters to decide. Accepted commitments can run for several years.</p>
-        <p>{scenario.objective.blurb} {scenario.objective.kind === 'loadFactor' ? 'Qualification also requires 1.5M total passengers and three active routes.' : ''}</p>
-        <p>Scheduled deliveries: {player.orders.length === 0 ? 'none' : player.orders.map((o) => `${o.type} in ${o.quartersLeft}q${o.replacesAircraftId ? ' (replacement)' : ''}`).join(' · ')}</p>
-        <p>Aircraft entering the market within two years: {AIRCRAFT.filter((t) => t.availableFrom > yearOf(state) && t.availableFrom <= yearOf(state) + 2).map((t) => `${t.name} (${t.availableFrom})`).join(' · ') || 'none announced'}.</p>
-        <p>Airport programmes on your network: {[...new Set([...Object.keys(player.slots), ...player.slotRequests.map((r) => r.city)])].map((city) => ({ city, ...nextExpansion(state, city) })).filter((e) => e.quartersAway <= 8).sort((a,b) => a.quartersAway-b.quartersAway).map((e) => `${e.city}: +${e.slots} slots in ${e.quartersAway}q`).join(' · ') || 'none opening in the next eight quarters'}.</p>
-        {state.airlines.filter((a) => a.campaign).map((a) => <p key={a.id}>{a.name}: {a.campaign!.kind} campaign at {a.campaign!.city}, through quarter {a.campaign!.untilTurn}.</p>)}
-      </details>}
-      {state.phase === 'planning' && <ManagementBrief state={state} onTab={setTab} onInspect={inspectRoute} onPlan={(from, to) => setPendingRoute({ from, to })} />}
-      <div className="map-area">
-        <Suspense
-          fallback={
-            <div className="map-wrap map-loading" data-testid="map-loading" aria-busy="true">
-              <span>Loading route map…</span>
-            </div>
-          }
-        >
-          <MapView
-            state={state}
-            selected={selectedCity}
-            routeFrom={routeFrom}
-            onCityClick={handleCityClick}
-            onRouteClick={inspectRoute}
-            newRouteIds={
-              new Set(
-                session.lastEvents
-                  .filter((e) => e.type === 'route_opened' && e.airline === viewSeat())
-                  .map((e) => (e.type === 'route_opened' ? e.routeId : -1)),
-              )
-            }
-            newSlotCities={
-              new Set(
-                session.lastEvents
-                  .filter((e) => e.type === 'slots_granted' && e.airline === viewSeat())
-                  .map((e) => (e.type === 'slots_granted' ? e.city : '')),
-              )
-            }
-            acquiredRouteIds={(() => {
-              // A takeover appends the target's routes with fresh ids — the
-              // last `routes` entries are the ones that just changed flags.
-              const deal = session.lastEvents.find((e) => e.type === 'rival_acquired' && e.airline === viewSeat())
-              if (!deal || deal.type !== 'rival_acquired' || deal.routes === 0) return new Set<number>()
-              return new Set(player.routes.slice(-deal.routes).map((r) => r.id))
-            })()}
-          />
-        </Suspense>
-        {selectedCity !== null && (
-          <CityPanel
-            state={state}
-            cityId={selectedCity}
-            routeFrom={routeFrom}
-            onPlanRoute={(from) => { setRouteFrom(routeFrom === from ? null : from); setSelectedCity(null) }}
-            onPlanPair={(from, to) => {
-              setSelectedCity(null)
-              setRouteFrom(null)
-              setPendingRoute({ from, to })
-            }}
-            onClose={() => {
-              setSelectedCity(null)
-              setRouteFrom(null)
-            }}
-          />
-        )}
-        {selectedRoute !== null && (
-          <RouteDossier
-            state={state}
-            routeId={selectedRoute}
-            onClose={() => setSelectedRoute(null)}
-            onSelectRoute={setSelectedRoute}
-          />
-        )}
-      </div>
-      <ToastStack events={session.lastEvents} state={state} unlocks={session.lastUnlocks} onOpenRoute={inspectRoute} />
-      <nav className="tabs">
-        {TABS.map((t, i) => (
-          <button
-            key={t}
-            className={tab === t ? 'active' : ''}
-            data-testid={`tab-${t}`}
-            onClick={() => setTab(t)}
-            title={`shortcut: ${i + 1}`}
-          >
-            {t}
-          </button>
-        ))}
-        <span className="key-hints">space = end quarter · 1–6 = panels · esc = deselect</span>
-        <BuildStamp />
-      </nav>
-      <section className="panel">
-        {tab === 'routes' && (
-          <RoutesPanel
-            state={state}
-            onInspect={inspectRoute}
-            onPlan={(from, to) => setPendingRoute({ from, to })}
-          />
-        )}
-        {tab === 'fleet' && <FleetPanel state={state} />}
-        {tab === 'airports' && <AirportsPanel state={state} />}
-        {tab === 'rivals' && <RivalsPanel state={state} />}
-        {tab === 'finance' && <FinancePanel state={state} />}
-        {tab === 'report' && <ReportPanel state={state} archive={session.reportArchive} />}
-      </section>
-      <footer className="standings">
-        {state.airlines.map((a) => (
-          <span key={a.id} className={a.id === viewSeat() ? 'me' : ''}>
-            {a.name}: {a.bankrupt ? 'bankrupt' : `${a.routes.length} routes, ${objectiveValue(objectiveScore(a, scenario.objective.kind), scenario.objective.unit)}`}
-          </span>
-        ))}
-      </footer>
-    </main>
-  )
+
+  </main>
 }
 
 // Which build is running. Small, dim, and selectable, in the footer of the
@@ -1236,7 +1181,7 @@ export function App() {
           ✉ {mpNotice} <button onClick={() => setMpNotice(null)}>dismiss</button>
         </div>
       )}
-      {session ? <GameScreen onWatchReplay={setReplay} /> : <ScenarioSelect onWatchReplay={setReplay} />}
+      {session ? <GameScreen key={`${session.state.scenario}-${session.state.seed}`} onWatchReplay={setReplay} /> : <ScenarioSelect onWatchReplay={setReplay} />}
     </>
   )
 }

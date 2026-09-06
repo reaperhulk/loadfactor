@@ -5,6 +5,7 @@ import { App } from './ui/App'
 import { installHarness } from './ui/harness'
 import { installSounds } from './ui/sounds'
 import './ui/styles.css'
+import './ui/workspace.css'
 
 installDisplay()
 installHarness()

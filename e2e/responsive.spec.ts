@@ -1,3 +1,4 @@
+import { openPanel, flyQuarter } from './workspace'
 // Viewport regression suite: the game must work — and never horizontally
 // scroll the page — from phone to desktop. Wide tables scroll inside their
 // own containers instead.
@@ -45,18 +46,20 @@ for (const viewport of VIEWPORTS) {
       window.__harness.endQuarter()
     })
     for (const tab of TABS) {
-      await page.getByTestId(`tab-${tab}`).click()
+      await openPanel(page, tab)
       expect(await horizontalOverflow(page), `${tab} tab fits`).toBeLessThanOrEqual(0)
     }
 
     // The city dossier panel must fit too (overlay on desktop, stacked on mobile).
-    await page.getByTestId('city-MIA').click()
+    await openPanel(page, 'map')
+  await page.getByTestId('city-MIA').click()
     await expect(page.getByTestId('city-panel')).toBeVisible()
     expect(await horizontalOverflow(page), 'city panel fits').toBeLessThanOrEqual(0)
-    await page.getByTestId('city-panel-close').click()
+    await openPanel(page, 'map')
+  await page.getByTestId('city-panel-close').click()
 
     // The core interaction still works at this size, report card included.
-    await page.getByTestId('end-quarter').click()
+    await flyQuarter(page)
     await expect(page.getByTestId('report-card')).toBeVisible()
     expect(await horizontalOverflow(page), 'report card fits').toBeLessThanOrEqual(0)
     await page.getByTestId('report-card-close').click()
@@ -78,6 +81,8 @@ test('keyboard shortcuts: space ends quarter, digits switch tabs, esc deselects'
 
   await page.locator('body').click() // move focus off the start button
   await page.keyboard.press(' ')
+  await expect(page.getByTestId('quarter-review')).toBeVisible()
+  await page.getByTestId('confirm-quarter').click()
   await expect(page.getByTestId('date')).toHaveText('1960 Q2')
   // Space presented the report card; Esc dismisses it.
   await expect(page.getByTestId('report-card')).toBeVisible()
@@ -89,6 +94,7 @@ test('keyboard shortcuts: space ends quarter, digits switch tabs, esc deselects'
   await page.keyboard.press('6')
   await expect(page.getByTestId('tab-report')).toHaveClass(/active/)
 
+  await openPanel(page, 'map')
   await page.getByTestId('city-MIA').click()
   await expect(page.locator('.city-dot.selected')).toHaveCount(1)
   await page.keyboard.press('Escape')
@@ -115,6 +121,7 @@ test('mobile: fat-finger taps select cities and the chrome stays usable', async 
   expect(dot).not.toBeNull()
   await page.mouse.click(dot!.x + dot!.width / 2, dot!.y + dot!.height / 2 - 12)
   await expect(page.getByTestId('city-panel')).toContainText('Chicago')
+  await openPanel(page, 'map')
   await page.getByTestId('city-panel-close').click()
 
   // Map controls are finger-sized on touch layouts.
@@ -154,6 +161,7 @@ test('mobile: the map opens on the home region, with the network on screen', asy
   }
   // Tapping one still opens its dossier — the pointer maths has to follow the
   // same cover-scaling the render uses.
+  await openPanel(page, 'map')
   await page.getByTestId('city-ORD').click()
   await expect(page.getByTestId('city-panel')).toContainText('Chicago')
 })

@@ -1,0 +1,157 @@
+/* The application owns the viewport; each workspace owns its content scroll.
+   Persistent mounted pages retain filters, scroll positions and the map camera. */
+body:has(.game-shell) { overflow:hidden; }
+main.game-shell {
+  width:100%; max-width:none; height:100dvh; margin:0; padding:0; overflow:hidden;
+  display:grid; grid-template-columns:136px minmax(0,1fr) auto;
+  grid-template-rows:auto auto minmax(0,1fr);
+  grid-template-areas:"header header actions" "status status status" "nav workspace workspace";
+  border:0; background:var(--bg); --accent:#9bd7e8;
+}
+.game-shell [hidden] { display:none !important; }
+.game-shell .app-header { grid-area:header; display:flex; align-items:center; flex-wrap:nowrap; gap:18px; padding:12px 18px; margin:0; border:0; min-width:0; }
+.airline-brand { display:flex; align-items:center; gap:10px; min-width:0; flex:1; }
+.airline-brand > .icon { color:var(--livery,var(--accent)); width:24px; height:24px; flex-shrink:0; }
+.game-shell .airline-brand h1 { font:600 1.05rem/1.2 system-ui,sans-serif; letter-spacing:-.025em; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; max-width:38ch; }
+.airline-brand > div { min-width:0; }
+.airline-brand small { display:block; font-size:.6rem; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); }
+.app-date { white-space:nowrap; font-variant-numeric:tabular-nums; font-size:.86rem; color:var(--ink); }
+.app-date small { display:block; font-size:.7rem; color:var(--dim); }
+.game-shell .app-header button { display:flex; gap:7px; align-items:center; background:transparent; }
+.inbox-button b { font-size:.72rem; color:var(--neg); font-weight:600; }
+.settings-button { padding:6px; }
+.turn-actions { grid-area:actions; display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:12px 18px 12px 0; }
+.turn-actions .hotseat-controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; max-width:430px; }
+.turn-actions .seat-chip { font-size:.7rem; }
+.turn-actions .end-quarter { margin:0; font-size:.84rem; white-space:nowrap; }
+.mobile-profit { display:none; }
+.status-bar { grid-area:status; display:flex; align-items:center; gap:28px; padding:10px 20px; border-block:1px solid var(--rule); background:var(--panel); min-width:0; }
+.status-bar .hud-stat { min-width:0; }
+.status-bar .hud-figure { font-size:1.04rem; }
+.status-bar .hud-stat::before { font-size:.63rem; letter-spacing:.035em; text-transform:none; }
+.status-bar .hud-objective { flex:1; max-width:400px; min-width:0; }
+.status-bar .hud-target { font-size:.75rem; }
+.status-bar .hud-objective [data-testid=objective-progress] { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.status-bar .planned-cash { border:0; background:transparent; padding:0; color:var(--ink); text-align:left; }
+.status-bar [data-testid=rank] { margin-left:auto; font-size:.92rem; }
+.status-bar [data-testid=rank] .dim { font-size:.7rem; }
+.primary-nav { grid-area:nav; display:flex; flex-direction:column; gap:4px; padding:14px 8px; border-right:1px solid var(--rule); min-height:0; }
+.primary-nav > button { display:flex; align-items:center; gap:9px; padding:12px 10px; border:0; background:transparent; text-transform:none; text-align:left; color:var(--dim); }
+.primary-nav > button.active { color:var(--accent); background:var(--panel); }
+.nav-footer { margin-top:auto; padding:14px 8px; display:grid; gap:9px; color:var(--dim); font-size:.72rem; }
+.nav-footer small { font-size:.68rem; }
+.workspace { grid-area:workspace; min-width:0; min-height:0; display:grid; grid-template-rows:auto minmax(0,1fr); }
+.workspace-tabs.tabs { display:flex; align-items:center; flex-wrap:nowrap; gap:18px; border-bottom:1px solid var(--rule); padding:0 18px; margin:0; min-width:0; }
+.workspace-tabs.tabs > button { padding:13px 0 11px; border:0; border-radius:0; background:transparent; color:var(--dim); white-space:nowrap; font-size:.82rem; }
+.workspace-tabs.tabs > button.active { background:transparent; color:var(--accent); box-shadow:inset 0 -2px var(--accent); }
+.workspace-tabs.tabs > .undo-action { margin-left:auto; display:flex; gap:5px; align-items:center; }
+.workspace-pages { position:relative; min-width:0; min-height:0; }
+.workspace-page { position:absolute; inset:0; overflow:auto; overscroll-behavior:contain; padding:20px; scrollbar-gutter:stable; min-width:0; min-height:0; }
+.workspace-page.map-page,.workspace-page.route-page { padding:0; overflow:hidden; scrollbar-gutter:auto; }
+.page-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 16px; }
+.page-heading h2 { margin:0; color:var(--ink); font-size:1.35rem; font-weight:550; letter-spacing:-.03em; }
+.page-heading h2 > span { font-size:.85rem; color:var(--dim); font-weight:400; }
+.page-heading > .dim { font-size:.74rem; }
+.split-view { position:relative; display:grid; grid-template-columns:minmax(0,1fr); height:100%; min-height:0; overflow:hidden; }
+.split-view.has-inspector { grid-template-columns:minmax(0,1fr) 360px; }
+.split-list { overflow:auto; min-width:0; min-height:0; padding:20px; overscroll-behavior:contain; scrollbar-gutter:stable; }
+.game-shell .map-area:has(.city-panel) { gap:0; align-items:stretch; grid-template-columns:minmax(0,1fr) 360px; }
+.game-shell .map-wrap { height:100%; min-height:0; max-height:none; width:100%; border-radius:0; }
+.game-shell .split-view > .city-panel { position:relative; inset:auto; width:auto; max-height:none; height:100%; min-height:0; overflow:auto; margin:0; padding:16px; border:0; border-left:1px solid var(--rule); border-radius:0; background:var(--panel); backdrop-filter:none; box-shadow:none; font-size:.85rem; }
+.game-shell .city-panel-head { position:sticky; top:-16px; margin:-16px -16px 14px; padding:14px 16px; background:var(--panel); z-index:5; align-items:flex-start; flex-wrap:nowrap; }
+.game-shell .city-panel-head h2 { margin:0; font-size:1.12rem; }
+.game-shell .city-panel-head > span { display:flex; gap:4px; flex-shrink:0; }
+.game-shell .city-panel-head .dim { font-size:.72rem; }
+.game-shell .city-panel table { width:100%; font-size:.73rem; }
+.game-shell .city-panel :is(th,td) { white-space:normal; padding:6px 4px; }
+.game-shell .management-brief { margin:16px 0; }
+.game-shell .coach { margin:12px 0; }
+.game-shell .offer-card { margin:12px 0; }
+.game-shell .events-strip { flex-wrap:wrap; overflow:visible; }
+.game-shell .toast-stack { bottom:18px; right:18px; max-width:min(440px,calc(100vw - 36px)); }
+.game-shell .save-warning { position:fixed; top:8px; left:8px; right:8px; z-index:100; max-height:50dvh; overflow:auto; }
+.settings-card { width:min(430px,calc(100vw - 28px)); max-height:85dvh; overflow:auto; background:var(--panel); border:1px solid var(--rule); padding:20px; border-radius:10px; }
+.settings-card > button { margin:8px 8px 8px 0; }
+.settings-card :is(.audio-settings,.display-settings) { margin:10px 0; max-width:none; }
+.dialog-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
+.dialog-heading h2 { margin:0 0 8px; }
+.dialog-heading > button { flex-shrink:0; }
+.game-shell .quarter-review { width:min(510px,calc(100vw - 28px)); max-height:88dvh; overflow:auto; padding:24px; }
+.review-profit { margin:16px 0; }
+.review-profit small { display:block; font-size:.8rem; color:var(--dim); }
+.review-profit strong { display:block; font-size:2rem; font-weight:550; font-variant-numeric:tabular-nums; }
+.cash-bridge { margin:0; }
+.cash-bridge > div { display:flex; justify-content:space-between; gap:16px; padding:9px 0; border-bottom:1px solid var(--rule); font-size:.87rem; }
+.cash-bridge dd { margin:0; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.cash-bridge .bridge-total { font-weight:650; }
+.review-attention h3 { font-size:1rem; margin:18px 0 8px; }
+.review-attention p { font-size:.85rem; margin:6px 0; }
+.dialog-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
+@media(min-width:1101px) {
+  .game-shell .split-view > .city-panel { font-size:.85rem; }
+}
+@media(max-width:1100px) {
+  main.game-shell { grid-template-columns:110px minmax(0,1fr) auto; }
+  .game-shell .app-header { gap:10px; padding:10px 14px; }
+  .status-bar { gap:18px; padding:10px 14px; }
+  .status-bar .planned-cash { display:none; }
+  .primary-nav > button { gap:7px; padding:11px 8px; }
+  .split-view.has-inspector,.game-shell .map-area:has(.city-panel) { grid-template-columns:minmax(0,1fr); }
+  .game-shell .split-view > .city-panel { position:absolute; inset:0 0 0 auto; width:min(390px,100%); z-index:12; box-shadow:-12px 0 30px #0004; }
+}
+@media(max-width:700px) {
+  main.game-shell { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto minmax(0,1fr) auto auto; grid-template-areas:"header" "status" "workspace" "actions" "nav"; }
+  .game-shell .app-header { padding:9px 12px; gap:8px; min-height:56px; }
+  .game-shell .airline-brand h1 { font-size:.92rem; max-width:22ch; }
+  .airline-brand > .icon,.airline-brand small { display:none; }
+  .app-date { font-size:.72rem; }
+  .app-date small { font-size:.62rem; }
+  .app-header .inbox-button { border:0; padding:4px; gap:3px; }
+  .inbox-button > span { display:none; }
+  .app-header .settings-button { border:0; padding:4px; }
+  .game-shell button { min-height:44px; }
+  .game-shell .app-header button { min-width:36px; }
+  .status-bar { gap:16px; padding:9px 12px; }
+  .status-bar .hud-stat::before { font-size:.61rem; }
+  .status-bar .hud-figure { font-size:.95rem; }
+  .status-bar .planned-profit,.status-bar .planned-cash,.status-bar [data-testid=rank] { display:none; }
+  .status-bar .hud-objective { margin-left:auto; max-width:65%; }
+  .status-bar .hud-target { font-size:.67rem; }
+  .primary-nav { flex-direction:row; justify-content:space-around; padding:4px 8px calc(4px + env(safe-area-inset-bottom)); gap:4px; border:0; border-top:1px solid var(--rule); background:var(--bg); }
+  .primary-nav > button { display:flex; flex-direction:column; align-items:center; gap:3px; flex:1; font-size:.64rem; min-height:48px; padding:5px 0; }
+  .primary-nav > button.active { background:transparent; }
+  .nav-footer { display:none; }
+  .turn-actions { padding:8px 12px; min-height:60px; justify-content:space-between; background:var(--panel); border-top:1px solid var(--rule); }
+  .turn-actions .end-quarter { white-space:normal; min-height:42px; font-size:.78rem; }
+  .turn-actions .hotseat-controls { justify-content:flex-end; gap:4px; max-width:65%; }
+  .turn-actions .seat-chip { display:none; }
+  .mobile-profit { display:block; flex-shrink:0; font-variant-numeric:tabular-nums; }
+  .mobile-profit small { display:block; color:var(--dim); font-size:.63rem; }
+  .mobile-profit strong { font-size:.92rem; font-weight:600; }
+  .workspace-tabs.tabs { gap:16px; padding:0 12px; }
+  .workspace-tabs.tabs > button { font-size:.75rem; padding:10px 0; min-height:44px; }
+  .workspace-tabs .undo-action span { display:none; }
+  .workspace-page { padding:14px 12px; }
+  .split-list { padding:14px 12px; }
+  .page-heading { margin-bottom:12px; }
+  .page-heading h2 { font-size:1.22rem; }
+  .page-heading > .dim { font-size:.65rem; }
+  .game-shell .split-view > .city-panel { inset:0; width:100%; box-shadow:none; border:0; padding:14px 12px; }
+  .game-shell .split-view.has-inspector > .split-list { visibility:hidden; pointer-events:none; }
+  .game-shell .city-panel-head { top:-14px; margin:-14px -12px 12px; padding:10px 12px; }
+  .game-shell .city-panel-head h2 { font-size:1.12rem; }
+  .game-shell .city-panel-head button { min-width:40px; }
+  .game-shell .city-panel :is(input,select,textarea) { font-size:16px; min-height:44px; }
+  .game-shell .toast-stack { bottom:calc(124px + env(safe-area-inset-bottom)); right:12px; max-width:calc(100vw - 24px); }
+  .game-shell .quarter-review { padding:18px; }
+  .game-shell .dialog-actions { justify-content:stretch; }
+  .dialog-actions button { flex:1; }
+  .game-shell .map-wrap { min-height:0; }
+}
+@media(max-height:550px) and (max-width:900px) {
+  .airline-brand small,.app-date small,.status-bar [data-testid=rank] { display:none; }
+  .game-shell .app-header { padding-block:4px; min-height:40px; }
+  .status-bar { padding-block:5px; }
+  .turn-actions { min-height:48px; padding-block:3px; }
+  .primary-nav > button { min-height:40px; flex-direction:row; justify-content:center; }
+}

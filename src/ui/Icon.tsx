@@ -1,4 +1,5 @@
 export type IconName =
+  | 'desk' | 'network' | 'aircraft' | 'company' | 'settings' | 'inbox' | 'chevron'
   | 'balance'
   | 'duel'
   | 'globe'
@@ -30,6 +31,13 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   }
 
   switch (name) {
+    case 'desk': return <svg {...common}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
+    case 'network': return <svg {...common}><circle cx="5" cy="5" r="2" /><circle cx="19" cy="19" r="2" /><path d="M7 5h8a4 4 0 0 1 0 8H9a3 3 0 0 0 0 6h8" /></svg>
+    case 'aircraft': return <svg {...common}><path d="m21 3-5 18-4-7-9-3 18-8ZM12 14l9-11" /></svg>
+    case 'company': return <svg {...common}><path d="M5 21V3h11v18M16 10h4v11M3 21h19M8 7h5M8 11h5M8 15h5M10 21v-3" /></svg>
+    case 'settings': return <svg {...common}><path d="M4 6h16M4 12h16M4 18h16" /><circle cx="9" cy="6" r="2" fill="var(--panel)" /><circle cx="15" cy="12" r="2" fill="var(--panel)" /><circle cx="8" cy="18" r="2" fill="var(--panel)" /></svg>
+    case 'inbox': return <svg {...common}><path d="m3 14 3-9h12l3 9v6H3v-6Zm0 0h6l1 3h4l1-3h6" /></svg>
+    case 'chevron': return <svg {...common}><path d="m9 5 7 7-7 7" /></svg>
     case 'zoomIn':
     case 'zoomOut':
       return (

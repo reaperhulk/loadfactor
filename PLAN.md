@@ -561,3 +561,15 @@ covers planning, mobile layout, preferences and hot-seat recovery. The artifact
 from the checked commit reaches Pages only after both jobs succeed. Offline
 HTML is network-first; immutable app assets use a bounded 48-entry cache. Only
 Load Factor cache namespaces are removed on activation.
+
+### Persistent workspaces (2026-09-06)
+
+The UI uses Desk, Network, Fleet and Company destinations. A bounded viewport
+shell owns status, navigation and the quarter action; task pages own content
+scroll. Network separates map, routes and airports. Fleet separates owned
+aircraft, deliveries and the market. Company groups finances, rivals and reports.
+Mounted pages preserve their local selection/filter/scroll state; inactive map
+traffic pauses. Desktop inspectors sit beside their lists; mobile detail views
+return to the same list position. A quarter review exposes projected profit,
+loan principal and ending cash before the player resolves the simulation.
+UI-REDESIGN.md tracks delivery and the viewport acceptance contract.

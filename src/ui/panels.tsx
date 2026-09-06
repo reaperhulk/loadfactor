@@ -606,7 +606,7 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
 
 type FleetSortKey = 'type' | 'age' | 'util' | 'maint' | 'value'
 
-export function FleetPanel({ state }: { state: GameState }) {
+export function FleetPanel({ state, view = 'fleet' }: { state: GameState; view?: 'fleet' | 'orders' | 'catalog' }) {
   const player = state.airlines[viewSeat()]!
   const year = yearOf(state)
   const [fleetSort, setFleetSort] = useState<FleetSortKey>('type')
@@ -637,6 +637,9 @@ export function FleetPanel({ state }: { state: GameState }) {
   })
   return (
     <div>
+      <div className="page-heading"><h2>{view === 'fleet' ? 'Owned aircraft' : view === 'orders' ? 'Orders & deliveries' : 'Aircraft market'}</h2><span className="dim">{year}</span></div>
+      {view === 'fleet' && <>
+      <ReliabilityLegend />
       <OperationsPanel state={state} />
       {player.fleet.some((a) => a.routeId === null && !a.reserve && !isGrounded(a, state.turn)) && player.routes.length > 0 && (
         <button
@@ -843,7 +846,14 @@ export function FleetPanel({ state }: { state: GameState }) {
               </tr>
             )
           })}
-          {player.orders.map((o) => {
+
+        </tbody>
+      </table></div>
+        )
+      })()}
+      <CabinLegend />
+      </>}
+      {view === 'orders' && <>{player.orders.length === 0 ? <p className="hint">No aircraft on order. Choose an aircraft in the market to compare purchase and lease options.</p> : <div className="table-scroll"><table><thead><tr><th>Aircraft</th><th colSpan={5}>Delivery</th><th>Actions</th></tr></thead><tbody>          {player.orders.map((o) => {
             const refund = o.leased
               ? 0
               : Math.floor((getAircraftType(o.type).price * ORDER_CANCEL_REFUND_BP) / 10000)
@@ -863,15 +873,8 @@ export function FleetPanel({ state }: { state: GameState }) {
                 </td>
               </tr>
             )
-          })}
-        </tbody>
-      </table></div>
-        )
-      })()}
-      <CabinLegend />
-      <h3>Order new aircraft ({year})</h3>
-      <ReliabilityLegend />
-      <Shop state={state} />
+          })}</tbody></table></div>}</>}
+      {view === 'catalog' && <><ReliabilityLegend /><Shop state={state} /></>}
     </div>
   )
 }
