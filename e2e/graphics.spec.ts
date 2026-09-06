@@ -118,3 +118,28 @@ test('globe traffic disappears during rotation and returns on release or cancell
   await map.dispatchEvent('pointercancel', { pointerId: 91, pointerType: 'touch' })
   await expect.poll(() => planes.count()).toBeGreaterThan(0)
 })
+
+for (const width of [1440,390]) test(`route selection ${width}px accepts a click beside the visible line`, async ({page}) => {
+  await page.setViewportSize({width,height:844})
+  await page.addInitScript(()=>localStorage.setItem('loadfactor:display:v1',JSON.stringify({celebrations:false})))
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await page.evaluate(()=>window.__harness.dispatch({type:'open_route',from:'JFK',to:'ORD',aircraftId:1,frequency:5}))
+  const hit=page.locator('.route-hit')
+  for(const globe of [false,true]) {
+    if(globe) { await page.getByTestId('map-projection').click(); await expect(page.getByTestId('globe-land')).toBeVisible() }
+    const p=await hit.evaluate((el)=>{
+      const path=el as SVGPathElement, matrix=path.getScreenCTM()!,length=path.getTotalLength(),r=path.ownerSVGElement!.getBoundingClientRect()
+      for(let i=3;i<17;i++) {
+        const a=path.getPointAtLength(length*i/20).matrixTransform(matrix),b=path.getPointAtLength(length*i/20+1).matrixTransform(matrix)
+        const dx=b.x-a.x,dy=b.y-a.y,k=Math.hypot(dx,dy)
+        const x=a.x-dy/k*9,y=a.y+dx/k*9
+        if(x>r.left+20&&x<r.right-20&&y>r.top+20&&y<r.bottom-20)return{x,y}
+      }
+      throw new Error('No visible route segment')
+    })
+    await page.mouse.click(p.x,p.y)
+    await expect(page.getByTestId('route-dossier')).toBeVisible()
+    await page.keyboard.press('Escape')
+  }
+})

@@ -1076,7 +1076,16 @@ export function MapView({
       const d = routePathFor(r.from, r.to)
       if (d === '') return null
       return (
-        <g key={r.id}>
+        <g key={r.id} className="route-group"
+            onClick={(e) => {
+              e.stopPropagation() // an arc click must not select a nearby city
+              if (suppressClick.current) {
+                suppressClick.current = false
+                return
+              }
+              onRouteClick?.(r.id)
+            }}
+        >
           <path
             d={d}
             pathLength={1}
@@ -1094,15 +1103,9 @@ export function MapView({
             }
             data-losing={r.lastCapacity > 0 && r.lastRevenue < r.lastCost ? '' : undefined}
             data-testid={isNew ? 'route-line-new' : undefined}
-            onClick={(e) => {
-              e.stopPropagation() // an arc click must not select a nearby city
-              if (suppressClick.current) {
-                suppressClick.current = false
-                return
-              }
-              onRouteClick?.(r.id)
-            }}
+
           />
+          <path d={d} className="route-hit" data-testid={`route-hit-${r.id}`} aria-hidden="true" />
           {isNew &&
             [r.from, r.to].map((cityId) => {
               const p = cityPt(cityId)
