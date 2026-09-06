@@ -91,7 +91,7 @@ test('map metrics, route what-ifs and optional detail are explicit', async ({ pa
 test('maintenance and standby are deliberate fleet decisions', async ({ page }) => {
   await start(page)
   await openPanel(page, 'fleet')
-  await page.getByTestId('operations-panel').locator('summary').click()
+  await page.locator('[data-testid^=inspect-aircraft-]').first().click()
   await page.getByLabel('Keep on standby', { exact: false }).check()
   expect(await page.evaluate(() => window.__harness.getState()!.airlines[0]!.fleet[0]!.reserve)).toBe(true)
   await page.getByRole('button', { name: /^Book maintenance/ }).click()

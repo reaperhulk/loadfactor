@@ -19,6 +19,7 @@ import { ConfirmButton } from './ConfirmButton'
 import { useCountUp } from './countUp'
 import { isMuted, setMuted } from './sounds'
 import { ActiveDeals, OfferCard } from './OfferCard'
+import { AircraftDossier } from './AircraftDossier'
 import { AirportsPanel, FinancePanel, FleetPanel, ReportPanel, RoutesPanel } from './panels'
 import { ReportCard } from './ReportCard'
 import { RivalsPanel } from './RivalsPanel'
@@ -651,6 +652,9 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const area = areaFor(tab)
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<number | null>(null)
+  const [selectedAircraft, setSelectedAircraft] = useState<number | null>(null)
+  const inspectedAircraft = player.fleet.find((a) => a.id === selectedAircraft)
+  const inspectedRoute = player.routes.find((r) => r.id === selectedRoute)
   const [routeFrom, setRouteFrom] = useState<string | null>(null)
   const [pendingRoute, setPendingRoute] = useState<{ from: string; to: string } | null>(null)
   const [showReport, setShowReport] = useState(false)
@@ -945,7 +949,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
 
         </section>
         <section className="workspace-page map-page" hidden={tab !== 'map'} data-testid="page-map">
-      <div className={`map-area split-view${selectedCity !== null || selectedRoute !== null ? " has-inspector" : ""}`}>
+      <div className={`map-area split-view${selectedCity !== null || inspectedRoute !== undefined ? " has-inspector" : ""}`}>
         <Suspense
           fallback={
             <div className="map-wrap map-loading" data-testid="map-loading" aria-busy="true">
@@ -1000,10 +1004,10 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             }}
           />
         )}
-        {tab === "map" && selectedRoute !== null && (
+        {tab === "map" && inspectedRoute !== undefined && (
           <RouteDossier
             state={state}
-            routeId={selectedRoute}
+            routeId={inspectedRoute!.id}
             onClose={() => setSelectedRoute(null)}
             onSelectRoute={setSelectedRoute}
           />
@@ -1011,11 +1015,11 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       </div>
 
         </section>
-        {visited.has('routes') && <section className={`workspace-page route-page split-view${selectedRoute !== null ? ' has-inspector' : ''}`} hidden={tab !== 'routes'} data-testid="page-routes">
-          <div className="split-list"><div className="page-heading"><div><span className="eyebrow">Network</span><h2>Routes <span>{player.routes.length}</span></h2></div><span className="dim">Last quarter’s results</span></div><RoutesPanel state={state} onInspect={inspectRoute} onPlan={(from, to) => setPendingRoute({ from, to })} /></div>
-          {tab === 'routes' && selectedRoute !== null && <RouteDossier state={state} routeId={selectedRoute} onClose={closeRoute} onSelectRoute={setSelectedRoute} />}
+        {visited.has('routes') && <section className={`workspace-page route-page split-view${inspectedRoute !== undefined ? ' has-inspector' : ''}`} hidden={tab !== 'routes'} data-testid="page-routes">
+          <div className="split-list"><div className="page-heading"><div><span className="eyebrow">Network</span><h2>Routes <span>{player.routes.length}</span></h2></div><span className="dim">Last quarter’s results</span></div><RoutesPanel state={state} selectedRouteId={selectedRoute} onInspect={inspectRoute} onPlan={(from, to) => setPendingRoute({ from, to })} /></div>
+          {tab === 'routes' && inspectedRoute !== undefined && <RouteDossier state={state} routeId={inspectedRoute!.id} onClose={closeRoute} onSelectRoute={setSelectedRoute} />}
         </section>}
-        {visited.has('fleet') && <section className="workspace-page" hidden={tab !== 'fleet'} data-testid="page-fleet"><FleetPanel state={state} /></section>}
+        {visited.has('fleet') && <section className={`workspace-page fleet-page split-view${inspectedAircraft ? ' has-inspector' : ''}`} hidden={tab !== 'fleet'} data-testid="page-fleet"><div className="split-list"><FleetPanel state={state} selectedAircraftId={selectedAircraft} onInspect={setSelectedAircraft} /></div>{tab === 'fleet' && inspectedAircraft && <AircraftDossier state={state} aircraftId={inspectedAircraft.id} onClose={() => { setSelectedAircraft(null); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-testid="inspect-aircraft-${inspectedAircraft.id}"]`)?.focus({ preventScroll:true })) }} />}</section>}
         {visited.has('orders') && <section className="workspace-page" hidden={tab !== 'orders'} data-testid="page-orders"><FleetPanel state={state} view="orders" /></section>}
         {visited.has('catalog') && <section className="workspace-page" hidden={tab !== 'catalog'} data-testid="page-catalog"><FleetPanel state={state} view="catalog" /></section>}
         {visited.has('airports') && <section className="workspace-page" hidden={tab !== 'airports'} data-testid="page-airports"><div className="page-heading"><h2>Airports</h2></div><AirportsPanel state={state} /></section>}

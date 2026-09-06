@@ -155,3 +155,54 @@ main.game-shell {
   .turn-actions { min-height:48px; padding-block:3px; }
   .primary-nav > button { min-height:40px; flex-direction:row; justify-content:center; }
 }
+
+/* Dense comparison rows; edits live in the selected entity. */
+.workspace-page.fleet-page { padding:0; overflow:hidden; scrollbar-gutter:auto; }
+.game-shell .route-table-compact :is(th,td):is(:nth-child(2),:nth-child(3),:nth-child(4),:nth-child(5),:nth-child(9),:nth-child(10),:nth-child(11),:nth-child(12),:nth-child(13),:nth-child(14)) { display:none; }
+.game-shell .route-table-compact { width:100%; }
+.game-shell .route-table-compact :is(th,td) { padding:10px 8px; }
+.game-shell .selected-row { background:color-mix(in srgb,var(--accent) 10%,transparent); box-shadow:inset 3px 0 var(--accent); }
+.entity-name { text-align:left; white-space:normal; font-weight:600; }
+.entity-name small { font-weight:400; color:var(--dim); }
+.fleet-table { width:100%; }
+.fleet-table td:first-child > .dim { display:block; font-size:.7rem; }
+.fleet-policy-disclosure { margin:0 0 12px; font-size:.8rem; }
+.entity-facts { display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; margin:12px 0 18px; }
+.entity-facts dt,.forecast-values dt { color:var(--dim); font-size:.72rem; }
+.entity-facts dd { margin:3px 0 0; font-variant-numeric:tabular-nums; }
+.route-plan-fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.route-plan-fields label:first-child { grid-column:1/-1; }
+.route-plan-fields label,.entity-field { display:block; font-size:.75rem; color:var(--dim); }
+.route-plan-fields :is(select,input),.entity-field select { display:block; width:100%; margin-top:4px; min-width:0; }
+.entity-field { margin:12px 0; }
+.entity-forecast { border-block:1px solid var(--rule); padding:12px 0; margin:12px 0; }
+.forecast-values { margin:8px 0 0; display:grid; gap:8px; }
+.forecast-values > div { display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+.forecast-values dd { margin:0; text-align:right; font-variant-numeric:tabular-nums; }
+.forecast-before { color:var(--dim); font-size:.75rem; }
+.entity-plan-actions { display:flex; gap:8px; }
+.primary-action { background:var(--accent); color:var(--bg); border-color:var(--accent); }
+.entity-actions { margin:18px 0; border-top:1px solid var(--rule); padding-top:12px; }
+.aircraft-dossier .aircraft-art { width:100%; max-height:100px; }
+.aircraft-dossier .operations-panel { padding:0; border:0; background:transparent; margin:20px 0; }
+.aircraft-dossier .operations-panel select { max-width:100%; }
+.aircraft-dossier .operations-panel p { font-size:.78rem; }
+.aircraft-dossier .operations-panel label { font-size:.8rem; }
+.game-shell .filter-bar { gap:8px; margin-top:0; }
+.game-shell .filter-input { flex:1; min-width:130px; }
+.game-shell .metrics-toggle { font-size:.72rem; margin:0 0 10px; }
+@media(max-width:900px) {
+  .fleet-table :is(th,td):is(:nth-child(4),:nth-child(5),:nth-child(6)) { display:none; }
+  .game-shell .route-table-compact :is(th,td):nth-child(6) { display:none; }
+}
+@media(max-width:700px) {
+  .game-shell .route-table-compact :is(th,td):nth-child(7) { display:none; }
+  .game-shell .route-table-compact :is(th,td) { padding:8px 4px; font-size:.75rem; }
+  .game-shell .route-table-compact .lf-bar { display:none; }
+  .fleet-table :is(th,td):nth-child(2) { display:none; }
+  .fleet-table :is(th,td) { padding:8px 4px; font-size:.72rem; white-space:normal; }
+  .fleet-table td:first-child > .dim { display:none; }
+  .fleet-table .lf-bar { display:none; }
+  .game-shell .filter-bar .segmented { flex-wrap:wrap; }
+  .game-shell .filter-bar .segment { font-size:.72rem; padding:4px 8px; }
+}

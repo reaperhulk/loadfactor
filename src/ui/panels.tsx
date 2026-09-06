@@ -15,7 +15,6 @@ import {
   GROUNDING_AGE_QUARTERS,
   ROUTE_MEMORY_QUARTERS,
   ROUTE_SPOOL_BP,
-  CABIN_REFIT_COST_BP,
   MAINT_AGE_BP_PER_QUARTER,
   ORDER_CANCEL_REFUND_BP,
   SLOTS_PER_GRANT,
@@ -84,8 +83,10 @@ export function RoutesPanel({
   state,
   onInspect,
   onPlan,
+  selectedRouteId,
 }: {
   state: GameState
+  selectedRouteId?: number | null
   onInspect: (routeId: number) => void
   onPlan?: (from: string, to: string) => void
 }) {
@@ -211,45 +212,6 @@ export function RoutesPanel({
   })
   return (
     <div>
-    <PlanningWorkbench key={`${state.turn}-${seat}`} state={state} suggestions={schedulePlan} />
-    <p className="dim" data-testid="network-overhead">
-      Network management: {money(networkOverhead)}/quarter for {player.routes.length} routes (grows with the
-      square of the network — quality beats sprawl){' '}
-      <button
-        className="link-btn"
-        data-testid="copy-routes"
-        title="copy this table as TSV — paste into any spreadsheet (raw numbers, $k)"
-        onClick={() =>
-          copyTsv(
-            ['route', 'km', 'fareUsd', 'service', 'planes', 'rivals', 'loadBp', 'revenueK', 'marginBp', 'profitK'],
-            rows.map((x) => [
-              `${x.route.from}-${x.route.to}`,
-              x.km,
-              fareFor(x.km, x.route.fareLevel),
-              x.route.serviceLevel,
-              x.planes,
-              x.rivals,
-              x.route.lastLoadFactorBp,
-              x.route.lastRevenue,
-              x.marginBp,
-              x.profit,
-            ]),
-            'Routes table',
-          )
-        }
-      >
-        ⎘ copy as spreadsheet
-      </button>
-      <button
-        className="link-btn"
-        data-testid="balance-schedules"
-        disabled={schedulePlan.length === 0}
-        title="right-size every route to forecast demand; undo restores the previous schedules"
-        onClick={() => dispatchBatch(schedulePlan)}
-      >
-        <Icon name="balance" /> Balance schedules
-      </button>
-    </p>
     <div className="filter-bar">
       <span className="segmented" role="group" aria-label="route filter">
         {ROUTE_FILTERS.map((f) => (
@@ -309,14 +271,13 @@ export function RoutesPanel({
           {header('cost', 'Cost')}
           {header('margin', 'Margin')}
           {header('profit', 'Contribution', 'route revenue minus flight costs; company fixed costs are reported separately')}
-          <th />
         </tr>
       </thead>
       <tbody>
         {rows.map(({ route: r, km, planes, rivals: rivalsHere, profit, marginBp, profitTrend, pax, transfer, yieldPerPax, costPerSeat, cost, ramping }) => {
           const freq = `${effectiveFrequency(player, r, state.turn)}/${maxRouteFrequency(player, r)}`
           return (
-            <tr key={r.id} data-testid={`route-${r.from}-${r.to}`}>
+            <tr key={r.id} className={selectedRouteId === r.id ? 'selected-row' : undefined} data-testid={`route-${r.from}-${r.to}`}>
               <td>
                 <button
                   className="link-btn"
@@ -328,36 +289,8 @@ export function RoutesPanel({
                 </button>
               </td>
               <td>{km}</td>
-              <td>
-                <button
-                  disabled={r.fareLevel <= -2}
-                  onClick={() => dispatch({ type: 'set_fare', routeId: r.id, fareLevel: r.fareLevel - 1 })}
-                >
-                  −
-                </button>
-                ${fareFor(km, r.fareLevel)}
-                <button
-                  disabled={r.fareLevel >= 2}
-                  onClick={() => dispatch({ type: 'set_fare', routeId: r.id, fareLevel: r.fareLevel + 1 })}
-                >
-                  +
-                </button>
-              </td>
-              <td>
-                <button
-                  disabled={r.serviceLevel <= 1}
-                  onClick={() => dispatch({ type: 'set_service', routeId: r.id, serviceLevel: r.serviceLevel - 1 })}
-                >
-                  −
-                </button>
-                {['', 'basic', 'standard', 'premium'][r.serviceLevel]}
-                <button
-                  disabled={r.serviceLevel >= 3}
-                  onClick={() => dispatch({ type: 'set_service', routeId: r.id, serviceLevel: r.serviceLevel + 1 })}
-                >
-                  +
-                </button>
-              </td>
+              <td>${fareFor(km, r.fareLevel)}</td>
+              <td>{['', 'basic', 'standard', 'premium'][r.serviceLevel]}</td>
               <td>{planes}</td>
               <td>{freq}</td>
               <td className={rivalsHere > 0 ? 'neg' : 'dim'}>{rivalsHere > 0 ? `⚔ ${rivalsHere}` : '—'}</td>
@@ -365,7 +298,7 @@ export function RoutesPanel({
                 <span className="lf-bar">
                   <span className="lf-fill" style={{ width: `${r.lastLoadFactorBp / 100}%` }} />
                 </span>
-                {(r.lastLoadFactorBp / 100).toFixed(0)}%
+                {r.history.length ? `${(r.lastLoadFactorBp / 100).toFixed(0)}%` : '—'}
               </td>
               <td>
                 {pax.toLocaleString('en-US')}
@@ -388,7 +321,7 @@ export function RoutesPanel({
               <td className="dim">{money(cost)}</td>
               <td className={marginBp >= 0 ? 'pos' : 'neg'}>{(marginBp / 100).toFixed(0)}%</td>
               <td className={profit >= 0 ? 'pos' : 'neg'}>
-                {money(profit)}
+                {r.history.length ? money(profit) : <span className="dim">Not flown yet</span>}
                 {profitTrend !== 0 && (
                   <span className={profitTrend > 0 ? 'pos' : 'neg'} title="vs previous quarter">
                     {' '}
@@ -396,59 +329,62 @@ export function RoutesPanel({
                   </span>
                 )}
               </td>
-              <td>
-                <ConfirmButton
-                  label="close"
-                  confirmLabel="sure?"
-                  onConfirm={() => dispatch({ type: 'close_route', routeId: r.id })}
-                />
-              </td>
             </tr>
           )
         })}
       </tbody>
       {/* The aggregate of what is on screen: filter to the losers and this row
           tells you what the losers cost, not what the network earns. */}
-      {!allMetrics ? <tfoot><tr data-testid="routes-totals">
+      <tfoot><tr data-testid="routes-totals">
         <td><strong>{rows.length === allRows.length ? 'Network' : `${rows.length} shown`}</strong></td>
-        <td colSpan={3} className="dim">{totals.seats.toLocaleString('en-US')} seats/wk</td>
-        <td>{(totalLoadBp / 100).toFixed(0)}%</td>
-        <td className={totals.profit >= 0 ? 'pos' : 'neg'}><strong>{money(totals.profit)}</strong></td><td />
-      </tr></tfoot> : (
-      <tfoot>
-        <tr data-testid="routes-totals">
-          <td>
-            <strong>{rows.length === allRows.length ? 'Network' : `${rows.length} shown`}</strong>
-          </td>
-          <td colSpan={6} className="dim">
-            {totals.seats.toLocaleString('en-US')} seats/wk
-          </td>
-          <td>{(totalLoadBp / 100).toFixed(0)}%</td>
-          <td>
-            {totals.pax.toLocaleString('en-US')}
-            {totals.transfer > 0 && (
-              <span className="dim"> ({totals.transfer.toLocaleString('en-US')} conn)</span>
-            )}
-          </td>
-          <td className="dim">
-            {totals.pax > 0 ? `$${Math.floor((totals.revenue * 1000) / totals.pax)}` : '—'}
-          </td>
-          <td className="dim">
-            {totals.seatsFlown > 0 ? `$${Math.floor((totals.cost * 1000) / totals.seatsFlown)}` : '—'}
-          </td>
-          <td>
-            <strong>{money(totals.revenue)}</strong>
-          </td>
-          <td className="dim">{money(totals.cost)}</td>
-          <td className={totalMarginBp >= 0 ? 'pos' : 'neg'}>{(totalMarginBp / 100).toFixed(0)}%</td>
-          <td className={totals.profit >= 0 ? 'pos' : 'neg'}>
-            <strong>{money(totals.profit)}</strong>
-          </td>
-          <td />
-        </tr>
-      </tfoot>
-      )}
+        <td>—</td><td>—</td><td>—</td><td>{player.fleet.length}</td><td>—</td><td>—</td>
+        <td>{totals.seatsFlown ? `${(totalLoadBp / 100).toFixed(0)}%` : '—'}</td>
+        <td>{totals.pax.toLocaleString('en-US')}</td>
+        <td>{totals.pax > 0 ? `$${Math.floor(totals.revenue*1000/totals.pax)}` : '—'}</td>
+        <td>{totals.seatsFlown > 0 ? `$${Math.floor(totals.cost*1000/totals.seatsFlown)}` : '—'}</td>
+        <td>{money(totals.revenue)}</td><td>{money(totals.cost)}</td><td>{(totalMarginBp/100).toFixed(0)}%</td>
+        <td className={totals.profit >= 0 ? 'pos' : 'neg'}><strong>{money(totals.profit)}</strong></td>
+      </tr></tfoot>
     </table></div>
+    <PlanningWorkbench key={`${state.turn}-${seat}`} state={state} suggestions={schedulePlan} />
+    <p className="dim" data-testid="network-overhead">
+      Network management: {money(networkOverhead)}/quarter for {player.routes.length} routes (grows with the
+      square of the network — quality beats sprawl){' '}
+      <button
+        className="link-btn"
+        data-testid="copy-routes"
+        title="copy this table as TSV — paste into any spreadsheet (raw numbers, $k)"
+        onClick={() =>
+          copyTsv(
+            ['route', 'km', 'fareUsd', 'service', 'planes', 'rivals', 'loadBp', 'revenueK', 'marginBp', 'profitK'],
+            rows.map((x) => [
+              `${x.route.from}-${x.route.to}`,
+              x.km,
+              fareFor(x.km, x.route.fareLevel),
+              x.route.serviceLevel,
+              x.planes,
+              x.rivals,
+              x.route.lastLoadFactorBp,
+              x.route.lastRevenue,
+              x.marginBp,
+              x.profit,
+            ]),
+            'Routes table',
+          )
+        }
+      >
+        ⎘ copy as spreadsheet
+      </button>
+      <button
+        className="link-btn"
+        data-testid="balance-schedules"
+        disabled={schedulePlan.length === 0}
+        title="right-size every route to forecast demand; undo restores the previous schedules"
+        onClick={() => dispatchBatch(schedulePlan)}
+      >
+        <Icon name="balance" /> Balance schedules
+      </button>
+    </p>
     <ServiceLegend />
     <Opportunities state={state} onPlan={onPlan} />
     </div>
@@ -606,7 +542,7 @@ function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: st
 
 type FleetSortKey = 'type' | 'age' | 'util' | 'maint' | 'value'
 
-export function FleetPanel({ state, view = 'fleet' }: { state: GameState; view?: 'fleet' | 'orders' | 'catalog' }) {
+export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftId }: { state: GameState; view?: 'fleet' | 'orders' | 'catalog'; onInspect?: (id: number) => void; selectedAircraftId?: number | null }) {
   const player = state.airlines[viewSeat()]!
   const year = yearOf(state)
   const [fleetSort, setFleetSort] = useState<FleetSortKey>('type')
@@ -639,8 +575,7 @@ export function FleetPanel({ state, view = 'fleet' }: { state: GameState; view?:
     <div>
       <div className="page-heading"><h2>{view === 'fleet' ? 'Owned aircraft' : view === 'orders' ? 'Orders & deliveries' : 'Aircraft market'}</h2><span className="dim">{year}</span></div>
       {view === 'fleet' && <>
-      <ReliabilityLegend />
-      <OperationsPanel state={state} />
+      <details className="fleet-policy-disclosure"><summary>Fleet policy & reliability</summary><OperationsPanel state={state} mode="policy" /><ReliabilityLegend /></details>
       {player.fleet.some((a) => a.routeId === null && !a.reserve && !isGrounded(a, state.turn)) && player.routes.length > 0 && (
         <button
           data-testid="assign-all-idle"
@@ -740,7 +675,7 @@ export function FleetPanel({ state, view = 'fleet' }: { state: GameState; view?:
         })
         const fheader = fleetHeader
         return (
-      <div className="table-scroll"><table>
+      <div className="table-scroll"><table className="fleet-table" data-testid="fleet-table">
         <thead>
           <tr>
             {fheader('type', 'Aircraft')}
@@ -756,9 +691,9 @@ export function FleetPanel({ state, view = 'fleet' }: { state: GameState; view?:
           {fleetRows.map(({ a, type, route, utilBp, maint, value }) => {
             const geriatric = a.ageQuarters >= 48
             return (
-              <tr key={a.id}>
+              <tr key={a.id} className={selectedAircraftId === a.id ? 'selected-row' : undefined}>
                 <td>
-                  {type.name} {a.leased && <span className="dim">(leased)</span>}{' '}
+                  <button className="link-btn entity-name" data-testid={`inspect-aircraft-${a.id}`} onClick={() => onInspect?.(a.id)}>{type.name} <small>#{a.id}</small></button> {a.leased && <span className="dim">(leased)</span>}{' '}
                   <span className="dim">({cabinSeats(a.type, a.cabin)} seats, {type.rangeKm}km)</span>
                 </td>
                 <td className={geriatric ? 'neg' : ''} title={geriatric ? 'maintenance hog — consider retiring' : undefined}>
@@ -809,40 +744,8 @@ export function FleetPanel({ state, view = 'fleet' }: { state: GameState; view?:
                 </td>
                 <td className={geriatric ? 'neg' : 'dim'}>{money(maint)}</td>
                 <td className="dim">{a.leased ? '—' : money(value)}</td>
-                <td>
-                  <select
-                    value={a.cabin}
-                    aria-label="cabin fit"
-                    title={`refit costs ${money(Math.floor((type.price * CABIN_REFIT_COST_BP) / 10000))}`}
-                    onChange={(e) => dispatch({ type: 'refit_cabin', aircraftId: a.id, cabin: Number(e.target.value) })}
-                  >
-                    <option value={1}>dense</option>
-                    <option value={2}>standard</option>
-                    <option value={3}>premium</option>
-                  </select>
-                </td>
-                <td>
-                  <select
-                    value={a.routeId ?? ''}
-                    onChange={(e) =>
-                      e.target.value === ''
-                        ? dispatch({ type: 'assign_aircraft', aircraftId: a.id, routeId: null })
-                        : assignAndSchedule(state, a.id, Number(e.target.value))
-                    }
-                  >
-                    <option value="">{a.reserve ? (utilBp > 0 ? '— standby cover —' : '— standby —') : '— idle —'}</option>
-                    {player.routes.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.from}–{r.to}
-                      </option>
-                    ))}
-                  </select>
-                  <ConfirmButton
-                    label={a.leased ? 'return' : 'sell'}
-                    confirmLabel="sure?"
-                    onConfirm={() => dispatch({ type: 'sell_aircraft', aircraftId: a.id })}
-                  />
-                </td>
+                <td>{['','Dense','Standard','Premium'][a.cabin]}</td>
+                <td>{route ? `${route.from}–${route.to}` : a.reserve ? 'Standby' : isGrounded(a,state.turn) ? 'Maintenance' : 'Unassigned'}</td>
               </tr>
             )
           })}

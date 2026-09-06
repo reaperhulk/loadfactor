@@ -11,11 +11,10 @@ import { fareFor, pairWeeklyDemand, routeShareWeight, routeSpoolBp, seasonalBp }
 import {
   isGrounded,
   cabinSeats,
-  effectiveFrequency,
-  maxRouteFrequency,
   roundTripsPerWeek,
   routeWeeklyCapacity,
 } from '../engine/queries'
+import { RoutePlanner } from './RoutePlanner'
 import { ConfirmButton } from './ConfirmButton'
 import { Sparkline } from './Sparkline'
 import { assignAndSchedule } from './assign'
@@ -143,6 +142,8 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
         </span>
       </header>
 
+      <section className="route-actuals"><span className="eyebrow">Last quarter · actual</span>{route.history.length === 0 ? <p className="dim">Not flown yet</p> : <dl className="entity-facts"><div><dt>Contribution</dt><dd className={route.lastRevenue >= route.lastCost ? 'pos' : 'neg'}>{money(route.lastRevenue-route.lastCost)}</dd></div><div><dt>Load factor</dt><dd>{(route.lastLoadFactorBp/100).toFixed(0)}%</dd></div></dl>}</section>
+      <RoutePlanner key={`${route.id}-${route.fareLevel}-${route.serviceLevel}-${route.frequency}`} state={state} route={route} />
       {route.lastSegments && <section className="segment-results"><h3>Who flies with you</h3>
         <p>Business {route.lastSegments.business.toLocaleString()} · Leisure {route.lastSegments.leisure.toLocaleString()} · Budget {route.lastSegments.budget.toLocaleString()}</p>
         <p>Connections contribute {money(route.lastTransferRevenue ?? 0)} of route revenue. Removing a feeder also removes its connecting traffic from the other leg.</p>
@@ -155,7 +156,7 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
         <span>{(route.lastLoadFactorBp / 100).toFixed(0)}%</span>
       </div>
       <div className="trend-row">
-        <span className="dim">profit</span>
+        <span className="dim">contribution</span>
         <Sparkline points={profitTrend} className="sparkline spark-profit" />
         <span className={route.lastRevenue - route.lastCost >= 0 ? 'pos' : 'neg'}>
           {money(route.lastRevenue - route.lastCost)}/q
@@ -206,67 +207,7 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
       <SpoolLegend />
       <HubLegend />
 
-      <h3>Controls</h3>
-      <div className="dossier-controls">
-        <span data-testid="dossier-frequency">
-          Schedule{' '}
-          <button
-            disabled={route.frequency <= 1}
-            onClick={() => dispatch({ type: 'set_frequency', routeId: route.id, frequency: route.frequency - 1 })}
-          >
-            −
-          </button>{' '}
-          {effectiveFrequency(player, route, state.turn)}/{maxRouteFrequency(player, route)} rt/wk{' '}
-          <button
-            disabled={route.frequency >= maxRouteFrequency(player, route)}
-            onClick={() => dispatch({ type: 'set_frequency', routeId: route.id, frequency: route.frequency + 1 })}
-          >
-            +
-          </button>
-        </span>
-        <span>
-          Fare{' '}
-          <button
-            disabled={route.fareLevel <= -2}
-            onClick={() => dispatch({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel - 1 })}
-          >
-            −
-          </button>{' '}
-          ${fareFor(km, route.fareLevel)}{' '}
-          <button
-            disabled={route.fareLevel >= 2}
-            onClick={() => dispatch({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel + 1 })}
-          >
-            +
-          </button>
-        </span>
-        <span>
-          Service{' '}
-          <button
-            disabled={route.serviceLevel <= 1}
-            onClick={() => dispatch({ type: 'set_service', routeId: route.id, serviceLevel: route.serviceLevel - 1 })}
-          >
-            −
-          </button>{' '}
-          {['', 'basic', 'standard', 'premium'][route.serviceLevel]}{' '}
-          <button
-            disabled={route.serviceLevel >= 3}
-            onClick={() => dispatch({ type: 'set_service', routeId: route.id, serviceLevel: route.serviceLevel + 1 })}
-          >
-            +
-          </button>
-        </span>
-        <ConfirmButton
-          label="close route"
-          confirmLabel="really close it?"
-          title={
-            route.history.length > 0
-              ? `the market remembers this pair for ${ROUTE_MEMORY_QUARTERS} quarters — reopening within that window skips the spool-up`
-              : undefined
-          }
-          onConfirm={() => dispatch({ type: 'close_route', routeId: route.id })}
-        />
-      </div>
+      <details className="entity-actions"><summary>Close this route</summary><p className="hint">Removes the schedule and releases assigned aircraft. The market remembers this pair for {ROUTE_MEMORY_QUARTERS} quarters.</p><ConfirmButton label="close route" confirmLabel="really close it?" onConfirm={() => { dispatch({ type:'close_route', routeId:route.id }); onClose() }} /></details>
 
       <h3>The pair{contenders.length > 1 ? ' — contested' : ''}</h3>
       <table data-testid="pair-battle">
