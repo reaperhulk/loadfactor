@@ -16,11 +16,11 @@ import {
   ROUTE_MEMORY_QUARTERS,
   ROUTE_SPOOL_BP,
   MAINT_AGE_BP_PER_QUARTER,
-  ORDER_CANCEL_REFUND_BP,
   SLOTS_PER_GRANT,
   ROUTE_OVERHEAD_QUAD,
 } from '../data/constants'
 import { inflationBp } from '../engine/market'
+import { canWithdrawOrder, orderRefund } from '../engine/orders'
 import { cityPool, nextExpansion, slotFee, slotQueue, slotRent, slotsRemaining } from '../engine/slots'
 import {
   airlinesOnPair,
@@ -764,21 +764,20 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
       <CabinLegend />
       </>}
       {view === 'orders' && <>{player.orders.length === 0 ? <p className="hint">No aircraft on order. Choose an aircraft in the market to compare purchase and lease options.</p> : <div className="table-scroll"><table><thead><tr><th>Aircraft</th><th colSpan={5}>Delivery</th><th>Actions</th></tr></thead><tbody>          {player.orders.map((o) => {
-            const refund = o.leased
-              ? 0
-              : Math.floor((getAircraftType(o.type).price * ORDER_CANCEL_REFUND_BP) / 10000)
+            const refund = orderRefund(o), withdraw = canWithdrawOrder(o)
             return (
               <tr key={`order-${o.id}`} className="dim">
                 <td>{getAircraftType(o.type).name}</td>
                 <td colSpan={5}>
                   on order — delivers in {o.quartersLeft} quarter(s)
+                  {withdraw && <small className="hint"> · Full refund until you advance the quarter</small>}
                 </td>
                 <td>
                   <ConfirmButton
                     data-testid={`cancel-order-${o.id}`}
-                    label={o.leased ? 'cancel lease' : `cancel (${money(refund)} back)`}
+                    label={o.leased ? 'cancel lease' : withdraw ? `cancel (${money(refund)} back · full refund)` : `cancel (${money(refund)} back)`}
                     confirmLabel="sure?"
-                    onConfirm={() => dispatch({ type: 'cancel_order', orderId: o.id })}
+                    onConfirm={() => dispatch({ type: withdraw ? 'withdraw_order' : 'cancel_order', orderId: o.id })}
                   />
                 </td>
               </tr>

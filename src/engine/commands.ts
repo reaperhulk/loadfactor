@@ -8,7 +8,6 @@ import { distanceKm, getCity, isCity, pairKey } from '../data/cities'
 import { getScenario } from '../data/scenarios'
 import {
   CABIN_REFIT_COST_BP,
-  ORDER_CANCEL_REFUND_BP,
   HEDGE_MAX_QUARTERS,
   HEDGE_MIN_QUARTERS,
   HEDGE_PREMIUM_PER_AIRCRAFT,
@@ -20,6 +19,7 @@ import {
   OFFER_FUEL_PREMIUM_BP,
 } from '../data/constants'
 import { slotFee, slotQueue } from './slots'
+import { canWithdrawOrder, orderRefund } from './orders'
 import { effFuelBp } from './worldEvents'
 import {
   isGrounded,
@@ -259,14 +259,15 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       }
     }
 
+    case 'withdraw_order':
     case 'cancel_order': {
       const order = airline.orders.find((o) => o.id === command.orderId)
       if (!order) return reject(airlineIdx, command, 'no such order')
-      // Purchases refund most of the price (the maker keeps a deposit);
-      // leases cancel free — nothing was paid up front.
-      const refund = order.leased
-        ? 0
-        : Math.floor((getAircraftType(order.type).price * ORDER_CANCEL_REFUND_BP) / 10000)
+      const withdraw = command.type === 'withdraw_order'
+      if (withdraw && !canWithdrawOrder(order)) return reject(airlineIdx, command, 'full refund is only available for purchases ordered this quarter')
+      // A distinct command preserves historical cancel_order outcomes in
+      // existing saves/replays while allowing full refunds in those careers.
+      const refund = orderRefund(order, withdraw)
       airline.orders = airline.orders.filter((o) => o.id !== order.id)
       airline.cash += refund
       return {

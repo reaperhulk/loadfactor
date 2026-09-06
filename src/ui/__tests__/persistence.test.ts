@@ -15,6 +15,22 @@ beforeEach(() => {
 afterEach(() => { reset(); vi.unstubAllGlobals() })
 
 describe('career continuity', () => {
+  it('resumes, withdraws and undoes a purchase without losing unrelated planning decisions', () => {
+    startGame('jet_age', 'withdraw-resume')
+    const initialCash = getSession()!.state.airlines[0]!.cash
+    dispatch({ type: 'order_aircraft', aircraftType: 'caravelle' })
+    dispatch({ type: 'set_marketing', level: 1 })
+    const purchasedHash = hashState(getSession()!.state)
+    reset()
+    expect(resumeSave(0)).toBe(true)
+    const orderId = getSession()!.state.airlines[0]!.orders[0]!.id
+    dispatch({ type: 'withdraw_order', orderId })
+    expect(getSession()!.state.airlines[0]!.cash).toBe(initialCash)
+    expect(getSession()!.state.airlines[0]!.marketing).toBe(1)
+    expect(hashState(runReplay(getReplay()!).state)).toBe(hashState(getSession()!.state))
+    expect(undoLastAction()).toBe(true)
+    expect(hashState(getSession()!.state)).toBe(purchasedHash)
+  })
   it('versions exports, replays both human seats and restores the active planner', () => {
     startGame('jet_age', 'portable-hotseat', undefined, undefined, 2)
     dispatch({ type: 'set_marketing', level: 1 })

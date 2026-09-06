@@ -618,3 +618,15 @@ The inbox badge counts unseen operational items. Visiting Desk acknowledges them
 without resolving or hiding the underlying work. Acknowledgements persist per
 scenario/seed/seat, bounded to 12 careers and the current quarter; new issues and
 new quarterly reviews can raise the badge again.
+
+### Reversible purchase decisions
+
+A purchase order whose delivery counter has not advanced can be withdrawn for
+its full price. The Orders page quotes that refund and its quarter-end deadline.
+The distinct withdraw_order command leaves historical cancel_order logs at their
+original deposit penalty, preserving old cash balances, replays and multiplayer
+hashes. It works in existing careers, including replacement orders and reloads.
+Leases return no cash that was not paid. A withdrawal after a resolved quarter
+rejects; ordinary later cancellation retains the existing refund policy.
+OPERATIONS-REDESIGN.md proposes fractional downtime, automatic compatible fleet
+coverage and passenger-based reliability consequences; those changes are pending.

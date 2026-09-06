@@ -1113,7 +1113,7 @@ test('M2 tools: daily challenge, leasing, used market, fuel hedge', async ({ pag
   expect(marketing).toBe(2)
 })
 
-test('an aircraft order cancels for the partial refund', async ({ page }) => {
+test('a same-quarter aircraft order cancels for a full refund, including after reload', async ({ page }) => {
   await startGame(page)
   await openPanel(page, 'catalog')
   const cashBefore = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)
@@ -1123,16 +1123,23 @@ test('an aircraft order cancels for the partial refund', async ({ page }) => {
   const cashAfterOrder = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)
   const price = cashBefore - cashAfterOrder
   expect(price).toBeGreaterThan(0)
+  await page.reload()
+  await page.getByTestId('continue-save').click()
+  await openPanel(page, 'orders')
   // Cancelling is a two-step ConfirmButton: arm, then confirm.
   const cancel = page.locator('[data-testid^="cancel-order-"]')
   await expect(cancel).toContainText('back') // the refund is quoted up front
+  await expect(cancel).toContainText('full refund')
   await cancel.click()
   await expect(cancel).toHaveText('sure?')
   await cancel.click()
   await expect(page.getByTestId('page-orders').locator('[data-testid^=cancel-order-]')).toHaveCount(0)
-  // 80% of the purchase price comes back (ORDER_CANCEL_REFUND_BP).
+  // An uncommitted purchase returns every dollar paid.
   const cashFinal = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)
-  expect(cashFinal).toBe(cashAfterOrder + Math.floor(price * 0.8))
+  expect(cashFinal).toBe(cashBefore)
+  await page.getByTestId('undo-action').click()
+  expect(await page.evaluate(() => window.__harness.getState()!.airlines[0]!.cash)).toBe(cashAfterOrder)
+  await expect(page.locator('[data-testid^="cancel-order-"]')).toContainText('full refund')
 })
 
 // A zoom step eases over ~130ms. It used to push every one of those frames

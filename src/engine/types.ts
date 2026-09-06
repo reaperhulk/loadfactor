@@ -261,6 +261,7 @@ export type Command =
   | { type: 'assign_aircraft'; aircraftId: number; routeId: number | null }
   | { type: 'order_aircraft'; aircraftType: string }
   | { type: 'cancel_order'; orderId: number }
+  | { type: 'withdraw_order'; orderId: number }
   | { type: 'lease_aircraft'; aircraftType: string }
   | { type: 'buy_used'; offerId: number }
   | { type: 'hedge_fuel'; quarters: number }
