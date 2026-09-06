@@ -1404,6 +1404,9 @@ test('keyboard reaches the network and every control has an accessible name', as
     const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
     window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
   })
+  // Dismiss the new route scene before issuing workspace shortcuts.
+  await page.getByTestId('skip-celebration').press('Enter')
+  await expect(page.getByTestId('celebration')).toHaveCount(0)
   // Arrow keys cycle the dossier through network cities without a mouse.
   await page.keyboard.press('ArrowRight')
   await expect(page.getByTestId('city-panel')).toBeVisible()
