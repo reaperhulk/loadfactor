@@ -12,6 +12,26 @@ async function route(page: Page, to = 'ORD') {
     window.__harness.dispatch({ type: 'open_route', from: a.hq, to, aircraftId: a.fleet.find((f) => f.routeId === null)!.id, frequency: 5 })
   }, to)
 }
+async function checkRunwayHeading(page: Page, approaching: boolean) {
+  const scene = page.locator('.celebration-scene'), plane = page.locator('.celebration-plane')
+  await expect(plane.locator('svg')).toHaveAttribute('data-view', approaching ? 'front' : 'rear')
+  const frame = (await scene.boundingBox())!
+  const widths: number[] = []
+  for (const time of [0, 1200, 2800]) {
+    // Sample the real CSS timeline deterministically, without waiting for
+    // wall-clock frames or asking screenshots to race a brief flyby.
+    await plane.evaluate((el, time) => {
+      for (const animation of el.getAnimations()) { animation.pause(); animation.currentTime = time }
+    }, time)
+    const box = (await plane.boundingBox())!
+    expect(Math.abs(box.x + box.width / 2 - frame.x - frame.width / 2)).toBeLessThan(1)
+    widths.push(box.width)
+  }
+  expect(approaching ? widths[2]! > widths[0]! : widths[2]! < widths[0]!).toBe(true)
+  // Leave the screenshot at a readable point; the modal's independent
+  // completion timer still proves normal report sequencing below.
+  await plane.evaluate((el) => { for (const a of el.getAnimations()) a.currentTime = 1400 })
+}
 for (const width of [1440, 390]) test(`celebrations ${width}px: route skip and delivery completion`, async ({ page }, info) => {
   await page.setViewportSize({ width, height: 844 })
   await start(page)
@@ -21,6 +41,7 @@ for (const width of [1440, 390]) test(`celebrations ${width}px: route skip and d
   await expect(scene).toContainText('New route opened')
   await expect(page.getByTestId('skip-celebration')).toBeFocused()
   expect(await scene.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
+  await checkRunwayHeading(page, false)
   await info.attach(`${width}-route-opening`, { body: await page.screenshot(), contentType: 'image/png' })
   await page.keyboard.press('Escape')
   await expect(scene).toHaveCount(0)
@@ -33,6 +54,7 @@ for (const width of [1440, 390]) test(`celebrations ${width}px: route skip and d
   await flyQuarter(page)
   await expect(scene).toContainText('2 aircraft delivered')
   await expect(page.getByTestId('report-card')).toHaveCount(0)
+  await checkRunwayHeading(page, true)
   await info.attach(`${width}-delivery`, { body: await page.screenshot(), contentType: 'image/png' })
   await expect(scene).toHaveCount(0, { timeout: 6000 })
   await expect(page.getByTestId('report-card')).toBeVisible()

@@ -12,13 +12,13 @@
 .celebration-ground { position:absolute; width:250%; left:-75%; height:1000px; top:0; transform-origin:50% 0; transform:rotateX(68deg); background:repeating-linear-gradient(0deg,#6e977e 0 70px,#7ca188 70px 140px); animation:celebration-ground 700ms linear infinite; }
 .celebration-runway { position:absolute; width:24%; left:38%; height:100%; background:#354c55; border-inline:8px solid #d7cfac; }
 .celebration-runway::after { content:''; position:absolute; width:8px; height:100%; left:calc(50% - 4px); background:repeating-linear-gradient(0deg,#fff0cb 0 50px,transparent 50px 140px); }
-.celebration-plane { position:absolute; width:74%; left:7%; top:25%; animation:celebration-arrival 3.8s cubic-bezier(.2,.5,.35,1) both; }
-.celebration-plane .aircraft-art { width:100%; height:auto; }
-.celebration-plane .aircraft-art svg { height:auto; background:none; border-radius:0; }
-.celebration-plane .aircraft-art :is(figcaption,text,.aircraft-apron,.aircraft-shadow,.aircraft-datum) { display:none; }
+.celebration-plane { position:absolute; width:74%; left:50%; top:56%; transform-origin:50% 55%; animation:celebration-arrival 3.8s ease-in-out both; }
+.runway-aircraft { display:block; width:100%; height:auto; overflow:visible; }
 .celebration-runway::after { animation:celebration-ground 700ms linear infinite; }
-.celebration-shadow { position:absolute; left:25%; top:79%; width:42%; height:6%; background:#152b4260; border-radius:50%; transform:skewX(-35deg); animation:celebration-shadow 3.8s ease-out both; }
+.celebration-shadow { position:absolute; left:50%; top:81%; width:42%; height:6%; background:#152b4260; border-radius:50%; animation:celebration-shadow-arrival 3.8s ease-in-out both; }
 .inauguration .celebration-plane { animation-name:celebration-departure; }
+.inauguration .celebration-shadow { animation-name:celebration-shadow-departure; }
+.inauguration .runway-gear { animation:celebration-gear 3.8s linear both; }
 .inauguration .celebration-ground { background-color:#588982; }
 .celebration-scene-label { position:absolute; left:22px; bottom:14px; font:11px monospace; letter-spacing:.2em; color:#fff2cd; }
 .celebration-copy { padding:24px 28px 20px; }
@@ -28,9 +28,11 @@
 .celebration-footer button { flex-shrink:0; background:transparent; }
 .celebration-progress { height:3px; background:#f3cb82; transform-origin:left; animation:celebration-progress 3.8s linear both; }
 @keyframes celebration-ground { to { background-position:0 140px; } }
-@keyframes celebration-arrival { from { transform:translate(-55%,-20%) scale(.6); } 65%,to { transform:translate(5%,8%) scale(1); } }
-@keyframes celebration-departure { from { transform:translate(-20%,35%) scale(.85); } 45% { transform:translate(5%,8%) rotate(-3deg); } to { transform:translate(56%,-80%) rotate(-8deg) scale(.7); } }
-@keyframes celebration-shadow { from { opacity:0; transform:translateX(-80%) scale(.5); } 60% { opacity:1; } to { opacity:.25; transform:translateX(60%) scale(.7); } }
+@keyframes celebration-arrival { from { transform:translate(-50%,-55%) scale(.16); } 75%,to { transform:translate(-50%,-40%) scale(1.08); } }
+@keyframes celebration-departure { from { transform:translate(-50%,-40%) scale(1.08); } 35% { transform:translate(-50%,-60%) scale(.8); } to { transform:translate(-50%,-85%) scale(.16); } }
+@keyframes celebration-shadow-arrival { from { opacity:.15; transform:translate(-50%,-180%) scale(.12); } 75%,to { opacity:.8; transform:translate(-50%,0) scale(1); } }
+@keyframes celebration-shadow-departure { from { opacity:.8; transform:translate(-50%,0) scale(1); } to { opacity:0; transform:translate(-50%,-180%) scale(.12); } }
+@keyframes celebration-gear { 0%,20% { opacity:1; } 40%,100% { opacity:0; } }
 @keyframes celebration-progress { to { transform:scaleX(0); } }
 @media(max-width:540px) { .celebration-card header { padding:12px; } .celebration-copy { padding:20px; } .celebration-footer { align-items:flex-start; flex-direction:column; gap:12px; } .celebration-card header .eyebrow { max-width:48%; line-height:1.6; } }
 html[data-motion=reduced] .celebration-card * { animation:none; }

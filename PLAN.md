@@ -630,3 +630,8 @@ Leases return no cash that was not paid. A withdrawal after a resolved quarter
 rejects; ordinary later cancellation retains the existing refund policy.
 OPERATIONS-REDESIGN.md proposes fractional downtime, automatic compatible fleet
 coverage and passenger-based reliability consequences; those changes are pending.
+
+Runway celebration aircraft use dedicated front/rear vector portraits aligned
+to the scene's depth axis. Their screen-space center remains on the runway
+centerline while scale and altitude change; fleet/catalog art stays side-on.
+Browser tests sample both timelines at three points on desktop and mobile.

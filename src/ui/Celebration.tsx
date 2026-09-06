@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { GameEvent, GameState } from '../engine/types'
 import { getAircraftType } from '../data/aircraft'
 import { distanceKm, getCity } from '../data/cities'
-import { AircraftArt } from './AircraftArt'
+import { RunwayAircraft } from './RunwayAircraft'
 import { Dialog } from './Dialog'
 import { setDisplayPreferences, useDisplayPreferences, useReducedMotion } from './display'
 import './celebration.css'
@@ -52,7 +52,7 @@ export function Celebration({ milestones, state, onClose }: {
       <div className="celebration-scene" aria-hidden="true">
         <div className="celebration-sun" /><div className="celebration-hills" />
         <div className="celebration-perspective"><div className="celebration-ground"><div className="celebration-runway" /></div></div>
-        <div className="celebration-shadow" /><div className="celebration-plane"><AircraftArt type={type} /></div>
+        <div className="celebration-shadow" /><div className="celebration-plane"><RunwayAircraft type={type} approaching={delivery} /></div>
         <span className="celebration-scene-label">{delivery ? 'WELCOME TO THE FLEET' : `${event.from} → ${event.to}`}</span>
       </div>
       <div className="celebration-copy"><span className="eyebrow">{delivery ? 'Ready for your next chapter' : `${distanceKm(event.from, event.to).toLocaleString('en-US')} km · A new connection`}</span><h2>{title}</h2><p>{detail}</p>
