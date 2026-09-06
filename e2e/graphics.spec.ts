@@ -9,10 +9,10 @@ test.use({ serviceWorkers: 'block' })
 
 test('globe geometry loads on demand while the flat map remains usable', async ({ page }) => {
   const requests: string[] = []
-  page.on('request', (request) => { if (/globemap\.gen-.*\.js/.test(request.url())) requests.push(request.url()) })
+  page.on('request', (request) => { if (/globemap\.gen-.*\.json/.test(request.url())) requests.push(request.url()) })
   let release!: () => void
   const held = new Promise<void>((resolve) => { release = resolve })
-  await page.route('**/globemap.gen-*.js', async (route) => { await held; await route.continue() })
+  await page.route('**/globemap.gen-*.json', async (route) => { await held; await route.continue() })
   await page.goto('/')
   await page.getByTestId('start-jet_age').click()
   await expect(page.getByTestId('map')).toBeVisible()
@@ -37,7 +37,7 @@ test('globe geometry loads on demand while the flat map remains usable', async (
 
 test('a failed globe download preserves the map and offers a retry', async ({ page }) => {
   let attempts = 0
-  await page.route('**/globemap.gen-*.js', async (route) => {
+  await page.route('**/globemap.gen-*.json', async (route) => {
     if (++attempts === 1) await route.abort()
     else await route.continue()
   })
@@ -67,6 +67,12 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
     // The marker radius describes market size, independent of map aspect/zoom.
     await expect.poll(async () => (await home.boundingBox())!.width).toBeLessThan(12)
     expect((await home.boundingBox())!.width).toBeGreaterThan(8)
+    for (const id of ['zoom-in', 'zoom-out', 'zoom-reset', 'map-projection', 'toggle-rivals']) {
+      expect(await page.getByTestId(id).evaluate((el) => {
+        const r = el.getBoundingClientRect(), hit = document.elementFromPoint(r.x+r.width/2, r.y+r.height/2)
+        return hit === el || el.contains(hit)
+      }), 'map controls remain available during achievement notifications').toBe(true)
+    }
     await info.attach(`${width}-network`, { body: await page.screenshot(), contentType: 'image/png' })
     await page.getByTestId('zoom-in').click()
     await expect.poll(async () => (await home.boundingBox())!.width).toBeLessThan(12)

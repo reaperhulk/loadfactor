@@ -41,7 +41,8 @@ self.addEventListener('fetch', (event) => {
     })())
     return
   }
-  if (!['script', 'style', 'image', 'font'].includes(request.destination)) return
+  const globeData = /\/assets\/globemap\.gen-[\w-]+\.json$/.test(url.pathname)
+  if (!globeData && !['script', 'style', 'image', 'font'].includes(request.destination)) return
   event.respondWith((async () => {
     const cached = await caches.match(request)
     if (cached) return cached

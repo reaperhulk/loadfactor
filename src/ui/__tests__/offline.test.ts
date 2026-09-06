@@ -71,3 +71,14 @@ describe('offline release behavior', () => {
     expect((await w.fetch('https://example.test/loadfactor/assets/missing.js', 'cors', 'script'))!.status).toBe(503)
   })
 })
+
+it('caches optional globe data after success, recovers from misses, and leaves other JSON alone', async () => {
+  const w = worker(), url = 'https://example.test/loadfactor/assets/globemap.gen-abc123.json'
+  w.network(async () => { throw new Error('offline') })
+  expect((await w.fetch(url, 'cors', ''))!.status).toBe(503)
+  w.network(async () => new Response('{"WORLD_RINGS":[]}'))
+  expect(await (await w.fetch(url, 'cors', ''))!.text()).toBe('{"WORLD_RINGS":[]}')
+  w.network(async () => { throw new Error('offline') })
+  expect(await (await w.fetch(url, 'cors', ''))!.text()).toBe('{"WORLD_RINGS":[]}')
+  expect(await w.fetch('https://example.test/loadfactor/api/data.json', 'cors', '')).toBeUndefined()
+})

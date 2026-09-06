@@ -585,7 +585,7 @@ eight viewport sizes, plus 125% text, and assert viewport geometry directly.
 
 Animated money values own their animation state in text-only components, so
 650 ms balance roll-ups do not rerender every retained workspace page. Globe
-coordinates live in a separate generated module fetched only on demand; the
+coordinates live in a separate generated JSON asset fetched only on demand; the
 flat map remains interactive while it loads, with visible failure/retry state.
 Both outputs of gen:worldmap share the same source geometry and projection.
 The flat map has a 95 KiB gzip budget alongside the 190 KiB shell budget.
@@ -598,3 +598,8 @@ sea and globe lighting use gradients/strokes; animated aircraft and long-haul
 routes no longer allocate blur filters. Memoized vector fleet portraits carry
 airframe-specific proportions, engines, tails and the player's livery. Windows
 and seams are batched paths, with no raster downloads or animation in the shop.
+
+The globe loader shares successful/in-flight requests, discards failed requests,
+and retries with fetch. This avoids the browser's cached failed-module imports.
+The worker caches the versioned geometry URL for offline use after the first
+successful load; unrelated JSON requests remain outside its scope.

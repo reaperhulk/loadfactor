@@ -332,3 +332,9 @@ main.game-shell { --bg:#10232c; --panel:#19333e; --ink:#ede9de; --dim:#a4b4b9; -
 .game-shell .shop-table .aircraft-art { height:auto; margin:6px 0 0; }
 .game-shell .shop-table .aircraft-art svg { display:block; height:auto; border-radius:4px; }
 .game-shell .shop-table .aircraft-art figcaption { display:none; }
+
+@media (max-width:640px) {
+  /* The map's thumb controls own bottom-right; notifications use the space
+     beside them so a route opening never hides zoom or projection controls. */
+  .game-shell:has(.map-page:not([hidden])) .toast-stack { left:12px; right:auto; max-width:calc(100vw - 170px); }
+}

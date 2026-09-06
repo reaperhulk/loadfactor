@@ -7,7 +7,7 @@
 // coordinates, not against a previous render.
 
 import { describe, expect, it } from 'vitest'
-import { WORLD_RINGS } from '../../data/globemap.gen'
+import { WORLD_RINGS } from '../../data/globemap.gen.json'
 import { CITIES, getCity } from '../../data/cities'
 import {
   BORDERS_PATH,
@@ -188,8 +188,9 @@ describe('the landmass is the real world', () => {
   })
 
   it('keeps the globe rings in lon/lat, poles included', () => {
-    const lats = WORLD_RINGS.flatMap((r) => r.map(([, lat]) => lat))
-    const lons = WORLD_RINGS.flatMap((r) => r.map(([lon]) => lon))
+    expect(WORLD_RINGS.every((ring) => ring.every((point) => point.length === 2))).toBe(true)
+    const lats = WORLD_RINGS.flatMap((r) => r.map(([, lat]) => lat!))
+    const lons = WORLD_RINGS.flatMap((r) => r.map(([lon]) => lon!))
     expect(Math.min(...lats)).toBeLessThan(-70) // a sphere has Antarctica
     expect(Math.max(...lats)).toBeGreaterThan(75)
     expect(Math.min(...lons)).toBeGreaterThanOrEqual(-180)

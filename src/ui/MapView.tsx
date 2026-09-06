@@ -11,6 +11,7 @@ import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
 import { seasonalBp } from '../engine/market'
 import { Icon } from './Icon'
+import { loadGlobeGeometry, type GlobeGeometry } from './globeGeometry'
 import { aircraftGlyph } from './AircraftArt'
 import { reducedMotion, useDisplayPreferences, useReducedMotion } from './display'
 import { placeLabels } from './labels'
@@ -540,13 +541,13 @@ export function MapView({
   const [projection, setProjection] = useState<'flat' | 'globe'>(() => {
     try { return localStorage.getItem('loadfactor:projection') === 'globe' ? 'globe' : 'flat' } catch { return 'flat' }
   })
-  const [globeGeometry, setGlobeGeometry] = useState<typeof import('../data/globemap.gen') | null>(null)
+  const [globeGeometry, setGlobeGeometry] = useState<GlobeGeometry | null>(null)
   const [globeError, setGlobeError] = useState(false)
   const [globeRetry, setGlobeRetry] = useState(0)
   useEffect(() => {
     if (projection !== 'globe' || globeGeometry) return
     let cancelled = false
-    import('../data/globemap.gen').then((geometry) => {
+    loadGlobeGeometry().then((geometry) => {
       if (!cancelled) { setGlobeGeometry(geometry); setGlobeError(false) }
     }).catch(() => { if (!cancelled) setGlobeError(true) })
     return () => { cancelled = true }
@@ -1520,8 +1521,8 @@ export function MapView({
 
   // Fat-finger tap resolution: a tap that misses every dot still selects the
   // nearest visible city within a finger's reach in SCREEN pixels. On a
-  // phone the dots render around a single CSS pixel — without this the
-  // game's primary verb is mouse-only. Precise dot/arc clicks stopPropagation
+  // phone the markers stay compact — the generous reach keeps the game's
+  // primary verb comfortable without covering the network in large dots. Precise dot/arc clicks stopPropagation
   // so they keep their exact behavior.
   const handleMapTap = (e: ReactMouseEvent<SVGSVGElement>): void => {
     if (e.detail >= 2) return // the second click of a double-click zooms
