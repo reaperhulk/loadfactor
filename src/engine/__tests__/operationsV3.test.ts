@@ -1,3 +1,4 @@
+import { ENTRANT_EVERY_QUARTERS } from '../../data/constants'
 import { describe, expect, it } from 'vitest'
 import { applyCommand, applyCommandBatch, newGame, runReplay } from '../index'
 import { recurringFinancials } from '../accounting'
@@ -201,6 +202,19 @@ describe('fractional operations', () => {
     ).toEqual(final)
     checkInvariants(final)
     expect(JSON.parse(JSON.stringify(final))).toEqual(final)
+  })
+  it('a new rival enters with reserve policy and fresh wear before its first planning turn', () => {
+    const s = network()
+    s.turn = ENTRANT_EVERY_QUARTERS
+    const rival = s.airlines[1]!
+    rival.bankrupt = true; rival.fleet = []; rival.routes = []; rival.slots = {}
+    const result = applyCommand(s, { type: 'end_quarter' })
+    const entry = result.events.find(e => e.type === 'airline_entered')
+    expect(entry).toBeDefined()
+    if (entry?.type !== 'airline_entered') throw new Error('missing entrant')
+    const a = result.state.airlines[entry.airline]!
+    expect(a.operationsPolicy?.reserveBp).toBe(500)
+    expect(a.fleet.every(ac => ac.operations?.checkedTurn === result.state.turn && ac.operations.cycles === 0)).toBe(true)
   })
   it('rejects invalid policies and in-progress check changes', () => {
     let s = network()

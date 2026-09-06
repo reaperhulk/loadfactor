@@ -188,7 +188,7 @@ export function OperationsPanel({
                 Cover uses compatible crews and aircraft with free hours. Standby aircraft must be at a route
                 endpoint or within a 1,000 km ferry; range, ferry time and existing flights still limit cover.
               </p>
-              {readiness && <OperationsSummary summary={readiness} forecast />}
+              {readiness && <OperationsSummary summary={readiness} routes={airline.routes} forecast />}
             </>
           )}
           <label>

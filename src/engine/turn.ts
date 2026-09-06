@@ -1,4 +1,4 @@
-import { enableOperations, modernOperations, resolveOperations } from './operations'
+import { aircraftOperations, enableOperations, modernOperations, resolveOperations } from './operations'
 import { recurringFinancials } from './accounting'
 // Quarter resolution — the fixed order documented in PLAN.md §3.3. Every cash
 // movement in this file flows through the quarterly P&L so the accounting test
@@ -177,6 +177,10 @@ function admitEntrant(state: GameState, events: GameEvent[]): void {
   }
   for (let i = 0; i < 2; i++) {
     airline.fleet.push({ id: airline.nextId++, type: metal.id, ageQuarters: 0, routeId: null, leased: false, cabin: 2 })
+  }
+  if (modernOperations(state)) {
+    airline.operationsPolicy = { reserveBp: 500, recovery: false }
+    for (const ac of airline.fleet) ac.operations = aircraftOperations(airline, ac, state.turn + 1)
   }
   if (deadSeat >= 0) state.airlines[deadSeat] = airline
   else state.airlines.push(airline)

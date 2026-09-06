@@ -104,7 +104,7 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
           {' '}− fleet, airport and company costs {money(now.costs - now.breakdown.fuel - now.breakdown.fees - now.breakdown.flightPay - now.breakdown.service)}
           {' '}= airline net profit {money(now.profit)}.
         </p>
-        {now.operations && <OperationsSummary summary={now.operations} />}
+        {now.operations && <OperationsSummary summary={now.operations} routes={player.routes} />}
         <table className="report-lines">
           <tbody>
             <tr>

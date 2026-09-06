@@ -137,7 +137,7 @@ function QuarterPage({ state, events }: { state: GameState; events: GameEvent[] 
   }
   return (
     <div>
-      {ops && <OperationsSummary summary={ops.summary} />}
+      {ops && <OperationsSummary summary={ops.summary} routes={player.routes} />}
       {results.length > 0 && (
         <div className="table-scroll">
           <table data-testid="report-results">

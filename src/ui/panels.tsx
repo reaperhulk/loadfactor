@@ -1,3 +1,4 @@
+import { planningForecast } from './forecast'
 import { checkDueIn } from '../engine/operations'
 import { PlanningWorkbench } from './PlanningWorkbench'
 import { OperationsPanel } from './OperationsPanel'
@@ -547,6 +548,7 @@ type FleetSortKey = 'type' | 'age' | 'util' | 'maint' | 'value'
 export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftId }: { state: GameState; view?: 'fleet' | 'orders' | 'catalog'; onInspect?: (id: number) => void; selectedAircraftId?: number | null }) {
   const player = state.airlines[viewSeat()]!
   const year = yearOf(state)
+  const readiness = player.operationsPolicy && view === 'fleet' ? planningForecast(state, player.id).operations : undefined
   const [fleetSort, setFleetSort] = useState<FleetSortKey>('type')
   const [fleetAsc, setFleetAsc] = useState(true)
   const [fleetQuery,setFleetQuery] = useState('')
@@ -753,7 +755,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
                   )}
                 </td>
                 <td className={geriatric ? 'neg' : 'dim'}>{money(maint)}</td>
-                {player.operationsPolicy && <td><span className="dim">{a.operations?.checkStart !== undefined ? 'Check booked' : checkDueIn(player, a, state.turn) === 0 ? 'Check due' : `Check in ${checkDueIn(player, a, state.turn)}q`}</span></td>}
+                {player.operationsPolicy && <td>{readiness && <div>{(100 - (readiness.aircraft.find(f => f.aircraftId === a.id)?.unavailableMinutes ?? 0) * 100 / (13 * 7 * 24 * 60)).toFixed(1)}% available</div>}<span className="dim">{a.operations?.checkStart !== undefined ? 'Check booked' : checkDueIn(player, a, state.turn) === 0 ? 'Check due' : `Check in ${checkDueIn(player, a, state.turn)}q`}</span></td>}
                 <td className="dim">{a.leased ? '—' : money(value)}</td>
                 <td>{['','Dense','Standard','Premium'][a.cabin]}</td>
                 <td>{route ? `${route.from}–${route.to}` : a.reserve ? 'Standby' : isGrounded(a,state.turn) ? 'Maintenance' : 'Unassigned'}</td>

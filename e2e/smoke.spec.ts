@@ -1589,18 +1589,20 @@ test('the world asks questions: an offer can be taken or passed', async ({ page 
   await expect(page.getByTestId('active-deals')).toContainText('LHR')
 })
 
-test('stakes scale with the airline: groundings, reputation, milestones', async ({ page }) => {
+test('older aircraft remain usable and the fleet explains wear and checks', async ({ page }) => {
   await startGame(page)
   await page.evaluate(() => {
     const snap = window.__harness.getState()!
     const idle = snap.airlines[0]!.fleet.find((ac) => ac.routeId === null)!
     window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
-    // A geriatric fleet: the reliability warning must appear where the metal is.
+    // Calendar age alone must not label a maintained fleet as broken.
     const s = window.__harness.getState()!
     for (const ac of s.airlines[0]!.fleet) ac.ageQuarters = 60
     window.__harness.dispatch({ type: 'set_marketing', level: 0 })
   })
   await openPanel(page, 'fleet')
-  await expect(page.getByTestId('reliability-note')).toContainText('old metal breaks')
-  await expect(page.getByTestId('reliability-legend')).toBeAttached()
+  await page.getByText('Fleet policy & actions', { exact: true }).click()
+  await page.getByTestId('reliability-legend').locator('summary').click()
+  await expect(page.getByTestId('reliability-legend')).toContainText('maintained 15–20-year-old aircraft can remain useful')
+  await expect(page.getByTestId('reliability-note')).not.toBeVisible()
 })

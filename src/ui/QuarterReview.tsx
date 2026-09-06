@@ -32,7 +32,7 @@ export function QuarterReview({ state, forecast, onClose, onConfirm }: {
         {idle > 0 && <p>{idle} unassigned aircraft still incur crew and ownership costs.</p>}
         {losing > 0 && <p>{losing} routes forecast a loss before fixed company costs.</p>}
       </section>}
-      {forecast.operations && <OperationsSummary summary={forecast.operations} forecast />}
+      {forecast.operations && <OperationsSummary summary={forecast.operations} routes={airline.routes} forecast />}
       {adverse?.operations && <p className="review-attention" data-testid="operations-adverse">Stress case · one additional three-day repair: {adverse.operations.cancelledTrips} cancelled round trips; {money(adverse.profit)} company profit. This is an illustration, not a prediction of the next repair.</p>}
       <p className="hint">Forecast at current fuel, demand and rival schedules. Deliveries, competitor moves and disruptions can change the result.</p>
       <div className="dialog-actions"><button onClick={onClose}>Back to planning</button><button className="end-quarter" data-testid="confirm-quarter" onClick={onConfirm}>Fly this quarter <span aria-hidden="true">→</span></button></div>

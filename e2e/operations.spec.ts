@@ -51,6 +51,8 @@ for (const [width, height] of [
     const review = page.getByTestId('quarter-review')
     await expect(review.getByTestId('operations-summary')).toContainText('Planned operations')
     await expect(review.getByTestId('operations-adverse')).toBeVisible()
+    await review.getByTestId('operations-route-detail').locator('summary').click()
+    await expect(review.getByTestId('operations-route-detail')).toContainText('JFK–ORD')
     await info.attach(`${width}-operations-review`, {
       body: await page.screenshot(),
       contentType: 'image/png',
@@ -72,8 +74,7 @@ for (const [width, height] of [
       contentType: 'image/png',
     })
     await page.reload()
-    const resume = page.getByTestId('continue-save')
-    if (await resume.isVisible()) await resume.click()
+    await page.getByTestId('continue-save').click()
     await expect
       .poll(() => page.evaluate(() => window.__harness.getState()?.airlines[0]?.operationsPolicy?.reserveBp))
       .toBe(1000)
