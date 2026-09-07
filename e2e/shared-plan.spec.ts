@@ -100,3 +100,14 @@ for (const width of [1440,390]) test(`commercial choices ${width}px: real flows,
   await expect(page.getByTestId('passenger-flows')).toContainText('Actual journeys')
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBe(0)
 })
+
+test('legacy careers keep their existing availability and route totals',async({page})=>{
+  await page.addInitScript(()=>localStorage.setItem('loadfactor:save:v1',JSON.stringify({version:1,scenario:'jet_age',seed:'legacy-inspection',commands:[{type:'open_route',from:'JFK',to:'ORD',aircraftId:1,frequency:5}]})))
+  await page.goto('/');await page.getByTestId('continue-save').click()
+  const before=await page.evaluate(()=>JSON.stringify(window.__harness.getState()))
+  await openPanel(page,'operations')
+  await expect(page.getByTestId('operations-board')).toContainText('earlier operations system')
+  await openPanel(page,'routes');await page.locator('[data-testid^="inspect-"]').first().click()
+  await expect(page.getByText('This older career records route totals only.',{exact:false})).toBeVisible()
+  expect(await page.evaluate(()=>JSON.stringify(window.__harness.getState()))).toBe(before)
+})

@@ -73,6 +73,28 @@ Settings → Display → **Map performance diagnostics** shows recent FPS, frame
 p95, frames over 50 ms and approximate JS heap when the device exposes it. The
 isolated sampler retains at most 120 intervals and stops in hidden tabs.
 
+## Hosted browser results
+
+The full 172-test browser run for commit `d06a7c2` passed on September 7,
+2026, including all nine large-save workloads and offline planning panels.
+These timings include automation/browser scheduling overhead and combine globe
+gestures with planning/navigation; they do not isolate map-rendering FPS.
+
+| Metric | Chromium, four layouts | WebKit, five desktop/mobile runs |
+| --- | --- | --- |
+| Restore 65-quarter save | 1.30–1.46 s | 1.61–2.14 s |
+| Request and display advice | 306–499 ms | 445–612 ms |
+| Mixed-workload frame p95 | 33–50 ms | 185–320 ms |
+| DOM nodes after repeated navigation | Unchanged in every layout | Unchanged in every layout |
+| JS heap after collection | Unchanged (coarse browser estimates) | Not exposed |
+| Replay save size | 16,061 bytes | 16,061 bytes |
+
+WebKit remains the renderer to investigate next: its mixed-workload long frames
+are materially higher even though planning, save fidelity, controls and offline
+checks pass. Diagnose individual gesture/paint/layout segments on real devices
+before attributing all of this to engine work. The deterministic Node comparison
+above isolates the algorithm improvements more directly.
+
 ## Strategy and pacing coverage
 
 The rules-4 release probe runs 108 careers: nine scenarios, two independent

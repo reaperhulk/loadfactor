@@ -5,7 +5,12 @@ import { usePlanningCommands } from './planningDrafts'
 import { viewSeat } from './session'
 
 export interface FlowFocus { routes:number[]; label:string }
-export function PassengerFlows({state,city,routeId,onHighlight}:{state:GameState;city?:string;routeId?:number;onHighlight?:(focus:FlowFocus)=>void}) {
+interface PassengerFlowsProps {state:GameState;city?:string;routeId?:number;onHighlight?:(focus:FlowFocus)=>void}
+export function PassengerFlows(props:PassengerFlowsProps) {
+  if((props.state.rulesVersion??1)<2) return <p className="hint">This older career records route totals only. Passenger-path inspection is available in newer careers.</p>
+  return <RecordedPassengerFlows {...props} />
+}
+function RecordedPassengerFlows({state,city,routeId,onHighlight}:PassengerFlowsProps) {
   const seat=viewSeat(), draft=usePlanningCommands(), [open,setOpen]=useState(false), [mode,setMode]=useState<'planned'|'actual'>('planned')
   const planned=useMemo(()=>open ? passengerFlows(draft.length ? applyCommandBatchFor(state,draft.map(command=>({seat,command}))).state : state,seat) : null,[state,seat,draft,open])
   const actual=state.airlines[seat]!.passengerHistory

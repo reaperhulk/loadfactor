@@ -8,7 +8,11 @@ import { viewSeat } from './session'
 import { mergePlanningCommands, stagePlanningCommands, usePlanningCommands } from './planningDrafts'
 import { money } from './format'
 
-export function OperationsBoard({state,active=true}:{state:GameState;active?:boolean}) {
+export function OperationsBoard(props:{state:GameState;active?:boolean}) {
+  if(!props.state.airlines[viewSeat()]!.operationsPolicy) return <section data-testid="operations-board"><h2>Aircraft availability</h2><p>This career uses the earlier operations system. Owned aircraft shows its availability and maintenance controls. The weekly calendar becomes available when an eligible career enables improved operations in Fleet policy.</p></section>
+  return <WeeklyOperationsBoard {...props} />
+}
+function WeeklyOperationsBoard({state,active=true}:{state:GameState;active?:boolean}) {
   const seat=viewSeat(), airline=state.airlines[seat]!, draft=usePlanningCommands()
   const [aircraftId,setAircraftId]=useState(airline.fleet[0]?.id ?? 0),[week,setWeek]=useState(0),[action,setAction]=useState('check'),[base,setBase]=useState(airline.hq),[rotation,setRotation]=useState(airline.routes[0]?.id ?? 0)
   const [preview,setPreview]=useState(false)
