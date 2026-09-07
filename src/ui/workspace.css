@@ -352,3 +352,19 @@ main.game-shell { --bg:#10232c; --panel:#19333e; --ink:#ede9de; --dim:#a4b4b9; -
 .decision-options h4 { margin:0 0 6px; }
 .route-diagnosis p,.decision-options p { font-size:.82rem; line-height:1.45; }
 @media(min-width:1000px) { .plan-review .decision-metrics { grid-template-columns:repeat(4,minmax(0,1fr)); } }
+
+.network-advisor,.expansion-planner { margin:18px 0; padding:16px; border:1px solid var(--rule); border-radius:12px; }
+.network-advisor>summary { font-weight:750; cursor:pointer; }
+.adviser-locks { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; margin:12px 0; }
+.adviser-locks fieldset { min-width:0; border:1px solid var(--rule); border-radius:6px; }
+.adviser-locks label { display:inline-flex; align-items:center; gap:4px; margin-right:10px; font-size:.8rem; min-height:36px; }
+.adviser-total { background:var(--panel); padding:14px; border:1px solid var(--rule); border-radius:10px; margin:14px 0; }
+.expansion-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:12px; margin:14px 0; }
+.expansion-options article { min-width:0; border:1px solid var(--rule); border-radius:10px; padding:14px; }
+.expansion-options h4 { margin:0; font-size:1rem; }
+.expansion-options p,.expansion-options li { font-size:.8rem; line-height:1.5; }
+.expansion-sort { display:flex; align-items:center; gap:8px; margin:14px 0; }
+.expansion-comparison { border-top:2px solid var(--rule); margin-top:16px; }
+.network-advisor input[type=checkbox],.expansion-planner input[type=checkbox] { width:18px; height:18px; vertical-align:middle; }
+
+@media(min-width:1000px) { .adviser-options { grid-template-columns:repeat(2,minmax(0,1fr)); } }

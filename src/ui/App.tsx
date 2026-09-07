@@ -1,3 +1,4 @@
+import type { ExpansionOption } from '../engine/expansion'
 import { useInbox } from './inbox'
 import { Celebration, useCelebration } from './Celebration'
 import { planningForecast } from './forecast'
@@ -677,7 +678,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const inspectedAircraft = player.fleet.find((a) => a.id === selectedAircraft)
   const inspectedRoute = player.routes.find((r) => r.id === selectedRoute)
   const [routeFrom, setRouteFrom] = useState<string | null>(null)
-  const [pendingRoute, setPendingRoute] = useState<{ from: string; to: string } | null>(null)
+  const [pendingRoute, setPendingRoute] = useState<{ from: string; to: string; preset?: ExpansionOption } | null>(null)
   const [showReport, setShowReport] = useState(false)
   const [showReview, setShowReview] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
@@ -1019,7 +1020,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
 
         </section>
         {visited.has('routes') && <section className={`workspace-page route-page split-view${inspectedRoute !== undefined ? ' has-inspector' : ''}`} hidden={tab !== 'routes'} data-testid="page-routes">
-          <div className="split-list"><div className="page-heading"><div><span className="eyebrow">Network</span><h2>Routes <span>{player.routes.length}</span></h2></div><span className="dim">Last quarter’s results</span></div><RoutesPanel state={state} selectedRouteId={selectedRoute} onInspect={inspectRoute} onPlan={(from, to) => setPendingRoute({ from, to })} /></div>
+          <div className="split-list"><div className="page-heading"><div><span className="eyebrow">Network</span><h2>Routes <span>{player.routes.length}</span></h2></div><span className="dim">Last quarter’s results</span></div><RoutesPanel state={state} selectedRouteId={selectedRoute} onInspect={inspectRoute} onPlan={(from, to, preset) => setPendingRoute({ from, to, preset })} onAirport={(city) => { setTab('map'); setSelectedCity(city); setSelectedRoute(null) }} /></div>
           {tab === 'routes' && inspectedRoute !== undefined && <RouteDossier state={state} routeId={inspectedRoute!.id} onClose={closeRoute} onSelectRoute={setSelectedRoute} />}
         </section>}
         {visited.has('fleet') && <section className={`workspace-page fleet-page split-view${inspectedAircraft ? ' has-inspector' : ''}`} hidden={tab !== 'fleet'} data-testid="page-fleet"><div className="split-list"><FleetPanel state={state} selectedAircraftId={selectedAircraft} onInspect={setSelectedAircraft} /></div>{tab === 'fleet' && inspectedAircraft && <AircraftDossier state={state} aircraftId={inspectedAircraft.id} onClose={() => { setSelectedAircraft(null); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-testid="inspect-aircraft-${inspectedAircraft.id}"]`)?.focus({ preventScroll:true })) }} />}</section>}
@@ -1035,7 +1036,8 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     <ToastStack events={session.lastEvents} state={state} unlocks={session.lastUnlocks} onOpenRoute={inspectRoute} />
     {showReview && <Suspense fallback={<Dialog label="Review quarter" className="gameover-overlay" onClose={() => setShowReview(false)}><p role="status">Loading quarter review…</p></Dialog>}><QuarterReview state={state} forecast={forecast} onClose={() => setShowReview(false)} onConfirm={endQuarter} /></Suspense>}
     {showReport && !celebration.milestones.length && session.reportEvents.length > 0 && <Suspense fallback={<Dialog label="Quarterly report" className="gameover-overlay" onClose={() => setShowReport(false)}><p role="status">Loading quarterly report…</p></Dialog>}><ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} onInspect={(id) => { setShowReport(false); setTab('routes'); inspectRoute(id) }} /></Suspense>}
-    {pendingRoute !== null && <RouteSetupDialog state={state} from={pendingRoute.from} to={pendingRoute.to} onClose={() => setPendingRoute(null)} />}
+    {pendingRoute !== null && <RouteSetupDialog state={state} from={pendingRoute.from} to={pendingRoute.to}
+        preset={pendingRoute.preset} onClose={() => setPendingRoute(null)} />}
     {state.phase !== 'planning' && <GameOverOverlay state={state} earned={session.careerUnlocks} onWatchReplay={onWatchReplay} />}
     {showSettings && <Dialog label="Settings" className="gameover-overlay" testId="settings-dialog" onClose={() => setShowSettings(false)}><div className="settings-card"><div className="dialog-heading"><h2>Settings</h2><button onClick={() => setShowSettings(false)} aria-label="Close settings">×</button></div>
         <button

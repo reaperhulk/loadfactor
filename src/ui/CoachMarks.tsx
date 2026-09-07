@@ -34,7 +34,7 @@ function nextHint(state: GameState): string | null {
     return 'A rival is on one of your pairs. Marketing (finance tab) buys appeal in every share battle.'
   }
   if (state.turn >= 3 && player.routes.length >= 1) {
-    return 'The routes tab ranks the richest unserved markets under Opportunities — plan one in a click.'
+    return 'Choose Find expansion options in the routes tab to compare feasible launches, costs and connecting traffic.'
   }
   return null
 }

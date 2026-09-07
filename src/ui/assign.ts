@@ -8,8 +8,9 @@ import { distanceKm } from '../data/cities'
 import type { Command, GameState } from '../engine'
 import { pairWeeklyDemand } from '../engine/market'
 import { isGrounded, maxRouteFrequency, roundTripsPerWeek, routeWeeklyCapacity } from '../engine/queries'
-import { forecastDirectRoute, forecastQuarter } from '../engine/forecast'
-import { rulesOf } from '../engine/version'
+import { createForecastPlanner } from '../engine/forecast'
+import { directCandidates } from '../engine/schedulePlanning'
+import type { PlanningLocks } from '../engine/planning'
 import { viewSeat, dispatchBatch, getSession } from './session'
 
 export function assignAndSchedule(state: GameState, aircraftId: number, routeId: number): void {
@@ -36,39 +37,24 @@ export function assignAndSchedule(state: GameState, aircraftId: number, routeId:
 // Delegate repetitive schedule tuning while keeping network strategy in the
 // player's hands. Compare direct-market contribution against competing
 // schedules, capped by the fleet actually assigned.
-export function balancedScheduleCommands(state: GameState, airlineIdx: number): Command[] {
+export function balancedScheduleCommands(state: GameState, airlineIdx: number, locks: PlanningLocks = {}): Command[] {
   const airline = state.airlines[airlineIdx]
   if (!airline) return []
-  const commands: Command[] = []
-  for (const route of airline.routes) {
-    const max = maxRouteFrequency(airline, route, state.turn)
-    if (max < 1) continue
-    // Maximize the route's contribution against the actual competing schedules.
-    // Bound candidate count for very large fleets, then refine around the winner.
-    const step = Math.max(1, Math.ceil(max / 32))
-    let frequency = Math.min(route.frequency, max)
-    let best = -Infinity
-    const consider = (candidate: number) => {
-      const result = forecastDirectRoute(state, airlineIdx, { ...route, frequency: candidate })
-      const contribution = result.lastRevenue - result.lastCost
-      if (contribution > best || (contribution === best && candidate < frequency)) {
-        best = contribution
-        frequency = candidate
-      }
-    }
-    consider(frequency)
-    for (let candidate = 1; candidate <= max; candidate += step) consider(candidate)
-    consider(max)
-    const center = frequency
-    for (let candidate = Math.max(1, center - step); candidate <= Math.min(max, center + step); candidate++) consider(candidate)
-    if (frequency !== route.frequency) {
-      commands.push({ type: 'set_frequency', routeId: route.id, frequency })
-    }
+  const evaluate = createForecastPlanner(state, airlineIdx), before = evaluate()
+  const commands = airline.routes.flatMap(route => directCandidates(state, airlineIdx, route,
+    [...(locks[route.id] ?? []), 'fare', 'service'], before.routes.find(r => r.id === route.id)!).map(c => c.command))
+  if (!commands.length) return []
+  const batch = evaluate(commands)
+  if (!batch.errors.length && batch.profit >= before.profit) return commands
+  // Preserve useful changes when one direct-market choice hurts a feeder.
+  // Each accepted prefix is validated against the complete network.
+  const accepted: Command[] = []
+  let profit = before.profit
+  for (const command of commands) {
+    const next = evaluate([...accepted, command])
+    if (!next.errors.length && next.profit > profit) { accepted.push(command); profit = next.profit }
   }
-  // A direct-market improvement can damage feeder traffic. Reject a batch
-  // whose full-network contribution is worse under the same conditions.
-  if (rulesOf(state) >= 2 && commands.length && forecastQuarter(state, airlineIdx, commands).profit < forecastQuarter(state, airlineIdx).profit) return []
-  return commands
+  return accepted
 }
 
 export function balanceSchedules(state: GameState): void {

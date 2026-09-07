@@ -719,3 +719,43 @@ form before applying. A comparison session shares unchanged rival dispatch and
 schedule-equivalent fare/service dispatch; full passenger markets are rerun.
 Archive reports and inspector analysis have separate UI chunks to keep the
 existing startup budget as features grow. Engine speedups do not depend on this.
+
+Stage 3: expansion screens network-to-world markets with demand, aircraft costs
+and complementary spokes, then evaluates six feasible pairs with up to two
+plane/cabin groups and three schedules. Final rankings use incremental company
+profit or scenario progress, including conserved connecting traffic. Three
+alternatives can be compared under headwinds; the chosen plane and frequency
+carry into launch review. Unavailable slots/aircraft appear as requirements,
+without a misleading profit quote. Forecasts describe standard fare/service and
+first-quarter ramp-up, not a multi-quarter ROI promise.
+
+The network adviser screens direct-market alternatives before full-network
+validation, supports per-setting locks, individual selection, combined impact,
+and atomic undo. Combined plans that reduce forecast company profit cannot be
+applied through the adviser. Locks persist per scenario, seed, seat and airline.
+Frequency search is bounded and capacity-guided; it is not a global optimizer.
+If the combined schedule proposal hurts a feeder, individually profitable
+prefixes are retained rather than rejecting every change.
+
+Operations now aggregate unaffected airframes even in mixed-disruption quarters;
+only potential donor weeks materialize preferred flight intervals. Weekly hours
+are protected before recovery and the original first-flight allocation order is
+preserved. Differential tests cover simultaneous repairs and paid-recovery caps.
+Comparison sessions reuse their baseline market result and schedule-equivalent
+operations. Browser release cases cover report persistence, previews, locks,
+selective apply/undo and expansion presets on desktop and phone, including Safari.
+
+Measured locally with the same warmed benchmark script and matching career
+hashes, comparing 369eb5a with this implementation (milliseconds, median):
+
+| Quarter / routes / fleet | Forecast before → after | Schedule search before → after |
+| --- | --- | --- |
+| 20 / 12 / 12 | 2.88 → 0.96 | 25.40 → 7.35 |
+| 40 / 22 / 32 | 6.26 → 2.37 | 70.16 → 18.10 |
+| 65 / 34 / 56 | 8.71 → 1.67 | 123.43 → 27.40 |
+
+At quarter 65 the full adviser proposed 49 changes in 94ms median, and six
+feasible expansions took 40ms with an aircraft freed for the comparison. These
+are runtime-specific CPU measurements, not phone latency guarantees. Run
+`npx vite-node tools/profile-planning.ts` and `tools/profile-decisions.ts` to
+repeat. No simulation balance or historical golden fixtures changed.

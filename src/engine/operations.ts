@@ -253,30 +253,40 @@ export function resolveOperations(
     unavailable.set(ac.id, intervals)
     occupancy.set(ac.id, Array.from({ length: 13 }, () => []))
   }
-  // With no downtime there is no dispatch conflict to solve. Aggregate the
-  // thirteen identical weeks exactly, without allocating/sorting flight jobs.
-  // A past/future check still needs timed jobs to preserve post-check wear.
-  const aggregate = [...unavailable.values()].every((intervals) => intervals.length === 0)
-  if (!aggregate) for (const ac of airline.fleet) {
-    const own = ownPlans.get(ac.id) ?? []
-    const weeklyMinutes = own.reduce((n, a) => n + a.minutes * a.trips, 0)
-    for (let week = 0; week < 13; week++) {
-      let prefix = 0
-      for (const row of own)
-        for (let i = 0; i < row.trips; i++) {
-          const phase = Math.min(
-            (ac.id * 37) % 120,
-            Math.floor((row.minutes * (WEEK_MINUTES - weeklyMinutes)) / Math.max(1, weeklyMinutes)),
-          )
-          const at =
-            start +
-            week * WEEK_MINUTES +
-            phase +
-            Math.floor((prefix * WEEK_MINUTES) / Math.max(1, weeklyMinutes))
-          jobs.push({ ac, route: row.route, week, minutes: row.minutes, start: at, end: at + row.minutes })
-          prefix += row.minutes
-        }
+  // Aggregate each unaffected airframe, even when another aircraft is in a
+  // check. Materialize its preferred intervals only if dispatch tries to use
+  // its spare hours, and only for that week. All hours are reserved up front.
+  const aggregate = new Set(airline.fleet.filter(ac => !unavailable.get(ac.id)!.length).map(ac => ac.id))
+  const weeklyMinutes = new Map(airline.fleet.map(ac => [ac.id, (ownPlans.get(ac.id) ?? []).reduce((n, row) => n + row.minutes * row.trips, 0)]))
+  const departure = (ac: OwnedAircraft, minutes: number, prefix: number, week: number) => {
+    const total = weeklyMinutes.get(ac.id)!
+    return start + week * WEEK_MINUTES + Math.min((ac.id * 37) % 120,
+      Math.floor(minutes * (WEEK_MINUTES - total) / Math.max(1, total))) +
+      Math.floor(prefix * WEEK_MINUTES / Math.max(1, total))
+  }
+  const jobsInWeek = (ac: OwnedAircraft, week: number): Job[] => {
+    const result: Job[] = []
+    let prefix = 0
+    for (const row of ownPlans.get(ac.id) ?? []) for (let i = 0; i < row.trips; i++) {
+      const at = departure(ac, row.minutes, prefix, week)
+      result.push({ ac, route: row.route, week, minutes: row.minutes, start: at, end: at + row.minutes })
+      prefix += row.minutes
     }
+    return result
+  }
+  const populated = new Set<string>()
+  const preferredOccupancy = (ac: OwnedAircraft, week: number) => {
+    const rows = occupancy.get(ac.id)![week]!, key = `${ac.id}:${week}`
+    if (aggregate.has(ac.id) && !populated.has(key)) {
+      rows.push(...jobsInWeek(ac, week)); populated.add(key)
+    }
+    return rows
+  }
+  let plannedTrips = 0
+  for (const ac of airline.fleet) {
+    plannedTrips += (ownPlans.get(ac.id) ?? []).reduce((n, row) => n + row.trips * 13, 0)
+    if (aggregate.has(ac.id)) used.get(ac.id)!.fill(weeklyMinutes.get(ac.id)!)
+    else for (let week = 0; week < 13; week++) jobs.push(...jobsInWeek(ac, week))
   }
   // Protect every unaffected preferred flight before using its aircraft as
   // recovery capacity. Cover must fit real time AND remaining weekly hours.
@@ -295,9 +305,15 @@ export function resolveOperations(
     group.push(ac); candidateFamilies.set(family, group)
   }
   const allocations = new Map<number, TripAllocation[]>()
+  const firstAllocation = new Map<string, { start: number; origin: number }>()
+  const recordFirst = (routeId: number, aircraftId: number, at: number, origin: number) => {
+    const key = `${routeId}:${aircraftId}`, prior = firstAllocation.get(key)
+    if (!prior || at < prior.start || (at === prior.start && origin < prior.origin)) firstAllocation.set(key, { start: at, origin })
+  }
   const add = (job: Job, ac: OwnedAircraft, minutes = job.minutes, charter = false) => {
     const rows = allocations.get(job.route.id) ?? []
     const aircraftId = charter ? -ac.id : ac.id
+    recordFirst(job.route.id, aircraftId, job.start, job.ac.id)
     let row = rows.find((r) => r.aircraftId === aircraftId)
     if (!row) {
       row = {
@@ -330,8 +346,11 @@ export function resolveOperations(
       }
     }
   }
-  if (aggregate) for (const ac of airline.fleet) {
+  for (const ac of airline.fleet) if (aggregate.has(ac.id)) {
+    let prefix = 0
     for (const row of ownPlans.get(ac.id) ?? []) {
+      recordFirst(row.route.id, ac.id, departure(ac, row.minutes, prefix, 0), ac.id)
+      prefix += row.minutes * row.trips
       const count = row.trips * 13
       const rows = allocations.get(row.route.id) ?? []
       rows.push({ aircraftId: ac.id, type: ac.type, cabin: ac.cabin,
@@ -343,23 +362,6 @@ export function resolveOperations(
       u.minutes += row.minutes * count; u.cycles += count * 2
     }
   }
-  // Match the temporal path's order of first appearance, used for integer
-  // accumulation downstream. First departures use the same phase/prefix rule.
-  if (aggregate) for (const [routeId, rows] of allocations) rows.sort((a, b) => {
-    const first = (id: number) => {
-      const own = ownPlans.get(id)!
-      const total = own.reduce((n, r) => n + r.minutes * r.trips, 0)
-      let prefix = 0
-      for (const row of own) {
-        if (row.route.id === routeId) return Math.min((id * 37) % 120,
-          Math.floor(row.minutes * (WEEK_MINUTES - total) / Math.max(1, total))) +
-          Math.floor(prefix * WEEK_MINUTES / Math.max(1, total))
-        prefix += row.minutes * row.trips
-      }
-      return 0
-    }
-    return first(a.aircraftId) - first(b.aircraftId) || a.aircraftId - b.aircraftId
-  })
   jobs.sort((a, b) => a.start - b.start || a.ac.id - b.ac.id || a.route.id - b.route.id)
   for (const job of jobs) {
     if (!unavailable.get(job.ac.id)!.some((i) => overlaps(i, job))) {
@@ -391,7 +393,7 @@ export function resolveOperations(
         continue
       if (
         unavailable.get(donor.id)!.some((i) => overlaps(i, span)) ||
-        occupancy.get(donor.id)![job.week]!.some((i) => overlaps(i, span))
+        preferredOccupancy(donor, job.week).some((i) => overlaps(i, span))
       )
         continue
       occupancy.get(donor.id)![job.week]!.push(span)
@@ -406,7 +408,7 @@ export function resolveOperations(
     if (
       !covered &&
       airline.operationsPolicy?.recovery &&
-      summary.charterTrips < Math.floor(jobs.length / 10)
+      summary.charterTrips < Math.floor(plannedTrips / 10)
     ) {
       add(job, job.ac, job.minutes, true)
       summary.charterTrips++
@@ -425,6 +427,12 @@ export function resolveOperations(
       routeStats.get(job.route.id)!.unservedSeats +=
         Math.floor((getAircraftType(job.ac.type).seats * CABIN_SEATS_BP[job.ac.cabin - 1]!) / 10000) * 2
   }
+  // Aggregation commutes with dispatch counts; preserve the original order
+  // of first flown trips for downstream integer cost accumulation.
+  for (const [id, rows] of allocations) rows.sort((a, b) => {
+    const one = firstAllocation.get(`${id}:${a.aircraftId}`)!, two = firstAllocation.get(`${id}:${b.aircraftId}`)!
+    return one.start - two.start || one.origin - two.origin
+  })
   let unavailableTotal = 0
   for (const ac of airline.fleet) {
     const o = updated.get(ac.id)!,

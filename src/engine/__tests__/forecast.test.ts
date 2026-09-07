@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import * as operations from '../operations'
 import { applyCommandBatchFor, applyCommandFor, newGame } from '../index'
 import { createForecastPlanner, forecastDirectRoute, forecastQuarter } from '../forecast'
 import { resolveMarket } from '../market'
@@ -99,4 +100,19 @@ it('prepared comparison sessions match standalone forecasts across schedules, fa
     expect(evaluate(commands, assumptions)).toEqual(forecastQuarter(state, 0, commands, assumptions))
     expect(evaluate(commands, assumptions)).toEqual(forecastQuarter(state, 0, commands, assumptions))
   }
+})
+
+it('fare and service comparisons reuse dispatch; changing frequency recomputes only the player fleet', () => {
+  const state = setup(), routeId = state.airlines[0]!.routes[0]!.id
+  const spy = vi.spyOn(operations, 'resolveOperations')
+  try {
+    const evaluate = createForecastPlanner(state, 0)
+    evaluate()
+    const initial = spy.mock.calls.length
+    for (const fareLevel of [-2,-1,0,1,2]) evaluate([{ type: 'set_fare', routeId, fareLevel }])
+    evaluate([{ type: 'set_service', routeId, serviceLevel: 3 }])
+    expect(spy.mock.calls.length).toBe(initial)
+    evaluate([{ type: 'set_frequency', routeId, frequency: 4 }])
+    expect(spy.mock.calls.length).toBe(initial + 1)
+  } finally { spy.mockRestore() }
 })

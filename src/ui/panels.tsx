@@ -5,18 +5,19 @@ import { OperationsPanel } from './OperationsPanel'
 // Management panels: routes, fleet, airports, finance, and the quarterly
 // report. Every button is a Command dispatch — no state is touched directly.
 
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
+import { usePlanningLocks } from './planningLocks'
+import type { ExpansionOption } from '../engine/expansion'
+const NetworkAdvisor = lazy(() => import('./NetworkAdvisor').then(m => ({ default: m.NetworkAdvisor })))
+const ExpansionPlanner = lazy(() => import('./ExpansionPlanner').then(m => ({ default: m.ExpansionPlanner })))
 import { getAircraftType } from '../data/aircraft'
-import { CITIES, distanceKm, pairKey } from '../data/cities'
-import { MIN_ROUTE_KM } from '../data/constants'
+import { CITIES, distanceKm } from '../data/cities'
 import { getScenario } from '../data/scenarios'
 import type { GameState } from '../engine'
 import { fleetCommonalityBp } from '../engine/accounting'
-import { baseFare, fareFor, pairWeeklyDemand, routeSpoolBp, seasonalBp } from '../engine/market'
+import { fareFor, pairWeeklyDemand, routeSpoolBp } from '../engine/market'
 import {
   GROUNDING_AGE_QUARTERS,
-  ROUTE_MEMORY_QUARTERS,
-  ROUTE_SPOOL_BP,
   MAINT_AGE_BP_PER_QUARTER,
   OPERATIONS_MAINT_AGE_BP_PER_QUARTER,
   SLOTS_PER_GRANT,
@@ -29,16 +30,13 @@ import {
   airlinesOnPair,
   isGrounded,
   allocateTrips,
-  networkCities,
   cabinSeats,
   effectiveFrequency,
   maxRouteFrequency,
   resaleValue,
   roundTripsPerWeek,
   routeWeeklyCapacity,
-  slotCities,
   slotsAllocated,
-  slotsFree,
   slotsHeld,
   slotsUsed,
   yearOf,
@@ -87,11 +85,13 @@ export function RoutesPanel({
   onInspect,
   onPlan,
   selectedRouteId,
+  onAirport,
 }: {
   state: GameState
   selectedRouteId?: number | null
   onInspect: (routeId: number) => void
-  onPlan?: (from: string, to: string) => void
+  onPlan?: (from: string, to: string, preset?: ExpansionOption) => void
+  onAirport?: (city: string) => void
 }) {
   const player = state.airlines[viewSeat()]!
   const [sortKey, setSortKey] = useState<RouteSortKey>('profit')
@@ -100,14 +100,14 @@ export function RoutesPanel({
   const [routeQuery, setRouteQuery] = useState('')
   const [allMetrics, setAllMetrics] = useState(false)
   const seat = viewSeat()
-  const schedulePlan = useMemo(() => balancedScheduleCommands(state, seat), [state, seat])
+  const { locks, toggle } = usePlanningLocks(state, seat)
   if (player.routes.length === 0) {
     // Even before the first route, the opportunities list is the guidance
     // that matters most.
     return (
       <div>
         <p className="hint">No routes yet. Click a city on the map, then “Open route from here”.</p>
-        <Opportunities state={state} onPlan={onPlan} />
+        <Suspense fallback={<p role="status">Loading expansion planner…</p>}><ExpansionPlanner state={state} onPlan={onPlan} onAirport={onAirport} /></Suspense>
       </div>
     )
   }
@@ -349,7 +349,8 @@ export function RoutesPanel({
         <td className={totals.profit >= 0 ? 'pos' : 'neg'}><strong>{money(totals.profit)}</strong></td>
       </tr></tfoot>
     </table></div>
-    <PlanningWorkbench key={`${state.turn}-${seat}`} state={state} suggestions={schedulePlan} />
+    <Suspense fallback={<p role="status">Loading network adviser…</p>}><NetworkAdvisor key={`${state.turn}-${seat}`} state={state} locks={locks} onToggle={toggle} /></Suspense>
+    <PlanningWorkbench key={`${state.turn}-${seat}`} state={state} suggestions={[]} onSuggest={() => balancedScheduleCommands(state, seat, locks)} />
     <p className="dim" data-testid="network-overhead">
       Network management: {money(networkOverhead)}/quarter for {player.routes.length} routes (grows with the
       square of the network — quality beats sprawl){' '}
@@ -381,164 +382,14 @@ export function RoutesPanel({
       <button
         className="link-btn"
         data-testid="balance-schedules"
-        disabled={schedulePlan.length === 0}
         title="right-size every route to forecast demand; undo restores the previous schedules"
-        onClick={() => dispatchBatch(schedulePlan)}
+        onClick={() => dispatchBatch(balancedScheduleCommands(state, seat, locks))}
       >
         <Icon name="balance" /> Balance schedules
       </button>
     </p>
     <ServiceLegend />
-    <Opportunities state={state} onPlan={onPlan} />
-    </div>
-  )
-}
-
-// The planning tool the bots keep to themselves: the richest unserved pairs
-// you could open from your current slots and network, market-dollars first.
-function Opportunities({ state, onPlan }: { state: GameState; onPlan?: (from: string, to: string) => void }) {
-  const player = state.airlines[viewSeat()]!
-  const network = networkCities(player)
-  const cities = slotCities(player)
-  const served = new Set(player.routes.map((r) => pairKey(r.from, r.to)))
-  let idleReach = 0
-  for (const a of player.fleet) {
-    if (a.routeId === null && !a.reserve && !isGrounded(a, state.turn)) idleReach = Math.max(idleReach, getAircraftType(a.type).rangeKm)
-  }
-  const rows: {
-    from: string
-    to: string
-    km: number
-    demand: number
-    marketK: number
-    rivals: number
-    risks: string[]
-  }[] = []
-  for (let i = 0; i < cities.length; i++) {
-    for (let j = i + 1; j < cities.length; j++) {
-      const a = cities[i]!
-      const b = cities[j]!
-      if (served.has(pairKey(a, b))) continue
-      if (!network.has(a) && !network.has(b)) continue
-      if (slotsFree(player, a) < 1 || slotsFree(player, b) < 1) continue
-      const km = distanceKm(a, b)
-      if (km < MIN_ROUTE_KM) continue
-      const demand = pairWeeklyDemand(state, a, b)
-      const rivals = airlinesOnPair(state, a, b, viewSeat())
-      // What the headline number does not say. A ranked list with no risk
-      // column makes the top row automatically right; these are the reasons
-      // it might not be.
-      const risks: string[] = []
-      if (rivals > 0) risks.push(`${rivals} incumbent${rivals > 1 ? 's' : ''}`)
-      const seasonBp = Math.floor((seasonalBp(a, state.turn) * seasonalBp(b, state.turn)) / 10000)
-      if (seasonBp > 10250) risks.push('peak season now — it will fall back')
-      else if (seasonBp < 9750) risks.push('off season now — it will recover')
-      const mem = player.servedUntil[pairKey(a, b)]
-      const remembered = mem !== undefined && state.turn - mem <= ROUTE_MEMORY_QUARTERS
-      if (!remembered) risks.push(`ramps from ${ROUTE_SPOOL_BP[0]! / 100}%`)
-      if (km > idleReach) risks.push('no idle plane in range')
-      rows.push({
-        from: a,
-        to: b,
-        km,
-        demand,
-        marketK: Math.floor((demand * baseFare(km)) / 1000),
-        rivals,
-        risks,
-      })
-    }
-  }
-  rows.sort((x, y) => y.marketK - x.marketK)
-  const top = rows.slice(0, 5)
-  // Where to expand next: the richest markets from your network you have NO
-  // slots for yet — negotiation targets, ranked by the same market dollars.
-  const networkList = [...network].sort()
-  const negotiable: { from: string; to: string; marketK: number; courted: string[] }[] = []
-  for (const c of CITIES) {
-    if (slotsHeld(player, c.id) > 0) continue
-    if (slotsRemaining(state, c.id) <= 0 && nextExpansion(state, c.id).quartersAway > 8) continue
-    let bestFrom = ''
-    let bestMarket = 0
-    for (const a of networkList) {
-      const km = distanceKm(a, c.id)
-      if (km < MIN_ROUTE_KM) continue
-      const m = Math.floor((pairWeeklyDemand(state, a, c.id) * baseFare(km)) / 1000)
-      if (m > bestMarket) {
-        bestMarket = m
-        bestFrom = a
-      }
-    }
-    if (bestFrom !== '')
-      negotiable.push({
-        from: bestFrom,
-        to: c.id,
-        marketK: bestMarket,
-        // Announced rival campaigns: the richest target is a different
-        // decision when someone else is already walking toward it.
-        courted: state.airlines
-          .filter((a) => a.id !== viewSeat() && !a.bankrupt && a.slotInterest === c.id)
-          .map((a) => a.name),
-      })
-  }
-  negotiable.sort((x, y) => y.marketK - x.marketK)
-  if (top.length === 0 && negotiable.length === 0) return null
-  return (
-    <div data-testid="opportunities">
-      <h3>Opportunities — unserved pairs you hold slots for</h3>
-      <div className="table-scroll">
-        <table>
-          <tbody>
-            {top.map((r) => (
-              <tr key={`${r.from}-${r.to}`}>
-                <td>
-                  {r.from}–{r.to}
-                </td>
-                <td>{r.km}km</td>
-                <td>
-                  {r.demand}/wk
-                  {(() => {
-                    // A seasonal pair's demand number is a snapshot, not a
-                    // promise — flag which way the calendar is leaning.
-                    const bp = Math.floor(
-                      (seasonalBp(r.from, state.turn) * seasonalBp(r.to, state.turn)) / 10000,
-                    )
-                    if (bp > 10100) return <span className="pos" title="tourism high season — demand dips off-season"> 🌞</span>
-                    if (bp < 9900) return <span className="neg" title="tourism off season — demand rises in season"> ❄</span>
-                    return null
-                  })()}
-                </td>
-                <td title="weekly demand × base fare">{money(r.marketK)}/wk</td>
-                <td className={r.rivals > 0 ? 'neg' : 'pos'}>
-                  {r.rivals > 0 ? `⚔ ${r.rivals} rival${r.rivals > 1 ? 's' : ''}` : 'open market'}
-                </td>
-                <td className={r.risks.length === 0 ? 'pos' : 'dim'} data-testid={`risk-${r.from}-${r.to}`}>
-                  {r.risks.length === 0 ? 'clean shot' : r.risks.join(' · ')}
-                </td>
-                <td>
-                  {onPlan && r.km <= idleReach && (
-                    <button data-testid={`plan-${r.from}-${r.to}`} onClick={() => onPlan(r.from, r.to)}>
-                      plan ✈
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {negotiable.length > 0 && (
-        <p className="dim" data-testid="negotiation-targets">
-          Worth queueing for:{' '}
-          {negotiable
-            .slice(0, 3)
-            .map(
-              (n) =>
-                `${n.to} (${money(n.marketK)}/wk vs ${n.from})${n.courted.length > 0 ? ` ⚠ ${n.courted.join(', ')} bidding` : ''}`,
-            )
-            .join(' · ')}{' '}
-          — join the list from the airports tab or the city panel.
-        </p>
-      )}
+    <Suspense fallback={<p role="status">Loading expansion planner…</p>}><ExpansionPlanner state={state} onPlan={onPlan} onAirport={onAirport} /></Suspense>
     </div>
   )
 }

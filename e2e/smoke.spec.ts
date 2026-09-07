@@ -305,8 +305,9 @@ test('wheel over the map zooms without scrolling the page', async ({ page }) => 
 test('the opportunities list plans a route in one click', async ({ page }) => {
   await startGame(page)
   await openPanel(page, 'routes')
-  await expect(page.getByTestId('opportunities')).toContainText('JFK–ORD')
-  await expect(page.getByTestId('negotiation-targets')).toContainText('Worth queueing for')
+  await page.getByRole('button', { name: 'Find expansion options' }).click()
+  await expect(page.getByTestId('expansion-planner')).toContainText('JFK–ORD')
+  await expect(page.getByTestId('expansion-planner')).toContainText('Markets needing aircraft or slots')
   await page.getByTestId('plan-JFK-ORD').click()
   await expect(page.getByTestId('route-setup')).toBeVisible()
   await expect(page.getByTestId('route-setup')).toContainText('Open JFK–ORD')
@@ -334,7 +335,8 @@ test('previews report bands, opportunities carry risks, rival intent is visible'
   await page.getByTestId('route-dossier-close').click()
 
   // Every opportunity row states what the headline market number omits.
-  await expect(page.getByTestId('opportunities').locator('[data-testid^="risk-"]').first()).not.toBeEmpty()
+  await page.getByRole('button', { name: 'Find expansion options' }).click()
+  await expect(page.getByTestId('expansion-planner').locator('[data-testid^="risk-"]').first()).not.toBeEmpty()
 
   // Rival slot campaigns are announced a quarter ahead, so during planning
   // there is always someone's declared target to find. The seed is fixed, so

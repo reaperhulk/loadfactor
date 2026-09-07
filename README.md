@@ -22,10 +22,12 @@ npm run dev     # http://localhost:5173
   the device among two to four players, or exchange turn links in a duel.
 - **Learn the first three quarters.** The operations desk proposes a first
   market, flags financial or fleet problems, and points to decisions you can make.
+- **Understand the result.** Approved forecasts survive save/load. Quarterly reports explain revenue and cost differences, and route analysis identifies capacity, season, startup and service issues with changes to preview.
 - **Plan before committing.** Compare aircraft and schedules when opening a
   route. The Routes workbench stages multiple fare, service and frequency changes,
   previews full company profit and cash, and commits them as one undoable action.
   Its stress test adds 20% to the fuel index and reduces the demand index by 10%.
+  The Network adviser proposes individual improvements, respects locked fares, service and frequencies, and recalculates combined effects before one undoable apply. Expansion comparisons rank feasible launches by company profit or the scenario objective, include connecting traffic, and carry the selected aircraft and schedule into launch review.
 - **Compete for passengers.** Business, leisure and budget passengers weigh
   price, service and schedule differently. Direct flights and viable one-stop
   itineraries compete for the same origin/destination demand across airlines.
@@ -104,6 +106,7 @@ npm run check              # lint, types, unit tests, build and startup-size bud
 npm run ci                 # complete local gate, including browser tests
 npm run goldens:update     # accept an intentional rules-2 balance change
 npx vite-node tools/profile-planning.ts
+npx vite-node tools/profile-decisions.ts
 npx vite-node tools/balance-report.ts experiment 6 /tmp/balance.json
 ```
 

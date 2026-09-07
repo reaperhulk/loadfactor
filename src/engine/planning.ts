@@ -2,6 +2,7 @@
 // These queries never change simulation policy, save identity or rival behavior.
 import { createForecastPlanner } from './forecast'
 import { maxRouteFrequency } from './queries'
+import { frequencyCandidates, directCandidates } from './schedulePlanning'
 import { routeSpoolBp, seasonalBp } from './market'
 import type { Command, GameState, Route } from './types'
 
@@ -18,15 +19,6 @@ export interface Recommendation {
   contributionDelta: number
 }
 
-// A bounded capacity-guided search. Include the present plan, demand-sized
-// capacity and nearby values; avoid resolving every integer frequency on every
-// route. Full-network evaluation protects feeders and accounts for rivals.
-export function frequencyCandidates(route: Route, max: number, projected: Route): number[] {
-  const demandSized = Math.ceil(route.frequency * projected.lastLoadFactorBp / 10000)
-  return [...new Set([route.frequency, route.frequency - 1, route.frequency + 1,
-    demandSized - 1, demandSized, demandSized + 1, Math.ceil(route.frequency * 0.75), max])]
-    .filter(n => n >= 1 && n <= max).sort((a, b) => a - b)
-}
 export function routeRecommendations(state: GameState, seat: number, route: Route, evaluate: ForecastPlanner = createForecastPlanner(state, seat), locked: readonly RouteSetting[] = [], closure = true): Recommendation[] {
   const before = evaluate(), projected = before.routes.find(r => r.id === route.id)!
   const candidates: { setting: Recommendation['setting']; commands: Command[]; title: string }[] = []
@@ -74,4 +66,27 @@ export function routeSignals(state: GameState, seat: number, route: Route, evalu
   if (projected.lastTransferPax > 0) signals.push({ title: 'Feeds the network', detail: `${projected.lastTransferPax.toLocaleString('en-US')} forecast connecting boardings. Judge changes by company profit as well as this route's contribution.` })
   if (!signals.length) signals.push({ title: 'Compare the next move', detail: 'Test fares, service and frequency against the whole network before changing the plan.' })
   return signals
+}
+
+export type PlanningLocks = Record<number, RouteSetting[]>
+// Screen alternatives on their direct markets, then quote the shortlisted
+// actions against the full network. This bounds full-network market passes to
+// a few actions per route instead of every fare/service/frequency combination.
+export function networkRecommendations(state: GameState, seat: number, locks: PlanningLocks = {}): Recommendation[] {
+  const evaluate = createForecastPlanner(state, seat), before = evaluate()
+  const suggestions: Recommendation[] = []
+  for (const route of state.airlines[seat]!.routes) {
+    const projected = before.routes.find(r => r.id === route.id)!
+    const candidates = directCandidates(state, seat, route, locks[route.id] ?? [], projected)
+    for (const c of candidates) {
+      const after = evaluate([c.command]), leg = after.routes.find(r => r.id === route.id)!
+      const delta = after.profit - before.profit
+      if (after.errors.length || delta <= 0) continue
+      suggestions.push({ routeId: route.id, setting: c.setting, commands: [c.command],
+        title: c.title, reason: 'Screened on this market, then checked with connecting traffic and all company costs.',
+        profitDelta: delta, cashAfter: after.cashAfter,
+        contributionDelta: leg.lastRevenue - leg.lastCost - (projected.lastRevenue - projected.lastCost) })
+    }
+  }
+  return suggestions.sort((a, b) => b.profitDelta - a.profitDelta || a.routeId - b.routeId)
 }

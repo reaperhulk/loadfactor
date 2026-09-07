@@ -1,3 +1,4 @@
+import type { ExpansionOption } from '../engine/expansion'
 import { Dialog } from './Dialog'
 // Opening a route is a scheduling decision: pick the launch aircraft and the
 // weekly round-trip frequency it will fly (bounded by its speed and the
@@ -18,9 +19,10 @@ interface RouteSetupDialogProps {
   from: string
   to: string
   onClose: () => void
+  preset?: ExpansionOption
 }
 
-export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogProps) {
+export function RouteSetupDialog({ state, from, to, onClose, preset }: RouteSetupDialogProps) {
   const player = state.airlines[viewSeat()]!
   const km = distanceKm(from, to)
   const candidates = player.fleet
@@ -34,12 +36,12 @@ export function RouteSetupDialog({ state, from, to, onClose }: RouteSetupDialogP
       }
       return perSeat(a) - perSeat(b) || a.id - b.id
     })
-  const [aircraftId, setAircraftId] = useState<number | null>(candidates[0]?.id ?? null)
+  const [aircraftId, setAircraftId] = useState<number | null>(preset?.aircraftId ?? candidates[0]?.id ?? null)
   const chosen = candidates.find((ac) => ac.id === aircraftId) ?? null
   const maxFreq = chosen ? roundTripsPerWeek(chosen.type, km, player.operationsPolicy?.reserveBp) : 0
   const demand = pairWeeklyDemand(state, from, to)
   const suggestedFrequency = (ac: (typeof candidates)[number]) => Math.max(1, Math.min(roundTripsPerWeek(ac.type, km, player.operationsPolicy?.reserveBp), Math.ceil(demand * 0.7 / (cabinSeats(ac.type, ac.cabin) * 2))))
-  const [frequency, setFrequency] = useState(chosen ? suggestedFrequency(chosen) : 1)
+  const [frequency, setFrequency] = useState(preset?.frequency ?? (chosen ? suggestedFrequency(chosen) : 1))
   const [fareLevel, setFareLevel] = useState(0)
   const [serviceLevel, setServiceLevel] = useState(2)
 

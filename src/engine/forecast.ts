@@ -82,7 +82,11 @@ export function createForecastPlanner(previous: GameState, seat: number) {
     }
     return prepared
   }
-  return (commands: readonly Command[] = [], assumptions: ForecastAssumptions = {}) => evaluateQuarter(previous, seat, commands, assumptions, prepare)
+  let baseline: ReturnType<typeof evaluateQuarter> | undefined
+  return (commands: readonly Command[] = [], assumptions: ForecastAssumptions = {}) => {
+    if (!commands.length && !Object.keys(assumptions).length) return baseline ??= evaluateQuarter(previous, seat, commands, assumptions, prepare)
+    return evaluateQuarter(previous, seat, commands, assumptions, prepare)
+  }
 }
 
 // Structural sharing is confined to read-only inputs of resolveMarket and

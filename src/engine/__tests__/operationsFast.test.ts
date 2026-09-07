@@ -14,3 +14,13 @@ it('aggregate operations exactly match timed dispatch, including allocation orde
     }
   }
 })
+
+it('mixed aggregate and timed recovery matches full temporal dispatch under simultaneous repairs', () => {
+  const state = runCareer('jet_age', 'mixed-dispatch-contract', 'greedy', 25).state
+  const airline = state.airlines[0]!
+  airline.operationsPolicy!.recovery = true
+  const start = state.turn * 131040
+  const incidents = airline.fleet.slice(0, 3).map(ac => ({ aircraftId: ac.id, start: start + 40320, end: start + 44640, cost: 100 }))
+  const past = airline.fleet.map(ac => ({ aircraftId: ac.id, start: -10, end: -5, cost: 0 }))
+  expect(resolveOperations(state, airline, 'forecast', incidents)).toEqual(resolveOperations(state, airline, 'forecast', [...incidents, ...past]))
+})

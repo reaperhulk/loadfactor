@@ -7,7 +7,7 @@ import { planningForecast } from './forecast'
 import { usePlanningDraftNotice } from './planningDrafts'
 import { money } from './format'
 
-export function PlanningWorkbench({ state, suggestions }: { state: GameState; suggestions: Command[] }) {
+export function PlanningWorkbench({ state, suggestions, onSuggest }: { state: GameState; suggestions: Command[]; onSuggest?: () => Command[] }) {
   const seat = viewSeat(), airline = state.airlines[seat]!
   const [routeId, setRouteId] = useState(airline.routes[0]?.id ?? 0)
   const [fare, setFare] = useState(airline.routes[0]?.fareLevel ?? 0)
@@ -37,7 +37,7 @@ export function PlanningWorkbench({ state, suggestions }: { state: GameState; su
       <label>Round trips/week <input aria-label="plan frequency" type="number" min="1" max={maxRouteFrequency(airline, route, state.turn)} value={frequency} onChange={(e) => setFrequency(Number(e.target.value))} /></label>
     </div>
     <button onClick={() => setDraft((current) => [...current.filter((c) => !('routeId' in c && c.routeId === route.id)), { type: 'set_fare', routeId: route.id, fareLevel: fare }, { type: 'set_service', routeId: route.id, serviceLevel: service }, { type: 'set_frequency', routeId: route.id, frequency }])}>Stage this route</button>{' '}
-    <button disabled={suggestions.length === 0} onClick={() => setDraft(suggestions)}>Preview recommended schedules</button>
+    <button disabled={suggestions.length === 0 && !onSuggest} onClick={() => setDraft(onSuggest?.() ?? suggestions)}>Preview recommended schedules</button>
     {draft.length > 0 && <ul className="staged-changes">{draft.map((c, i) => <li key={i}>{'routeId' in c ? (() => { const r = airline.routes.find((r) => r.id === c.routeId); return r ? `${r.from}–${r.to}: ` : '' })() : ''}{c.type === 'set_fare' ? `fare ${c.fareLevel}` : c.type === 'set_service' ? `service ${c.serviceLevel}` : c.type === 'set_frequency' ? `${c.frequency} round trips/week` : c.type}</li>)}</ul>}
     <div className="table-scroll"><table className="forecast-comparison" data-testid="plan-comparison"><thead><tr><th>Planned quarter</th><th>Current plan</th><th>With changes</th>{stress && <th>Headwind</th>}</tr></thead><tbody>
       <tr><th>Airline net profit</th><td>{money(forecast.before.profit)}</td><td className={forecast.after.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.after.profit)}</td>{stress && <td>{money(forecast.headwind!.profit)}</td>}</tr>
