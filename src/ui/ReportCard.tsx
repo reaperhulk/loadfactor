@@ -1,3 +1,5 @@
+import { PlanReview } from './PlanReview'
+import { approvedPlan } from './session'
 import { OperationsSummary } from './OperationsSummary'
 import { Dialog } from './Dialog'
 // The quarterly report card: what just happened, at a glance — shown after
@@ -25,9 +27,10 @@ interface ReportCardProps {
   state: GameState
   events: GameEvent[]
   onClose: () => void
+  onInspect?: (id: number) => void
 }
 
-export function ReportCard({ state, events, onClose }: ReportCardProps) {
+export function ReportCard({ state, events, onClose, onInspect }: ReportCardProps) {
   const player = state.airlines[viewSeat()]!
   const now = player.history[player.history.length - 1]
   const prev = player.history[player.history.length - 2]
@@ -99,6 +102,7 @@ export function ReportCard({ state, events, onClose }: ReportCardProps) {
             />
           )}
         </div>
+        <PlanReview plan={approvedPlan(now.turn)} actual={now} events={events} onInspect={onInspect} />
         <p className="profit-bridge" data-testid="profit-bridge">
           Route contribution {money(now.revenue - now.breakdown.fuel - now.breakdown.fees - now.breakdown.flightPay - now.breakdown.service)}
           {' '}− fleet, airport and company costs {money(now.costs - now.breakdown.fuel - now.breakdown.fees - now.breakdown.flightPay - now.breakdown.service)}

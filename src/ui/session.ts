@@ -1,3 +1,4 @@
+import { capturePlan, readApprovedPlans, type ApprovedPlan } from './planReview'
 import { identityOf, rulesOf, RULES_VERSION, CONTENT_VERSION, type RulesIdentity } from '../engine/version'
 import { objectiveScore } from '../engine/queries'
 // The bridge between the pure engine and the React shell. Holds the current
@@ -40,6 +41,7 @@ export interface QuarterRecord {
 export type SessionMode = 'solo' | 'hotseat' | 'link'
 
 export interface Session {
+  approvedPlans?: ApprovedPlan[]
   state: GameState
   lastEvents: GameEvent[] // events from the most recent engine call
   reportEvents: GameEvent[] // events from the most recent end_quarter
@@ -81,7 +83,8 @@ export function passSeat(): boolean {
   const order = seatOrder()
   const at = order.indexOf(session.activeSeat)
   if (at < 0 || at >= order.length - 1) return false
-  session = { ...session, activeSeat: order[at + 1]! }
+  rememberPlan()
+  session = { ...session!, activeSeat: order[at + 1]! }
   undoGroups = []
   persist()
   notify()
@@ -111,6 +114,7 @@ const SLOT_KEYS = ['loadfactor:save:v1', 'loadfactor:save:v1:1', 'loadfactor:sav
 export const SAVE_SLOTS = SLOT_KEYS.length
 
 interface SaveV1 extends Replay {
+  approvedPlans?: ApprovedPlan[]
   version: 1
   color?: string
   savedAt?: number // wall-clock ms, presentation only (slot ordering/labels)
@@ -121,6 +125,7 @@ interface SaveV1 extends Replay {
 // A hot-seat save: same identity idea, seat-tagged log. Solo saves stay v1
 // so every existing save keeps loading.
 interface SaveV2 extends RulesIdentity {
+  approvedPlans?: ApprovedPlan[]
   challenge?: ChallengeTarget
   activeSeat?: number
   version: 2
@@ -174,7 +179,7 @@ export function exportCurrentCareer(): string | null {
     version: 2, ...identityOf(session.state), scenario: session.state.scenario,
     seed: session.state.seed, player: sessionPlayer ?? undefined, color: playerColor ?? undefined,
     savedAt: Date.now(), humanSeats: session.seats.slice(1), activeSeat: session.activeSeat,
-    entries: session.entries, challenge: challengeTarget ?? undefined,
+    entries: session.entries, challenge: challengeTarget ?? undefined, approvedPlans: session.approvedPlans,
   })
 }
 
@@ -195,6 +200,7 @@ function persist(): void {
       color: playerColor ?? undefined,
       finished: session.state.phase !== 'planning' || undefined,
       savedAt: Date.now(),
+      approvedPlans: session.approvedPlans,
       humanSeats: session.seats.filter((x) => x !== 0),
       entries: session.entries,
     }
@@ -212,6 +218,7 @@ function persist(): void {
     finished: session.state.phase !== 'planning' || undefined,
     savedAt: Date.now(),
     commands: session.commandLog,
+    approvedPlans: session.approvedPlans,
   }
   storeJson(SLOT_KEYS[activeSlot]!, save)
 }
@@ -287,6 +294,7 @@ export function resumeSave(slot = 0): boolean {
     activeSeat: 0,
     mp: null,
     player: save.player,
+    approvedPlans: readApprovedPlans(save.approvedPlans),
   })
   if (session && session.mode === 'hotseat') {
     session = { ...session, activeSeat: save.version === 2 && seats.includes(save.activeSeat ?? -1)
@@ -434,10 +442,20 @@ function recordFame(state: GameState): void {
   }
 }
 
+export function approvedPlan(turn: number, seat = viewSeat()): ApprovedPlan | undefined {
+  return session?.approvedPlans?.find(p => p.turn === turn && p.seat === seat)
+}
+function rememberPlan(): void {
+  if (!session || session.state.phase !== 'planning') return
+  const plan = capturePlan(session.state, session.activeSeat)
+  session = { ...session, approvedPlans: [...(session.approvedPlans ?? []).filter(p => p.turn !== plan.turn || p.seat !== plan.seat), plan].slice(-400) }
+}
+
 export function dispatch(command: Command): GameEvent[] {
   if (!session) throw new Error('no active session')
   if (session.mode === 'link' && session.mp?.awaiting) return [] // their sitting
-  const seat = session.activeSeat
+  if (command.type === 'end_quarter') rememberPlan()
+  const seat = session!.activeSeat
   const wasPlanning = session.state.phase === 'planning'
   const { state, events } = applyCommandFor(session.state, seat, command)
   // Fame and achievements are solo concepts: a hot-seat or link game has no
@@ -454,6 +472,7 @@ export function dispatch(command: Command): GameEvent[] {
       : session.activeSeat
   session = {
     state,
+    approvedPlans: session.approvedPlans,
     lastEvents: events,
     reportEvents: command.type === 'end_quarter' ? events : session.reportEvents,
     reportArchive: resolved
@@ -544,6 +563,7 @@ export function undoLastAction(): boolean {
 const MP_KEY = 'loadfactor:mp:v1'
 
 interface MpRecord extends RulesIdentity {
+  approvedPlans?: ApprovedPlan[]
   lastSentLink?: string
   gameId: string
   scenario: string
@@ -576,6 +596,7 @@ function persistMp(): void {
     mySeat: session.mp.mySeat,
     entries: session.entries,
     theirKnown: session.mp.theirKnown,
+    approvedPlans: session.approvedPlans,
     awaiting: session.mp.awaiting,
     lastSentLink: lastSentLink ?? undefined,
     savedAt: Date.now(),
@@ -590,6 +611,7 @@ export function listMpGames(): MpRecord[] {
 // Rebuild a live session from an entry log — the one fold used by resume,
 // join, and receive, so they cannot disagree about how a log becomes a game.
 function sessionFromEntries(record: RulesIdentity & {
+  approvedPlans?: ApprovedPlan[]
   scenario: string
   seed: string
   entries: SeatCommand[]
@@ -630,6 +652,7 @@ function sessionFromEntries(record: RulesIdentity & {
     reportEvents: reportArchive[reportArchive.length - 1]?.events ?? [],
     reportArchive,
     commandLog: record.entries.map((e) => e.command),
+    approvedPlans: readApprovedPlans(record.approvedPlans).filter(p => p.turn <= state.turn && record.seats.includes(p.seat)),
     lastUnlocks: [],
     careerUnlocks: [],
     mode: record.mode,
@@ -675,6 +698,7 @@ export function resumeMpGame(gameId: string): boolean {
     scenario: rec.scenario,
     seed: rec.seed,
     entries: rec.entries,
+    approvedPlans: rec.approvedPlans,
     mode: 'link',
     seats: [0, 1],
     activeSeat: rec.mySeat,
@@ -708,6 +732,7 @@ export async function sendSitting(): Promise<string | null> {
     entries: known,
     theirKnown: session.mp.theirKnown,
   }
+  rememberPlan()
   const turn = buildTurn(game, appended)
   const encoded = await encodeTurn(turn)
   session = {
@@ -773,6 +798,7 @@ export async function receiveTurn(encoded: string): Promise<ReceiveResult> {
     scenario: rec.scenario,
     seed: rec.seed,
     entries: outcome.entries,
+    approvedPlans: rec.approvedPlans,
     mode: 'link',
     seats: [0, 1],
     activeSeat: rec.mySeat,

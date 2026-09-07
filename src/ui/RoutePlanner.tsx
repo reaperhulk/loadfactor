@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import type { Command, GameState, Route } from '../engine'
 import { distanceKm } from '../data/cities'
 import { forecastQuarter } from '../engine/forecast'
@@ -8,6 +8,8 @@ import { dispatchBatch, viewSeat } from './session'
 import { planningForecast } from './forecast'
 import { usePlanningDraftNotice } from './planningDrafts'
 import { money } from './format'
+
+const RouteDiagnosis = lazy(() => import('./RouteDiagnosis').then(m => ({ default: m.RouteDiagnosis })))
 
 export function RoutePlanner({ state, route }: { state: GameState; route: Route }) {
   const seat = viewSeat(), airline = state.airlines[seat]!
@@ -50,6 +52,14 @@ export function RoutePlanner({ state, route }: { state: GameState; route: Route 
       dispatchBatch(commands)
       requestAnimationFrame(() => inspector?.querySelector<HTMLSelectElement>('[aria-label="Route fare"]')?.focus({ preventScroll:true }))
     }}>Apply route changes</button><button disabled={!commands.length} onClick={() => { setFare(route.fareLevel); setService(route.serviceLevel); setFrequency(route.frequency) }}>Reset</button></div>
+    <Suspense fallback={<p role="status">Loading route analysis…</p>}><RouteDiagnosis state={state} route={route} onPreview={(changes) => {
+      setFare(route.fareLevel); setService(route.serviceLevel); setFrequency(route.frequency)
+      for (const c of changes) {
+        if (c.type === 'set_fare') setFare(c.fareLevel)
+        if (c.type === 'set_service') setService(c.serviceLevel)
+        if (c.type === 'set_frequency') setFrequency(c.frequency)
+      }
+    }} /></Suspense>
     <p className="hint">Includes connections and fixed company costs. Fuel, demand and rival schedules held at current conditions. Apply is one undoable action.</p>
   </section>
 }

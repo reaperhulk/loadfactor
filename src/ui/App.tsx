@@ -22,7 +22,7 @@ import { isMuted, setMuted } from './sounds'
 import { ActiveDeals, OfferCard } from './OfferCard'
 import { DeskTimeline } from './DeskTimeline'
 import { AircraftDossier } from './AircraftDossier'
-import { AirportsPanel, FinancePanel, FleetPanel, ReportPanel, RoutesPanel } from './panels'
+import { AirportsPanel, FinancePanel, FleetPanel, RoutesPanel } from './panels'
 import { RivalsPanel } from './RivalsPanel'
 import { RouteDossier } from './RouteDossier'
 import { RouteSetupDialog } from './RouteSetupDialog'
@@ -73,6 +73,8 @@ const loadQuarterReview = () => import('./QuarterReview').then(({ QuarterReview 
 const QuarterReview = lazy(loadQuarterReview)
 const loadReportCard = () => import('./ReportCard').then(({ ReportCard }) => ({ default: ReportCard }))
 const ReportCard = lazy(loadReportCard)
+const loadReportPanel = () => import('./ReportPanel').then(({ ReportPanel }) => ({ default: ReportPanel }))
+const ReportPanel = lazy(loadReportPanel)
 const MapView = lazy(() => import('./MapView').then(({ MapView }) => ({ default: MapView })))
 const ReplayViewer = lazy(() => import('./ReplayViewer').then(({ ReplayViewer }) => ({ default: ReplayViewer })))
 
@@ -651,7 +653,7 @@ function AnimatedMoney({ value }: { value: number }) {
 function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   useEffect(() => {
     // Keep first paint light, then warm the quarter flow for offline play.
-    const warm = () => { void Promise.allSettled([loadQuarterReview(), loadReportCard()]) }
+    const warm = () => { void Promise.allSettled([loadQuarterReview(), loadReportCard(), loadReportPanel()]) }
     const timer = window.setTimeout(warm, 500)
     window.addEventListener('online', warm)
     return () => { clearTimeout(timer); window.removeEventListener('online', warm) }
@@ -1026,13 +1028,13 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         {visited.has('airports') && <section className="workspace-page" hidden={tab !== 'airports'} data-testid="page-airports"><div className="page-heading"><h2>Airports</h2></div><AirportsPanel state={state} /></section>}
         {visited.has('rivals') && <section className="workspace-page" hidden={tab !== 'rivals'} data-testid="page-rivals"><RivalsPanel state={state} /></section>}
         {visited.has('finance') && <section className="workspace-page" hidden={tab !== 'finance'} data-testid="page-finance"><FinancePanel state={state} /></section>}
-        {visited.has('report') && <section className="workspace-page" hidden={tab !== 'report'} data-testid="page-report"><ReportPanel state={state} archive={session.reportArchive} /></section>}
+        {visited.has('report') && <section className="workspace-page" hidden={tab !== 'report'} data-testid="page-report"><Suspense fallback={<p role="status">Loading reports…</p>}><ReportPanel state={state} archive={session.reportArchive} onInspect={(id) => { setTab('routes'); inspectRoute(id) }} /></Suspense></section>}
       </div>
     </section>
     {celebration.milestones.length > 0 && <Celebration milestones={celebration.milestones} state={state} onClose={celebration.dismiss} />}
     <ToastStack events={session.lastEvents} state={state} unlocks={session.lastUnlocks} onOpenRoute={inspectRoute} />
     {showReview && <Suspense fallback={<Dialog label="Review quarter" className="gameover-overlay" onClose={() => setShowReview(false)}><p role="status">Loading quarter review…</p></Dialog>}><QuarterReview state={state} forecast={forecast} onClose={() => setShowReview(false)} onConfirm={endQuarter} /></Suspense>}
-    {showReport && !celebration.milestones.length && session.reportEvents.length > 0 && <Suspense fallback={<Dialog label="Quarterly report" className="gameover-overlay" onClose={() => setShowReport(false)}><p role="status">Loading quarterly report…</p></Dialog>}><ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} /></Suspense>}
+    {showReport && !celebration.milestones.length && session.reportEvents.length > 0 && <Suspense fallback={<Dialog label="Quarterly report" className="gameover-overlay" onClose={() => setShowReport(false)}><p role="status">Loading quarterly report…</p></Dialog>}><ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} onInspect={(id) => { setShowReport(false); setTab('routes'); inspectRoute(id) }} /></Suspense>}
     {pendingRoute !== null && <RouteSetupDialog state={state} from={pendingRoute.from} to={pendingRoute.to} onClose={() => setPendingRoute(null)} />}
     {state.phase !== 'planning' && <GameOverOverlay state={state} earned={session.careerUnlocks} onWatchReplay={onWatchReplay} />}
     {showSettings && <Dialog label="Settings" className="gameover-overlay" testId="settings-dialog" onClose={() => setShowSettings(false)}><div className="settings-card"><div className="dialog-heading"><h2>Settings</h2><button onClick={() => setShowSettings(false)} aria-label="Close settings">×</button></div>

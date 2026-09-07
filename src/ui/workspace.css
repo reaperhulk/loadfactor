@@ -338,3 +338,17 @@ main.game-shell { --bg:#10232c; --panel:#19333e; --ink:#ede9de; --dim:#a4b4b9; -
      beside them so a route opening never hides zoom or projection controls. */
   .game-shell:has(.map-page:not([hidden])) .toast-stack { left:12px; right:auto; max-width:calc(100vw - 170px); }
 }
+
+/* Decisions pair evidence with the next action, at both inspector widths. */
+.plan-review,.route-diagnosis { border:1px solid var(--rule); border-radius:12px; padding:14px; margin:14px 0; }
+.decision-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:12px 0; }
+.decision-metrics dt { font-size:.75rem; color:var(--dim); }
+.decision-metrics dd { margin:4px 0 0; font-weight:750; font-size:1.05rem; }
+.decision-movements { list-style:none; margin:10px 0; padding:0; }
+.decision-movements li { display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px solid var(--rule); }
+.decision-movements small { display:block; color:var(--dim); }
+.decision-options { display:grid; gap:10px; margin-top:12px; }
+.decision-options article { border:1px solid var(--rule); border-radius:8px; padding:10px; min-width:0; }
+.decision-options h4 { margin:0 0 6px; }
+.route-diagnosis p,.decision-options p { font-size:.82rem; line-height:1.45; }
+@media(min-width:1000px) { .plan-review .decision-metrics { grid-template-columns:repeat(4,minmax(0,1fr)); } }

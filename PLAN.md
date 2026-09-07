@@ -704,3 +704,18 @@ accounting differences without inventing causal precision, compare route actions
 against the full network, and rank feasible expansion shortlists by incremental
 profit or objective progress. Recommendation locks are UI preferences; the player
 reviews and applies serializable commands through the existing undo boundary.
+
+Stage 2: approved expectations persist as bounded, validated save metadata, not
+commands or engine state. Hot-seat handover captures each player's own plan;
+solo quarter resolution and link handover capture the active seat. Historical
+careers without saved expectations show that explicitly instead of recreating
+what a player supposedly approved. Profit movements reconcile revenue and all
+cost buckets; routes link into inspectors. These are accounting differences,
+not claims that a price change alone caused a fuel-spend difference.
+
+Route analysis separates observable capacity, season, startup, competition and
+service-gap signals from tested recommendations. Changes preview in the existing
+form before applying. A comparison session shares unchanged rival dispatch and
+schedule-equivalent fare/service dispatch; full passenger markets are rerun.
+Archive reports and inspector analysis have separate UI chunks to keep the
+existing startup budget as features grow. Engine speedups do not depend on this.

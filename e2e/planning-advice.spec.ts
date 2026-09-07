@@ -1,0 +1,38 @@
+import { test, expect } from '@playwright/test'
+import { openPanel } from './workspace'
+
+for (const width of [1440, 390]) test(`planning advice ${width}px: preview, report differences and saved expectations`, async ({ page }, info) => {
+  await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 })
+  await page.addInitScript(() => localStorage.setItem('loadfactor:display:v1', JSON.stringify({ motion: 'reduced' })))
+  await page.goto('/')
+  await page.getByTestId('start-hub_defense').click()
+  await openPanel(page, 'routes')
+  await page.locator('[data-testid^="inspect-"]').first().click()
+  const diagnosis = page.getByTestId('route-diagnosis')
+  await diagnosis.scrollIntoViewIfNeeded()
+  await expect(diagnosis).toContainText('What this route needs')
+  const before = await page.evaluate(() => JSON.stringify(window.__harness.getState()))
+  await diagnosis.getByRole('button', { name: 'Compare improvements' }).click()
+  await expect(page.getByTestId('route-recommendations')).toBeVisible()
+  expect(await page.evaluate(() => JSON.stringify(window.__harness.getState()))).toBe(before)
+  const preview = diagnosis.getByRole('button', { name: 'Preview this change' }).first()
+  if (await preview.count()) {
+    await preview.click()
+    expect(await page.evaluate(() => JSON.stringify(window.__harness.getState()))).toBe(before)
+    await page.getByTestId('apply-route-plan').click()
+    expect(await page.evaluate(() => JSON.stringify(window.__harness.getState()))).not.toBe(before)
+  }
+  await page.getByTestId('end-quarter').click()
+  await page.getByTestId('confirm-quarter').click()
+  const report = page.getByTestId('report-card')
+  await expect(report.getByTestId('plan-review')).toBeVisible()
+  await expect(report.getByTestId('plan-review')).toContainText('Planned profit')
+  const expected = await report.getByTestId('plan-review').innerText()
+  await info.attach(`${width}-forecast-result`, { body: await page.screenshot({ animations: 'disabled' }), contentType: 'image/png' })
+  await page.keyboard.press('Escape')
+  await page.reload()
+  await page.getByTestId('continue-save').click()
+  await openPanel(page, 'report')
+  await expect(page.getByTestId('plan-review')).toHaveText(expected)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0)
+})

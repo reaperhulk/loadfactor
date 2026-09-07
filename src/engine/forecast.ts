@@ -1,4 +1,4 @@
-import { aircraftOperations } from './operations'
+import { aircraftOperations, modernOperations, resolveOperations, type OperationsResult } from './operations'
 // A planning forecast holds today's world and rival schedules fixed. It uses
 // real market resolution and accounting, never next quarter's hidden RNG draws.
 import { applyCommandBatchFor } from './index'
@@ -17,11 +17,12 @@ export interface ForecastAssumptions {
   fuelBp?: number
 }
 
-export function forecastQuarter(
+function evaluateQuarter(
   previous: GameState,
   seat: number,
   commands: readonly Command[] = [],
   assumptions: ForecastAssumptions = {},
+  prepare?: (state: GameState, commands: readonly Command[], mode: 'forecast' | 'adverse') => Map<number, OperationsResult>,
 ) {
   if (commands.some((command) => command.type === 'end_quarter')) {
     throw new Error('Forecasts accept planning actions only')
@@ -29,7 +30,7 @@ export function forecastQuarter(
   // Market resolution writes route results only. Route-control previews need
   // independent routes/history arrays and world indices, not copies of every
   // past aircraft operations report. Other commands retain the full boundary.
-  const routeOnly = commands.every(c => c.type === 'set_fare' || c.type === 'set_service' || c.type === 'set_frequency')
+  const routeOnly = commands.every(localRouteCommand)
   const planned = routeOnly ? { state: marketSnapshot(previous), events: [] as GameEvent[] }
     : applyCommandBatchFor(previous, commands.map((command) => ({ seat, command })))
   const state = planned.state
@@ -39,7 +40,9 @@ export function forecastQuarter(
   const airline = state.airlines[seat]
   if (!airline) throw new Error('Unknown forecast airline')
   const events: GameEvent[] = []
-  const totals = resolveMarket(state, events, undefined, assumptions.operations ?? 'forecast')[seat]!
+  const mode = assumptions.operations ?? 'forecast'
+  const prepared = routeOnly && modernOperations(state) ? prepare?.(state, commands, mode) : undefined
+  const totals = resolveMarket(state, events, prepared, mode)[seat]!
   const financials = recurringFinancials(state, airline, totals)
   return {
     ...financials,
@@ -51,11 +54,43 @@ export function forecastQuarter(
   }
 }
 
+const localRouteCommand = (c: Command) => ['set_fare', 'set_service', 'set_frequency', 'open_route', 'close_route'].includes(c.type)
+export const forecastQuarter = (previous: GameState, seat: number, commands: readonly Command[] = [], assumptions: ForecastAssumptions = {}) =>
+  evaluateQuarter(previous, seat, commands, assumptions)
+
+// A comparison session reuses dispatch for unchanged rival fleets and for
+// fare/service variants sharing the same schedule. Passenger markets always
+// resolve across the full network. Cache lifetime is one immutable snapshot.
+export function createForecastPlanner(previous: GameState, seat: number) {
+  const rivals = new Map<string, OperationsResult>()
+  const own = new Map<string, OperationsResult>()
+  const prepare = (state: GameState, commands: readonly Command[], mode: 'forecast' | 'adverse') => {
+    const key = mode + JSON.stringify(commands.filter(c => c.type !== 'set_fare' && c.type !== 'set_service'))
+    const prepared = new Map<number, OperationsResult>()
+    for (const airline of state.airlines) {
+      if (airline.bankrupt) continue
+      const cache = airline.id === seat ? own : rivals
+      const id = airline.id === seat ? key : `${mode}:${airline.id}`
+      let result = cache.get(id)
+      if (!result) {
+        result = resolveOperations(state, airline, mode)
+        if (cache.size >= 64) cache.delete(cache.keys().next().value!)
+        cache.set(id, result)
+      }
+      // resolveMarket adds estimated affected passengers to the summary.
+      prepared.set(airline.id, { ...result, summary: { ...result.summary } })
+    }
+    return prepared
+  }
+  return (commands: readonly Command[] = [], assumptions: ForecastAssumptions = {}) => evaluateQuarter(previous, seat, commands, assumptions, prepare)
+}
+
 // Structural sharing is confined to read-only inputs of resolveMarket and
 // recurringFinancials. Callers must treat forecast output as read-only too.
 function marketSnapshot(previous: GameState): GameState {
   return { ...previous, world: { ...previous.world }, airlines: previous.airlines.map(a => ({
     ...a, routes: a.routes.map(r => ({ ...r, history: [...r.history] })),
+    fleet: a.fleet.map(ac => ({ ...ac })), servedUntil: { ...a.servedUntil },
   })) }
 }
 

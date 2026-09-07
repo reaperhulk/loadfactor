@@ -1,3 +1,5 @@
+import { PlanReview } from './PlanReview'
+import { approvedPlan } from './session'
 import { OperationsSummary } from './OperationsSummary'
 // The report newspaper, split out of panels.tsx: the quarter archive, the
 // filterable wire, and the annual review.
@@ -118,7 +120,7 @@ function eventSection(e: GameEvent): LogFilter {
 
 // One resolved quarter rendered as the day's paper: the route results table
 // on top, the filtered wire log underneath.
-function QuarterPage({ state, events }: { state: GameState; events: GameEvent[] }) {
+function QuarterPage({ state, events, turn, onInspect }: { state: GameState; events: GameEvent[]; turn: number; onInspect?: (id: number) => void }) {
   const [filter, setFilter] = useState<LogFilter>('all')
   const lines = events
     .filter((e) => filter === 'all' || eventSection(e) === filter)
@@ -137,6 +139,7 @@ function QuarterPage({ state, events }: { state: GameState; events: GameEvent[] 
   }
   return (
     <div>
+      {player.history.find(h => h.turn === turn) && <PlanReview plan={approvedPlan(turn)} actual={player.history.find(h => h.turn === turn)!} events={events} onInspect={onInspect} />}
       {ops && <OperationsSummary summary={ops.summary} routes={player.routes} />}
       {results.length > 0 && (
         <div className="table-scroll">
@@ -239,7 +242,7 @@ function AnnualReview({ state }: { state: GameState }) {
   )
 }
 
-export function ReportPanel({ state, archive }: { state: GameState; archive: QuarterRecord[] }) {
+export function ReportPanel({ state, archive, onInspect }: { state: GameState; archive: QuarterRecord[]; onInspect?: (id: number) => void }) {
   // idx === null shows the latest edition; the arrows browse the morgue.
   const [idx, setIdx] = useState<number | null>(null)
   const [view, setView] = useState<'quarter' | 'years'>('quarter')
@@ -294,7 +297,7 @@ export function ReportPanel({ state, archive }: { state: GameState; archive: Qua
         )}
       </p>
       {view === 'quarter' ? (
-        <QuarterPage key={shown} state={state} events={record.events} />
+        <QuarterPage key={shown} state={state} events={record.events} turn={record.turn} onInspect={onInspect} />
       ) : (
         <AnnualReview state={state} />
       )}

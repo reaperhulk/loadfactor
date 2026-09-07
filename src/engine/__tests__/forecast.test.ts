@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyCommandBatchFor, applyCommandFor, newGame } from '../index'
-import { forecastDirectRoute, forecastQuarter } from '../forecast'
+import { createForecastPlanner, forecastDirectRoute, forecastQuarter } from '../forecast'
 import { resolveMarket } from '../market'
 import { recurringFinancials } from '../accounting'
 import { hashState } from '../../harness/hash'
@@ -85,4 +85,18 @@ it('route previews structurally share only read-only inputs', () => {
   expect(forecast.routes).toEqual(planned.state.airlines[0]!.routes)
   expect(forecast.errors).toEqual(planned.events.filter(e => e.type === 'command_rejected'))
   expect(state).toEqual(before)
+})
+
+it('prepared comparison sessions match standalone forecasts across schedules, fares, closure and stress', () => {
+  const state = setup(), evaluate = createForecastPlanner(state, 0)
+  const routeId = state.airlines[0]!.routes[0]!.id
+  const variants = [[], [{ type: 'set_fare', routeId, fareLevel: 2 }],
+    [{ type: 'set_frequency', routeId, frequency: 4 }],
+    [{ type: 'set_frequency', routeId, frequency: 4 }, { type: 'set_service', routeId, serviceLevel: 1 }],
+    [{ type: 'close_route', routeId }], [{ type: 'set_marketing', level: 3 }],
+  ] as const
+  for (const commands of variants) for (const assumptions of [{}, { operations: 'adverse' as const }, { fuelBp: 12000 }]) {
+    expect(evaluate(commands, assumptions)).toEqual(forecastQuarter(state, 0, commands, assumptions))
+    expect(evaluate(commands, assumptions)).toEqual(forecastQuarter(state, 0, commands, assumptions))
+  }
 })
