@@ -11,7 +11,7 @@ function measure(fn: () => unknown, samples: number) {
   return { p50: +times[Math.floor(samples / 2)]!.toFixed(2), p95: +times[Math.ceil(samples * .95) - 1]!.toFixed(2) }
 }
 for (const turns of [20, 40, 65]) {
-  const { state } = runCareer('jet_age', 'planning-profile-v2', 'greedy', turns)
+  const { state } = runCareer('jet_age', 'planning-profile-v2', 'greedy', turns, Number(process.argv[2] ?? 3))
   const forecast = measure(() => forecastQuarter(state, 0), 24)
   const schedules = measure(() => balancedScheduleCommands(state, 0), 12)
   const commands = balancedScheduleCommands(state, 0)

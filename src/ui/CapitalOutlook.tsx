@@ -7,13 +7,14 @@ import { viewSeat } from './session'
 import { mergePlanningCommands, stagePlanningCommands, usePlanningCommands } from './planningDrafts'
 import { money } from './format'
 
-export function CapitalOutlook({ state }: { state: GameState }) {
+export function CapitalOutlook({ state, active=true }: { state: GameState; active?:boolean }) {
   const seat = viewSeat(), airline = state.airlines[seat]!, draft = usePlanningCommands()
   const [quarters, setQuarters] = useState(4), [type, setType] = useState(typesOnSale(yearOf(state))[0]?.id ?? '')
   const [replaces, setReplaces] = useState<number | null>(airline.fleet[0]?.id ?? null), [finance, setFinance] = useState(false)
   const [compare, setCompare] = useState(false)
   const spec = type ? getAircraftType(type) : undefined
   const options = useMemo(() => {
+    if(!active) return []
     const choices: { name:string; commands:Command[] }[] = [{name:'Keep current plan',commands:[]}]
     if (compare && spec) for (const leased of [false,true]) {
       const commands: Command[] = []
@@ -24,7 +25,7 @@ export function CapitalOutlook({ state }: { state: GameState }) {
       choices.push({name:leased ? 'Lease' : 'Buy',commands})
     }
     return choices.map(c=>({ ...c, baseline:capitalOutlook(state,seat,mergePlanningCommands(draft,c.commands),quarters), stress:capitalOutlook(state,seat,mergePlanningCommands(draft,c.commands),quarters,true) }))
-  }, [state,seat,draft,quarters,compare,spec,type,replaces,finance,airline.cash])
+  }, [state,seat,draft,quarters,compare,spec,type,replaces,finance,airline.cash,active])
   const date = (turn:number) => `${getScenarioYear(state)+Math.floor(turn/4)} Q${turn%4+1}`
   return <section className="capital-outlook" data-testid="capital-outlook"><div className="page-heading"><div><span className="eyebrow">Commitments and cash</span><h2>Capital outlook</h2></div><label>Horizon <select aria-label="Outlook horizon" value={quarters} onChange={e=>setQuarters(Number(e.target.value))}><option value={4}>4 quarters</option><option value={8}>8 quarters</option></select></label></div>
     <p className="hint">Includes your shared plan, delivery dates, replacement sales, route ramp-up, seasonality, scheduled checks, loan payments and contract expiry. Current rival schedules and base world indices stay fixed. Known events expire; new shocks and repairs are not predicted.</p>

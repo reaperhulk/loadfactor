@@ -1,5 +1,5 @@
 import { modernOperations, resolveOperations, type OperationsResult } from './operations'
-import { resolveItineraries, type MarketTrace, type PassengerSegment } from './itineraries'
+import { resolveItineraries, type createItineraryPlanner, type MarketTrace, type PassengerSegment } from './itineraries'
 // Route economics: the heart of the game (PLAN.md §2.2). Pure arithmetic plus
 // stateless hash noise — no stream draws, so resolution order can never
 // reshuffle another subsystem's randomness. Resolution has two phases:
@@ -244,7 +244,7 @@ interface AirlineTotals {
 // each airline's own network, writes each route's last* results, emits
 // route_result events, and returns per-airline totals. Mutates state
 // (callers clone at the entry point).
-export function resolveMarket(state: GameState, events: GameEvent[], prepared?: Map<number, OperationsResult>, mode: 'forecast' | 'adverse' = 'forecast', trace?: MarketTrace[]): AirlineTotals[] {
+export function resolveMarket(state: GameState, events: GameEvent[], prepared?: Map<number, OperationsResult>, mode: 'forecast' | 'adverse' = 'forecast', trace?: MarketTrace[], itineraryPlanner?:ReturnType<typeof createItineraryPlanner>): AirlineTotals[] {
   const modern = modernOperations(state)
   const operations = prepared ?? new Map(modern ? state.airlines.filter(a => !a.bankrupt).map(a => [a.id, resolveOperations(state, a, mode)]) : [])
   const periodWeeks = modern ? WEEKS_PER_QUARTER : 1
@@ -310,6 +310,8 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
     const first = entrants[0]!
     const { from, to } = first.route
     const km = distanceKm(from, to)
+    let pax:number[]=[]
+    if ((state.rulesVersion ?? 1) < 2) {
     const demand = pairWeeklyDemand(state, from, to) * periodWeeks
 
     // Split demand by attractiveness, shaped by fare elasticity (gouging
@@ -328,7 +330,7 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
       a = Math.floor((a * routeSpoolBp(state.airlines[e.airlineIdx]!, e.route, state.turn)) / 10000)
       return a
     })
-    const pax = entrants.map((e, i) => Math.min(attracted[i]!, e.weeklyCapacity))
+    pax = entrants.map((e, i) => Math.min(attracted[i]!, e.weeklyCapacity))
     let unmet = 0
     let spare = 0
     for (let i = 0; i < entrants.length; i++) {
@@ -340,6 +342,8 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
       for (let i = 0; i < entrants.length; i++) {
         pax[i] = pax[i]! + Math.floor((spill * (entrants[i]!.weeklyCapacity - pax[i]!)) / spare)
       }
+    }
+
     }
 
     for (let i = 0; i < entrants.length; i++) {
@@ -381,7 +385,7 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
   }
 
   if ((state.rulesVersion ?? 1) >= 2) {
-    resolveItineraries(state, [...accs.values()], periodWeeks, trace)
+    resolveItineraries(state, [...accs.values()], periodWeeks, trace, itineraryPlanner)
   } else {
   // ---- Phase 2: connecting itineraries over each airline's own network ----
   // A share of unserved O/D demand will take a one-stop over a hub if both

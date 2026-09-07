@@ -1,3 +1,4 @@
+import { createItineraryPlanner } from './itineraries'
 import { aircraftOperations, modernOperations, resolveOperations, type OperationsResult } from './operations'
 // A planning forecast holds today's world and rival schedules fixed. It uses
 // real market resolution and accounting, never next quarter's hidden RNG draws.
@@ -23,6 +24,7 @@ function evaluateQuarter(
   commands: readonly Command[] = [],
   assumptions: ForecastAssumptions = {},
   prepare?: (state: GameState, commands: readonly Command[], mode: 'forecast' | 'adverse') => Map<number, OperationsResult>,
+  itineraries?: ReturnType<typeof createItineraryPlanner>,
 ) {
   if (commands.some((command) => command.type === 'end_quarter')) {
     throw new Error('Forecasts accept planning actions only')
@@ -42,7 +44,7 @@ function evaluateQuarter(
   const events: GameEvent[] = []
   const mode = assumptions.operations ?? 'forecast'
   const prepared = routeOnly && modernOperations(state) ? prepare?.(state, commands, mode) : undefined
-  const totals = resolveMarket(state, events, prepared, mode)[seat]!
+  const totals = resolveMarket(state, events, prepared, mode, undefined, itineraries)[seat]!
   const financials = recurringFinancials(state, airline, totals)
   return {
     ...financials,
@@ -82,10 +84,15 @@ export function createForecastPlanner(previous: GameState, seat: number) {
     }
     return prepared
   }
+  const itineraries=createItineraryPlanner()
+  const quotes=new Map<string,ReturnType<typeof evaluateQuarter>>()
   let baseline: ReturnType<typeof evaluateQuarter> | undefined
   return (commands: readonly Command[] = [], assumptions: ForecastAssumptions = {}) => {
-    if (!commands.length && !Object.keys(assumptions).length) return baseline ??= evaluateQuarter(previous, seat, commands, assumptions, prepare)
-    return evaluateQuarter(previous, seat, commands, assumptions, prepare)
+    if (!commands.length && !Object.keys(assumptions).length) return baseline ??= evaluateQuarter(previous, seat, commands, assumptions, prepare, itineraries)
+    const key=JSON.stringify([commands,assumptions])
+    let quote=quotes.get(key)
+    if(!quote) {quote=evaluateQuarter(previous,seat,commands,assumptions,prepare,itineraries);if(quotes.size>=32)quotes.delete(quotes.keys().next().value!);quotes.set(key,quote)}
+    return quote
   }
 }
 
@@ -133,4 +140,27 @@ export function forecastReplacement(state: GameState, seat: number, aircraftId: 
     requiredCash: leased ? Math.floor(spec.price * LEASE_BP_PER_QUARTER / 10000) : spec.price,
     saleOnDelivery: old.leased ? 0 : resaleValue(old.type, old.ageQuarters + (leased ? 1 : spec.deliveryQuarters)),
     projectedProfit: after.profit }
+}
+
+// Direct-market screening changes one route repeatedly. Dispatch depends on
+// frequency, not fare/service, and other carriers' schedules remain fixed.
+// Reuse those dispatches instead of rebuilding every fleet calendar per price.
+export function createDirectRoutePlanner(previous:GameState,seat:number,route:Route) {
+  const key=pairKey(route.from,route.to), dispatches=new Map<string,OperationsResult>(), itineraries=createItineraryPlanner()
+  const template={...previous,airlines:previous.airlines.map(a=>({...a,routes:a.id===seat?[route]:a.routes.filter(r=>pairKey(r.from,r.to)===key)}))}
+  return (variant:Route)=>{
+    const state={...template,airlines:template.airlines.map(a=>({...a,routes:(a.id===seat?[variant]:a.routes).map(r=>({...r,history:[...r.history]}))}))}
+    let prepared:Map<number,OperationsResult>|undefined
+    if(modernOperations(state)) {
+      prepared=new Map()
+      for(const a of state.airlines) if(!a.bankrupt) {
+        const id=`${a.id}:${a.id===seat?variant.frequency:0}`
+        let result=dispatches.get(id)
+        if(!result) {result=resolveOperations(state,a,'forecast');if(dispatches.size>=32)dispatches.delete(dispatches.keys().next().value!);dispatches.set(id,result)}
+        prepared.set(a.id,{...result,summary:{...result.summary}})
+      }
+    }
+    resolveMarket(state,[],prepared,'forecast',undefined,itineraries)
+    return state.airlines[seat]!.routes[0]!
+  }
 }

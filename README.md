@@ -9,7 +9,7 @@ through fuel shocks, recessions and changing aviation eras.
 The simulation is deterministic and runs without a browser. A career records its
 scenario, seed, rules/content versions and commands. Saves, replays, multiplayer
 turn links, bot playtesting and golden tests all use that same record. Existing
-unversioned careers keep their original rules; new careers use rules 3. Rules-2 solo careers can opt into improved operations in Fleet policy.
+unversioned careers keep their original rules; new careers use rules 4. Rules 1, 2 and 3 retain their original deterministic behavior. Rules-2 solo careers can opt into improved operations in Fleet policy.
 
 ## Playing
 
@@ -26,8 +26,19 @@ npm run dev     # http://localhost:5173
 - **Plan before committing.** Compare aircraft and schedules when opening a
   route. The Routes workbench stages multiple fare, service and frequency changes,
   previews full company profit and cash, and commits them as one undoable action.
+  A shared plan tray carries drafts across the Desk, map, adviser, route inspector
+  and expansion tools; invalid batches never apply partially.
   Its stress test adds 20% to the fuel index and reduces the demand index by 10%.
   The Network adviser proposes individual improvements, respects locked fares, service and frequencies, and recalculates combined effects before one undoable apply. Expansion comparisons rank feasible launches by company profit or the scenario objective, include connecting traffic, and carry the selected aircraft and schedule into launch review.
+- **Plan around commitments.** Company → Outlook compares buying, leasing,
+  replacement or waiting over four/eight quarters, with known deliveries, checks,
+  debt, contract expiry and a headwind case. Advice supports the scenario goal,
+  profit, passenger growth, connections, efficiency or resilience and a cash floor.
+- **See the network working.** Route and city inspectors expose passenger paths,
+  competing carriers, constrained legs and uncarried potential demand. Highlight
+  a journey on the map; rules-4 careers also retain actual last-quarter paths.
+  Fleet → Operations shows a 13-week calendar and previews check timing,
+  standby bases and shared rotations before staging the change.
 - **Compete for passengers.** Business, leisure and budget passengers weigh
   price, service and schedule differently. Direct flights and viable one-stop
   itineraries compete for the same origin/destination demand across airlines.
@@ -40,7 +51,10 @@ npm run dev     # http://localhost:5173
   an airframe between two routes, keep standby cover and book preventive
   maintenance. Repairs now remove hours or days, with reserve hours and compatible standby aircraft covering disrupted flights. Book 7–10-day checks, choose reserve hours and optional paid recovery in Fleet policy and aircraft details. Fleet commonality changes upkeep. Replacement plans preview costs
   and keep the old aircraft working until its successor arrives.
-- **Read the competition.** Rivals announce sustained campaigns. The planning
+- **Read the competition.** Rivals announce sustained campaigns that respond to
+  cash pressure, repeated losses and contested markets. Dossiers distinguish
+  observed evidence from announced intent. Customer preference grows gradually
+  from the price, service, schedule and reliability passengers actually experience. The planning
   calendar shows upcoming opportunities, aircraft introductions, airport
   programmes and deliveries. Board offers have decision deadlines and continuing
   obligations; declining is a valid choice.
@@ -62,6 +76,12 @@ Four shorter mandates use the full simulation:
 | Atlantic Crossing | 20 quarters | Build a long-haul operation from London |
 | Sixteen Quarters of Oil | 16 quarters | Earn profits with fuel starting at 160% |
 | Fortress Hub | 24 quarters | Grow connecting traffic through an established hub |
+
+Concise quiet-quarter reports are optional in Display settings. The first three
+quarters, decisions, disruptions, losses and large swings still show the full
+report. No quarter advances automatically. Optional map diagnostics report the
+actual device's frame intervals; see [performance and validation](PERFORMANCE.md)
+for reproducible algorithm and browser workloads.
 
 ## Your workspace
 
@@ -112,7 +132,7 @@ npm run test:unit          # engine, replay, accounting, balance and offline con
 npm run test:e2e           # Chromium plus desktop/mobile WebKit coverage
 npm run check              # lint, types, unit tests, build and startup-size budget
 npm run ci                 # complete local gate, including browser tests
-npm run goldens:update     # accept an intentional rules-2 balance change
+npm run goldens:update     # accept an intentional current-rules balance change
 npx vite-node tools/profile-planning.ts
 npx vite-node tools/profile-decisions.ts
 npx vite-node tools/balance-report.ts experiment 6 /tmp/balance.json

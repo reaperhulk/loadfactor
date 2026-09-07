@@ -12,11 +12,12 @@ import { money } from './format'
 export function ExpansionPlanner({ state, onPlan, onAirport }: { state: GameState; onPlan?: (from: string, to: string, preset?: ExpansionOption) => void; onAirport?: (city: string) => void }) {
   const seat = viewSeat()
   const draft = usePlanningCommands()
-  const working = useMemo(() => draft.length ? applyCommandBatchFor(state, draft.map(command => ({ seat, command }))).state : state, [state, seat, draft])
+  const applied=useMemo(()=>draft.length ? applyCommandBatchFor(state,draft.map(command=>({seat,command}))) : {state,events:[]},[state,seat,draft])
+  const working=applied.state, invalid=applied.events.some(e=>e.type==='command_rejected')
   const [searched, setSearched] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
   const [sort, setSort] = useState<'objective' | 'profit'>('objective')
-  const result = useMemo(() => searched ? expansionOptions(working, seat) : null, [working, seat, searched])
+  const result = useMemo(() => searched && !invalid ? expansionOptions(working, seat) : null, [working, seat, searched, invalid])
   const key = (o: ExpansionOption) => `${o.from}-${o.to}`
   const comparisons = useMemo(() => {
     if (!result) return []
@@ -29,7 +30,8 @@ export function ExpansionPlanner({ state, onPlan, onAirport }: { state: GameStat
   return <section className="expansion-planner" data-testid="expansion-planner">
     <h3>Where to grow next</h3><p className="hint">Compare routes your current fleet and slots can launch. Rankings include connecting traffic, fleet costs and your scenario objective.</p>
     {!!draft.length && <p className="hint">Options include your shared plan. Profit changes below are additional to those planned changes.</p>}
-    <button onClick={() => { setSearched(true); setSelected([]) }}>Find expansion options</button>
+    <button disabled={invalid} onClick={() => { setSearched(true); setSelected([]) }}>Find expansion options</button>
+    {invalid && <p role="status">Resolve the invalid shared-plan changes before searching for additional launches.</p>}
     {result && <><label className="expansion-sort">Rank by <select aria-label="Rank expansion options" value={sort} onChange={e => setSort(e.target.value as 'objective' | 'profit')}><option value="objective">Scenario objective</option><option value="profit">Company profit</option></select></label>
       <div className="expansion-options">{[...result.options].sort((a,b)=>sort === 'profit' ? b.profitDelta-a.profitDelta : b.objectiveDelta-a.objectiveDelta).map(o => <article data-testid={`expansion-${key(o)}`} key={key(o)}><h4>{o.from}–{o.to}</h4><p>{getAircraftType(o.aircraftType).name} #{o.aircraftId} · {o.frequency} round trips/week</p><dl className="decision-metrics"><div><dt>Company profit change/q</dt><dd className={o.profitDelta >= 0 ? 'pos' : 'neg'}>{money(o.profitDelta)}</dd></div><div><dt>Ending cash</dt><dd>{money(o.cashAfter)}</dd></div><div><dt>Objective change</dt><dd>{gain(o.objectiveDelta)}</dd></div><div><dt>Connecting boardings change</dt><dd>{o.connectionsDelta.toLocaleString('en-US')}</dd></div></dl>
         <label><input type="checkbox" aria-label={`Compare ${key(o)}`} checked={selected.includes(key(o))} disabled={!selected.includes(key(o)) && selected.length >= 3} onChange={() => setSelected(current => current.includes(key(o)) ? current.filter(k=>k!==key(o)) : [...current, key(o)])} />Compare</label>{' '}

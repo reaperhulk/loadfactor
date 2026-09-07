@@ -5,7 +5,7 @@ import { applyCommand } from '../src/engine'
 import { networkRecommendations } from '../src/engine/planning'
 import { expansionOptions } from '../src/engine/expansion'
 for (const turns of [20, 40, 65]) {
-  const original = runCareer('jet_age', 'planning-profile-v2', 'greedy', turns).state
+  const original = runCareer('jet_age', 'planning-profile-v2', 'greedy', turns, Number(process.argv[2] ?? 3)).state
   const ac = original.airlines[0]!.fleet.find(a => a.routeId !== null)!
   const state = applyCommand(original, { type: 'assign_aircraft', aircraftId: ac.id, routeId: null }).state
   for (const [name, run] of [['network', () => networkRecommendations(state, 0)], ['expansion', () => expansionOptions(state, 0)]] as const) {

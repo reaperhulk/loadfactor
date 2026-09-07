@@ -11,9 +11,10 @@ export function frequencyCandidates(route: Route, max: number, projected: Route)
     demandSized - 1, demandSized, demandSized + 1, Math.ceil(route.frequency * 0.75), max])]
     .filter(n => n >= 1 && n <= max).sort((a, b) => a - b)
 }
-import { forecastDirectRoute } from './forecast'
+import { createDirectRoutePlanner } from './forecast'
 export function directCandidates(state: GameState, seat: number, route: Route, locks: readonly RouteSetting[] = [], projected = route) {
-  const base = forecastDirectRoute(state, seat, route)
+  const evaluate=createDirectRoutePlanner(state,seat,route)
+  const base = evaluate(route)
   const baseline = base.lastRevenue - base.lastCost
   const winners: { setting: RouteSetting; command: Command; title: string; gain: number }[] = []
   for (const setting of ['frequency', 'fare', 'service'] as const) {
@@ -24,7 +25,7 @@ export function directCandidates(state: GameState, seat: number, route: Route, l
     for (const value of candidates) {
       const variant = { ...route, [setting === 'frequency' ? 'frequency' : setting === 'fare' ? 'fareLevel' : 'serviceLevel']: value }
       if (variant.frequency === route.frequency && variant.fareLevel === route.fareLevel && variant.serviceLevel === route.serviceLevel) continue
-      const result = forecastDirectRoute(state, seat, variant), gain = result.lastRevenue - result.lastCost - baseline
+      const result = evaluate(variant), gain = result.lastRevenue - result.lastCost - baseline
       if (gain <= 0 || gain <= (winner?.gain ?? 0)) continue
       const command: Command = setting === 'frequency' ? { type: 'set_frequency', routeId: route.id, frequency: value }
         : setting === 'fare' ? { type: 'set_fare', routeId: route.id, fareLevel: value } : { type: 'set_service', routeId: route.id, serviceLevel: value }

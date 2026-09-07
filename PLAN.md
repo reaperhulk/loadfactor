@@ -831,3 +831,14 @@ now include premium, budget and connecting doctrines; harness telemetry records
 the actual live leader each quarter (including recycled rival seats), competitive
 quarters, proposed-action repetition and action variety. Proposed actions include
 validator rejections and are explicitly labelled as such.
+
+Stage 6 indexes market topology once per comparison network, precomputes leg
+attributes, reuses allocation scratch arrays and direct-market dispatch, and
+skips the legacy allocation pass under modern rules. Bounded shared quote caches
+and weak snapshot keys prevent duplicate UI evaluations. Exact legacy/current
+replays and independent uncached comparisons protect allocation semantics.
+Recorded browser workloads cover a real 65-quarter rules-4 save, globe gestures,
+advice, outlook, calendar, repeated navigation and save/load on desktop/mobile
+and enlarged text. Optional device diagnostics retain 120 frame samples and
+stop when hidden. PERFORMANCE.md records matched rules-3 timing comparisons and
+the separate 108-career rules-4 strategy probe; bundle limits remain unchanged.

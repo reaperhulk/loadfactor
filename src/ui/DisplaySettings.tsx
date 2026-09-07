@@ -8,5 +8,6 @@ export function DisplaySettings() {
     <label><input type="checkbox" aria-label="Delivery and route animations" checked={preferences.celebrations} onChange={(e) => setDisplayPreferences({ celebrations: e.target.checked })} /> Delivery and route animations</label>
     <label><input type="checkbox" aria-label="Concise quiet quarters" checked={preferences.quietReports} onChange={e=>setDisplayPreferences({quietReports:e.target.checked})} /> Concise quiet quarters</label>
     <p className="hint">Routine results stay on the Desk. New decisions, disruptions, losses and large changes still open a full report.</p>
+    <label><input type="checkbox" aria-label="Map performance diagnostics" checked={preferences.diagnostics} onChange={e=>setDisplayPreferences({diagnostics:e.target.checked})} /> Map performance diagnostics</label>
   </details>
 }

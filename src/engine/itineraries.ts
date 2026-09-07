@@ -23,67 +23,86 @@ export interface MarketTrace extends MarketAudit {
   choices: { airline: number; routeIds: number[]; via: string | null; journeys: number }[]
 }
 
-// Exporting the audit lets tests prove conservation without storing a giant
-// O/D matrix in every save. The UI receives compact per-route segment totals.
-export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWeeks = 1, trace?: MarketTrace[]): MarketAudit[] {
-  const markets = new Map<string, Itinerary[]>()
-  const add = (from: string, to: string, itinerary: Itinerary) => {
-    const key = pairKey(from, to)
-    const existing = markets.get(key) ?? []
-    existing.push(itinerary)
-    markets.set(key, existing)
+interface PathIndex { one:number; two?:number; airline:number; km:number }
+interface MarketIndex { key:string; from:string; to:string; directKm:number; mix:ReturnType<typeof segmentMix>; paths:PathIndex[] }
+function indexMarkets(legs:RouteAcc[]): MarketIndex[] {
+  const markets=new Map<string,PathIndex[]>(), hubs=new Map<number,Map<string,number[]>>()
+  const add=(from:string,to:string,path:PathIndex)=>{
+    const key=pairKey(from,to), paths=markets.get(key)??[]; paths.push(path); markets.set(key,paths)
   }
-  for (const leg of legs) {
-    leg.segments = { business: 0, leisure: 0, budget: 0 }
-    leg.transferRevenue = 0
-    if (leg.weeklyCapacity <= 0) continue
-    add(leg.route.from, leg.route.to, {
-      legs: [leg], airline: leg.airlineIdx, km: leg.km, trips: leg.weeklyTrips,
-      fare: Math.floor(fareFor(leg.km, leg.route.fareLevel) * leg.yieldBp / 10000),
-    })
+  // Construct adjacency in one pass rather than filtering all legs for each
+  // airline. Zero-capacity legs stay in the index, then filter at resolution.
+  for(let i=0;i<legs.length;i++) {
+    const leg=legs[i]!
+    add(leg.route.from,leg.route.to,{one:i,airline:leg.airlineIdx,km:leg.km})
+    const cities=hubs.get(leg.airlineIdx)??new Map<string,number[]>()
+    for(const city of [leg.route.from,leg.route.to]) {const list=cities.get(city)??[];list.push(i);cities.set(city,list)}
+    hubs.set(leg.airlineIdx,cities)
   }
-  for (const airline of state.airlines) {
-    const hubs = new Map<string, RouteAcc[]>()
-    for (const leg of legs.filter((l) => l.airlineIdx === airline.id && l.weeklyCapacity > 0)) {
-      for (const city of [leg.route.from, leg.route.to]) {
-        const list = hubs.get(city) ?? []; list.push(leg); hubs.set(city, list)
-      }
-    }
-    for (const hub of [...hubs.keys()].sort()) {
-      const spokes = hubs.get(hub)!
-      for (let i = 0; i < spokes.length; i++) for (let j = i + 1; j < spokes.length; j++) {
-        const one = spokes[i]!, two = spokes[j]!
-        const from = one.route.from === hub ? one.route.to : one.route.from
-        const to = two.route.from === hub ? two.route.to : two.route.from
-        const km = one.km + two.km
-        if (km * 10000 > distanceKm(from, to) * CONNECT_DETOUR_MAX_BP) continue
-        const fare = [one, two].reduce((sum, l) => sum + Math.floor(fareFor(l.km, l.route.fareLevel) * l.yieldBp / 10000), 0)
-        add(from, to, { legs: [one, two], airline: airline.id, km,
-          trips: Math.min(one.weeklyTrips, two.weeklyTrips),
-          fare: Math.floor(fare * CONNECT_FARE_DISCOUNT_BP / 10000) })
+  for(const airline of [...hubs.keys()].sort((a,b)=>a-b)) {
+    const cities=hubs.get(airline)!
+    for(const hub of [...cities.keys()].sort()) {
+      const spokes=cities.get(hub)!
+      for(let i=0;i<spokes.length;i++) for(let j=i+1;j<spokes.length;j++) {
+        const one=legs[spokes[i]!]!,two=legs[spokes[j]!]!
+        const from=one.route.from===hub?one.route.to:one.route.from, to=two.route.from===hub?two.route.to:two.route.from
+        const km=one.km+two.km
+        if(km*10000>distanceKm(from,to)*CONNECT_DETOUR_MAX_BP) continue
+        add(from,to,{one:spokes[i]!,two:spokes[j]!,airline,km})
       }
     }
   }
+  return [...markets.keys()].sort().map(key=>{
+    const [from,to]=key.split('-') as [string,string]
+    return {key,from,to,directKm:distanceKm(from,to),mix:segmentMix(from,to),paths:markets.get(key)!}
+  })
+}
+
+// Bounded to a comparison session: schedules, fares and service reuse the
+// network graph. Changed endpoints, airline ownership or leg order invalidate.
+export function createItineraryPlanner() {
+  const cache=new Map<string,MarketIndex[]>()
+  return (legs:RouteAcc[])=>{
+    const key=legs.map(l=>`${l.airlineIdx}:${l.route.id}:${l.route.from}:${l.route.to}`).join('|')
+    let index=cache.get(key)
+    if(!index) {index=indexMarkets(legs);if(cache.size>=16)cache.delete(cache.keys().next().value!);cache.set(key,index)}
+    return index
+  }
+}
+
+// Optional traces prove conservation without storing an unbounded O/D matrix.
+export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWeeks = 1, trace?: MarketTrace[], planner?:ReturnType<typeof createItineraryPlanner>): MarketAudit[] {
+  const markets=planner ? planner(legs) : indexMarkets(legs)
+  const fares=legs.map(leg=>Math.floor(fareFor(leg.km,leg.route.fareLevel)*leg.yieldBp/10000))
+  const spool=legs.map(leg=>routeSpoolBp(state.airlines[leg.airlineIdx]!,leg.route,state.turn))
+  for(const leg of legs) {leg.segments={business:0,leisure:0,budget:0};leg.transferRevenue=0}
   const audit: MarketAudit[] = []
   const infl = inflationBp(state.turn)
   const rules = getScenario(state.scenario).rules
-  for (const key of [...markets.keys()].sort()) {
-    const choices = markets.get(key)!
+  for (const market of markets) {
+    const {key,from,to,directKm,mix}=market
+    const choices:Itinerary[]=[], spools:number[]=[]
+    for(const path of market.paths) {
+      const one=legs[path.one]!,two=path.two===undefined?undefined:legs[path.two]!
+      if(one.weeklyCapacity<=0 || (two && two.weeklyCapacity<=0)) continue
+      choices.push({legs:two?[one,two]:[one],airline:path.airline,km:path.km,
+        trips:two?Math.min(one.weeklyTrips,two.weeklyTrips):one.weeklyTrips,
+        fare:two?Math.floor((fares[path.one]!+fares[path.two!]!)*CONNECT_FARE_DISCOUNT_BP/10000):fares[path.one]!})
+      spools.push(two?Math.min(spool[path.one]!,spool[path.two!]!):spool[path.one]!)
+    }
+    if(!choices.length) continue
     const journeys = trace ? Array<number>(choices.length).fill(0) : undefined
-    const [from, to] = key.split('-') as [string, string]
     const demand = pairWeeklyDemand(state, from, to) * periodWeeks
-    const mix = segmentMix(from, to)
-    const directKm = distanceKm(from, to)
     const directFare = fareFor(directKm, 0)
     // Segment-independent attributes are evaluated once per itinerary.
-    const attributes = choices.map(it => {
+    const attributes = choices.map((it,index) => {
       const airline = state.airlines[it.airline]!
       return {
-        service: Math.min(...it.legs.map(l => l.route.serviceLevel)),
+        service: it.legs[1] ? Math.min(it.legs[0]!.route.serviceLevel,it.legs[1].route.serviceLevel) : it.legs[0]!.route.serviceLevel,
         cabin: Math.floor(it.legs.reduce((sum, l) => sum + l.yieldBp, 0) / it.legs.length),
         priceAppeal: Math.max(1200, 21000 - Math.min(24000, Math.floor(it.fare * 10000 / Math.max(1, directFare)))),
         frequency: Math.floor(it.trips / periodWeeks),
-        spool: Math.min(...it.legs.map(l => routeSpoolBp(airline, l.route, state.turn))),
+        spool: spools[index]!,
         reputation: reputationAppealBp(airline), deal: dealAppealBp(state, airline.id, from, to),
       }
     })
@@ -125,16 +144,23 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
       let remaining = Math.floor(population * purchaseBp * attachBp / 100_000_000)
       const connectLimit = Math.floor(population * ((segment === 'business' ? 2500 : segment === 'leisure' ? 5000 : 7000) + bankBonus) / 10000)
       let segmentConnections = 0
+      const available:number[]=[]
       // Capped water-filling: a full shortest hub yields to other hubs/directs.
       // Equal fractional remainders are awarded by the canonical route order.
       for (let round = 0; remaining > 0 && round < choices.length + 1; round++) {
-        const available = choices.map((it, i) => ({ it, i, spare: Math.min(...it.legs.map((l) => l.weeklyCapacity - l.weeklyPax), it.legs.length === 2 ? connectLimit - segmentConnections : remaining) })).filter((x) => x.spare > 0)
-        const totalWeight = available.reduce((sum, x) => sum + weights[x.i]!, 0)
+        available.length=0
+        let totalWeight=0
+        for(let i=0;i<choices.length;i++) {
+          const it=choices[i]!,one=it.legs[0]!,two=it.legs[1]
+          const spare=two ? Math.min(one.weeklyCapacity-one.weeklyPax,two.weeklyCapacity-two.weeklyPax,connectLimit-segmentConnections) : Math.min(one.weeklyCapacity-one.weeklyPax,remaining)
+          if(spare>0) {available.push(i);totalWeight+=weights[i]!}
+        }
         if (totalWeight === 0) break
         const pool = remaining
         let taken = 0
-        for (const { it, i } of available) {
-          const spare = Math.min(...it.legs.map((l) => l.weeklyCapacity - l.weeklyPax), it.legs.length === 2 ? connectLimit - segmentConnections : remaining)
+        for (const i of available) {
+          const it=choices[i]!,one=it.legs[0]!,two=it.legs[1]
+          const spare=two ? Math.min(one.weeklyCapacity-one.weeklyPax,two.weeklyCapacity-two.weeklyPax,connectLimit-segmentConnections) : Math.min(one.weeklyCapacity-one.weeklyPax,remaining)
           const take = Math.min(remaining, spare, Math.max(1, Math.floor(pool * weights[i]! / totalWeight)))
           if (take <= 0) continue
           remaining -= take; taken += take; carried += take

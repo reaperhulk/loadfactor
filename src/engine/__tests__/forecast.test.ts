@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import * as operations from '../operations'
-import { applyCommandBatchFor, applyCommandFor, newGame } from '../index'
+import { applyCommandBatchFor, applyCommandFor, newGame, type Command } from '../index'
 import { createForecastPlanner, forecastDirectRoute, forecastQuarter } from '../forecast'
 import { resolveMarket } from '../market'
 import { recurringFinancials } from '../accounting'
@@ -115,4 +115,26 @@ it('fare and service comparisons reuse dispatch; changing frequency recomputes o
     evaluate([{ type: 'set_frequency', routeId, frequency: 4 }])
     expect(spy.mock.calls.length).toBe(initial + 1)
   } finally { spy.mockRestore() }
+})
+
+it('reuses direct dispatch without changing fares, service, schedules or input history', async () => {
+  const {createDirectRoutePlanner}=await import('../forecast')
+  const state=setup(), snapshot=structuredClone(state),route=state.airlines[0]!.routes[0]!,evaluate=createDirectRoutePlanner(state,0,route)
+  for(const frequency of [1,4,12]) for(const fareLevel of [-2,0,2]) for(const serviceLevel of [1,3]) {
+    const variant={...route,frequency,fareLevel,serviceLevel}
+    expect(evaluate(variant)).toEqual(forecastDirectRoute(state,0,variant))
+  }
+  expect(state).toEqual(snapshot)
+})
+it('bounded cached market graphs match uncached resolution through closures, new routes, zero capacity and changing assumptions', () => {
+  const state=newGame('hub_defense','graph-invalidation'), evaluate=createForecastPlanner(state,0), route=state.airlines[0]!.routes[0]!
+  const variants:Command[][]=[[],[{type:'close_route',routeId:route.id}],
+    [{type:'set_frequency',routeId:route.id,frequency:1}],
+    [{type:'close_route',routeId:route.id},{type:'open_route',from:route.from,to:route.to,aircraftId:state.airlines[0]!.fleet[0]!.id,frequency:2}],
+    [{type:'assign_aircraft',aircraftId:state.airlines[0]!.fleet[0]!.id,routeId:null}]]
+  for(let i=0;i<40;i++) {
+    const commands=variants[i%variants.length]!, assumptions={fuelBp:10000+i*50,operations:i%2?'adverse' as const:'forecast' as const}
+    expect(evaluate(commands,assumptions)).toEqual(forecastQuarter(state,0,commands,assumptions))
+  }
+  expect(evaluate()).toEqual(forecastQuarter(state,0))
 })

@@ -84,6 +84,7 @@ for (const width of [1440,390]) test(`commercial choices ${width}px: real flows,
   const scenario=page.getByTestId('scenario-hub_defense')
   await scenario.getByRole('button').click();await scenario.getByRole('button').click()
   await page.evaluate(()=>window.__harness.endQuarter())
+  await openPanel(page,'desk')
   await expect(page.getByTestId('opening-choices')).toBeVisible()
   const before=await page.evaluate(()=>JSON.stringify(window.__harness.getState()))
   await page.getByRole('button',{name:'Try: fill more seats'}).click()
