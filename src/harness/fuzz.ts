@@ -176,11 +176,22 @@ export interface FuzzOptions {
 // Deterministic evolutionary hunt: same options → same result, so any finding
 // is instantly reproducible.
 export function fuzzBuilds(options: FuzzOptions): FuzzResult {
+  const search = fuzzBuildsSteps(options)
+  let step = search.next()
+  while (!step.done) step = search.next()
+  return step.value
+}
+
+// Yield after each career so a host can service timers/reporting between
+// bounded pieces of work. Scheduling stays outside this deterministic core;
+// pausing the iterator never changes evaluation order or RNG draws.
+export function* fuzzBuildsSteps(options: FuzzOptions): Generator<void, FuzzResult> {
   let rng = rngFromSeed(`fuzz ${options.searchSeed}`)
-  const fitness = (genome: Genome): number => {
+  const fitness = function* (genome: Genome): Generator<void, number> {
     let total = 0
     for (const seed of options.seeds) {
       total += runGenomeCareer(options.scenario, seed, genome, options.quarters)
+      yield
     }
     return Math.floor(total / options.seeds.length)
   }
@@ -189,7 +200,7 @@ export function fuzzBuilds(options: FuzzOptions): FuzzResult {
   for (let i = 0; i < options.population; i++) {
     const g = randomGenome(rng)
     rng = g.rng
-    population.push({ genome: g.genome, fit: fitness(g.genome) })
+    population.push({ genome: g.genome, fit: yield* fitness(g.genome) })
   }
   let evaluated = options.population
 
@@ -206,7 +217,7 @@ export function fuzzBuilds(options: FuzzOptions): FuzzResult {
       rng = crossed.rng
       const mutated = mutate(crossed.genome, rng)
       rng = mutated.rng
-      next.push({ genome: mutated.genome, fit: fitness(mutated.genome) })
+      next.push({ genome: mutated.genome, fit: yield* fitness(mutated.genome) })
       evaluated++
     }
     population = next

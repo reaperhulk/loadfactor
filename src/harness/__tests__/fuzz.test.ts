@@ -3,9 +3,10 @@
 // population/generations/seeds via env). A finding here means the curve has a
 // hole — investigate, fix, and pin the genome as a regression below.
 
+import { setImmediate } from 'node:timers/promises'
 import { describe, expect, it } from 'vitest'
 import { getScenario } from '../../data/scenarios'
-import { fuzzBuilds, runGenomeCareer, type Genome } from '../fuzz'
+import { fuzzBuilds, fuzzBuildsSteps, runGenomeCareer, type Genome } from '../fuzz'
 
 // The fuzzer searches harder than the pinned bots, so it gets headroom over
 // the envelope's 10× cap — but scaled to the scenario's floor, not absolute.
@@ -17,23 +18,32 @@ const SEEDS = (process.env.FUZZ_SEEDS ?? 'alpha').split(',')
 const SEARCH_SEEDS = (process.env.FUZZ_SEARCH_SEEDS ?? 'hunt-1').split(',')
 
 describe('build fuzzer', () => {
-  it('the evolutionary hunt finds no economy-breaking build', () => {
-    for (const searchSeed of SEARCH_SEEDS) {
-      const result = fuzzBuilds({
-        scenario: 'jet_age',
-        seeds: SEEDS,
-        population: POP,
-        generations: GENS,
-        quarters: 80,
-        searchSeed,
-      })
-      // Always log the champion — useful telemetry even when green.
-      console.log(
-        `fuzz[${searchSeed}]: best fitness $${(result.bestFitness / 1000).toFixed(1)}M ` +
-          `over ${result.evaluated} genomes — ${JSON.stringify(result.bestGenome)}`,
-      )
-      expect(result.bestFitness, `search ${searchSeed} found a runaway build`).toBeLessThan(RUNAWAY_CAP)
+  // Each independent search gets its own budget, regardless of seed count.
+  // The deep preset took ~15 minutes in aggregate on CI; bundling its three
+  // searches into one synchronous test exceeded both test and worker RPC timers.
+  it.each(SEARCH_SEEDS)('evolutionary hunt %s finds no economy-breaking build', async (searchSeed) => {
+    const search = fuzzBuildsSteps({
+      scenario: 'jet_age',
+      seeds: SEEDS,
+      population: POP,
+      generations: GENS,
+      quarters: 80,
+      searchSeed,
+    })
+    let step = search.next()
+    while (!step.done) {
+      // A macrotask (not just Promise.resolve) lets Vitest report results and
+      // handle worker messages while the full search continues.
+      await setImmediate()
+      step = search.next()
     }
+    const result = step.value
+    // Always log the champion — useful telemetry even when green.
+    console.log(
+      `fuzz[${searchSeed}]: best fitness $${(result.bestFitness / 1000).toFixed(1)}M ` +
+        `over ${result.evaluated} genomes — ${JSON.stringify(result.bestGenome)}`,
+    )
+    expect(result.bestFitness, `search ${searchSeed} found a runaway build`).toBeLessThan(RUNAWAY_CAP)
   }, 900_000)
 
   it('the search is deterministic', () => {
@@ -48,6 +58,38 @@ describe('build fuzzer', () => {
     const a = fuzzBuilds(options)
     const b = fuzzBuilds(options)
     expect(a).toEqual(b)
+  }, 60_000)
+
+  it('pausing between careers preserves the search and evaluates every seed', async () => {
+    const options = {
+      scenario: 'jet_age',
+      seeds: ['alpha', 'beta'],
+      population: 4,
+      generations: 1,
+      quarters: 20,
+      searchSeed: 'repro',
+    } as const
+    const search = fuzzBuildsSteps(options)
+    let careers = 0
+    let step = search.next()
+    while (!step.done) {
+      careers++
+      await setImmediate()
+      step = search.next()
+    }
+    expect(careers).toBe(step.value.evaluated * options.seeds.length)
+    expect(step.value).toEqual(fuzzBuilds(options))
+    // Recorded from the synchronous search before introducing checkpoints.
+    expect(step.value).toEqual({
+      bestFitness: 449273,
+      evaluated: 6,
+      bestGenome: {
+        buyLfBp: 6701, cabin: 1, cashBuffer: 10184, contestDiscountBp: 12608,
+        debtAppetite: 18120, expandThreshold: 338, fareBias: 2, fareFloor: -1,
+        hedges: 0, marketing: 3, renewAge: 27, serviceLevel: 2,
+        slotBudgetBp: 8616, takeovers: 0,
+      },
+    })
   }, 60_000)
 
   // Pinned regression genomes: past fuzzer finds (or hand-built abuses) that
