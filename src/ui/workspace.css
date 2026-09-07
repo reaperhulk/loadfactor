@@ -417,3 +417,6 @@ main.game-shell { --bg:#10232c; --panel:#19333e; --ink:#ede9de; --dim:#a4b4b9; -
   .network-advisor,.expansion-planner { padding:12px; }
   .decision-options p,.route-diagnosis p { line-height:1.55; }
 }
+
+.quiet-result{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;padding:.75rem;border:1px solid var(--line);border-radius:.5rem;margin-block:.5rem}
+.quiet-result button{margin-left:auto}.opening-choices{flex-basis:100%;min-width:0}.coach:has(.opening-choices){flex-wrap:wrap}.opening-choices article{padding:.7rem;border:1px solid var(--line);border-radius:.4rem}.customer-identity{margin-block:1rem}.campaign-evidence{font-size:.85rem}

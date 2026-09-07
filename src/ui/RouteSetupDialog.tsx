@@ -55,7 +55,7 @@ export function RouteSetupDialog({ state, from, to, onClose, preset }: RouteSetu
   const preview = useMemo(() => aircraftId === null ? null : forecastQuarter(state, seat, mergePlanningCommands(draft, [{
     type: 'open_route', from, to, aircraftId, frequency: clampedFreq, fareLevel, serviceLevel,
   }])), [state, seat, draft, from, to, aircraftId, clampedFreq, fareLevel, serviceLevel])
-  const launch = preview?.routes.find((route) => !player.routes.some((existing) => existing.id === route.id))
+  const launch = preview?.routes.find((route) => [route.from,route.to].sort().join('-') === [from,to].sort().join('-'))
 
   return (
     <Dialog label={`Plan ${from} to ${to}`} className="gameover-overlay" testId="route-setup" onClose={onClose}>

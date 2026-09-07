@@ -821,3 +821,13 @@ in advance, and use the same paid command validator as the player. Recovery
 pauses new capacity and airport expansion. Latest actual passenger paths are
 retained for player seats only (top 64 plus exact totals), never accumulated in
 quarterly history. Existing careers retain planned-flow inspection.
+
+Stage 5 makes the first three quarters choice-driven: first markets expose
+company cash/profit/frequency/boardings, the next quarter offers reversible fare
+experiments, and the approved-plan report closes the loop. Concise quiet reports
+are opt-in; no quarter advances automatically, and early quarters, new decisions,
+losses, large swings and cancellations still open a full report. Strategy probes
+now include premium, budget and connecting doctrines; harness telemetry records
+the actual live leader each quarter (including recycled rival seats), competitive
+quarters, proposed-action repetition and action variety. Proposed actions include
+validator rejections and are explicitly labelled as such.

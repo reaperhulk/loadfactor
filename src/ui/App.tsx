@@ -1,3 +1,5 @@
+import { needsFullReport } from './quarterPacing'
+import { useDisplayPreferences } from './display'
 import type { FlowFocus } from './PassengerFlows'
 import { PlanTray } from './PlanTray'
 import type { ExpansionOption } from '../engine/expansion'
@@ -26,7 +28,7 @@ import { ActiveDeals, OfferCard } from './OfferCard'
 import { DeskTimeline } from './DeskTimeline'
 import { AircraftDossier } from './AircraftDossier'
 import { AirportsPanel, FleetPanel, RoutesPanel } from './panels'
-import { RivalsPanel } from './RivalsPanel'
+const RivalsPanel = lazy(() => import('./RivalsPanel').then(m=>({default:m.RivalsPanel})))
 import { RouteDossier } from './RouteDossier'
 import { RouteSetupDialog } from './RouteSetupDialog'
 import { ACHIEVEMENTS, loadAchievements } from './achievements'
@@ -685,6 +687,8 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const inspectedRoute = player.routes.find((r) => r.id === selectedRoute)
   const [routeFrom, setRouteFrom] = useState<string | null>(null)
   const [pendingRoute, setPendingRoute] = useState<{ from: string; to: string; preset?: Pick<ExpansionOption, 'aircraftId' | 'frequency'> } | null>(null)
+  const display = useDisplayPreferences()
+  const [quietTurn,setQuietTurn]=useState<number | null>(null)
   const [showReport, setShowReport] = useState(false)
   const [showReview, setShowReview] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
@@ -717,7 +721,10 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const endQuarter = (): void => {
     if (getSession()?.state.phase !== 'planning' || !canEndQuarter()) return
     if (getSession()?.mode === 'hotseat') clearSelection()
-    setShowReview(false); dispatch({ type: 'end_quarter' }); setShowReport(true)
+    setShowReview(false); dispatch({ type: 'end_quarter' })
+    const next=getSession()
+    const full=!display.quietReports || !next || needsFullReport(next.state,next.reportEvents,seat)
+    setShowReport(full); setQuietTurn(full ? null : next!.state.turn); if(!full) setTab('desk')
   }
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -922,6 +929,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             ⚠ INSOLVENT — {player.insolventQuarters > 0 ? 'one more losing quarter folds the airline' : 'end the quarter in the red and the clock starts'}
           </span>
         )}
+      {quietTurn===state.turn && <div className="quiet-result" role="status" data-testid="quiet-result"><strong>Quarter complete</strong><span>{money(player.history.at(-1)?.profit ?? 0)} profit · {money(player.cash)} cash</span><button onClick={()=>setShowReport(true)}>Read full report</button></div>}
       <div className="desk-columns"><div className="desk-priorities">
       {state.phase === 'planning' && <ManagementBrief state={state} onTab={setTab} onAircraft={(id) => { setSelectedAircraft(id); setTab('fleet') }} onInspect={(id) => { setSelectedRoute(id); setTab('routes') }} onPlan={(from, to, preset) => setPendingRoute({ from, to, preset })} />}
       <OfferCard state={state} />
@@ -1041,7 +1049,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         {visited.has('orders') && <section className="workspace-page" hidden={tab !== 'orders'} data-testid="page-orders"><FleetPanel state={state} view="orders" /></section>}
         {visited.has('catalog') && <section className="workspace-page" hidden={tab !== 'catalog'} data-testid="page-catalog"><FleetPanel state={state} view="catalog" /></section>}
         {visited.has('airports') && <section className="workspace-page" hidden={tab !== 'airports'} data-testid="page-airports"><div className="page-heading"><h2>Airports</h2></div><AirportsPanel state={state} /></section>}
-        {visited.has('rivals') && <section className="workspace-page" hidden={tab !== 'rivals'} data-testid="page-rivals"><RivalsPanel state={state} /></section>}
+        {visited.has('rivals') && <section className="workspace-page" hidden={tab !== 'rivals'} data-testid="page-rivals"><Suspense fallback={<p role="status">Loading rival intelligence…</p>}><RivalsPanel state={state} /></Suspense></section>}
         {visited.has('operations') && <section className="workspace-page" hidden={tab !== 'operations'} data-testid="page-operations"><Suspense fallback={<p role="status">Preparing operations calendar…</p>}><OperationsBoard state={state} /></Suspense></section>}
         {visited.has('outlook') && <section className="workspace-page" hidden={tab !== 'outlook'} data-testid="page-outlook"><Suspense fallback={<p role="status">Preparing capital outlook…</p>}><CapitalOutlook state={state} /></Suspense></section>}
         {visited.has('finance') && <section className="workspace-page" hidden={tab !== 'finance'} data-testid="page-finance"><Suspense fallback={<p role="status">Loading finances…</p>}><FinancePanel state={state} /></Suspense></section>}

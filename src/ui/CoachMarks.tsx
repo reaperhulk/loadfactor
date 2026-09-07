@@ -1,3 +1,4 @@
+import { OpeningChoices } from './OpeningChoices'
 // First-flight coaching: one contextual hint at a time, derived from game
 // state — never a modal tour. Dismissal persists PER SCENARIO: waving off
 // the hints in your first jet_age career must not silently disable coaching
@@ -14,7 +15,7 @@ const COACH_KEY = 'loadfactor:coach:v1' // legacy global key, still honored
 function nextHint(state: GameState): string | null {
   const player = state.airlines[viewSeat()]!
   if (player.routes.length === 0) {
-    return 'Start here: click one of your blue cities on the map, then “✈ Open route from here” and pick a destination.'
+    return 'Compare the two first-market choices on the Desk. Each quote includes your idle aircraft costs. You can also choose any feasible market on the map.'
   }
   if (player.fleet.every((a) => a.routeId === null)) {
     return 'Your jets are parked. Assign them on the fleet tab (or click the route and assign from its dossier).'
@@ -60,6 +61,7 @@ export function CoachMarks({ state }: { state: GameState }) {
         <ol className="tutorial-steps"><li aria-current={state.turn === 0 ? 'step' : undefined}>Choose a market</li><li aria-current={state.turn === 1 ? 'step' : undefined}>Read profit & refine the schedule</li><li aria-current={state.turn === 2 ? 'step' : undefined}>Grow or protect your cash</li></ol>
         <span>💡 {state.turn === 1 ? 'Your report separates route contribution from company profit. Open the Planning workbench on Routes to compare a fare or schedule change, then commit it as one undoable action.' : state.turn === 2 ? 'Choose your pace: expand into another market, or keep a cash cushion and improve reliability. The operations desk explains the tradeoff.' : hint}</span>
       </div>
+      <OpeningChoices state={state} />
       <button
         data-testid="coach-dismiss"
         onClick={() => {

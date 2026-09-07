@@ -1,12 +1,14 @@
 import { useSyncExternalStore } from 'react'
-export interface DisplayPreferences { motion: 'system' | 'reduced' | 'full'; text: number; traffic: 'normal' | 'low'; celebrations: boolean }
+export interface DisplayPreferences { motion: 'system' | 'reduced' | 'full'; text: number; traffic: 'normal' | 'low'; celebrations: boolean; quietReports: boolean; diagnostics: boolean }
 const KEY = 'loadfactor:display:v1'
-let preferences: DisplayPreferences = { motion: 'system', text: 100, traffic: 'normal', celebrations: true }
+let preferences: DisplayPreferences = { motion: 'system', text: 100, traffic: 'normal', celebrations: true, quietReports: false, diagnostics: false }
 try {
   const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<DisplayPreferences>
   if (saved.motion === 'system' || saved.motion === 'reduced' || saved.motion === 'full') preferences.motion = saved.motion
   if (saved.text === 100 || saved.text === 112 || saved.text === 125) preferences.text = saved.text
   if (typeof saved.celebrations === 'boolean') preferences.celebrations = saved.celebrations
+  if (typeof saved.quietReports === 'boolean') preferences.quietReports = saved.quietReports
+  if (typeof saved.diagnostics === 'boolean') preferences.diagnostics = saved.diagnostics
   if (saved.traffic === 'low') preferences.traffic = 'low'
 } catch { /* default display */ }
 const listeners = new Set<() => void>()

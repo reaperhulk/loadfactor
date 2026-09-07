@@ -26,7 +26,7 @@ import {
 import { getScenario } from '../data/scenarios'
 import type { Command, GameState } from '../engine/types'
 
-export type BotName = 'naive' | 'greedy' | 'cautious'
+export type BotName = 'naive' | 'greedy' | 'cautious' | 'premium' | 'budget' | 'connector'
 
 // Re-exports: the fuzzer and tests address these through the bot surface.
 export { launchFrequency, pairScore, bestUnservedPair } from '../engine/policy'
@@ -113,10 +113,10 @@ function naiveCommands(state: GameState): Command[] {
 // fuel, discipline the schedule, shed distress, brand while liquid, prune
 // losers, renew geriatric metal, buy the rival lever, expand, order, and
 // negotiate for the next city.
-function greedyCommands(state: GameState): Command[] {
-  const { dials, cabin } = dialsFor(state.scenario)
+function greedyCommands(state: GameState, doctrine?: ReturnType<typeof dialsFor>): Command[] {
+  const { dials, cabin } = doctrine ?? dialsFor(state.scenario)
   const commands: Command[] = []
-  if ((state.rulesVersion ?? 1) >= 2 && getScenario(state.scenario).objective.kind === 'transfer' && state.airlines[0]!.routes.length >= 3 && state.airlines[0]!.hubMode !== 'banked') commands.push({ type: 'set_hub_mode', mode: 'banked' })
+  if ((state.rulesVersion ?? 1) >= 2 && (doctrine?.dials.connectionFocus || getScenario(state.scenario).objective.kind === 'transfer') && state.airlines[0]!.routes.length >= 3 && state.airlines[0]!.hubMode !== 'banked') commands.push({ type: 'set_hub_mode', mode: 'banked' })
   commands.push(...treasuryCommands(state, 0))
   commands.push(...hedgeCommands(state, 0))
   commands.push(...scheduleCommands(state, 0))
@@ -144,7 +144,10 @@ function greedyCommands(state: GameState): Command[] {
 
 export function botCommands(state: GameState, bot: BotName): Command[] {
   if (bot === 'naive') return naiveCommands(state)
-  const commands = greedyCommands(state)
+  const doctrine = bot==='premium' ? {dials:{...GREEDY_DIALS,fareLevel:1,fareFloor:0,serviceLevel:3,marketing:2},cabin:3}
+    : bot==='budget' ? {dials:{...GREEDY_DIALS,fareLevel:-1,fareFloor:-2,serviceLevel:1,marketing:0,expandMinDemand:350},cabin:1}
+    : bot==='connector' ? {dials:{...GREEDY_DIALS,connectionFocus:true,expandMinDemand:180,marketing:2},cabin:2} : undefined
+  const commands = greedyCommands(state,doctrine)
   if (bot !== 'cautious') return commands
   const airline = state.airlines[0]!
   const buffer = Math.max(12000, (airline.history.at(-1)?.costs ?? 0) * 2)
