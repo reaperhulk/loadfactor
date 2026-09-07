@@ -287,7 +287,7 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
       }
       // Accepted world offers can lift a route's appeal (a capacity
       // commitment paying off once the Games actually land).
-      const weight = Math.floor(
+      const weight = (state.rulesVersion ?? 1) >= 2 ? 0 : Math.floor(
         (Math.floor(
           (routeShareWeight(airline, route) * dealAppealBp(state, airline.id, route.from, route.to)) / 10000,
         ) *

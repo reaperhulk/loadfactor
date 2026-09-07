@@ -2,6 +2,7 @@ import { aircraftOperations } from './operations'
 // A planning forecast holds today's world and rival schedules fixed. It uses
 // real market resolution and accounting, never next quarter's hidden RNG draws.
 import { applyCommandBatchFor } from './index'
+import { applyPlanningCommand } from './commands'
 import { recurringFinancials } from './accounting'
 import { resolveMarket } from './market'
 import { getAircraftType } from '../data/aircraft'
@@ -25,8 +26,14 @@ export function forecastQuarter(
   if (commands.some((command) => command.type === 'end_quarter')) {
     throw new Error('Forecasts accept planning actions only')
   }
-  const planned = applyCommandBatchFor(previous, commands.map((command) => ({ seat, command })))
-  const state = planned.state === previous ? structuredClone(previous) : planned.state
+  // Market resolution writes route results only. Route-control previews need
+  // independent routes/history arrays and world indices, not copies of every
+  // past aircraft operations report. Other commands retain the full boundary.
+  const routeOnly = commands.every(c => c.type === 'set_fare' || c.type === 'set_service' || c.type === 'set_frequency')
+  const planned = routeOnly ? { state: marketSnapshot(previous), events: [] as GameEvent[] }
+    : applyCommandBatchFor(previous, commands.map((command) => ({ seat, command })))
+  const state = planned.state
+  if (routeOnly) for (const command of commands) planned.events.push(...applyPlanningCommand(state, seat, command).events)
   if (assumptions.economyBp !== undefined) state.world.economyBp = assumptions.economyBp
   if (assumptions.fuelBp !== undefined) state.world.fuelBp = assumptions.fuelBp
   const airline = state.airlines[seat]
@@ -42,6 +49,14 @@ export function forecastQuarter(
     routes: airline.routes,
     errors: planned.events.filter((event) => event.type === 'command_rejected'),
   }
+}
+
+// Structural sharing is confined to read-only inputs of resolveMarket and
+// recurringFinancials. Callers must treat forecast output as read-only too.
+function marketSnapshot(previous: GameState): GameState {
+  return { ...previous, world: { ...previous.world }, airlines: previous.airlines.map(a => ({
+    ...a, routes: a.routes.map(r => ({ ...r, history: [...r.history] })),
+  })) }
 }
 
 // A smaller direct-market evaluation for fare and frequency controls. Preserve

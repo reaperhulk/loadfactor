@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyCommandFor, newGame } from '../index'
+import { applyCommandBatchFor, applyCommandFor, newGame } from '../index'
 import { forecastDirectRoute, forecastQuarter } from '../forecast'
 import { resolveMarket } from '../market'
 import { recurringFinancials } from '../accounting'
@@ -58,4 +58,31 @@ describe('planning forecasts', () => {
     expect(forecastQuarter(state, 0, [{ type: 'set_frequency', routeId: -1, frequency: 1 }]).errors).toHaveLength(1)
     expect(() => forecastQuarter(state, 0, [{ type: 'end_quarter' }])).toThrow('planning')
   })
+})
+
+// Optimized previews must match the independent full-copy market/ledger path,
+// including errors, check downtime and the histories exposed to inspectors.
+it('route previews structurally share only read-only inputs', () => {
+  const state = setup()
+  const before = structuredClone(state)
+  const routeId = state.airlines[0]!.routes[0]!.id
+  const commands = [
+    { type: 'set_fare', routeId, fareLevel: 1 },
+    { type: 'set_service', routeId, serviceLevel: 3 },
+    { type: 'set_frequency', routeId, frequency: 4 },
+    { type: 'set_frequency', routeId: -1, frequency: 2 },
+  ] as const
+  const planned = applyCommandBatchFor(state, commands.map(command => ({ seat: 0, command })))
+  const totals = resolveMarket(planned.state, [])
+  const reference = recurringFinancials(planned.state, planned.state.airlines[0]!, totals[0]!)
+  const freeze = (value: unknown): void => {
+    if (value && typeof value === 'object') { Object.freeze(value); Object.values(value).forEach(freeze) }
+  }
+  freeze(state)
+  const forecast = forecastQuarter(state, 0, commands)
+  expect(forecast.breakdown).toEqual(reference.breakdown)
+  expect(forecast.profit).toBe(reference.profit)
+  expect(forecast.routes).toEqual(planned.state.airlines[0]!.routes)
+  expect(forecast.errors).toEqual(planned.events.filter(e => e.type === 'command_rejected'))
+  expect(state).toEqual(before)
 })

@@ -682,3 +682,25 @@ whole-trip accounting, forecasts, replay upgrades and maintained old aircraft.
 Browser tests exercise policy, maintenance, report and save continuity at desktop
 and phone sizes. Quarter review/report UI is deferred then warmed after startup to preserve the existing
 190 KiB eager-bundle budget; map hit targets are 24 CSS pixels / 36 for coarse pointers.
+
+### Planning and feedback programme (2026-09-07)
+
+Authorized: implement forecast/result reconciliation, actionable route diagnosis,
+airline-aware expansion comparisons, selective network recommendations and locks;
+profile and improve algorithms, committing validated stages to main.
+
+Forecast route edits copy only mutable route records/history arrays and world
+indices; commands affecting other entities retain the full engine copy boundary.
+Operations index assignments by route and reverse plans by aircraft. Quarters
+without blocked intervals aggregate thirteen identical weeks exactly, preserving
+allocation order and wear. Timed recovery uses crew-family candidates and weekly
+occupancy buckets. Itinerary attributes shared by passenger segments are computed
+once. These changes preserve all three rules identities and golden outcomes.
+A differential test forces the temporal path with harmless past intervals to
+check the aggregate path against dispatch, including allocation order and wear.
+
+Next stages retain approved forecast snapshots outside simulation state, explain
+accounting differences without inventing causal precision, compare route actions
+against the full network, and rank feasible expansion shortlists by incremental
+profit or objective progress. Recommendation locks are UI preferences; the player
+reviews and applies serializable commands through the existing undo boundary.

@@ -67,11 +67,21 @@ export function maintenanceQuote(ac: OwnedAircraft) {
 }
 export function weeklyPlan(airline: Airline, onlyRoute?: Route): Map<number, TripAllocation[]> {
   const out = new Map<number, TripAllocation[]>()
+  // Index assignments once; a whole-fleet plan is O(fleet + routes), not
+  // a scan of every airframe for every route. Preserve original fleet order.
+  const assigned = new Map<number, OwnedAircraft[]>()
+  for (const ac of airline.fleet) {
+    if (ac.reserve) continue
+    for (const id of [ac.routeId, ac.secondaryRouteId]) {
+      if (id === null || id === undefined || (onlyRoute && id !== onlyRoute.id)) continue
+      const rows = assigned.get(id) ?? []
+      rows.push(ac); assigned.set(id, rows)
+    }
+  }
   for (const route of onlyRoute ? [onlyRoute] : airline.routes) {
     let left = route.frequency
     const rows: TripAllocation[] = []
-    for (const ac of airline.fleet) {
-      if (ac.reserve || (ac.routeId !== route.id && ac.secondaryRouteId !== route.id)) continue
+    for (const ac of assigned.get(route.id) ?? []) {
       const share = ac.secondaryRouteId === undefined ? 10000 : ac.routeId === route.id ? 6000 : 4000
       const budget = Math.floor(
         (WEEKLY_BLOCK_MINUTES * (10000 - (airline.operationsPolicy?.reserveBp ?? 0)) * share) / 100_000_000,
@@ -131,9 +141,16 @@ export function resolveOperations(
     end = start + QUARTER_MINUTES
   const plans = weeklyPlan(airline),
     routes = new Map(airline.routes.map((r) => [r.id, r]))
+  const ownPlans = new Map<number, { route: Route; trips: number; minutes: number }[]>()
+  for (const [id, rows] of plans) for (const row of rows) {
+    if (row.trips <= 0) continue
+    const own = ownPlans.get(row.aircraftId) ?? []
+    own.push({ route: routes.get(id)!, trips: row.trips, minutes: tripMinutes(row.type, routes.get(id)!) })
+    ownPlans.set(row.aircraftId, own)
+  }
   const jobs: Job[] = [],
     unavailable = new Map<number, Interval[]>(),
-    occupancy = new Map<number, Interval[]>()
+    occupancy = new Map<number, Interval[][]>()
   const used = new Map<number, number[]>(),
     updated = new Map<number, AircraftOperations>()
   const summary: OperationsSummary = {
@@ -181,33 +198,8 @@ export function resolveOperations(
       effectiveChecks.set(ac.id, o.checkEnd)
       if (o.checkStart >= start && o.checkStart < end) summary.checkCost += maintenanceQuote(ac).cost
     }
-    const own = [...plans].flatMap(([id, rows]) =>
-      rows
-        .filter((a) => a.aircraftId === ac.id && a.trips > 0)
-        .map((a) => ({
-          route: routes.get(id)!,
-          trips: a.trips,
-          minutes: tripMinutes(ac.type, routes.get(id)!),
-        })),
-    )
+    const own = ownPlans.get(ac.id) ?? []
     const weeklyMinutes = own.reduce((n, a) => n + a.minutes * a.trips, 0)
-    for (let week = 0; week < 13; week++) {
-      let prefix = 0
-      for (const row of own)
-        for (let i = 0; i < row.trips; i++) {
-          const phase = Math.min(
-            (ac.id * 37) % 120,
-            Math.floor((row.minutes * (WEEK_MINUTES - weeklyMinutes)) / Math.max(1, weeklyMinutes)),
-          )
-          const at =
-            start +
-            week * WEEK_MINUTES +
-            phase +
-            Math.floor((prefix * WEEK_MINUTES) / Math.max(1, weeklyMinutes))
-          jobs.push({ ac, route: row.route, week, minutes: row.minutes, start: at, end: at + row.minutes })
-          prefix += row.minutes
-        }
-    }
     const incidents: Disruption[] = forced?.filter((i) => i.aircraftId === ac.id) ?? []
     if (forced === undefined && weeklyMinutes > 0) {
       if (mode === 'actual') {
@@ -259,18 +251,49 @@ export function resolveOperations(
       o.repairUntil = Math.max(o.repairUntil ?? 0, incident.end)
     }
     unavailable.set(ac.id, intervals)
-    occupancy.set(ac.id, [])
+    occupancy.set(ac.id, Array.from({ length: 13 }, () => []))
+  }
+  // With no downtime there is no dispatch conflict to solve. Aggregate the
+  // thirteen identical weeks exactly, without allocating/sorting flight jobs.
+  // A past/future check still needs timed jobs to preserve post-check wear.
+  const aggregate = [...unavailable.values()].every((intervals) => intervals.length === 0)
+  if (!aggregate) for (const ac of airline.fleet) {
+    const own = ownPlans.get(ac.id) ?? []
+    const weeklyMinutes = own.reduce((n, a) => n + a.minutes * a.trips, 0)
+    for (let week = 0; week < 13; week++) {
+      let prefix = 0
+      for (const row of own)
+        for (let i = 0; i < row.trips; i++) {
+          const phase = Math.min(
+            (ac.id * 37) % 120,
+            Math.floor((row.minutes * (WEEK_MINUTES - weeklyMinutes)) / Math.max(1, weeklyMinutes)),
+          )
+          const at =
+            start +
+            week * WEEK_MINUTES +
+            phase +
+            Math.floor((prefix * WEEK_MINUTES) / Math.max(1, weeklyMinutes))
+          jobs.push({ ac, route: row.route, week, minutes: row.minutes, start: at, end: at + row.minutes })
+          prefix += row.minutes
+        }
+    }
   }
   // Protect every unaffected preferred flight before using its aircraft as
   // recovery capacity. Cover must fit real time AND remaining weekly hours.
   for (const job of jobs)
     if (!unavailable.get(job.ac.id)!.some((i) => overlaps(i, job))) {
-      occupancy.get(job.ac.id)!.push(job)
+      occupancy.get(job.ac.id)![job.week]!.push(job)
       used.get(job.ac.id)![job.week]! += job.minutes
     }
   const candidates = [...airline.fleet].sort(
     (a, b) => Number(!!a.reserve) - Number(!!b.reserve) || a.id - b.id,
   )
+  const candidateFamilies = new Map<string, OwnedAircraft[]>()
+  const bases = new Map(candidates.map(ac => [ac.id, aircraftBase(airline, ac)]))
+  for (const ac of candidates) {
+    const family = crewFamily(ac.type), group = candidateFamilies.get(family) ?? []
+    group.push(ac); candidateFamilies.set(family, group)
+  }
   const allocations = new Map<number, TripAllocation[]>()
   const add = (job: Job, ac: OwnedAircraft, minutes = job.minutes, charter = false) => {
     const rows = allocations.get(job.route.id) ?? []
@@ -307,6 +330,36 @@ export function resolveOperations(
       }
     }
   }
+  if (aggregate) for (const ac of airline.fleet) {
+    for (const row of ownPlans.get(ac.id) ?? []) {
+      const count = row.trips * 13
+      const rows = allocations.get(row.route.id) ?? []
+      rows.push({ aircraftId: ac.id, type: ac.type, cabin: ac.cabin,
+        seats: Math.floor(getAircraftType(ac.type).seats * CABIN_SEATS_BP[ac.cabin - 1]! / 10000), trips: count })
+      allocations.set(row.route.id, rows)
+      routeStats.get(row.route.id)!.completed += count
+      summary.completedTrips += count
+      const u = flightUsage.get(ac.id)!
+      u.minutes += row.minutes * count; u.cycles += count * 2
+    }
+  }
+  // Match the temporal path's order of first appearance, used for integer
+  // accumulation downstream. First departures use the same phase/prefix rule.
+  if (aggregate) for (const [routeId, rows] of allocations) rows.sort((a, b) => {
+    const first = (id: number) => {
+      const own = ownPlans.get(id)!
+      const total = own.reduce((n, r) => n + r.minutes * r.trips, 0)
+      let prefix = 0
+      for (const row of own) {
+        if (row.route.id === routeId) return Math.min((id * 37) % 120,
+          Math.floor(row.minutes * (WEEK_MINUTES - total) / Math.max(1, total))) +
+          Math.floor(prefix * WEEK_MINUTES / Math.max(1, total))
+        prefix += row.minutes * row.trips
+      }
+      return 0
+    }
+    return first(a.aircraftId) - first(b.aircraftId) || a.aircraftId - b.aircraftId
+  })
   jobs.sort((a, b) => a.start - b.start || a.ac.id - b.ac.id || a.route.id - b.route.id)
   for (const job of jobs) {
     if (!unavailable.get(job.ac.id)!.some((i) => overlaps(i, job))) {
@@ -316,12 +369,12 @@ export function resolveOperations(
     summary.disruptedTrips++
     let covered = false
     // Spare hours on scheduled fleet first; dedicated standby second.
-    for (const donor of candidates) {
+    for (const donor of candidateFamilies.get(crewFamily(job.ac.type)) ?? []) {
       if (donor.id === job.ac.id || crewFamily(donor.type) !== crewFamily(job.ac.type)) continue
       const t = getAircraftType(donor.type),
         km = distanceKm(job.route.from, job.route.to)
       if (km > t.rangeKm) continue
-      const base = aircraftBase(airline, donor),
+      const base = bases.get(donor.id)!,
         ferryKm =
           base === job.route.from || base === job.route.to
             ? 0
@@ -338,10 +391,10 @@ export function resolveOperations(
         continue
       if (
         unavailable.get(donor.id)!.some((i) => overlaps(i, span)) ||
-        occupancy.get(donor.id)!.some((i) => overlaps(i, span))
+        occupancy.get(donor.id)![job.week]!.some((i) => overlaps(i, span))
       )
         continue
-      occupancy.get(donor.id)!.push(span)
+      occupancy.get(donor.id)![job.week]!.push(span)
       used.get(donor.id)![job.week]! += minutes
       add(job, donor, minutes)
       summary.coveredTrips++

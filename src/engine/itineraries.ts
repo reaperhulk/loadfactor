@@ -63,23 +63,37 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
   }
   const audit: MarketAudit[] = []
   const infl = inflationBp(state.turn)
+  const rules = getScenario(state.scenario).rules
   for (const key of [...markets.keys()].sort()) {
     const choices = markets.get(key)!
     const [from, to] = key.split('-') as [string, string]
     const demand = pairWeeklyDemand(state, from, to) * periodWeeks
     const mix = segmentMix(from, to)
-    const directFare = fareFor(distanceKm(from, to), 0)
+    const directKm = distanceKm(from, to)
+    const directFare = fareFor(directKm, 0)
+    // Segment-independent attributes are evaluated once per itinerary.
+    const attributes = choices.map(it => {
+      const airline = state.airlines[it.airline]!
+      return {
+        service: Math.min(...it.legs.map(l => l.route.serviceLevel)),
+        cabin: Math.floor(it.legs.reduce((sum, l) => sum + l.yieldBp, 0) / it.legs.length),
+        priceAppeal: Math.max(1200, 21000 - Math.min(24000, Math.floor(it.fare * 10000 / Math.max(1, directFare)))),
+        frequency: Math.floor(it.trips / periodWeeks),
+        spool: Math.min(...it.legs.map(l => routeSpoolBp(airline, l.route, state.turn))),
+        reputation: reputationAppealBp(airline), deal: dealAppealBp(state, airline.id, from, to),
+      }
+    })
+    const cheapest = Math.min(...choices.map(it => it.fare))
+    const purchaseRatio = Math.floor(cheapest * 10000 / Math.max(1, directFare))
+    const attachBp = Math.max(...attributes.map(a => a.spool))
+    const bankBonus = choices.some(it => it.legs.length === 2 && state.airlines[it.airline]!.hubMode === 'banked') ? 1000 : 0
     let carried = 0, connecting = 0, apportioned = 0
     for (const segment of SEGMENTS) {
       const population = segment === 'budget' ? demand - apportioned : Math.floor(demand * mix[segment] / 10000)
       apportioned += population
-      const weights = choices.map((it) => {
+      const weights = choices.map((it, index) => {
         const airline = state.airlines[it.airline]!
-        const service = Math.min(...it.legs.map((l) => l.route.serviceLevel))
-        const cabin = Math.floor(it.legs.reduce((sum, l) => sum + l.yieldBp, 0) / it.legs.length)
-        const ratio = Math.min(24000, Math.floor(it.fare * 10000 / Math.max(1, directFare)))
-        const priceAppeal = Math.max(1200, 21000 - ratio)
-        const frequency = Math.floor(it.trips / periodWeeks)
+        const { service, cabin, priceAppeal, frequency, spool, reputation, deal } = attributes[index]!
         let weight = segment === 'business'
           ? Math.max(1, frequency) * (6500 + service * 1700) * cabin / 10000
           : (6 + Math.min(24, frequency)) * (segment === 'budget' ? priceAppeal * priceAppeal / 10000 : priceAppeal)
@@ -87,27 +101,23 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
           const banked = airline.hubMode === 'banked'
           const base = segment === 'business' ? 2000 : segment === 'leisure' ? 4500 : 6500
           weight *= (base + (banked ? 1500 : 0)) / 10000
-          weight *= distanceKm(from, to) / it.km
+          weight *= directKm / it.km
           // A connection depends on two reliable flights. Tight banks amplify
           // the commercial impact of a damaged operational reputation.
-          if (banked) weight *= reputationAppealBp(airline) / 10000
-          if (airline.controller === 'player') weight *= (getScenario(state.scenario).rules.connectionDemandBp ?? 10000) / 10000
+          if (banked) weight *= reputation / 10000
+          if (airline.controller === 'player') weight *= (rules.connectionDemandBp ?? 10000) / 10000
         }
-        if (segment === 'budget' && it.fare < directFare) weight *= (getScenario(state.scenario).rules.discountDemandBp ?? 10000) / 10000
-        weight *= reputationAppealBp(airline) * (10000 + airline.marketing * 900) / 100_000_000
-        weight *= Math.min(...it.legs.map((l) => routeSpoolBp(airline, l.route, state.turn))) / 10000
-        weight *= dealAppealBp(state, airline.id, from, to) / 10000
+        if (segment === 'budget' && it.fare < directFare) weight *= (rules.discountDemandBp ?? 10000) / 10000
+        weight *= reputation * (10000 + airline.marketing * 900) / 100_000_000
+        weight *= spool / 10000
+        weight *= deal / 10000
         return Math.max(1, Math.floor(weight))
       })
       // Expensive offers lose shoppers to the outside option. Connections
       // alone attract a limited market; adding more airlines cannot duplicate it.
-      const cheapest = Math.min(...choices.map((it) => it.fare))
-      const ratio = Math.floor(cheapest * 10000 / Math.max(1, directFare))
       const elasticity = segment === 'business' ? 3000 : segment === 'leisure' ? 6500 : 9500
-      const purchaseBp = Math.max(1200, Math.min(10000, 10000 - Math.floor(Math.max(0, ratio - 10000) * elasticity / 10000)))
-      const attachBp = Math.max(...choices.map((it) => Math.min(...it.legs.map((l) => routeSpoolBp(state.airlines[it.airline]!, l.route, state.turn)))))
+      const purchaseBp = Math.max(1200, Math.min(10000, 10000 - Math.floor(Math.max(0, purchaseRatio - 10000) * elasticity / 10000)))
       let remaining = Math.floor(population * purchaseBp * attachBp / 100_000_000)
-      const bankBonus = choices.some((it) => it.legs.length === 2 && state.airlines[it.airline]!.hubMode === 'banked') ? 1000 : 0
       const connectLimit = Math.floor(population * ((segment === 'business' ? 2500 : segment === 'leisure' ? 5000 : 7000) + bankBonus) / 10000)
       let segmentConnections = 0
       // Capped water-filling: a full shortest hub yields to other hubs/directs.
