@@ -78,6 +78,14 @@ Desktop uses a navigation rail and adjacent inspectors; mobile uses bottom
 navigation, full-width inspectors and catalog cards. List filters, scroll and
 map position survive workspace navigation.
 
+Every workspace shares one quarter draft. The plan tray previews combined profit
+and cash, removes individual changes, and applies a validated batch with one undo.
+The adviser can target scenario progress, passengers, connections, efficiency or
+reliability while retaining a chosen cash reserve. Company → Outlook compares
+four/eight quarters of known commitments, including replacement deliveries and
+debt payments, under baseline and adverse conditions; it never predicts hidden
+random draws or future rival decisions.
+
 ## Sound, display and controls
 
 Original generative music follows five era palettes and responds to financial

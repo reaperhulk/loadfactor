@@ -788,3 +788,18 @@ Ship validated stages to main. New simulation behavior uses a new rules version;
 legacy careers retain their previous deterministic rules. Shared plans are UI
 state, cleared at career/quarter/seat boundaries and excluded from replay until
 applied. No partial application of a rejected shared plan is allowed.
+
+Delivered stages 1–2: shared drafts preserve aircraft/schedule presets, survive
+workspace navigation and validate as a batch before applying. A separate
+subscriber store keeps draft edits from rerendering the entire game shell.
+Adviser goals quote conserved full-network outcomes and expose profit tradeoffs;
+non-profit screening includes bounded growth/contraction choices so direct-market
+profit screening cannot exclude every useful feeder. Combined advice observes
+the chosen cash reserve. Manual planning remains available independently.
+
+Capital outlook calls the same quarterly pipeline with rival decisions and new
+random world/repair/offer/entrant draws disabled. Known deliveries, queue grants,
+event expiry, operating wear, debt payments and aging advance normally. Inputs
+and RNG streams remain untouched; projection results stop at insolvency/deadline.
+Purchase/lease/replacement/wait comparisons include standing costs of unassigned
+deliveries and never imply that new aircraft automatically find profitable work.

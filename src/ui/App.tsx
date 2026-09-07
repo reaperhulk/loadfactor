@@ -24,7 +24,7 @@ import { isMuted, setMuted } from './sounds'
 import { ActiveDeals, OfferCard } from './OfferCard'
 import { DeskTimeline } from './DeskTimeline'
 import { AircraftDossier } from './AircraftDossier'
-import { AirportsPanel, FinancePanel, FleetPanel, RoutesPanel } from './panels'
+import { AirportsPanel, FleetPanel, RoutesPanel } from './panels'
 import { RivalsPanel } from './RivalsPanel'
 import { RouteDossier } from './RouteDossier'
 import { RouteSetupDialog } from './RouteSetupDialog'
@@ -77,6 +77,8 @@ const loadReportCard = () => import('./ReportCard').then(({ ReportCard }) => ({ 
 const ReportCard = lazy(loadReportCard)
 const loadReportPanel = () => import('./ReportPanel').then(({ ReportPanel }) => ({ default: ReportPanel }))
 const ReportPanel = lazy(loadReportPanel)
+const FinancePanel = lazy(() => import('./FinancePanel').then(m=>({default:m.FinancePanel})))
+const CapitalOutlook = lazy(() => import('./CapitalOutlook').then(m=>({default:m.CapitalOutlook})))
 const MapView = lazy(() => import('./MapView').then(({ MapView }) => ({ default: MapView })))
 const ReplayViewer = lazy(() => import('./ReplayViewer').then(({ ReplayViewer }) => ({ default: ReplayViewer })))
 
@@ -1029,7 +1031,8 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         {visited.has('catalog') && <section className="workspace-page" hidden={tab !== 'catalog'} data-testid="page-catalog"><FleetPanel state={state} view="catalog" /></section>}
         {visited.has('airports') && <section className="workspace-page" hidden={tab !== 'airports'} data-testid="page-airports"><div className="page-heading"><h2>Airports</h2></div><AirportsPanel state={state} /></section>}
         {visited.has('rivals') && <section className="workspace-page" hidden={tab !== 'rivals'} data-testid="page-rivals"><RivalsPanel state={state} /></section>}
-        {visited.has('finance') && <section className="workspace-page" hidden={tab !== 'finance'} data-testid="page-finance"><FinancePanel state={state} /></section>}
+        {visited.has('outlook') && <section className="workspace-page" hidden={tab !== 'outlook'} data-testid="page-outlook"><Suspense fallback={<p role="status">Preparing capital outlook…</p>}><CapitalOutlook state={state} /></Suspense></section>}
+        {visited.has('finance') && <section className="workspace-page" hidden={tab !== 'finance'} data-testid="page-finance"><Suspense fallback={<p role="status">Loading finances…</p>}><FinancePanel state={state} /></Suspense></section>}
         {visited.has('report') && <section className="workspace-page" hidden={tab !== 'report'} data-testid="page-report"><Suspense fallback={<p role="status">Loading reports…</p>}><ReportPanel state={state} archive={session.reportArchive} onInspect={(id) => { setTab('routes'); inspectRoute(id) }} /></Suspense></section>}
       </div>
       <PlanTray state={state} />

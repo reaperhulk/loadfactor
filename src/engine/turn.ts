@@ -202,13 +202,23 @@ const ENTRANT_NAMES: readonly string[] = [
 ]
 
 export function endQuarter(prev: GameState): EngineResult {
+  return resolveQuarter(prev, false)
+}
+
+// Known-commitment outlook: advance the same delivery, slot, operating,
+// amortization and aging pipeline without drawing future world/AI outcomes.
+export function projectQuarter(prev: GameState): EngineResult {
+  return resolveQuarter(prev, true)
+}
+
+function resolveQuarter(prev: GameState, outlook: boolean): EngineResult {
   if (prev.phase !== 'planning') return { state: prev, events: [] }
   const state = structuredClone(prev)
   const events: GameEvent[] = []
 
   // 1. Rival AI turns, ascending index, through the same command validator.
   for (const airline of state.airlines) {
-    if (airline.controller === 'rival') runRivalTurn(state, airline.id, events)
+    if (!outlook && airline.controller === 'rival') runRivalTurn(state, airline.id, events)
   }
 
   // 2. Aircraft deliveries.
@@ -263,12 +273,13 @@ export function endQuarter(prev: GameState): EngineResult {
 
   // 4. World economy and events, plus this quarter's used-aircraft market
   // (stateless hash picks — deterministic, order-independent).
-  events.push(...updateWorld(state))
+  if (!outlook) events.push(...updateWorld(state))
+  else state.world.events = state.world.events.map(e=>({...e, quartersLeft:e.quartersLeft-1})).filter(e=>e.quartersLeft>0)
   state.world.usedMarket = rollUsedMarket(state)
 
   // 5. Route economics.
   if (modernOperations(state)) enableOperations(state)
-  const operations = new Map(state.airlines.filter(a => a.operationsPolicy && !a.bankrupt).map(a => [a.id, resolveOperations(state, a, 'actual')]))
+  const operations = new Map(state.airlines.filter(a => a.operationsPolicy && !a.bankrupt).map(a => [a.id, resolveOperations(state, a, outlook ? 'forecast' : 'actual')]))
   const totals = resolveMarket(state, events, operations)
 
   // 6. Financials. Every cost lands in a named breakdown bucket; the total
@@ -316,7 +327,7 @@ export function endQuarter(prev: GameState): EngineResult {
     // rather than a stream draw. A grounded airframe still draws salaries and
     // ownership — that is the whole point of deferring renewal being a gamble.
     for (const ac of airline.fleet) {
-      if (airline.operationsPolicy || isGrounded(ac, state.turn)) continue
+      if (outlook || airline.operationsPolicy || isGrounded(ac, state.turn)) continue
       const over = ac.ageQuarters - GROUNDING_AGE_QUARTERS
       if (over <= 0) continue
       const baseRisk = Math.min(GROUNDING_MAX_BP, over * GROUNDING_BP_PER_QUARTER_OVER)
@@ -420,14 +431,14 @@ export function endQuarter(prev: GameState): EngineResult {
   // 10. The world asks a question: at most one open offer at a time, and
   // anything unanswered lapses.
   expireOffersAndDeals(state, events)
-  maybeOfferDeal(state, events)
+  if (!outlook) maybeOfferDeal(state, events)
 
   // 11. New entrants: an empty seat draws fresh capital on a fixed cadence, so
   // the map never becomes a one-airline world. Capped at the scenario's
   // intended field size.
   const liveRivals = state.airlines.filter((a) => a.controller === 'rival' && !a.bankrupt).length
   if (
-    liveRivals < getScenario(state.scenario).rivals.length &&
+    !outlook && liveRivals < getScenario(state.scenario).rivals.length &&
     state.turn > 0 &&
     state.turn % ENTRANT_EVERY_QUARTERS === 0
   ) {

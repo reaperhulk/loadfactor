@@ -5,6 +5,7 @@ import { maxRouteFrequency } from './queries'
 import { frequencyCandidates, directCandidates } from './schedulePlanning'
 import { routeSpoolBp, seasonalBp } from './market'
 import type { Command, GameState, Route } from './types'
+import { planningValue, resolvedGoal, type PlanningPreference } from './planningGoals'
 
 export type ForecastPlanner = ReturnType<typeof createForecastPlanner>
 export type RouteSetting = 'fare' | 'service' | 'frequency'
@@ -17,6 +18,7 @@ export interface Recommendation {
   profitDelta: number
   cashAfter: number
   contributionDelta: number
+  goalDelta?: number
 }
 
 export function routeRecommendations(state: GameState, seat: number, route: Route, evaluate: ForecastPlanner = createForecastPlanner(state, seat), locked: readonly RouteSetting[] = [], closure = true): Recommendation[] {
@@ -72,21 +74,36 @@ export type PlanningLocks = Record<number, RouteSetting[]>
 // Screen alternatives on their direct markets, then quote the shortlisted
 // actions against the full network. This bounds full-network market passes to
 // a few actions per route instead of every fare/service/frequency combination.
-export function networkRecommendations(state: GameState, seat: number, locks: PlanningLocks = {}): Recommendation[] {
+export function networkRecommendations(state: GameState, seat: number, locks: PlanningLocks = {}, preference: PlanningPreference = { goal: 'profit', minCash: -Infinity }): Recommendation[] {
   const evaluate = createForecastPlanner(state, seat), before = evaluate()
   const suggestions: Recommendation[] = []
+  const kind = resolvedGoal(state, preference.goal), baseline = planningValue(state, seat, before, preference.goal)
   for (const route of state.airlines[seat]!.routes) {
     const projected = before.routes.find(r => r.id === route.id)!
     const candidates = directCandidates(state, seat, route, locks[route.id] ?? [], projected)
+    // Profit screening alone would discard loss-making but useful feeders.
+    // Non-profit objectives also test bounded growth and contraction choices;
+    // every candidate is scored by the conserved full-network allocation.
+    if (kind !== 'profit') {
+      const locked = locks[route.id] ?? []
+      if (!locked.includes('frequency')) for (const frequency of [...new Set([Math.max(1,route.frequency-2), Math.min(maxRouteFrequency(state.airlines[seat]!,route,state.turn),route.frequency+2)])]) {
+        if (frequency !== route.frequency) candidates.push({ setting:'frequency', command:{ type:'set_frequency',routeId:route.id,frequency }, title:`${route.frequency} → ${frequency} round trips/week`, gain:0 })
+      }
+      if (!locked.includes('fare')) for (const fareLevel of [-1, 1]) if (fareLevel !== route.fareLevel) candidates.push({setting:'fare',command:{type:'set_fare',routeId:route.id,fareLevel},title:fareLevel < route.fareLevel ? 'Lower the fare' : 'Raise the fare',gain:0})
+      if (!locked.includes('service') && route.serviceLevel !== 3) candidates.push({setting:'service',command:{type:'set_service',routeId:route.id,serviceLevel:3},title:'Premium service',gain:0})
+    }
+    const winners = new Map<RouteSetting, Recommendation>()
     for (const c of candidates) {
       const after = evaluate([c.command]), leg = after.routes.find(r => r.id === route.id)!
       const delta = after.profit - before.profit
-      if (after.errors.length || delta <= 0) continue
-      suggestions.push({ routeId: route.id, setting: c.setting, commands: [c.command],
+      const goalDelta = planningValue(state, seat, after, preference.goal) - baseline
+      if (after.errors.length || goalDelta <= 0 || after.cashAfter < preference.minCash || goalDelta <= (winners.get(c.setting)?.goalDelta ?? 0)) continue
+      winners.set(c.setting, { routeId: route.id, setting: c.setting, commands: [c.command], goalDelta,
         title: c.title, reason: 'Screened on this market, then checked with connecting traffic and all company costs.',
         profitDelta: delta, cashAfter: after.cashAfter,
         contributionDelta: leg.lastRevenue - leg.lastCost - (projected.lastRevenue - projected.lastCost) })
     }
+    suggestions.push(...winners.values())
   }
-  return suggestions.sort((a, b) => b.profitDelta - a.profitDelta || a.routeId - b.routeId)
+  return suggestions.sort((a, b) => (b.goalDelta ?? b.profitDelta) - (a.goalDelta ?? a.profitDelta) || b.profitDelta - a.profitDelta || a.routeId - b.routeId)
 }

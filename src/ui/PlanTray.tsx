@@ -13,6 +13,9 @@ export function planningCommandLabel(state: GameState, seat: number, c: Command)
   if (c.type === 'set_service') return `${entity}: ${['','Basic','Standard','Premium'][c.serviceLevel]} service`
   if (c.type === 'set_frequency') return `${entity}: ${c.frequency} round trips/week`
   if (c.type === 'plan_maintenance') return `${entity}: check starts week ${(c.startWeek ?? 0)+1}`
+  if (c.type === 'order_replacement') return `${entity}: ${c.leased ? 'lease' : 'buy'} replacement ${c.aircraftType}`
+  if (c.type === 'order_aircraft' || c.type === 'lease_aircraft') return `${c.type === 'lease_aircraft' ? 'Lease' : 'Buy'} ${c.aircraftType}`
+  if (c.type === 'take_loan') return `Borrow ${money(c.amount)}`
   return `${entity}: ${c.type.replaceAll('_', ' ')}`
 }
 export function PlanTray({ state }: { state: GameState }) {

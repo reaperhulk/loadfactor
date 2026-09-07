@@ -380,6 +380,13 @@ main.game-shell { --bg:#10232c; --panel:#19333e; --ink:#ede9de; --dim:#a4b4b9; -
 .plan-tray > [role=alert] { margin:6px 0 0; font-size:.8rem; color:var(--neg); }
 .decision-metrics dd,.forecast-values dd { font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
 .network-advisor input[type=search] { max-width:100%; }
+.capital-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr)); gap:16px; margin:18px 0; }
+.capital-options article { border:1px solid var(--rule); border-radius:12px; padding:14px; min-width:0; }
+.capital-options table { font-size:.78rem; width:100%; }
+.capital-options th,.capital-options td { padding:8px; }
+.capital-options .cash-low { background:var(--panel); }
+.capital-outlook > details { border:1px solid var(--rule); padding:14px; border-radius:10px; }
+.capital-outlook .page-heading { flex-wrap:wrap; gap:12px; }
 @media(max-width:700px) {
   .plan-tray { padding:8px; }
   .plan-tray-bar { gap:8px; flex-wrap:wrap; }
