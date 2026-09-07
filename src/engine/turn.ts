@@ -1,3 +1,6 @@
+import { updateCustomerIdentity } from './customerIdentity'
+import { summarizeFlows } from './flows'
+import type { MarketTrace } from './itineraries'
 import { aircraftOperations, enableOperations, modernOperations, resolveOperations } from './operations'
 import { recurringFinancials } from './accounting'
 // Quarter resolution — the fixed order documented in PLAN.md §3.3. Every cash
@@ -280,7 +283,13 @@ function resolveQuarter(prev: GameState, outlook: boolean): EngineResult {
   // 5. Route economics.
   if (modernOperations(state)) enableOperations(state)
   const operations = new Map(state.airlines.filter(a => a.operationsPolicy && !a.bankrupt).map(a => [a.id, resolveOperations(state, a, outlook ? 'forecast' : 'actual')]))
-  const totals = resolveMarket(state, events, operations)
+  const traces: MarketTrace[] | undefined = (state.rulesVersion ?? 1) >= 4 && !outlook ? [] : undefined
+  const totals = resolveMarket(state, events, operations, 'forecast', traces)
+  if (traces) for (const airline of state.airlines) if (airline.controller === 'player' && !airline.bankrupt) {
+    const flows = summarizeFlows(state, airline.id, traces)
+    airline.passengerHistory = { turn:state.turn, journeys:flows.journeys, boardings:flows.boardings, pathCount:flows.own.length,
+      own:flows.own.sort((a,b)=>b.journeys-a.journeys || a.pair.localeCompare(b.pair)).slice(0,64) }
+  }
 
   // 6. Financials. Every cost lands in a named breakdown bucket; the total
   // is the sum of the buckets, never a separate number.
@@ -363,6 +372,7 @@ function resolveQuarter(prev: GameState, outlook: boolean): EngineResult {
     }
     // Reputation heals slowly toward spotless.
     airline.reputationBp = Math.min(10000, (airline.reputationBp ?? 10000) + REPUTATION_RECOVERY_BP)
+    if ((state.rulesVersion ?? 1) >= 4) updateCustomerIdentity(airline)
     if (airline.fuelHedge !== null) {
       airline.fuelHedge.quartersLeft--
       if (airline.fuelHedge.quartersLeft <= 0) airline.fuelHedge = null

@@ -1,6 +1,7 @@
 // Competitor intelligence: the net-worth race and a dossier card per rival —
 // personality, hubs, fleet composition, network size, momentum.
 
+import { CustomerIdentity } from './CustomerIdentity'
 import { useState } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { pairKey } from '../data/cities'
@@ -353,6 +354,8 @@ export function RivalsPanel({ state }: { state: GameState }) {
               </h4>
               <p className="dim">{PERSONALITY_BLURBS[rival.personality] ?? rival.personality}</p>
               {rival.campaign && <p className="campaign" data-testid={`campaign-${rival.id}`}><strong>{rival.campaign.kind} campaign · {rival.campaign.city}</strong> · {Math.max(0, rival.campaign.untilTurn - state.turn)}q remaining{rival.campaign.fromTurn > state.turn ? ' · starts next quarter' : ''}</p>}
+              {rival.campaign?.evidence && <div className="campaign-evidence"><p><strong>Observed:</strong> {rival.campaign.evidence}</p><p><strong>Announced intent:</strong> {rival.campaign.response}</p><p className="hint">Intent can be constrained by cash, aircraft and airport access. Inspect affected routes to compare price, service or capacity responses in your plan.</p></div>}
+              {rival.customerPreference && <CustomerIdentity airline={rival} compact />}
               {!rival.bankrupt && (
                 <>
                   <p>

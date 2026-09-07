@@ -812,3 +812,12 @@ The fleet calendar shows all 13 weeks and stages check/base/standby/rotation
 changes through the shared plan. Gap explanations distinguish insufficient
 assigned capacity, incompatible crews/range, ferry distance and calendar/hour
 conflicts. Weekly completed/covered counts reconcile with dispatch summaries.
+
+Stage 4 introduces rules 4; rules 1/2/3 golden careers remain frozen. Earned
+segment preference closes one eighth of the gap to a bounded product/reliability
+target each quarter, weighted by passengers actually carried. Rival campaigns
+respond to public finances, losses and contested traffic, announce a quarter
+in advance, and use the same paid command validator as the player. Recovery
+pauses new capacity and airport expansion. Latest actual passenger paths are
+retained for player seats only (top 64 plus exact totals), never accumulated in
+quarterly history. Existing careers retain planned-flow inspection.

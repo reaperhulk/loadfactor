@@ -1,3 +1,4 @@
+import { chooseCampaign } from './campaigns'
 // Rival airline AI. Lives in the engine because rivals are part of the sim:
 // their decisions must be deterministic and derived only from state + the
 // rivals RNG stream. They act through the exact same command validator as the
@@ -130,10 +131,14 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
     }
     if (!campaign || state.turn >= campaign.untilTurn) {
       const kind = airline.personality === 'price_war' ? 'price' : airline.personality === 'premium' ? 'premium' : airline.personality === 'fortress' ? 'defend' : 'expand'
-      airline.campaign = { kind, city: airline.slotInterest ?? airline.hq, fromTurn: state.turn + 1, untilTurn: state.turn + 5 }
-      events.push({ type: 'operations_changed', airline: idx, detail: `${airline.name} announces a four-quarter ${kind} campaign at ${airline.campaign.city}, starting next quarter` })
+      airline.campaign = (state.rulesVersion ?? 1) >= 4 ? chooseCampaign(state, idx) : { kind, city: airline.slotInterest ?? airline.hq, fromTurn: state.turn + 1, untilTurn: state.turn + 5 }
+      events.push({ type: 'operations_changed', airline: idx, detail: `${airline.name} announces a four-quarter ${airline.campaign.kind} campaign at ${airline.campaign.city}, starting next quarter` })
     }
   }
+
+  const active = (state.rulesVersion ?? 1) >= 4 && airline.campaign && state.turn >= airline.campaign.fromTurn && state.turn < airline.campaign.untilTurn ? airline.campaign : null
+  const recovering = active?.kind === 'recover'
+  if (recovering) personality = { ...personality, marketing: 0, orderChanceBp: 0 }
 
   if (airline.operationsPolicy) {
     const reserveBp = airline.personality === 'premium' || airline.personality === 'fortress' ? 1000 : 500
@@ -154,7 +159,7 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
 
   // Open the best reachable pair if an idle airframe can fly it.
   const idle = airline.fleet.some((a) => a.routeId === null)
-  if (idle) {
+  if (idle && !recovering) {
     applyAll(state, idx, launchCommands(state, idx, personality).commands, events)
   }
 
@@ -176,18 +181,25 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   // order, so being early is the whole game.
   applyAll(state, idx, slotReleaseCommands(state, idx), events)
   const announced = airline.slotInterest ?? null
-  applyAll(state, idx, slotRequestCommands(state, idx, personality, announced), events)
+  if (!recovering) applyAll(state, idx, slotRequestCommands(state, idx, personality, announced), events)
   // A campaign runs until it lands. Re-picking the richest target every
   // quarter looks smarter and is much worse: the authority you queued at last
   // quarter is abandoned the moment a marginally better one appears, and the
   // place in line — the only thing that matters — is thrown away. Only when
   // the announced city is held does the next campaign begin.
   const settled = announced === null || (airline.slots[announced] ?? 0) > 0
-  if (settled) {
+  if (settled && !recovering) {
     const next = slotTarget(state, idx, personality)
     if (next === null) delete airline.slotInterest
     else airline.slotInterest = next
     applyAll(state, idx, slotRequestCommands(state, idx, personality, next), events)
+  }
+  // Apply the announced product after generic yield management; otherwise
+  // the policy immediately overwrites its own public commitment.
+  if (active) for (const route of airline.routes) {
+    if (route.from !== active.city && route.to !== active.city) continue
+    if (active.kind === 'price') apply(state, idx, {type:'set_fare',routeId:route.id,fareLevel:-1}, events)
+    if (active.kind === 'premium') apply(state, idx, {type:'set_service',routeId:route.id,serviceLevel:3}, events)
   }
 }
 

@@ -166,9 +166,21 @@ export interface QuarterStats {
   breakdown: CostBreakdown
 }
 
+export interface PassengerPath {
+  airline: number; routeIds: number[]; via: string | null; journeys: number
+  pair: string; demand: number; carried: number; competing: number[]; constrained: number[]
+}
+export interface PassengerHistory { turn: number; journeys: number; boardings: number; own: PassengerPath[]; pathCount: number }
+export interface RivalCampaign {
+  kind: 'price' | 'premium' | 'defend' | 'expand' | 'recover'
+  city: string; fromTurn: number; untilTurn: number
+  evidence?: string; response?: string
+}
 export interface Airline {
+  customerPreference?: { business: number; leisure: number; budget: number }
+  passengerHistory?: PassengerHistory
   operationsPolicy?: OperationsPolicy
-  campaign?: { kind: 'price' | 'premium' | 'defend' | 'expand'; city: string; fromTurn: number; untilTurn: number }
+  campaign?: RivalCampaign
   hubMode?: 'flexible' | 'banked'
   id: number // index into GameState.airlines; 0 = player
   name: string

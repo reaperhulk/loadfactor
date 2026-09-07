@@ -68,3 +68,12 @@ describe('rules 2 compatibility', () => {
     expect({ checkpointHashes: result.checkpointHashes, summary: result.summary }).toEqual(legacy[career.name])
   })
 })
+
+// Rules 3 keeps its original operations and commercial behavior.
+describe('rules 3 compatibility', () => {
+  const legacy = JSON.parse(readFileSync(join(__dirname, '../../../fixtures/legacy-v3-goldens.json'), 'utf8')) as Record<string, Golden>
+  for (const career of CAREERS) it(`preserves ${career.name}`, () => {
+    const result = runCareer(career.scenario, career.seed, career.bot, career.quarters, 3)
+    expect({ checkpointHashes: result.checkpointHashes, summary: result.summary }).toEqual(legacy[career.name])
+  })
+})

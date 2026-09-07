@@ -115,6 +115,7 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
         weight *= reputation * (10000 + airline.marketing * 900) / 100_000_000
         weight *= spool / 10000
         weight *= deal / 10000
+        if ((state.rulesVersion ?? 1) >= 4) weight *= (airline.customerPreference?.[segment] ?? 10000) / 10000
         return Math.max(1, Math.floor(weight))
       })
       // Expensive offers lose shoppers to the outside option. Connections
