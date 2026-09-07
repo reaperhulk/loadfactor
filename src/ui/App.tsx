@@ -1,3 +1,4 @@
+import type { FlowFocus } from './PassengerFlows'
 import { PlanTray } from './PlanTray'
 import type { ExpansionOption } from '../engine/expansion'
 import { useInbox } from './inbox'
@@ -78,6 +79,7 @@ const ReportCard = lazy(loadReportCard)
 const loadReportPanel = () => import('./ReportPanel').then(({ ReportPanel }) => ({ default: ReportPanel }))
 const ReportPanel = lazy(loadReportPanel)
 const FinancePanel = lazy(() => import('./FinancePanel').then(m=>({default:m.FinancePanel})))
+const OperationsBoard = lazy(() => import('./OperationsBoard').then(m=>({default:m.OperationsBoard})))
 const CapitalOutlook = lazy(() => import('./CapitalOutlook').then(m=>({default:m.CapitalOutlook})))
 const MapView = lazy(() => import('./MapView').then(({ MapView }) => ({ default: MapView })))
 const ReplayViewer = lazy(() => import('./ReplayViewer').then(({ ReplayViewer }) => ({ default: ReplayViewer })))
@@ -675,6 +677,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     setTabState(page)
   }, [])
   const area = areaFor(tab)
+  const [flowFocus, setFlowFocus] = useState<FlowFocus | null>(null)
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<number | null>(null)
   const [selectedAircraft, setSelectedAircraft] = useState<number | null>(null)
@@ -688,7 +691,9 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const [showSettings, setShowSettings] = useState(false)
   const forecast = planningForecast(state, seat)
   const attentionCount = useInbox(state, seat, forecast.cashAfter, tab === 'desk')
+  const highlightFlow = (focus: FlowFocus) => { setFlowFocus(focus); setSelectedCity(null); setSelectedRoute(null); setTab('map') }
   const handleCityClick = (cityId: string): void => {
+    setFlowFocus(null)
     setSelectedRoute(null)
     if (routeFrom !== null && routeFrom !== cityId) {
       setPendingRoute({ from: routeFrom, to: cityId }); setRouteFrom(null)
@@ -696,6 +701,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     else setSelectedCity(selectedCity === cityId ? null : cityId)
   }
   const inspectRoute = (routeId: number): void => {
+    setFlowFocus(null)
     setSelectedCity(null); setRouteFrom(null); setSelectedRoute(routeId)
     if (tab !== 'map') setTab('routes')
   }
@@ -705,6 +711,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     if (r) requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-testid="inspect-${r.from}-${r.to}"]`)?.focus({ preventScroll: true }))
   }
   const clearSelection = (): void => {
+    setFlowFocus(null)
     setSelectedRoute(null); setSelectedAircraft(null); setSelectedCity(null); setRouteFrom(null)
   }
   const endQuarter = (): void => {
@@ -964,6 +971,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           }
         >
           <MapView
+            flowRouteIds={flowFocus?.routes}
           selectedRouteId={inspectedRoute?.id}
             state={state}
             active={tab === "map"}
@@ -994,10 +1002,12 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             })()}
           />
         </Suspense>
+        {flowFocus && <div className="flow-focus-banner" data-testid="flow-focus"><strong>{flowFocus.label}</strong><button onClick={()=>setFlowFocus(null)}>Clear journey</button></div>}
         {tab === "map" && selectedCity !== null && (
           <CityPanel
             state={state}
             cityId={selectedCity}
+            onHighlight={highlightFlow}
             routeFrom={routeFrom}
             onPlanRoute={(from) => { setRouteFrom(routeFrom === from ? null : from); setSelectedCity(null) }}
             onPlanPair={(from, to) => {
@@ -1017,6 +1027,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             routeId={inspectedRoute!.id}
             onClose={() => setSelectedRoute(null)}
             onSelectRoute={setSelectedRoute}
+            onHighlight={highlightFlow}
           />
         )}
       </div>
@@ -1024,13 +1035,14 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         </section>
         {visited.has('routes') && <section className={`workspace-page route-page split-view${inspectedRoute !== undefined ? ' has-inspector' : ''}`} hidden={tab !== 'routes'} data-testid="page-routes">
           <div className="split-list"><div className="page-heading"><div><span className="eyebrow">Network</span><h2>Routes <span>{player.routes.length}</span></h2></div><span className="dim">Last quarter’s results</span></div><RoutesPanel state={state} selectedRouteId={selectedRoute} onInspect={inspectRoute} onPlan={(from, to, preset) => setPendingRoute({ from, to, preset })} onAirport={(city) => { setTab('map'); setSelectedCity(city); setSelectedRoute(null) }} /></div>
-          {tab === 'routes' && inspectedRoute !== undefined && <RouteDossier state={state} routeId={inspectedRoute!.id} onClose={closeRoute} onSelectRoute={setSelectedRoute} />}
+          {tab === 'routes' && inspectedRoute !== undefined && <RouteDossier state={state} routeId={inspectedRoute!.id} onClose={closeRoute} onSelectRoute={setSelectedRoute} onHighlight={highlightFlow} />}
         </section>}
         {visited.has('fleet') && <section className={`workspace-page fleet-page split-view${inspectedAircraft ? ' has-inspector' : ''}`} hidden={tab !== 'fleet'} data-testid="page-fleet"><div className="split-list"><FleetPanel state={state} selectedAircraftId={selectedAircraft} onInspect={setSelectedAircraft} /></div>{tab === 'fleet' && inspectedAircraft && <AircraftDossier state={state} aircraftId={inspectedAircraft.id} onClose={() => { setSelectedAircraft(null); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-testid="inspect-aircraft-${inspectedAircraft.id}"]`)?.focus({ preventScroll:true })) }} />}</section>}
         {visited.has('orders') && <section className="workspace-page" hidden={tab !== 'orders'} data-testid="page-orders"><FleetPanel state={state} view="orders" /></section>}
         {visited.has('catalog') && <section className="workspace-page" hidden={tab !== 'catalog'} data-testid="page-catalog"><FleetPanel state={state} view="catalog" /></section>}
         {visited.has('airports') && <section className="workspace-page" hidden={tab !== 'airports'} data-testid="page-airports"><div className="page-heading"><h2>Airports</h2></div><AirportsPanel state={state} /></section>}
         {visited.has('rivals') && <section className="workspace-page" hidden={tab !== 'rivals'} data-testid="page-rivals"><RivalsPanel state={state} /></section>}
+        {visited.has('operations') && <section className="workspace-page" hidden={tab !== 'operations'} data-testid="page-operations"><Suspense fallback={<p role="status">Preparing operations calendar…</p>}><OperationsBoard state={state} /></Suspense></section>}
         {visited.has('outlook') && <section className="workspace-page" hidden={tab !== 'outlook'} data-testid="page-outlook"><Suspense fallback={<p role="status">Preparing capital outlook…</p>}><CapitalOutlook state={state} /></Suspense></section>}
         {visited.has('finance') && <section className="workspace-page" hidden={tab !== 'finance'} data-testid="page-finance"><Suspense fallback={<p role="status">Loading finances…</p>}><FinancePanel state={state} /></Suspense></section>}
         {visited.has('report') && <section className="workspace-page" hidden={tab !== 'report'} data-testid="page-report"><Suspense fallback={<p role="status">Loading reports…</p>}><ReportPanel state={state} archive={session.reportArchive} onInspect={(id) => { setTab('routes'); inspectRoute(id) }} /></Suspense></section>}

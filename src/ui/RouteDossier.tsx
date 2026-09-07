@@ -1,3 +1,6 @@
+import { lazy, Suspense } from 'react'
+import type { FlowFocus } from './PassengerFlows'
+const PassengerFlows = lazy(() => import('./PassengerFlows').then(m=>({default:m.PassengerFlows})))
 // The route dossier: one route's full story — trend lines, the competitive
 // picture on the pair, controls, and the fleet flying it. Opens from the
 // Routes table or by clicking an arc on the map.
@@ -25,13 +28,14 @@ import { viewSeat, dispatch } from './session'
 import { money } from './format'
 
 interface RouteDossierProps {
+  onHighlight?: (focus:FlowFocus)=>void
   state: GameState
   routeId: number
   onClose: () => void
   onSelectRoute?: (routeId: number) => void
 }
 
-export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDossierProps) {
+export function RouteDossier({ state, routeId, onClose, onSelectRoute, onHighlight }: RouteDossierProps) {
   const panel = useRef<HTMLElement>(null)
   useEffect(() => { panel.current?.scrollTo(0, 0); panel.current?.querySelector<HTMLButtonElement>('[data-testid=route-dossier-close]')?.focus({ preventScroll: true }) }, [routeId])
   const player = state.airlines[viewSeat()]!
@@ -149,6 +153,7 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute }: RouteDo
         <p>Connections contribute {money(route.lastTransferRevenue ?? 0)} of route revenue. Removing a feeder also removes its connecting traffic from the other leg.</p>
         <p className="dim">Passengers choose among direct flights and every viable one-stop. One connecting journey uses a seat on each leg; reported passengers count boardings.</p>
       </section>}
+      <Suspense fallback={null}><PassengerFlows state={state} routeId={routeId} onHighlight={onHighlight} /></Suspense>
       <h3>Trend (last {route.history.length}q)</h3>
       <div className="trend-row">
         <span className="dim">load</span>

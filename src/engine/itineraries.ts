@@ -19,10 +19,13 @@ export function segmentMix(from: string, to: string): Record<PassengerSegment, n
 }
 interface Itinerary { legs: RouteAcc[]; airline: number; fare: number; km: number; trips: number }
 export interface MarketAudit { pair: string; demand: number; carried: number; connecting: number }
+export interface MarketTrace extends MarketAudit {
+  choices: { airline: number; routeIds: number[]; via: string | null; journeys: number }[]
+}
 
 // Exporting the audit lets tests prove conservation without storing a giant
 // O/D matrix in every save. The UI receives compact per-route segment totals.
-export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWeeks = 1): MarketAudit[] {
+export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWeeks = 1, trace?: MarketTrace[]): MarketAudit[] {
   const markets = new Map<string, Itinerary[]>()
   const add = (from: string, to: string, itinerary: Itinerary) => {
     const key = pairKey(from, to)
@@ -66,6 +69,7 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
   const rules = getScenario(state.scenario).rules
   for (const key of [...markets.keys()].sort()) {
     const choices = markets.get(key)!
+    const journeys = trace ? Array<number>(choices.length).fill(0) : undefined
     const [from, to] = key.split('-') as [string, string]
     const demand = pairWeeklyDemand(state, from, to) * periodWeeks
     const mix = segmentMix(from, to)
@@ -133,6 +137,7 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
           const take = Math.min(remaining, spare, Math.max(1, Math.floor(pool * weights[i]! / totalWeight)))
           if (take <= 0) continue
           remaining -= take; taken += take; carried += take
+          if (journeys) journeys[i]! += take
           if (it.legs.length === 2) { segmentConnections += take; connecting += take }
           for (const leg of it.legs) {
             const revenue = Math.floor(take * fareFor(leg.km, leg.route.fareLevel) * leg.yieldBp / 10000 * (it.legs.length === 2 ? CONNECT_FARE_DISCOUNT_BP / 10000 : 1))
@@ -151,6 +156,12 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
       }
     }
     audit.push({ pair: key, demand, carried, connecting })
+    if (trace) {
+      const scale = 13 / periodWeeks
+      trace.push({ pair:key, demand:demand*scale, carried:carried*scale, connecting:connecting*scale,
+        choices:choices.map((it,i)=>({airline:it.airline,routeIds:it.legs.map(l=>l.route.id), journeys:journeys![i]!*scale,
+          via:it.legs.length === 2 ? [it.legs[0]!.route.from,it.legs[0]!.route.to].find(c=>c===it.legs[1]!.route.from || c===it.legs[1]!.route.to)! : null })) })
+    }
   }
   return audit
 }

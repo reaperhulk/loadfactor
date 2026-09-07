@@ -803,3 +803,12 @@ event expiry, operating wear, debt payments and aging advance normally. Inputs
 and RNG streams remain untouched; projection results stop at insolvency/deadline.
 Purchase/lease/replacement/wait comparisons include standing costs of unassigned
 deliveries and never imply that new aircraft automatically find profitable work.
+
+Stage 3 adds optional allocation traces and dispatch calendar annotations, without
+changing resolution. Flow journeys sum to the real market allocation; connecting
+paths consume two boardings. Inspectors show the eight busiest planned paths,
+competitors and shared seat constraints, with route highlights on the map.
+The fleet calendar shows all 13 weeks and stages check/base/standby/rotation
+changes through the shared plan. Gap explanations distinguish insufficient
+assigned capacity, incompatible crews/range, ferry distance and calendar/hour
+conflicts. Weekly completed/covered counts reconcile with dispatch summaries.

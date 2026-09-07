@@ -1,5 +1,5 @@
 import { modernOperations, resolveOperations, type OperationsResult } from './operations'
-import { resolveItineraries, type PassengerSegment } from './itineraries'
+import { resolveItineraries, type MarketTrace, type PassengerSegment } from './itineraries'
 // Route economics: the heart of the game (PLAN.md §2.2). Pure arithmetic plus
 // stateless hash noise — no stream draws, so resolution order can never
 // reshuffle another subsystem's randomness. Resolution has two phases:
@@ -244,7 +244,7 @@ interface AirlineTotals {
 // each airline's own network, writes each route's last* results, emits
 // route_result events, and returns per-airline totals. Mutates state
 // (callers clone at the entry point).
-export function resolveMarket(state: GameState, events: GameEvent[], prepared?: Map<number, OperationsResult>, mode: 'forecast' | 'adverse' = 'forecast'): AirlineTotals[] {
+export function resolveMarket(state: GameState, events: GameEvent[], prepared?: Map<number, OperationsResult>, mode: 'forecast' | 'adverse' = 'forecast', trace?: MarketTrace[]): AirlineTotals[] {
   const modern = modernOperations(state)
   const operations = prepared ?? new Map(modern ? state.airlines.filter(a => !a.bankrupt).map(a => [a.id, resolveOperations(state, a, mode)]) : [])
   const periodWeeks = modern ? WEEKS_PER_QUARTER : 1
@@ -381,7 +381,7 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
   }
 
   if ((state.rulesVersion ?? 1) >= 2) {
-    resolveItineraries(state, [...accs.values()], periodWeeks)
+    resolveItineraries(state, [...accs.values()], periodWeeks, trace)
   } else {
   // ---- Phase 2: connecting itineraries over each airline's own network ----
   // A share of unserved O/D demand will take a one-stop over a hub if both

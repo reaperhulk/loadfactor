@@ -1,3 +1,6 @@
+import { lazy, Suspense } from 'react'
+import type { FlowFocus } from './PassengerFlows'
+const PassengerFlows = lazy(() => import('./PassengerFlows').then(m=>({default:m.PassengerFlows})))
 // The city dossier: everything you can know and do about one airport, in
 // context — ratings, slots, active events, the richest pairs from here, your
 // presence, and slot negotiations. Opens when a city is clicked on the map.
@@ -39,6 +42,7 @@ function Rating({ label, value }: { label: string; value: number }) {
 }
 
 interface CityPanelProps {
+  onHighlight?: (focus:FlowFocus)=>void
   state: GameState
   cityId: string
   routeFrom: string | null
@@ -48,7 +52,7 @@ interface CityPanelProps {
   onClose: () => void
 }
 
-export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, onClose }: CityPanelProps) {
+export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, onClose, onHighlight }: CityPanelProps) {
   const city = getCity(cityId)
   const player = state.airlines[viewSeat()]!
 
@@ -329,6 +333,7 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
         </>
       )}
       <SeasonLegend />
+      <Suspense fallback={null}><PassengerFlows state={state} city={cityId} onHighlight={onHighlight} /></Suspense>
     </aside>
   )
 }

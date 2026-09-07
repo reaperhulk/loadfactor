@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 
 export async function openPanel(page: Page, panel: string) {
-  const area = panel === 'desk' ? 'desk' : ['map', 'routes', 'airports'].includes(panel) ? 'network' : ['fleet', 'orders', 'catalog'].includes(panel) ? 'fleet' : 'company'
+  const area = panel === 'desk' ? 'desk' : ['map', 'routes', 'airports'].includes(panel) ? 'network' : ['fleet', 'operations', 'orders', 'catalog'].includes(panel) ? 'fleet' : 'company'
   await page.getByTestId(`nav-${area}`).click()
   await page.getByTestId(`tab-${panel}`).click()
 }

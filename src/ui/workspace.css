@@ -387,6 +387,28 @@ main.game-shell { --bg:#10232c; --panel:#19333e; --ink:#ede9de; --dim:#a4b4b9; -
 .capital-options .cash-low { background:var(--panel); }
 .capital-outlook > details { border:1px solid var(--rule); padding:14px; border-radius:10px; }
 .capital-outlook .page-heading { flex-wrap:wrap; gap:12px; }
+.workspace-tabs.tabs { overflow-x:auto; scrollbar-width:thin; }
+.passenger-flows { margin:16px 0; border-top:1px solid var(--rule); padding-top:14px; }
+.flow-list article { border-left:2px solid var(--accent); margin:12px 0; padding:4px 12px; font-size:.85rem; }
+.flow-list p { margin:6px 0; }
+.flow-focus-banner { position:absolute; top:10px; left:50%; transform:translateX(-50%); background:var(--panel); border:1px solid var(--accent); border-radius:8px; padding:8px 12px; display:flex; align-items:center; gap:12px; z-index:12; font-size:.8rem; max-width:calc(100% - 80px); }
+.route-player.route-context { opacity:.2; }
+.operations-board-summary { display:flex; gap:20px; flex-wrap:wrap; background:var(--panel); padding:14px; border-radius:10px; margin:16px 0; }
+.fleet-calendar { border-collapse:separate; border-spacing:3px; width:100%; }
+.fleet-calendar th { font-size:.8rem; }
+.fleet-calendar th:first-child { position:sticky; left:0; z-index:1; min-width:165px; background:var(--bg); text-align:left; }
+.fleet-calendar small { display:block; font-size:.65rem; color:var(--dim); white-space:nowrap; }
+.fleet-calendar td { padding:0; }
+.fleet-calendar td button { min-width:62px; min-height:58px; width:100%; padding:5px; background:var(--panel); }
+.fleet-calendar .week-check { border-color:var(--accent); }
+.fleet-calendar .week-gap { border-color:var(--neg); color:var(--neg); }
+.operation-experiment { border:1px solid var(--rule); padding:16px; border-radius:12px; margin:18px 0; }
+@media(max-width:700px) {
+  .fleet-calendar th:first-child { min-width:105px; max-width:125px; }
+  .fleet-calendar th:first-child button { max-width:120px; font-size:.72rem; }
+  .flow-focus-banner { top:6px; padding:6px; gap:6px; }
+  .flow-focus-banner button { min-height:40px; }
+}
 @media(max-width:700px) {
   .plan-tray { padding:8px; }
   .plan-tray-bar { gap:8px; flex-wrap:wrap; }

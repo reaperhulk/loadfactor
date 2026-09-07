@@ -9,6 +9,7 @@ import type { TripAllocation } from './queries'
 
 export const WEEK_MINUTES = 7 * 24 * 60
 export const QUARTER_MINUTES = WEEK_MINUTES * WEEKS_PER_QUARTER
+export interface OperationsWeek { aircraftId:number; week:number; flightMinutes:number; unavailableMinutes:number; completed:number; covered:number; cancelled:number }
 export const CHECK_INTERVAL = 8
 export const crewFamily = (type: string): string =>
   type.startsWith('b747') ? '747' : type === 'b757' || type === 'b767' ? '757/767' : type
@@ -136,6 +137,7 @@ export function resolveOperations(
   airline: Airline,
   mode: 'actual' | 'forecast' | 'adverse' = 'forecast',
   forced?: Disruption[],
+  calendar?: OperationsWeek[],
 ): OperationsResult {
   const start = state.turn * QUARTER_MINUTES,
     end = start + QUARTER_MINUTES
@@ -151,6 +153,7 @@ export function resolveOperations(
   const jobs: Job[] = [],
     unavailable = new Map<number, Interval[]>(),
     occupancy = new Map<number, Interval[][]>()
+  const weeks = calendar ? new Map(airline.fleet.map(ac=>[ac.id,Array.from({length:13},(_,week):OperationsWeek=>({aircraftId:ac.id,week,flightMinutes:0,unavailableMinutes:0,completed:0,covered:0,cancelled:0}))])) : undefined
   const used = new Map<number, number[]>(),
     updated = new Map<number, AircraftOperations>()
   const summary: OperationsSummary = {
@@ -311,6 +314,7 @@ export function resolveOperations(
     if (!prior || at < prior.start || (at === prior.start && origin < prior.origin)) firstAllocation.set(key, { start: at, origin })
   }
   const add = (job: Job, ac: OwnedAircraft, minutes = job.minutes, charter = false) => {
+    if (weeks) { const row = weeks.get(job.ac.id)![job.week]!; row.completed++; if (charter || ac.id !== job.ac.id) row.covered++ }
     const rows = allocations.get(job.route.id) ?? []
     const aircraftId = charter ? -ac.id : ac.id
     recordFirst(job.route.id, aircraftId, job.start, job.ac.id)
@@ -352,6 +356,7 @@ export function resolveOperations(
       recordFirst(row.route.id, ac.id, departure(ac, row.minutes, prefix, 0), ac.id)
       prefix += row.minutes * row.trips
       const count = row.trips * 13
+      if (weeks) for (const week of weeks.get(ac.id)!) week.completed += row.trips
       const rows = allocations.get(row.route.id) ?? []
       rows.push({ aircraftId: ac.id, type: ac.type, cabin: ac.cabin,
         seats: Math.floor(getAircraftType(ac.type).seats * CABIN_SEATS_BP[ac.cabin - 1]! / 10000), trips: count })
@@ -423,9 +428,11 @@ export function resolveOperations(
         ),
       )
     }
-    if (!covered)
+    if (!covered) {
+      if (weeks) weeks.get(job.ac.id)![job.week]!.cancelled++
       routeStats.get(job.route.id)!.unservedSeats +=
         Math.floor((getAircraftType(job.ac.type).seats * CABIN_SEATS_BP[job.ac.cabin - 1]!) / 10000) * 2
+    }
   }
   // Aggregation commutes with dispatch counts; preserve the original order
   // of first flown trips for downstream integer cost accumulation.
@@ -439,6 +446,11 @@ export function resolveOperations(
       u = flightUsage.get(ac.id)!,
       blocked = unionMinutes(unavailable.get(ac.id)!, start, end)
     unavailableTotal += blocked
+    if (weeks && calendar) for (const row of weeks.get(ac.id)!) {
+      row.flightMinutes = used.get(ac.id)![row.week]!
+      row.unavailableMinutes = unionMinutes(unavailable.get(ac.id)!, start+row.week*WEEK_MINUTES, start+(row.week+1)*WEEK_MINUTES)
+      calendar.push(row)
+    }
     o.flightMinutes += u.minutes
     o.cycles += u.cycles
     if ((o.checkEnd ?? Infinity) <= end) {

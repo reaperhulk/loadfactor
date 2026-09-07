@@ -463,6 +463,7 @@ function clampView(v: ViewBox): ViewBox {
 }
 
 interface MapViewProps {
+  flowRouteIds?: number[]
   selectedRouteId?: number
   active?: boolean
   state: GameState
@@ -480,6 +481,7 @@ interface MapViewProps {
 export function MapView({
   active = true,
   selectedRouteId,
+  flowRouteIds,
   state,
   selected,
   routeFrom,
@@ -1090,7 +1092,7 @@ export function MapView({
             d={d}
             pathLength={1}
             data-acquired={isAcquired || undefined}
-            className={`route-player ${haulClass(km)}${r.id === selectedRouteId ? ' route-selected' : ''}${isNew ? ' route-new' : ''}${isAcquired ? ' route-acquired' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
+            className={`route-player ${haulClass(km)}${r.id === selectedRouteId || flowRouteIds?.includes(r.id) ? ' route-selected' : flowRouteIds?.length ? ' route-context' : ''}${isNew ? ' route-new' : ''}${isAcquired ? ' route-acquired' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
             style={
               {
                 '--cap-w': capWidth(player, r, false, state.turn),
@@ -1116,7 +1118,7 @@ export function MapView({
       )
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, seat, isGlobe, globe, projKey, newRouteIds, acquiredRouteIds, lens, pulseUi, onRouteClick, selectedRouteId])
+  }, [state, seat, isGlobe, globe, projKey, newRouteIds, acquiredRouteIds, lens, pulseUi, onRouteClick, selectedRouteId, flowRouteIds])
 
   const playerPlanesLayer = useMemo(() => {
     if (reduceMotion || (isGlobe && rotating)) return []

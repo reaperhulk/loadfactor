@@ -1,6 +1,36 @@
 import { test, expect } from '@playwright/test'
 import { openPanel } from './workspace'
 
+for (const width of [1440, 390]) test(`network operations ${width}px: trace a journey and preview a check`, async ({ page }, info) => {
+  await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 })
+  await page.addInitScript(() => localStorage.setItem('loadfactor:display:v1', JSON.stringify({ motion:'reduced' })))
+  await page.goto('/')
+  const scenario=page.getByTestId('scenario-hub_defense')
+  await scenario.getByRole('button').click(); await scenario.getByRole('button').click()
+  await openPanel(page,'routes')
+  await page.locator('[data-testid^="inspect-"]').first().click()
+  await page.getByRole('button',{name:'Explore passenger flows'}).click()
+  await expect(page.getByTestId('passenger-flows')).toContainText('Company journeys')
+  await page.getByRole('button',{name:'Show journey on map'}).first().click()
+  await expect(page.getByTestId('flow-focus')).toBeVisible()
+  await expect(page.locator('.route-player.route-selected').first()).toBeVisible()
+  await openPanel(page,'operations')
+  await expect(page.getByTestId('operations-board')).toContainText('Aircraft and cover')
+  const before=await page.evaluate(()=>JSON.stringify(window.__harness.getState()))
+  await page.getByLabel('Calendar check week').selectOption('5')
+  await page.getByRole('button',{name:'Preview operating change'}).click()
+  await expect(page.getByTestId('operations-preview')).toContainText('Cancelled trips')
+  expect(await page.evaluate(()=>JSON.stringify(window.__harness.getState()))).toBe(before)
+  await page.getByRole('button',{name:'Add operating change to plan'}).click()
+  await expect(page.getByTestId('plan-tray')).toBeVisible()
+  await info.attach(`${width}-operations-calendar`,{body:await page.screenshot({animations:'disabled'}),contentType:'image/png'})
+  await page.getByTestId('apply-shared-plan').click()
+  expect(await page.evaluate(()=>JSON.stringify(window.__harness.getState()))).not.toBe(before)
+  await page.getByTestId('undo-action').click()
+  expect(await page.evaluate(()=>JSON.stringify(window.__harness.getState()))).toBe(before)
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBe(0)
+})
+
 for (const width of [1440, 390]) test(`shared plan ${width}px: navigation, exact launch, combined apply and undo`, async ({ page }) => {
   await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 })
   await page.addInitScript(() => localStorage.setItem('loadfactor:display:v1', JSON.stringify({ motion: 'reduced' })))
