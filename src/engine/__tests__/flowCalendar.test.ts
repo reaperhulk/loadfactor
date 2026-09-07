@@ -31,3 +31,14 @@ it('calendar annotations leave dispatch identical and reconcile completed, cover
   expect(board.gaps.every(r=>r.reasons.length>0)).toBe(true)
   expect(hashState(state)).toBe(before)
 })
+
+it('explains constrained cover already based at either endpoint without a self-distance lookup', () => {
+  const state=newGame('hub_defense','endpoint-cover'),airline=state.airlines[0]!,route=airline.routes[0]!,source=airline.fleet.find(a=>a.routeId===route.id)!
+  airline.fleet.push({...structuredClone(source),id:airline.nextId++,routeId:null,reserve:true})
+  for(const aircraft of airline.fleet) {aircraft.operations!.checkStart=0;aircraft.operations!.checkEnd=7*24*60}
+  for(const base of [route.from,route.to]) {
+    airline.fleet.at(-1)!.operations!.base=base
+    const board=operationsBoard(state,0)
+    expect(board.gaps.some(g=>g.routeId===route.id && g.reasons.some(r=>r.startsWith('Nearby compatible aircraft')))).toBe(true)
+  }
+})

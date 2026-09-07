@@ -14,7 +14,10 @@ export function operationsBoard(state: GameState, seat: number) {
     const possible = airline.fleet.filter(ac=>!assigned.includes(ac))
     const family = possible.filter(ac=>assigned.some(own=>crewFamily(own.type)===crewFamily(ac.type)))
     const range = family.filter(ac=>getAircraftType(ac.type).rangeKm>=distanceKm(route.from,route.to))
-    const local = range.filter(ac=>Math.min(distanceKm(aircraftBase(airline,ac),route.from),distanceKm(aircraftBase(airline,ac),route.to))<=1000)
+    const local = range.filter(ac=>{
+      const base=aircraftBase(airline,ac)
+      return base===route.from || base===route.to || Math.min(distanceKm(base,route.from),distanceKm(base,route.to))<=1000
+    })
     if (!family.length) reasons.push('No other aircraft has compatible crews')
     else if (!range.length) reasons.push('Compatible aircraft lack route range')
     else if (!local.length) reasons.push('Compatible aircraft are beyond the 1,000 km ferry limit')

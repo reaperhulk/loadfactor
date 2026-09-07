@@ -1017,7 +1017,7 @@ test('the shop estimates per-route economics, coach marks guide, mute persists',
   await expect(page.getByTestId('shop-horizon')).toContainText('On the horizon')
   await openPanel(page, 'desk')
   // Coach mark points at the first move and is dismissable forever.
-  await expect(page.getByTestId('coach')).toContainText('Open route from here')
+  await expect(page.getByTestId('coach')).toContainText('first-market choices on the Desk')
   await page.getByTestId('coach-dismiss').click()
   await expect(page.getByTestId('coach')).toHaveCount(0)
 

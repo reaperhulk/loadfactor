@@ -28,7 +28,8 @@ import { ActiveDeals, OfferCard } from './OfferCard'
 import { DeskTimeline } from './DeskTimeline'
 import { AircraftDossier } from './AircraftDossier'
 import { AirportsPanel, FleetPanel, RoutesPanel } from './panels'
-const RivalsPanel = lazy(() => import('./RivalsPanel').then(m=>({default:m.RivalsPanel})))
+const loadRivalsPanel = () => import('./RivalsPanel').then(m=>({default:m.RivalsPanel}))
+const RivalsPanel = lazy(loadRivalsPanel)
 import { RouteDossier } from './RouteDossier'
 import { RouteSetupDialog } from './RouteSetupDialog'
 import { ACHIEVEMENTS, loadAchievements } from './achievements'
@@ -80,10 +81,13 @@ const loadReportCard = () => import('./ReportCard').then(({ ReportCard }) => ({ 
 const ReportCard = lazy(loadReportCard)
 const loadReportPanel = () => import('./ReportPanel').then(({ ReportPanel }) => ({ default: ReportPanel }))
 const ReportPanel = lazy(loadReportPanel)
-const FinancePanel = lazy(() => import('./FinancePanel').then(m=>({default:m.FinancePanel})))
+const loadFinancePanel = () => import('./FinancePanel').then(m=>({default:m.FinancePanel}))
+const FinancePanel = lazy(loadFinancePanel)
 const FrameDiagnostics = lazy(() => import('./FrameDiagnostics').then(m=>({default:m.FrameDiagnostics})))
-const OperationsBoard = lazy(() => import('./OperationsBoard').then(m=>({default:m.OperationsBoard})))
-const CapitalOutlook = lazy(() => import('./CapitalOutlook').then(m=>({default:m.CapitalOutlook})))
+const loadOperationsBoard = () => import('./OperationsBoard').then(m=>({default:m.OperationsBoard}))
+const OperationsBoard = lazy(loadOperationsBoard)
+const loadCapitalOutlook = () => import('./CapitalOutlook').then(m=>({default:m.CapitalOutlook}))
+const CapitalOutlook = lazy(loadCapitalOutlook)
 const MapView = lazy(() => import('./MapView').then(({ MapView }) => ({ default: MapView })))
 const ReplayViewer = lazy(() => import('./ReplayViewer').then(({ ReplayViewer }) => ({ default: ReplayViewer })))
 
@@ -662,7 +666,7 @@ function AnimatedMoney({ value }: { value: number }) {
 function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   useEffect(() => {
     // Keep first paint light, then warm the quarter flow for offline play.
-    const warm = () => { void Promise.allSettled([loadQuarterReview(), loadReportCard(), loadReportPanel()]) }
+    const warm = () => { void Promise.allSettled([loadQuarterReview(), loadReportCard(), loadReportPanel(), loadRivalsPanel(), loadFinancePanel(), loadOperationsBoard(), loadCapitalOutlook(), import('./PassengerFlows')]) }
     const timer = window.setTimeout(warm, 500)
     window.addEventListener('online', warm)
     return () => { clearTimeout(timer); window.removeEventListener('online', warm) }
