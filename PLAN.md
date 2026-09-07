@@ -759,3 +759,32 @@ feasible expansions took 40ms with an aircraft freed for the comparison. These
 are runtime-specific CPU measurements, not phone latency guarantees. Run
 `npx vite-node tools/profile-planning.ts` and `tools/profile-decisions.ts` to
 repeat. No simulation balance or historical golden fixtures changed.
+
+### Next ten priorities (approved September 2026)
+
+1. One shared, inspectable quarter draft across the Desk, map, route inspector,
+   expansion planner and adviser. Quotes carry concrete aircraft/schedule inputs;
+   validate the entire plan before any mutation, apply once and undo once.
+2. Consistent decision hierarchy, compact comparisons, reachable mobile actions
+   and desktop/phone/tablet checks including enlarged text and populated careers.
+3. Advice for profit, scenario progress, passengers, connections, efficiency or
+   resilience, constrained by a player-selected minimum cash reserve.
+4. Four/eight-quarter capital outlook: delivery, demand ramp, check, debt, slot
+   and contract timing; compare purchase/lease/replacement/wait under headwinds.
+5. Map intelligence: actual passenger journeys, connecting paths, capacity
+   constraints, competing carriers and unserved demand; distinguish boardings.
+6. A visual operations calendar with coverage explanations and previews of check
+   timing, rotations and standby location changes.
+7. Rivals adapt campaigns to observed competition, finances and market losses;
+   show evidence separately from predictions and preserve fair command rules.
+8. Persistent customer preferences earned through consistent operating choices,
+   with differentiated viable strategies rather than mandatory upgrade clicks.
+9. Choice-based opening guidance, concise quiet quarters, and balance measures
+   for decision repetition, race competitiveness and strategic variety.
+10. Recorded browser workloads, optional frame-time diagnostics, memory/save
+    measurements and algorithm improvements verified against exact references.
+
+Ship validated stages to main. New simulation behavior uses a new rules version;
+legacy careers retain their previous deterministic rules. Shared plans are UI
+state, cleared at career/quarter/seat boundaries and excluded from replay until
+applied. No partial application of a rejected shared plan is allowed.

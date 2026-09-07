@@ -1,3 +1,4 @@
+import type { ExpansionOption } from '../engine/expansion'
 import { checkDueIn } from '../engine/operations'
 import { useMemo } from 'react'
 import { getAircraftType } from '../data/aircraft'
@@ -12,7 +13,7 @@ import { viewSeat } from './session'
 import { money } from './format'
 
 type BriefTab = 'routes' | 'fleet' | 'finance' | 'rivals' | 'airports'
-export function ManagementBrief({ state, onTab, onInspect, onPlan, onAircraft }: { state: GameState; onTab: (tab: BriefTab) => void; onAircraft: (id: number) => void; onInspect: (routeId: number) => void; onPlan: (from: string, to: string) => void }) {
+export function ManagementBrief({ state, onTab, onInspect, onPlan, onAircraft }: { state: GameState; onTab: (tab: BriefTab) => void; onAircraft: (id: number) => void; onInspect: (routeId: number) => void; onPlan: (from: string, to: string, preset?: Pick<ExpansionOption, 'aircraftId' | 'frequency'>) => void }) {
   const seat = viewSeat()
   const { forecast, firstFlights } = useMemo(() => {
     const a = state.airlines[seat]!
@@ -28,7 +29,7 @@ export function ManagementBrief({ state, onTab, onInspect, onPlan, onAircraft }:
       })[0]!
       const frequency = Math.max(1, Math.min(roundTripsPerWeek(launch.type, distanceKm(a.hq, to)), Math.ceil(pairWeeklyDemand(state, a.hq, to) * 0.7 / (cabinSeats(launch.type, launch.cabin) * 2))))
       const quote = forecastQuarter(state, seat, [{ type: 'open_route', from: a.hq, to, aircraftId: launch.id, frequency }])
-      return { from: a.hq, to, quote }
+      return { from: a.hq, to, quote, preset: { aircraftId: launch.id, frequency } }
     }).filter((choice) => choice.quote.errors.length === 0)
     return { forecast, firstFlights }
   }, [state, seat])
@@ -51,7 +52,7 @@ export function ManagementBrief({ state, onTab, onInspect, onPlan, onAircraft }:
   if (!items.length) items.push({ priority: 0, title: 'Choose your next move', detail: 'Compare an expansion with improving the network you already have. Retain enough cash for a difficult quarter.', action: 'Plan route changes', run: () => onTab('routes') })
   return <section className="management-brief" data-testid="management-brief">
     <div className="brief-heading"><h2>Needs attention</h2><span>Planned quarter: <strong className={forecast.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.profit)} net profit</strong></span></div>
-    {firstFlights.length > 0 ? <div className="brief-grid">{firstFlights.map((choice) => <article key={choice.to}><span className="eyebrow">Your first market</span><h3>{getCity(choice.to).name}</h3><p>{choice.from}–{choice.to} · {getCity(choice.to).tour >= getCity(choice.to).biz ? 'Leisure appeal' : 'Business demand'}</p><p>Estimated company profit {money(choice.quote.profit)}/q.</p><button onClick={() => onPlan(choice.from, choice.to)}>Compare this launch</button></article>)}</div>
+    {firstFlights.length > 0 ? <div className="brief-grid">{firstFlights.map((choice) => <article key={choice.to}><span className="eyebrow">Your first market</span><h3>{getCity(choice.to).name}</h3><p>{choice.from}–{choice.to} · {getCity(choice.to).tour >= getCity(choice.to).biz ? 'Leisure appeal' : 'Business demand'}</p><p>Estimated company profit {money(choice.quote.profit)}/q.</p><button onClick={() => onPlan(choice.from, choice.to, choice.preset)}>Compare this launch</button></article>)}</div>
       : <div className="brief-list">{items.sort((a,b)=>b.priority-a.priority).slice(0,5).map((item) => <article key={item.title}><div><h3>{item.title}</h3><p>{item.detail}</p></div><button onClick={item.run}>{item.action} <span aria-hidden="true">→</span></button></article>)}</div>}
     <p className="brief-assumptions">Inbox items marked as seen. Operational issues stay here until resolved. Planning forecast uses current fuel, demand and rival schedules.</p>
   </section>

@@ -1,3 +1,4 @@
+import { clearPlanningDraft } from './planningDrafts'
 import { capturePlan, readApprovedPlans, type ApprovedPlan } from './planReview'
 import { identityOf, rulesOf, RULES_VERSION, CONTENT_VERSION, type RulesIdentity } from '../engine/version'
 import { objectiveScore } from '../engine/queries'
@@ -83,6 +84,7 @@ export function passSeat(): boolean {
   const order = seatOrder()
   const at = order.indexOf(session.activeSeat)
   if (at < 0 || at >= order.length - 1) return false
+  clearPlanningDraft()
   rememberPlan()
   session = { ...session!, activeSeat: order[at + 1]! }
   undoGroups = []
@@ -274,6 +276,7 @@ export function resumeSave(slot = 0): boolean {
   const save = loadSaveAt(slot)
   if (!save) return false
   try { rulesOf(save) } catch (error) { storageWarning = String(error); notify(); return false }
+  clearPlanningDraft()
   undoGroups = []
   activeSlot = slot
   sessionPlayer = save.player ?? null
@@ -332,6 +335,7 @@ export function startGame(
   humans = 1, // hot-seat: how many airline seats are people at this device
   rulesVersion = RULES_VERSION,
 ): void {
+  clearPlanningDraft()
   undoGroups = []
   const player: PlayerSetup | null =
     custom && (custom.name !== undefined || custom.hq !== undefined)
@@ -491,6 +495,7 @@ export function dispatch(command: Command): GameEvent[] {
     mp: session.mp,
   }
   if (command.type === 'end_quarter') {
+    clearPlanningDraft()
     undoGroups = []
     quarterBoundary = { state, entryCount: session.entries.length }
   }
@@ -665,6 +670,7 @@ function sessionFromEntries(record: RulesIdentity & {
 }
 
 export function startLinkGame(scenarioId: string, seed: string): void {
+  clearPlanningDraft()
   undoGroups = []
   lastSentLink = null
   const gameId = `${seed}-${crypto.randomUUID().slice(0, 8)}`
@@ -686,6 +692,7 @@ export function startLinkGame(scenarioId: string, seed: string): void {
 }
 
 export function resumeMpGame(gameId: string): boolean {
+  clearPlanningDraft()
   const rec = loadMpStore()[gameId]
   if (!rec) return false
   try { rulesOf(rec) } catch (error) { storageWarning = String(error); notify(); return false }
@@ -736,6 +743,7 @@ export async function sendSitting(): Promise<string | null> {
   rememberPlan()
   const turn = buildTurn(game, appended)
   const encoded = await encodeTurn(turn)
+  clearPlanningDraft()
   session = {
     ...session,
     mp: { ...session.mp, theirKnown: session.entries.length, awaiting: true },
@@ -840,6 +848,7 @@ export function getReplay(): Replay | null {
 // record of those decades, and "New game" used to destroy it. Slots recycle
 // via nextFreeSlot (stalest first) or an explicit delete.
 export function reset(): void {
+  clearPlanningDraft()
   session = null
   quarterBoundary = null
   undoGroups = []

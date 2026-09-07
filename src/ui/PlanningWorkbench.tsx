@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react'
 import type { Command, GameState } from '../engine'
 import { forecastQuarter } from '../engine/forecast'
 import { maxRouteFrequency } from '../engine/queries'
-import { dispatchBatch, viewSeat } from './session'
+import { viewSeat } from './session'
 import { planningForecast } from './forecast'
-import { usePlanningDraftNotice } from './planningDrafts'
+import { clearPlanningDraft, stagePlanningCommands, usePlanningCommands } from './planningDrafts'
+import { applyPlanningDraft } from './planActions'
 import { money } from './format'
 
 export function PlanningWorkbench({ state, suggestions, onSuggest }: { state: GameState; suggestions: Command[]; onSuggest?: () => Command[] }) {
@@ -13,8 +14,7 @@ export function PlanningWorkbench({ state, suggestions, onSuggest }: { state: Ga
   const [fare, setFare] = useState(airline.routes[0]?.fareLevel ?? 0)
   const [service, setService] = useState(airline.routes[0]?.serviceLevel ?? 2)
   const [frequency, setFrequency] = useState(airline.routes[0]?.frequency ?? 1)
-  const [draft, setDraft] = useState<Command[]>([])
-  usePlanningDraftNotice(draft.length)
+  const draft = usePlanningCommands()
   const [stress, setStress] = useState(false)
   const route = airline.routes.find((r) => r.id === routeId) ?? airline.routes[0]
   const forecast = useMemo(() => {
@@ -26,7 +26,7 @@ export function PlanningWorkbench({ state, suggestions, onSuggest }: { state: Ga
   if (!route) return null
   return <details className="planning-workbench" data-testid="planning-workbench">
     <summary>Planning workbench · compare changes before committing</summary>
-    <p className="dim">Stage several fare, service and schedule changes. Compare company profit and cash together; commit them as one reversible action.</p>
+    <p className="dim">Changes join your shared quarter plan. Add routes here, review the combined result, and apply everything as one undoable action.</p>
     <div className="plan-inputs">
       <label>Route <select aria-label="plan route" value={route.id} onChange={(e) => {
         const r = airline.routes.find((r) => r.id === Number(e.target.value))!
@@ -36,8 +36,8 @@ export function PlanningWorkbench({ state, suggestions, onSuggest }: { state: Ga
       <label>Service <select aria-label="plan service" value={service} onChange={(e) => setService(Number(e.target.value))}><option value="1">Basic</option><option value="2">Standard</option><option value="3">Premium</option></select></label>
       <label>Round trips/week <input aria-label="plan frequency" type="number" min="1" max={maxRouteFrequency(airline, route, state.turn)} value={frequency} onChange={(e) => setFrequency(Number(e.target.value))} /></label>
     </div>
-    <button onClick={() => setDraft((current) => [...current.filter((c) => !('routeId' in c && c.routeId === route.id)), { type: 'set_fare', routeId: route.id, fareLevel: fare }, { type: 'set_service', routeId: route.id, serviceLevel: service }, { type: 'set_frequency', routeId: route.id, frequency }])}>Stage this route</button>{' '}
-    <button disabled={suggestions.length === 0 && !onSuggest} onClick={() => setDraft(onSuggest?.() ?? suggestions)}>Preview recommended schedules</button>
+    <button onClick={() => stagePlanningCommands([ { type: 'set_fare', routeId: route.id, fareLevel: fare }, { type: 'set_service', routeId: route.id, serviceLevel: service }, { type: 'set_frequency', routeId: route.id, frequency }])}>Stage this route</button>{' '}
+    <button disabled={suggestions.length === 0 && !onSuggest} onClick={() => stagePlanningCommands(onSuggest?.() ?? suggestions)}>Preview recommended schedules</button>
     {draft.length > 0 && <ul className="staged-changes">{draft.map((c, i) => <li key={i}>{'routeId' in c ? (() => { const r = airline.routes.find((r) => r.id === c.routeId); return r ? `${r.from}–${r.to}: ` : '' })() : ''}{c.type === 'set_fare' ? `fare ${c.fareLevel}` : c.type === 'set_service' ? `service ${c.serviceLevel}` : c.type === 'set_frequency' ? `${c.frequency} round trips/week` : c.type}</li>)}</ul>}
     <div className="table-scroll"><table className="forecast-comparison" data-testid="plan-comparison"><thead><tr><th>Planned quarter</th><th>Current plan</th><th>With changes</th>{stress && <th>Headwind</th>}</tr></thead><tbody>
       <tr><th>Airline net profit</th><td>{money(forecast.before.profit)}</td><td className={forecast.after.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.after.profit)}</td>{stress && <td>{money(forecast.headwind!.profit)}</td>}</tr>
@@ -47,7 +47,7 @@ export function PlanningWorkbench({ state, suggestions, onSuggest }: { state: Ga
     <label><input type="checkbox" checked={stress} onChange={(e) => setStress(e.target.checked)} /> Stress test: fuel +20%, demand index −10%</label>
     <p className="dim">Current world and rival schedules held fixed. Includes connecting traffic, fleet costs and loan payments; future deliveries, competitor moves and random disruptions can change the result.</p>
     {forecast.after.errors.length > 0 && <p role="alert" className="neg">{forecast.after.errors.map((e) => e.reason).join(' · ')}</p>}
-    <button data-testid="commit-plan" disabled={draft.length === 0 || forecast.after.errors.length > 0} onClick={() => { dispatchBatch(draft); setDraft([]) }}>Commit plan</button>{' '}
-    <button disabled={draft.length === 0} onClick={() => setDraft([])}>Discard draft</button>
+    <button data-testid="commit-plan" disabled={draft.length === 0 || forecast.after.errors.length > 0} onClick={() => { applyPlanningDraft() }}>Commit plan</button>{' '}
+    <button disabled={draft.length === 0} onClick={clearPlanningDraft}>Discard draft</button>
   </details>
 }

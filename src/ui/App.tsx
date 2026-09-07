@@ -1,3 +1,4 @@
+import { PlanTray } from './PlanTray'
 import type { ExpansionOption } from '../engine/expansion'
 import { useInbox } from './inbox'
 import { Celebration, useCelebration } from './Celebration'
@@ -678,7 +679,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const inspectedAircraft = player.fleet.find((a) => a.id === selectedAircraft)
   const inspectedRoute = player.routes.find((r) => r.id === selectedRoute)
   const [routeFrom, setRouteFrom] = useState<string | null>(null)
-  const [pendingRoute, setPendingRoute] = useState<{ from: string; to: string; preset?: ExpansionOption } | null>(null)
+  const [pendingRoute, setPendingRoute] = useState<{ from: string; to: string; preset?: Pick<ExpansionOption, 'aircraftId' | 'frequency'> } | null>(null)
   const [showReport, setShowReport] = useState(false)
   const [showReview, setShowReview] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
@@ -913,7 +914,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           </span>
         )}
       <div className="desk-columns"><div className="desk-priorities">
-      {state.phase === 'planning' && <ManagementBrief state={state} onTab={setTab} onAircraft={(id) => { setSelectedAircraft(id); setTab('fleet') }} onInspect={(id) => { setSelectedRoute(id); setTab('routes') }} onPlan={(from, to) => setPendingRoute({ from, to })} />}
+      {state.phase === 'planning' && <ManagementBrief state={state} onTab={setTab} onAircraft={(id) => { setSelectedAircraft(id); setTab('fleet') }} onInspect={(id) => { setSelectedRoute(id); setTab('routes') }} onPlan={(from, to, preset) => setPendingRoute({ from, to, preset })} />}
       <OfferCard state={state} />
       </div><aside className="desk-agenda"><h2>Coming up</h2><DeskTimeline state={state} onTab={setTab} /><ActiveDeals state={state} />
       {state.world.events.length > 0 && (
@@ -1031,6 +1032,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         {visited.has('finance') && <section className="workspace-page" hidden={tab !== 'finance'} data-testid="page-finance"><FinancePanel state={state} /></section>}
         {visited.has('report') && <section className="workspace-page" hidden={tab !== 'report'} data-testid="page-report"><Suspense fallback={<p role="status">Loading reports…</p>}><ReportPanel state={state} archive={session.reportArchive} onInspect={(id) => { setTab('routes'); inspectRoute(id) }} /></Suspense></section>}
       </div>
+      <PlanTray state={state} />
     </section>
     {celebration.milestones.length > 0 && <Celebration milestones={celebration.milestones} state={state} onClose={celebration.dismiss} />}
     <ToastStack events={session.lastEvents} state={state} unlocks={session.lastUnlocks} onOpenRoute={inspectRoute} />

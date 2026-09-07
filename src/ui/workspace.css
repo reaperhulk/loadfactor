@@ -368,3 +368,23 @@ main.game-shell { --bg:#10232c; --panel:#19333e; --ink:#ede9de; --dim:#a4b4b9; -
 .network-advisor input[type=checkbox],.expansion-planner input[type=checkbox] { width:18px; height:18px; vertical-align:middle; }
 
 @media(min-width:1000px) { .adviser-options { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+.workspace:has(.plan-tray) { grid-template-rows:auto minmax(0,1fr) auto; }
+.plan-tray { position:relative; border-top:1px solid var(--accent); background:var(--panel); padding:8px 16px; min-width:0; z-index:20; }
+.plan-tray-bar { display:flex; align-items:center; gap:16px; font-size:.82rem; }
+.plan-tray-bar > span { flex:1; min-width:0; }
+.plan-tray-bar small { display:block; color:var(--dim); }
+.plan-tray-detail { position:absolute; bottom:100%; inset-inline:0; background:var(--panel); border:1px solid var(--rule); padding:14px; max-height:45dvh; overflow:auto; box-shadow:0 -8px 24px #0003; }
+.plan-tray-detail ul { list-style:none; padding:0; }
+.plan-tray-detail li { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--rule); font-size:.85rem; }
+.plan-tray > [role=alert] { margin:6px 0 0; font-size:.8rem; color:var(--neg); }
+.decision-metrics dd,.forecast-values dd { font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.network-advisor input[type=search] { max-width:100%; }
+@media(max-width:700px) {
+  .plan-tray { padding:8px; }
+  .plan-tray-bar { gap:8px; flex-wrap:wrap; }
+  .plan-tray-bar > span { font-size:.75rem; min-width:110px; }
+  .plan-tray button,.decision-options button,.expansion-options button,.adviser-locks label { min-height:44px; }
+  .network-advisor,.expansion-planner { padding:12px; }
+  .decision-options p,.route-diagnosis p { line-height:1.55; }
+}

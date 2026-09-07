@@ -1,31 +1,27 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense } from 'react'
 import type { Command, GameState, Route } from '../engine'
 import { distanceKm } from '../data/cities'
-import { forecastQuarter } from '../engine/forecast'
 import { fareFor } from '../engine/market'
 import { effectiveFrequency, maxRouteFrequency } from '../engine/queries'
-import { dispatchBatch, viewSeat } from './session'
-import { planningForecast } from './forecast'
-import { usePlanningDraftNotice } from './planningDrafts'
+import { viewSeat } from './session'
+import { applyPlanningDraft, planEvaluator } from './planActions'
+import { commandKey, removePlanningCommand, stagePlanningCommands, usePlanningCommands } from './planningDrafts'
 import { money } from './format'
 
 const RouteDiagnosis = lazy(() => import('./RouteDiagnosis').then(m => ({ default: m.RouteDiagnosis })))
 
 export function RoutePlanner({ state, route }: { state: GameState; route: Route }) {
   const seat = viewSeat(), airline = state.airlines[seat]!
-  const [fare, setFare] = useState(route.fareLevel)
-  const [service, setService] = useState(route.serviceLevel)
-  const [frequency, setFrequency] = useState(route.frequency)
-  const before = planningForecast(state, seat)
-  const { commands, after } = useMemo(() => {
-    const commands: Command[] = []
-    if (fare !== route.fareLevel) commands.push({ type: 'set_fare', routeId: route.id, fareLevel: fare })
-    if (service !== route.serviceLevel) commands.push({ type: 'set_service', routeId: route.id, serviceLevel: service })
-    if (frequency !== route.frequency) commands.push({ type: 'set_frequency', routeId: route.id, frequency })
-    return { commands, after: commands.length ? forecastQuarter(state, seat, commands) : before }
-  }, [state, seat, route, fare, service, frequency, before])
-  usePlanningDraftNotice(commands.length)
-  const prior = before.routes.find((r) => r.id === route.id)!, projected = after.routes.find((r) => r.id === route.id)!
+  const commands = usePlanningCommands()
+  const fare = commands.find((c): c is Extract<Command, { type: 'set_fare' }> => c.type === 'set_fare' && c.routeId === route.id)?.fareLevel ?? route.fareLevel
+  const service = commands.find((c): c is Extract<Command, { type: 'set_service' }> => c.type === 'set_service' && c.routeId === route.id)?.serviceLevel ?? route.serviceLevel
+  const frequency = commands.find((c): c is Extract<Command, { type: 'set_frequency' }> => c.type === 'set_frequency' && c.routeId === route.id)?.frequency ?? route.frequency
+  const edit = (c: Command, unchanged: boolean) => unchanged ? removePlanningCommand(commandKey(c)) : stagePlanningCommands([c])
+  const setFare = (fareLevel: number) => edit({ type: 'set_fare', routeId: route.id, fareLevel }, fareLevel === route.fareLevel)
+  const setService = (serviceLevel: number) => edit({ type: 'set_service', routeId: route.id, serviceLevel }, serviceLevel === route.serviceLevel)
+  const setFrequency = (frequency: number) => edit({ type: 'set_frequency', routeId: route.id, frequency }, frequency === route.frequency)
+  const evaluate = planEvaluator(state, seat), before = evaluate(), after = commands.length ? evaluate(commands) : before
+  const prior = before.routes.find((r) => r.id === route.id)!, projected = after.routes.find((r) => r.id === route.id) ?? prior
   const change = after.profit - before.profit
   const km = distanceKm(route.from, route.to)
   return <section className="route-planner" data-testid="route-planner">
@@ -49,16 +45,11 @@ export function RoutePlanner({ state, route }: { state: GameState; route: Route 
     {after.errors.length > 0 && <p role="alert" className="neg">{after.errors.map((e) => e.reason).join(' · ')}</p>}
     <div className="entity-plan-actions"><button className="primary-action" data-testid="apply-route-plan" disabled={!commands.length || after.errors.length > 0} onClick={(e) => {
       const inspector = e.currentTarget.closest('.route-dossier')
-      dispatchBatch(commands)
+      applyPlanningDraft()
       requestAnimationFrame(() => inspector?.querySelector<HTMLSelectElement>('[aria-label="Route fare"]')?.focus({ preventScroll:true }))
-    }}>Apply route changes</button><button disabled={!commands.length} onClick={() => { setFare(route.fareLevel); setService(route.serviceLevel); setFrequency(route.frequency) }}>Reset</button></div>
+    }}>Apply planned changes</button><button disabled={!commands.length} onClick={() => { setFare(route.fareLevel); setService(route.serviceLevel); setFrequency(route.frequency) }}>Reset</button></div>
     <Suspense fallback={<p role="status">Loading route analysis…</p>}><RouteDiagnosis state={state} route={route} onPreview={(changes) => {
-      setFare(route.fareLevel); setService(route.serviceLevel); setFrequency(route.frequency)
-      for (const c of changes) {
-        if (c.type === 'set_fare') setFare(c.fareLevel)
-        if (c.type === 'set_service') setService(c.serviceLevel)
-        if (c.type === 'set_frequency') setFrequency(c.frequency)
-      }
+      stagePlanningCommands(changes)
     }} /></Suspense>
     <p className="hint">Includes connections and fixed company costs. Fuel, demand and rival schedules held at current conditions. Apply is one undoable action.</p>
   </section>

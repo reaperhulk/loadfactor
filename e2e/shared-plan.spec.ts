@@ -1,0 +1,26 @@
+import { test, expect } from '@playwright/test'
+import { openPanel } from './workspace'
+
+for (const width of [1440, 390]) test(`shared plan ${width}px: navigation, exact launch, combined apply and undo`, async ({ page }) => {
+  await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 })
+  await page.addInitScript(() => localStorage.setItem('loadfactor:display:v1', JSON.stringify({ motion: 'reduced' })))
+  await page.goto('/')
+  await page.getByTestId('seed-input').fill('shared-plan-browser')
+  const scenario = page.getByTestId('scenario-hub_defense')
+  await scenario.getByRole('button').click(); await scenario.getByRole('button').click()
+  await openPanel(page, 'routes')
+  await page.locator('[data-testid^="inspect-"]').first().click()
+  const before = await page.evaluate(() => JSON.stringify(window.__harness.getState()))
+  await page.getByLabel('Route fare', { exact: true }).selectOption('2')
+  await expect(page.getByTestId('plan-tray')).toContainText('1 planned changes')
+  await openPanel(page, 'fleet')
+  await expect(page.getByTestId('plan-tray')).toBeVisible()
+  await openPanel(page, 'routes')
+  await expect(page.getByLabel('Route fare', { exact: true })).toHaveValue('2')
+  expect(await page.evaluate(() => JSON.stringify(window.__harness.getState()))).toBe(before)
+  await page.getByTestId('apply-shared-plan').click()
+  await expect(page.getByTestId('plan-tray')).toHaveCount(0)
+  await page.getByTestId('undo-action').click()
+  expect(await page.evaluate(() => JSON.stringify(window.__harness.getState()))).toBe(before)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0)
+})

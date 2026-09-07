@@ -11,7 +11,9 @@ import type { GameState } from '../engine'
 import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor, pairWeeklyDemand } from '../engine/market'
 import { cabinSeats, isGrounded, roundTripsPerWeek } from '../engine/queries'
 import { forecastQuarter } from '../engine/forecast'
-import { viewSeat, dispatch } from './session'
+import { viewSeat } from './session'
+import { stagePlanningCommands, usePlanningCommands, mergePlanningCommands } from './planningDrafts'
+import { applyPlanningDraft } from './planActions'
 import { money } from './format'
 
 interface RouteSetupDialogProps {
@@ -19,7 +21,7 @@ interface RouteSetupDialogProps {
   from: string
   to: string
   onClose: () => void
-  preset?: ExpansionOption
+  preset?: Pick<ExpansionOption, 'aircraftId' | 'frequency'>
 }
 
 export function RouteSetupDialog({ state, from, to, onClose, preset }: RouteSetupDialogProps) {
@@ -48,10 +50,11 @@ export function RouteSetupDialog({ state, from, to, onClose, preset }: RouteSetu
   const clampedFreq = Math.max(1, Math.min(frequency, maxFreq))
   const seats = chosen ? cabinSeats(chosen.type, chosen.cabin) * clampedFreq * 2 : 0
   const seat = viewSeat()
+  const draft = usePlanningCommands()
   const baseline = useMemo(() => forecastQuarter(state, seat), [state, seat])
-  const preview = useMemo(() => aircraftId === null ? null : forecastQuarter(state, seat, [{
+  const preview = useMemo(() => aircraftId === null ? null : forecastQuarter(state, seat, mergePlanningCommands(draft, [{
     type: 'open_route', from, to, aircraftId, frequency: clampedFreq, fareLevel, serviceLevel,
-  }]), [state, seat, from, to, aircraftId, clampedFreq, fareLevel, serviceLevel])
+  }])), [state, seat, draft, from, to, aircraftId, clampedFreq, fareLevel, serviceLevel])
   const launch = preview?.routes.find((route) => !player.routes.some((existing) => existing.id === route.id))
 
   return (
@@ -137,11 +140,13 @@ export function RouteSetupDialog({ state, from, to, onClose, preset }: RouteSetu
                 <p className="dim">Includes the selected schedule, cabin, current maintenance, lease payments, hedges and connecting traffic. Holds today's economy and rival schedules fixed; new routes ramp over 3 quarters.</p>
               </div>
             )}
+            {!!preview?.errors.length && <p role="alert">{preview.errors.map(e => e.reason).join(' · ')}</p>}
             <button
               data-testid="route-setup-confirm"
+              disabled={!preview || !!preview.errors.length}
               onClick={() => {
                 if (chosen === null) return
-                dispatch({
+                if (!applyPlanningDraft([{
                   type: 'open_route',
                   from,
                   to,
@@ -149,12 +154,13 @@ export function RouteSetupDialog({ state, from, to, onClose, preset }: RouteSetu
                   frequency: clampedFreq,
                   fareLevel,
                   serviceLevel,
-                })
+                }])) return
                 onClose()
               }}
             >
               ✈ Open route
             </button>{' '}
+            <button disabled={!preview || !!preview.errors.length} onClick={() => { if (aircraftId === null) return; stagePlanningCommands([{ type: 'open_route', from, to, aircraftId, frequency: clampedFreq, fareLevel, serviceLevel }]); onClose() }}>Add to plan</button>{' '}
             <button data-testid="route-setup-cancel" onClick={onClose}>
               Cancel
             </button>
