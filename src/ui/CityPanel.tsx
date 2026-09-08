@@ -110,7 +110,7 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
   const myRoutes = player.routes.filter((r) => r.from === cityId || r.to === cityId)
 
   return (
-    <aside className="city-panel" data-testid="city-panel" aria-label={`${city.name} details`}>
+    <aside className="city-panel" onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose() } }} data-testid="city-panel" aria-label={`${city.name} details`}>
       <header className="city-panel-head">
         <div>
           <h2>

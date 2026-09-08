@@ -17,7 +17,7 @@ export function AircraftDossier({ state, aircraftId, onClose }: { state: GameSta
   const airline = state.airlines[viewSeat()]!, ac = airline.fleet.find((a) => a.id === aircraftId)
   if (!ac) return null
   const type = getAircraftType(ac.type)
-  return <aside className="city-panel aircraft-dossier" data-testid="aircraft-dossier" ref={panel}>
+  return <aside className="city-panel aircraft-dossier" onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose() } }} data-testid="aircraft-dossier" ref={panel}>
     <header className="city-panel-head"><div><span className="eyebrow">Aircraft #{ac.id}</span><h2>{type.name}</h2><small>{isGrounded(ac,state.turn) ? 'In maintenance' : ac.reserve ? 'Standby' : ac.routeId === null ? 'Unassigned' : 'In service'}{ac.leased ? ' · leased' : ' · owned'}</small></div><button data-testid="aircraft-dossier-close" aria-label="Back to aircraft list" onClick={onClose}>×</button></header>
     <AircraftArt type={ac.type} />
     <dl className="entity-facts"><div><dt>Age</dt><dd>{(ac.ageQuarters/4).toFixed(1)} years</dd></div><div><dt>Seats</dt><dd>{cabinSeats(ac.type,ac.cabin)}</dd></div><div><dt>Range</dt><dd>{type.rangeKm.toLocaleString()} km</dd></div><div><dt>Sale value</dt><dd>{ac.leased ? 'Leased' : money(resaleValue(ac.type,ac.ageQuarters))}</dd></div></dl>

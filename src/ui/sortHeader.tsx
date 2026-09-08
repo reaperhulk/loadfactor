@@ -13,7 +13,7 @@ export function sortHeaderFactory<K extends string>(opts: {
   testPrefix: string
 }): (key: K, label: string, title?: string) => ReactElement {
   return (key, label, title) => (
-    <th title={title}>
+    <th scope="col" title={title} aria-sort={opts.current === key ? (opts.asc ? 'ascending' : 'descending') : 'none'}>
       <button
         className={`link-btn sort-btn${opts.current === key ? ' active' : ''}`}
         data-testid={`${opts.testPrefix}${key}`}

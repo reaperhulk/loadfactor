@@ -729,7 +729,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const closeRoute = (): void => {
     const r = player.routes.find((r) => r.id === selectedRoute)
     setSelectedRoute(null)
-    if (r) requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-testid="inspect-${r.from}-${r.to}"]`)?.focus({ preventScroll: true }))
+    if (r) requestAnimationFrame(() => (document.querySelector<HTMLElement>(`[data-testid="inspect-${r.from}-${r.to}"]`) ?? document.querySelector<HTMLElement>('[data-testid=route-search]'))?.focus({ preventScroll: true }))
   }
   const clearSelection = (): void => {
     setFlowFocus(null)
@@ -746,14 +746,15 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const target = e.target as HTMLElement | null
-      if (target?.closest('[role=dialog]')) return
+      if (e.defaultPrevented || document.querySelector('[role=dialog]')) return
       if (e.key === 'Escape') {
         setSelectedRoute(null); setSelectedAircraft(null); setPendingRoute(null)
         setRouteFrom((armed) => { if (armed === null) setSelectedCity(null); return null })
         return
       }
-      if (target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)) return
-      if (target?.tagName === 'BUTTON' && [' ', 'e', 'E'].includes(e.key)) return
+      if (target?.closest('input, select, textarea, [contenteditable=true]')) return
+      if (e.altKey || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() !== 'z')) return
+      if (target?.closest('button, summary, a[href], [role=button]') && [' ', 'e', 'E', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         if (undoLastAction()) e.preventDefault()
       } else if ([' ', 'e', 'E'].includes(e.key)) {
@@ -780,7 +781,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     <header className="app-header" data-testid="app-header">
       <div className="airline-brand"><Icon name="aircraft" /><div><h1 title={player.name}>{player.name}</h1><small>Load Factor</small></div></div>
       <span className="app-date"><span data-testid="date">{yearOf(state)} Q{quarterOf(state)}</span><small data-testid="race-clock">{Math.max(0, scenario.quarters - state.turn)}q left</small></span>
-      <button className="inbox-button" data-testid="open-inbox" title="New items since your last Desk visit. Opening the Desk marks them as seen." onClick={() => setTab('desk')}><Icon name="inbox" /><span>Inbox</span>{attentionCount > 0 && <b aria-label={`${attentionCount} unseen items`}>{attentionCount}</b>}</button>
+      <button className="inbox-button" data-testid="open-inbox" aria-label={attentionCount ? `Inbox, ${attentionCount} unseen items` : 'Inbox'} title="New items since your last Desk visit. Opening the Desk marks them as seen." onClick={() => setTab('desk')}><Icon name="inbox" /><span>Inbox</span>{attentionCount > 0 && <b aria-label={`${attentionCount} unseen items`}>{attentionCount}</b>}</button>
       <button className="settings-button" data-testid="open-settings" aria-label="Open settings" onClick={() => setShowSettings(true)}><Icon name="settings" /></button>
     </header>
     <div className="turn-actions" data-testid="turn-actions"><span className="mobile-profit"><small>Planned net profit</small><strong className={forecast.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.profit)}</strong></span>
@@ -1049,6 +1050,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             onClose={() => {
               setSelectedCity(null)
               setRouteFrom(null)
+              requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-testid=tab-map]')?.focus({preventScroll:true}))
             }}
           />
         )}
@@ -1056,7 +1058,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           <RouteDossier
             state={state}
             routeId={inspectedRoute!.id}
-            onClose={() => setSelectedRoute(null)}
+            onClose={() => { setSelectedRoute(null); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-testid=tab-map]')?.focus({preventScroll:true})) }}
             onSelectRoute={setSelectedRoute}
             onHighlight={highlightFlow}
           />

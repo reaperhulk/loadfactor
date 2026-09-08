@@ -37,7 +37,8 @@ interface RouteDossierProps {
 
 export function RouteDossier({ state, routeId, onClose, onSelectRoute, onHighlight }: RouteDossierProps) {
   const panel = useRef<HTMLElement>(null)
-  useEffect(() => { panel.current?.scrollTo(0, 0); panel.current?.querySelector<HTMLButtonElement>('[data-testid=route-dossier-close]')?.focus({ preventScroll: true }) }, [routeId])
+  useEffect(() => { panel.current?.scrollTo(0, 0) }, [routeId])
+  useEffect(() => { panel.current?.querySelector<HTMLButtonElement>('[data-testid=route-dossier-close]')?.focus({ preventScroll: true }) }, [])
   const player = state.airlines[viewSeat()]!
   const route = player.routes.find((r) => r.id === routeId)
   if (!route) return null
@@ -76,7 +77,7 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute, onHighlig
   const lfTrend = route.history.map((h) => h.loadFactorBp)
 
   return (
-    <aside ref={panel} className="city-panel route-dossier" data-testid="route-dossier">
+    <aside ref={panel} onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose() } }} className="city-panel route-dossier" data-testid="route-dossier">
       <header className="city-panel-head">
         <div>
           <h2>
