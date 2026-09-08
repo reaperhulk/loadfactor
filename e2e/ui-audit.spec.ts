@@ -95,7 +95,8 @@ test('UI audit keyboard: disclosures, dialog focus and inspector return',async({
   await expect(page.getByTestId('quarter-review')).toHaveCount(0)
   await page.getByTestId('open-settings').click()
   const dialog=page.getByTestId('settings-dialog')
-  await expect(page.getByTestId('workspace')).toHaveAttribute('inert','')
+  await page.getByTestId('nav-network').evaluate(el=>(el as HTMLElement).focus())
+  expect(await page.evaluate(()=>!!document.activeElement?.closest('[data-testid=settings-dialog]'))).toBe(true)
   const display=page.getByTestId('display-settings').locator('summary')
   await display.focus()
   await page.keyboard.press(' ')
@@ -106,7 +107,8 @@ test('UI audit keyboard: disclosures, dialog focus and inspector return',async({
   await page.keyboard.press('Escape')
   await expect(dialog).toHaveCount(0)
   await expect(page.getByTestId('open-settings')).toBeFocused()
-  await expect(page.getByTestId('workspace')).not.toHaveAttribute('inert','')
+  await page.getByTestId('nav-network').focus()
+  await expect(page.getByTestId('nav-network')).toBeFocused()
   await openPanel(page,'fleet')
   const aircraft=page.locator('[data-testid^=inspect-aircraft-]').first()
   await aircraft.click()
@@ -197,3 +199,23 @@ for(const [width,height] of [[320,568],[667,375],[1366,768]] as const) {
     await expect(page.getByTestId('date')).toHaveText('1960 Q2')
   })
 }
+
+
+test('UI audit career ending: the final screen stays interactive over the report',async({page})=>{
+  await page.goto('/')
+  await page.getByTestId('seed-input').fill('audit-career-ending')
+  await page.getByTestId('start-jet_age').click()
+  await page.evaluate(()=>{
+    for(let i=0;i<40;i++) {
+      const state=window.__harness.getState()!
+      if(state.phase !== 'planning' || state.airlines[0]!.insolventQuarters > 0) break
+      window.__harness.endQuarter()
+    }
+  })
+  expect(await page.evaluate(()=>window.__harness.getState()!.phase)).toBe('planning')
+  await page.getByTestId('end-quarter').click()
+  await page.getByTestId('confirm-quarter').click()
+  await expect(page.getByTestId('gameover-overlay')).toBeVisible()
+  await page.getByTestId('new-game').click()
+  await expect(page.getByTestId('start-first-career')).toBeVisible()
+})

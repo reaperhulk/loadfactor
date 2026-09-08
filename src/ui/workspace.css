@@ -542,3 +542,7 @@ main.game-shell { padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 
   .plan-tray-bar > span { grid-column:1; min-width:0; }
   .plan-tray-bar > [data-testid=apply-shared-plan] { grid-column:2; grid-row:1 / span 2; }
 }
+
+/* Reset the native dialog box; the existing overlay owns the viewport. */
+dialog.gameover-overlay,dialog.celebration-overlay { width:100%; height:100dvh; max-width:none; max-height:none; margin:0; padding:0; border:0; color:inherit; }
+dialog.gameover-overlay::backdrop,dialog.celebration-overlay::backdrop { background:transparent; }
