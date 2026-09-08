@@ -278,6 +278,15 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           </details>
         </div>
       )}
+      <section className="first-career" aria-labelledby="first-career-heading">
+        <div><span className="eyebrow">New here? Start with The Jet Age</span>
+          <h2 id="first-career-heading">Build your first airline</h2>
+          <p>Choose a route, fill its seats, and keep the airline profitable. Plan at your own pace; time moves only when you fly a quarter.</p>
+          <p className="dim">Your Desk compares two first routes and guides your opening three quarters. Airline details below are optional.</p>
+        </div>
+        {overwrites !== null ? <ConfirmButton data-testid="start-first-career" label="Start flying" confirmLabel="All slots full — replace oldest save?" onConfirm={() => startGame('jet_age', seed || new Date().toISOString().slice(0, 10), custom(), undefined, players)} />
+          : <button className="primary-action" data-testid="start-first-career" onClick={() => startGame('jet_age', seed || new Date().toISOString().slice(0, 10), custom(), undefined, players)}>Start flying <span aria-hidden="true">→</span></button>}
+      </section>
       <div className="airline-setup" data-testid="airline-setup">
         <h2>Your airline</h2>
         <label>
@@ -311,6 +320,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
               className={`livery-swatch${color === c ? ' active' : ''}`}
               style={{ background: c }}
               aria-label={`livery color ${c}`}
+              aria-pressed={color === c}
               data-testid={`livery-${c.slice(1)}`}
               onClick={() => setColor(c)}
             />
@@ -320,7 +330,8 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           A custom HQ starts you with slots there plus footholds at the strongest nearby cities.
         </p>
       </div>
-      <label className="seed-field">
+      <div className="seed-field">
+        <label>
         Seed (optional):{' '}
         <input
           value={seed}
@@ -328,6 +339,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           onChange={(e) => setSeed(e.target.value)}
           data-testid="seed-input"
         />{' '}
+        </label>
         <label className="dim">
           players{' '}
           <select
@@ -343,7 +355,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
             ))}
           </select>
         </label>
-      </label>
+      </div>
       <div className="scenario-card continue-card">
         <h2>Daily challenge</h2>
         <p className="dim">Everyone flies the same seed today. Compare final net worth with your friends.</p>
@@ -1016,6 +1028,11 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
             })()}
           />
         </Suspense>
+        {state.turn === 0 && player.routes.length === 0 && !selectedCity && !inspectedRoute && !routeFrom && <aside className="first-flight" data-testid="first-flight">
+          <strong>Your aircraft are ready. Choose their first route.</strong>
+          <p>Compare launch costs and profit on your Desk, then review the quarter to fly.</p>
+          <button className="primary-action" onClick={() => setTab('desk')}>Compare first routes <span aria-hidden="true">→</span></button>
+        </aside>}
         {flowFocus && <div className="flow-focus-banner" data-testid="flow-focus"><strong>{flowFocus.label}</strong><button onClick={()=>setFlowFocus(null)}>Clear journey</button></div>}
         {tab === "map" && selectedCity !== null && (
           <CityPanel
@@ -1098,8 +1115,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           <div className="gameover-card report-card handbook" onClick={(e) => e.stopPropagation()}>
             <h2>Handbook</h2>
             <p className="dim" data-testid="handbook-intro">
-              The game is a race: finish the era as the #1 airline by net worth AND clear the
-              scenario's floor. Each quarter you plan (open routes, assign jets, set fares, queue for
+              Each scenario has its own goal, shown below. Each quarter you plan (open routes, assign jets, set fares, queue for
               slots), then end the quarter — everyone flies, demand splits by appeal (schedule × cabin
               × fare × service × brand), and the world moves. Every system below is explained where
               you use it too.
