@@ -5,13 +5,13 @@ import { OperationsPanel } from './OperationsPanel'
 // Management panels: routes, fleet, airports, finance, and the quarterly
 // report. Every button is a Command dispatch — no state is touched directly.
 
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useRef, useState } from 'react'
 import { usePlanningLocks } from './planningLocks'
 import type { ExpansionOption } from '../engine/expansion'
 const NetworkAdvisor = lazy(() => import('./NetworkAdvisor').then(m => ({ default: m.NetworkAdvisor })))
 const ExpansionPlanner = lazy(() => import('./ExpansionPlanner').then(m => ({ default: m.ExpansionPlanner })))
 import { getAircraftType } from '../data/aircraft'
-import { CITIES, distanceKm } from '../data/cities'
+import { CITIES, distanceKm, getCity } from '../data/cities'
 import { getScenario } from '../data/scenarios'
 import type { GameState } from '../engine'
 import { fleetCommonalityBp } from '../engine/accounting'
@@ -98,6 +98,7 @@ export function RoutesPanel({
   const [sortAsc, setSortAsc] = useState(false)
   const [filter, setFilter] = useState<RouteFilter>('all')
   const [routeQuery, setRouteQuery] = useState('')
+  const routeSearch = useRef<HTMLInputElement>(null)
   const [allMetrics, setAllMetrics] = useState(false)
   const seat = viewSeat()
   const { locks, toggle } = usePlanningLocks(state, seat)
@@ -157,8 +158,9 @@ export function RoutesPanel({
     if (filter === 'contested' && x.rivals === 0) return false
     if (filter === 'ramping' && !x.ramping) return false
     if (filter === 'long' && x.km < 4500) return false
-    const q = routeQuery.trim().toUpperCase()
-    if (q !== '' && !`${x.route.from}-${x.route.to}`.includes(q)) return false
+    const terms = routeQuery.trim().toLowerCase().replace(/[–—]/g, '-').split(/\s+/)
+    const name = `${x.route.from}-${x.route.to} ${getCity(x.route.from).name} ${getCity(x.route.to).name}`.toLowerCase()
+    if (!terms.every(term => name.includes(term))) return false
     return true
   })
   // Aggregates over what is ON SCREEN: filter to the losers and the totals
@@ -247,16 +249,22 @@ export function RoutesPanel({
         ))}
       </span>
       <input
+        ref={routeSearch}
+        type="search"
         className="filter-input"
-        placeholder="find a route…"
+        placeholder="City or airport code…"
         value={routeQuery}
         onChange={(e) => setRouteQuery(e.target.value)}
         data-testid="route-search"
-        aria-label="filter routes by city code"
+        aria-label="Find routes by city or airport code"
       />
     <button className="metrics-toggle" aria-pressed={allMetrics} onClick={() => setAllMetrics((value) => !value)}>{allMetrics ? 'Show essential metrics' : 'Show all metrics'}</button>
     </div>
-    <div className="table-scroll"><table data-testid="routes-panel-table" className={`route-table ${allMetrics ? '' : 'route-table-compact'}`}>
+    <div className="search-feedback"><p role="status" data-testid="route-search-results">{rows.length} of {allRows.length} routes{rows.length === 0 ? ' · No matching routes. Try a city name or clear the filters.' : ' · Last quarter’s results'}</p>
+      {(routeQuery !== '' || filter !== 'all') && <button onClick={() => { setRouteQuery(''); setFilter('all'); routeSearch.current?.focus() }}>Clear route filters</button>}
+    </div>
+    {allMetrics && <p className="hint" id="route-metrics-hint">Scroll across to compare all metrics. Route names stay in view. Contribution excludes company fixed costs.</p>}
+    <div className={`table-scroll route-comparison${allMetrics ? ' expanded-metrics' : ''}`} tabIndex={allMetrics ? 0 : undefined} role={allMetrics ? 'region' : undefined} aria-label={allMetrics ? 'All route metrics' : undefined} aria-describedby={allMetrics ? 'route-metrics-hint' : undefined}><table data-testid="routes-panel-table" className={`route-table ${allMetrics ? '' : 'route-table-compact'}`}>
       <thead>
         <tr>
           {header('name', 'Route')}
@@ -283,12 +291,13 @@ export function RoutesPanel({
             <tr key={r.id} className={selectedRouteId === r.id ? 'selected-row' : undefined} data-testid={`route-${r.from}-${r.to}`}>
               <td>
                 <button
-                  className="link-btn"
+                  className="link-btn route-identity"
                   data-testid={`inspect-${r.from}-${r.to}`}
                   onClick={() => onInspect(r.id)}
                   title="open route dossier"
                 >
                   {r.from}–{r.to}
+                  <small>{getCity(r.from).name} – {getCity(r.to).name}</small>
                 </button>
               </td>
               <td>{km}</td>
@@ -498,12 +507,12 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
         </p>
       )}
       </details>
-      <div className="fleet-filters"><input type="search" aria-label="Find aircraft" placeholder="Find aircraft or route…" value={fleetQuery} onChange={(e)=>setFleetQuery(e.target.value)} /><label><input type="checkbox" checked={idleOnly} onChange={(e)=>setIdleOnly(e.target.checked)} /> Unassigned only</label></div>
+      <div className="fleet-filters"><input type="search" aria-label="Find aircraft" placeholder="Find aircraft or route…" value={fleetQuery} onChange={(e)=>setFleetQuery(e.target.value)} /><label><input type="checkbox" checked={idleOnly} onChange={(e)=>setIdleOnly(e.target.checked)} /> Unassigned only</label>{(fleetQuery || idleOnly) && <button onClick={() => { setFleetQuery(''); setIdleOnly(false) }}>Clear aircraft filters</button>}</div>
       {(() => {
         // Row models first so sorting works on exactly what the cells show.
         const fleetRows = player.fleet.filter((a) => {
           const r=player.routes.find((r)=>r.id===a.routeId)
-          return (!idleOnly || a.routeId===null && !a.reserve && !isGrounded(a,state.turn)) && `${a.id} ${getAircraftType(a.type).name} ${r ? `${r.from}-${r.to}` : ''}`.toLowerCase().includes(fleetQuery.toLowerCase())
+          return (!idleOnly || a.routeId===null && !a.reserve && !isGrounded(a,state.turn)) && `${a.id} ${getAircraftType(a.type).name} ${r ? `${r.from}-${r.to} ${getCity(r.from).name} ${getCity(r.to).name}` : ''}`.toLowerCase().includes(fleetQuery.trim().toLowerCase())
         }).map((a) => {
           const type = getAircraftType(a.type)
           const route = player.routes.find((r) => r.id === a.routeId)
@@ -537,6 +546,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
         })
         const fheader = fleetHeader
         return (
+      <><p className="search-feedback" role="status">{fleetRows.length} of {player.fleet.length} aircraft{fleetRows.length === 0 ? ' · No matching aircraft. Try another name or clear the filters.' : ''}</p>
       <div className="table-scroll"><table className="fleet-table" data-testid="fleet-table">
         <thead>
           <tr>
@@ -615,7 +625,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
           })}
 
         </tbody>
-      </table></div>
+      </table></div></>
         )
       })()}
       <CabinLegend />
