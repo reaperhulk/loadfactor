@@ -32,3 +32,44 @@ for (const [width, height] of [[390,844], [1366,768]]) {
     expect(await page.evaluate(() => window.__harness.getState()!.airlines[0]!.routes.length)).toBe(1)
   })
 }
+
+for (const [width,height] of [[320,568],[667,375],[844,390],[768,1024],[1024,768],[1366,768]] as const) {
+  test(`UI audit viewport ${width}x${height}: navigation and content stay reachable`, async ({page}, info) => {
+    await page.setViewportSize({width,height})
+    await page.goto('/')
+    await page.getByTestId('start-jet_age').click()
+    await expect(page.getByTestId('map')).toBeVisible()
+    expect((await page.getByTestId('map').boundingBox())!.height).toBeGreaterThan(150)
+    for(const panel of ['desk','routes','fleet','catalog','finance']) {
+      await openPanel(page,panel)
+      for(const id of ['nav-desk','nav-network','nav-fleet','nav-company','end-quarter','open-settings','cash']) await inside(page.getByTestId(id),page)
+      expect(await page.evaluate(()=>({x:document.documentElement.scrollWidth-innerWidth,y:document.documentElement.scrollHeight-innerHeight}))).toEqual({x:0,y:0})
+      if(panel==='desk') await info.attach(`${width}x${height}-desk`,{body:await page.screenshot(),contentType:'image/png'})
+    }
+    await page.getByTestId('open-settings').click()
+    await page.getByTestId('display-settings').locator('summary').click()
+    await page.getByLabel('text size',{exact:true}).selectOption('125')
+    await page.getByRole('button',{name:'Close settings',exact:true}).click()
+    await openPanel(page,'fleet')
+    for(const id of ['nav-desk','nav-network','nav-fleet','nav-company','end-quarter']) await inside(page.getByTestId(id),page)
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBe(0)
+  })
+}
+
+test('UI audit touch controls: setup, header and settings have usable targets',async({page,isMobile})=>{
+  test.skip(!isMobile,'Uses the actual mobile WebKit device profile')
+  await page.goto('/')
+  for(const id of ['livery-4fa3ff','airline-name','airline-hq']) {
+    const box=await page.getByTestId(id).boundingBox()
+    expect(box!.height).toBeGreaterThanOrEqual(44)
+  }
+  await page.getByTestId('start-jet_age').click()
+  for(const id of ['open-inbox','open-settings']) {
+    const box=await page.getByTestId(id).boundingBox()
+    expect(box!.width).toBeGreaterThanOrEqual(44)
+    expect(box!.height).toBeGreaterThanOrEqual(44)
+  }
+  await page.getByTestId('open-settings').click()
+  await page.getByTestId('display-settings').locator('summary').click()
+  expect(await page.getByLabel('text size',{exact:true}).evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
+})

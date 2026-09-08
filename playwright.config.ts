@@ -18,8 +18,8 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'webkit', testMatch: ['modern.spec.ts', 'responsive.spec.ts', 'multiplayer.spec.ts', 'density.spec.ts', 'graphics.spec.ts', 'celebrations.spec.ts', 'operations.spec.ts', 'planning-advice.spec.ts', 'shared-plan.spec.ts', 'performance.spec.ts'], grepInvert: /link duel:/, use: { ...devices['Desktop Safari'], launchOptions: {} } },
-    { name: 'mobile-webkit', testMatch: ['modern.spec.ts', 'operations.spec.ts', 'planning-advice.spec.ts', 'shared-plan.spec.ts', 'performance.spec.ts'], grepInvert: /operations 1440px|planning advice 1440px|shared plan 1440px|capital outlook 1440px|network operations 1440px|commercial choices 1440px|recorded workload (1440|768|1366)px/, use: { ...devices['iPhone 13'], launchOptions: {} } },
+    { name: 'webkit', testMatch: ['ui-audit.spec.ts', 'modern.spec.ts', 'responsive.spec.ts', 'multiplayer.spec.ts', 'density.spec.ts', 'graphics.spec.ts', 'celebrations.spec.ts', 'operations.spec.ts', 'planning-advice.spec.ts', 'shared-plan.spec.ts', 'performance.spec.ts'], grepInvert: /link duel:/, use: { ...devices['Desktop Safari'], launchOptions: {} } },
+    { name: 'mobile-webkit', testMatch: ['ui-audit.spec.ts', 'modern.spec.ts', 'operations.spec.ts', 'planning-advice.spec.ts', 'shared-plan.spec.ts', 'performance.spec.ts'], grepInvert: /operations 1440px|planning advice 1440px|shared plan 1440px|capital outlook 1440px|network operations 1440px|commercial choices 1440px|recorded workload (1440|768|1366)px/, use: { ...devices['iPhone 13'], launchOptions: {} } },
   ],
   webServer: {
     command: process.env.PW_PREBUILT ? 'npm run preview' : 'npm run build && npm run preview',

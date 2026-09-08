@@ -442,3 +442,57 @@ main.game-shell { --bg:#10232c; --panel:#19333e; --ink:#ede9de; --dim:#a4b4b9; -
   .first-flight strong,.first-flight p { display:none; }
 }
 @media(max-height:550px) { .first-flight p { display:none; } .first-flight button { margin-top:8px; } }
+
+/* Match target size to the input device, including touch tablets. */
+main.game-shell { padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+.game-shell .app-header button { min-width:44px; min-height:44px; }
+.status-bar .hud-stat::before { font-size:.72rem; }
+.airline-brand small,.app-date small { font-size:.72rem; }
+.workspace-tabs.tabs > button { min-height:44px; }
+.workspace-tabs.tabs { scroll-padding-inline:12px; }
+.game-shell .city-panel-head { gap:8px; }
+.game-shell .city-panel-head > div { min-width:0; overflow-wrap:anywhere; }
+.game-shell .city-panel-head button { min-width:36px; }
+@media(pointer:coarse), (max-width:700px) {
+  .menu button,.game-shell button,.menu summary,.game-shell summary { min-height:44px; }
+  .menu summary,.game-shell summary { padding-block:10px; }
+  .menu :is(input:not([type=checkbox],[type=range]),select,textarea),
+  .game-shell :is(input:not([type=checkbox],[type=range]),select,textarea) { font-size:max(16px,1rem); min-height:44px; }
+  .menu .livery-row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  .menu .livery-swatch { width:44px; height:44px; padding:0; margin:0; }
+  .game-shell .city-panel-head button { min-width:44px; }
+  .game-shell input[type=range] { min-height:44px; }
+  .game-shell input[type=checkbox] { width:20px; height:20px; flex-shrink:0; }
+}
+@media(max-width:700px) {
+  .primary-nav > button { font-size:.75rem; }
+  .mobile-profit small { font-size:.72rem; }
+  .status-bar { gap:12px; }
+  .status-bar .hud-objective { max-width:62%; }
+  .status-bar .hud-target { font-size:.72rem; }
+  .game-shell .workspace-tabs > .undo-action { min-width:44px; justify-content:center; }
+  .game-shell .city-panel-head h2 { font-size:1rem; }
+  .menu .seed-field { align-items:stretch; text-align:left; }
+  .menu .seed-field > label { display:grid; gap:4px; min-width:0; }
+}
+/* Landscape phones use a rail: two bottom bars would consume the workspace. */
+@media(max-height:500px) and (max-width:1000px) and (min-width:560px) {
+  main.game-shell { grid-template-columns:76px minmax(0,1fr) auto; grid-template-rows:auto auto minmax(0,1fr); grid-template-areas:"header header actions" "status status status" "nav workspace workspace"; padding-bottom:env(safe-area-inset-bottom); }
+  .game-shell .app-header { padding:4px 10px; min-height:52px; gap:6px; }
+  .airline-brand small,.app-date small,.nav-footer { display:none; }
+  .game-shell .airline-brand h1 { font-size:.85rem; }
+  .app-header .inbox-button > span { display:none; }
+  .turn-actions { padding:4px 10px 4px 0; min-height:52px; border:0; background:var(--bg); }
+  .turn-actions .hotseat-controls { max-width:200px; }
+  .turn-actions .end-quarter { font-size:.75rem; }
+  .mobile-profit { display:none; }
+  .status-bar { padding:5px 12px; gap:20px; }
+  .status-bar .hud-objective { max-width:50%; }
+  .primary-nav { flex-direction:column; justify-content:flex-start; gap:0; padding:4px; border:0; border-right:1px solid var(--rule); }
+  .primary-nav > button { flex:0 0 auto; flex-direction:row; justify-content:center; gap:4px; padding:6px 0; min-height:44px; font-size:.65rem; }
+  .primary-nav > button .icon { width:14px; height:14px; }
+  .game-shell .toast-stack { bottom:12px; }
+  .first-flight { bottom:8px; padding:8px; }
+  .first-flight strong,.first-flight p { display:none; }
+  .first-flight button { margin:0; }
+}
