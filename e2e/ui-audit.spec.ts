@@ -4,16 +4,19 @@ import type { GameState } from '../src/engine'
 import { openPanel } from './workspace'
 
 async function inside(control: Locator, page: Page) {
-  const rect = await control.boundingBox(), viewport = page.viewportSize()!
-  expect(rect).not.toBeNull()
-  expect(rect!.x).toBeGreaterThanOrEqual(-1)
-  expect(rect!.y).toBeGreaterThanOrEqual(-1)
-  expect(rect!.x + rect!.width).toBeLessThanOrEqual(viewport.width + 1)
-  expect(rect!.y + rect!.height).toBeLessThanOrEqual(viewport.height + 1)
-  expect(await control.evaluate(el => {
-    const r = el.getBoundingClientRect(), hit = document.elementFromPoint(r.x+r.width/2, r.y+r.height/2)
-    return hit === el || el.contains(hit)
-  }), 'control is not covered').toBe(true)
+  await expect(control).toBeVisible()
+  // Opening cards animate: wait for usable geometry instead of depending on
+  // the runner sampling one particular frame of the entrance transition.
+  await expect.poll(async () => {
+    const rect = await control.boundingBox(), viewport = page.viewportSize()!
+    return {
+      inside: !!rect && rect.x >= -1 && rect.y >= -1 && rect.x + rect.width <= viewport.width + 1 && rect.y + rect.height <= viewport.height + 1,
+      unobstructed: await control.evaluate(el => {
+        const r = el.getBoundingClientRect(), hit = document.elementFromPoint(r.x+r.width/2, r.y+r.height/2)
+        return hit === el || el.contains(hit)
+      }),
+    }
+  }, {message:'Control stays inside the viewport and can be reached'}).toEqual({inside:true,unobstructed:true})
 }
 
 for (const [width, height] of [[390,844], [1366,768]]) {
@@ -42,6 +45,7 @@ for (const [width,height] of [[320,568],[667,375],[844,390],[768,1024],[1024,768
     await page.getByTestId('start-jet_age').click()
     await expect(page.getByTestId('map')).toBeVisible()
     expect((await page.getByTestId('map').boundingBox())!.height).toBeGreaterThan(150)
+    for(const id of ['zoom-in','zoom-out','zoom-reset','map-projection','toggle-rivals']) await inside(page.getByTestId(id),page)
     for(const panel of ['desk','routes','fleet','catalog','finance']) {
       await openPanel(page,panel)
       for(const id of ['nav-desk','nav-network','nav-fleet','nav-company','end-quarter','open-settings','cash']) await inside(page.getByTestId(id),page)
@@ -51,6 +55,10 @@ for (const [width,height] of [[320,568],[667,375],[844,390],[768,1024],[1024,768
     await page.getByTestId('open-settings').click()
     await page.getByTestId('display-settings').locator('summary').click()
     await page.getByLabel('text size',{exact:true}).selectOption('125')
+    const settings=page.getByTestId('settings-dialog').locator('.settings-card')
+    expect(await settings.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1)
+    await settings.evaluate(el=>{el.scrollTop=el.scrollHeight})
+    await inside(page.getByRole('button',{name:'Close settings',exact:true}),page)
     await page.getByRole('button',{name:'Close settings',exact:true}).click()
     await openPanel(page,'fleet')
     for(const id of ['nav-desk','nav-network','nav-fleet','nav-company','end-quarter']) await inside(page.getByTestId(id),page)
