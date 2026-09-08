@@ -24,3 +24,32 @@ The existing viewport-owned workspace and retained list state are good foundatio
 
 Implementation and verification are recorded with each commit. Engine rules,
 forecasts and saved career formats are not changed by this audit.
+
+## Implemented
+
+- A first-career action above customization and a first-flight prompt on the map;
+  wrapped scenario chips, valid form labels, and accurate handbook goal wording.
+- 44px touch targets across phones and touch tablets; notch safe areas, scalable
+  navigation widths, and a compact rail for short landscape screens.
+- Disclosures retain native Space behavior. Dialogs include summaries in their
+  focus cycle, keep the covered workspace inert, handle initial Shift+Tab, and
+  restore focus. Inspectors handle Escape; route navigation retains button focus.
+  Inbox has an explicit accessible name and sortable headings expose direction.
+- Route and aircraft search accepts city names; counts and reset controls explain
+  empty results. Expanded route metrics retain the route column and header while
+  scrolling, with keyboard scrolling and clear accounting labels.
+- Quarter review, route launch and reports have independent scrolling content,
+  stable headings and persistent actions. The phone plan tray uses less width.
+
+## Verification
+
+`npm run check` passes all 290 unit tests, lint, TypeScript and the existing 190 KiB
+startup / 95 KiB map budgets. The new `e2e/ui-audit.spec.ts` runs in Chromium,
+desktop WebKit and mobile WebKit alongside the existing responsive and mature
+career suites. It covers 320px phones, 667×375 and 844×390 landscape, tablets,
+1366×768 desktop, 125% text, first-route launch, city searches, empty-result
+recovery, pinned columns, dialog focus and visible review actions. Screenshots
+are attached to the CI browser report for visual inspection.
+
+Local browser binaries could not be downloaded in this workspace. Browser
+validation therefore runs in GitHub CI, which gates the Pages deployment.

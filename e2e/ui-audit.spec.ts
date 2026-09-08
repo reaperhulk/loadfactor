@@ -160,3 +160,32 @@ for(const width of [320,390,1366]) {
     expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBe(0)
   })
 }
+
+for(const [width,height] of [[320,568],[667,375],[1366,768]] as const) {
+  test(`UI audit review ${width}x${height}: actions stay visible while forecasts scroll`,async({page},info)=>{
+    await page.setViewportSize({width,height})
+    await page.goto('/')
+    await page.getByTestId('start-jet_age').click()
+    await openPanel(page,'desk')
+    await page.getByRole('button',{name:'Compare this launch'}).first().click()
+    const launch=page.getByTestId('route-setup')
+    for(const id of ['route-setup-confirm','route-setup-cancel']) await inside(page.getByTestId(id),page)
+    await launch.locator('.dialog-scroll').evaluate(el=>{el.scrollTop=el.scrollHeight})
+    await inside(page.getByTestId('route-setup-confirm'),page)
+    await page.getByTestId('route-setup-confirm').click()
+    await page.getByTestId('end-quarter').click()
+    await expect(page.getByTestId('review-cash-bridge')).toBeVisible()
+    await inside(page.getByTestId('confirm-quarter'),page)
+    await page.getByTestId('quarter-review').locator('.dialog-scroll').evaluate(el=>{el.scrollTop=el.scrollHeight})
+    await inside(page.getByTestId('confirm-quarter'),page)
+    await inside(page.getByRole('button',{name:'Close quarter review',exact:true}),page)
+    await info.attach(`${width}x${height}-quarter-review`,{body:await page.screenshot(),contentType:'image/png'})
+    await page.getByTestId('confirm-quarter').click()
+    await expect(page.getByTestId('report-hero')).toBeFocused()
+    await inside(page.getByTestId('report-card-close'),page)
+    await page.getByTestId('report-card').locator('.dialog-scroll').evaluate(el=>{el.scrollTop=el.scrollHeight})
+    await inside(page.getByTestId('report-card-close'),page)
+    await page.getByTestId('report-card-close').click()
+    await expect(page.getByTestId('date')).toHaveText('1960 Q2')
+  })
+}

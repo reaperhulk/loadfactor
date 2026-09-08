@@ -18,6 +18,8 @@ npm ci
 npm run dev     # http://localhost:5173
 ```
 
+- **Start your first flight.** The starter card launches The Jet Age, and the
+  empty map points to two launch comparisons on your Desk.
 - **Found an airline.** Choose a name, livery and home airport. Play solo, pass
   the device among two to four players, or exchange turn links in a duel.
 - **Learn the first three quarters.** The operations desk proposes a first
@@ -90,13 +92,17 @@ on screen: **Desk** for prioritized decisions and upcoming commitments,
 **Network** for the map, routes and airports, **Fleet** for owned aircraft,
 orders and the market, and **Company** for finance, rivals and reports.
 
-Routes and aircraft use compact comparison lists with focused inspectors. Route
+Routes and aircraft use compact comparison lists with focused inspectors. Search by
+aircraft, airport code or city name, clear empty searches, and pin route names while
+scrolling expanded metrics. Route
 fare, service and frequency edits show company profit and ending cash before one
 undoable apply. Quarter review warns about unapplied drafts. New routes show
 “Not flown yet”; actual results and next-quarter forecasts are labeled separately.
 Desktop uses a navigation rail and adjacent inspectors; mobile uses bottom
 navigation, full-width inspectors and catalog cards. List filters, scroll and
-map position survive workspace navigation.
+map position survive workspace navigation. Landscape phones use a compact rail, and
+touch tablets get the same generous targets as phones. Review, launch and report
+actions remain visible while their content scrolls.
 
 Every workspace shares one quarter draft. The plan tray previews combined profit
 and cash, removes individual changes, and applies a validated batch with one undo.

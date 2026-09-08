@@ -17,8 +17,9 @@ export function QuarterReview({ state, forecast, onClose, onConfirm }: {
   const idle = airline.fleet.filter((a) => a.routeId === null && !a.reserve && !isGrounded(a, state.turn)).length
   const losing = forecast.routes.filter((r) => r.lastRevenue < r.lastCost).length
   return <Dialog label="Review quarter" className="gameover-overlay" testId="quarter-review" onClose={onClose}>
-    <div className="report-card quarter-review">
+    <div className="report-card quarter-review review-layout">
       <div className="dialog-heading"><div><span className="eyebrow">{yearOf(state)} Q{quarterOf(state)} · planning</span><h2>Review your next quarter</h2></div><button onClick={onClose} aria-label="Close quarter review">×</button></div>
+      <div className="dialog-scroll">
       {drafts > 0 && <p role="status" className="draft-warning">{drafts} unapplied changes are excluded from this forecast and will not fly. Return to planning to apply or discard them.</p>}
       <p className="review-profit"><small>Planned company net profit</small><strong className={forecast.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.profit)}</strong></p>
       <dl className="cash-bridge" data-testid="review-cash-bridge">
@@ -35,6 +36,7 @@ export function QuarterReview({ state, forecast, onClose, onConfirm }: {
       {forecast.operations && <OperationsSummary summary={forecast.operations} routes={airline.routes} forecast />}
       {adverse?.operations && <p className="review-attention" data-testid="operations-adverse">Stress case · one additional three-day repair: {adverse.operations.cancelledTrips} cancelled round trips; {money(adverse.profit)} company profit. This is an illustration, not a prediction of the next repair.</p>}
       <p className="hint">Forecast at current fuel, demand and rival schedules. Deliveries, competitor moves and disruptions can change the result.</p>
+      </div>
       <div className="dialog-actions"><button onClick={onClose}>Back to planning</button><button className="end-quarter" data-testid="confirm-quarter" onClick={onConfirm}>Fly this quarter <span aria-hidden="true">→</span></button></div>
     </div>
   </Dialog>

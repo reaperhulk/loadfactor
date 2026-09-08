@@ -79,7 +79,9 @@ export function ReportCard({ state, events, onClose, onInspect }: ReportCardProp
 
   return (
     <Dialog label="Quarterly report" className="gameover-overlay report-overlay" testId="report-card" onClose={onClose}>
-      <div className="gameover-card report-card" onClick={(e) => e.stopPropagation()}>
+      <div className="gameover-card report-card review-layout" onClick={(e) => e.stopPropagation()}>
+        <div className="dialog-heading"><h2>Quarterly report</h2><button aria-label="Close quarterly report" onClick={onClose}>×</button></div>
+        <div className="dialog-scroll">
         {/* The quarter's headline, not its ledger. A profit figure the size of
             a poster, its direction, and the margin behind it — the table below
             is the supporting detail, which is the order a reader wants it in. */}
@@ -375,9 +377,10 @@ export function ReportCard({ state, events, onClose, onInspect }: ReportCardProp
           </p>
         )}
 
-        <button data-testid="report-card-close" onClick={onClose}>
+        </div>
+        <div className="dialog-actions"><button data-testid="report-card-close" onClick={onClose}>
           Continue (space)
-        </button>
+        </button></div>
       </div>
     </Dialog>
   )

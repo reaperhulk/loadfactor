@@ -59,19 +59,16 @@ export function RouteSetupDialog({ state, from, to, onClose, preset }: RouteSetu
 
   return (
     <Dialog label={`Plan ${from} to ${to}`} className="gameover-overlay" testId="route-setup" onClose={onClose}>
-      <div className="gameover-card report-card" onClick={(e) => e.stopPropagation()}>
-        <h2>
-          Open {from}–{to}
-        </h2>
+      <div className="gameover-card report-card review-layout route-launch-review" onClick={(e) => e.stopPropagation()}>
+        <div className="dialog-heading"><h2>Open {from}–{to}</h2><button aria-label="Close route planning" onClick={onClose}>×</button></div>
+        <div className="dialog-scroll">
         <p className="dim">
           {km}km · demand {demand}/wk · base fare ${fareFor(km, fareLevel)}
         </p>
         {candidates.length === 0 ? (
           <>
             <p>No idle aircraft has the range for this route.</p>
-            <button data-testid="route-setup-cancel" onClick={onClose}>
-              Close
-            </button>
+
           </>
         ) : (
           <>
@@ -79,6 +76,7 @@ export function RouteSetupDialog({ state, from, to, onClose, preset }: RouteSetu
               Aircraft:{' '}
               <select
                 data-testid="route-setup-aircraft"
+                data-dialog-initial-focus
                 value={aircraftId ?? ''}
                 onChange={(e) => {
                   const id = Number(e.target.value)
@@ -141,7 +139,13 @@ export function RouteSetupDialog({ state, from, to, onClose, preset }: RouteSetu
               </div>
             )}
             {!!preview?.errors.length && <p role="alert">{preview.errors.map(e => e.reason).join(' · ')}</p>}
+          </>
+        )}
+        </div>
+        <div className="dialog-actions">
+          {candidates.length > 0 && <>
             <button
+              className="primary-action"
               data-testid="route-setup-confirm"
               disabled={!preview || !!preview.errors.length}
               onClick={() => {
@@ -161,11 +165,9 @@ export function RouteSetupDialog({ state, from, to, onClose, preset }: RouteSetu
               ✈ Open route
             </button>{' '}
             <button disabled={!preview || !!preview.errors.length} onClick={() => { if (aircraftId === null) return; stagePlanningCommands([{ type: 'open_route', from, to, aircraftId, frequency: clampedFreq, fareLevel, serviceLevel }]); onClose() }}>Add to plan</button>{' '}
-            <button data-testid="route-setup-cancel" onClick={onClose}>
-              Cancel
-            </button>
-          </>
-        )}
+          </>}
+          <button data-testid="route-setup-cancel" onClick={onClose}>{candidates.length ? 'Cancel' : 'Close'}</button>
+        </div>
       </div>
     </Dialog>
   )
