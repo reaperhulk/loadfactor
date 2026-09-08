@@ -3,6 +3,9 @@ import { readFileSync } from 'node:fs'
 import type { GameState } from '../src/engine'
 import { openPanel } from './workspace'
 
+// Every case owns its browser context and career; distribute them across CI shards.
+test.describe.configure({mode:'parallel'})
+
 async function inside(control: Locator, page: Page) {
   await expect(control).toBeVisible()
   // Opening cards animate: wait for usable geometry instead of depending on
@@ -56,7 +59,13 @@ for (const [width,height] of [[320,568],[667,375],[844,390],[768,1024],[1024,768
     await page.getByTestId('display-settings').locator('summary').click()
     await page.getByLabel('text size',{exact:true}).selectOption('125')
     const settings=page.getByTestId('settings-dialog').locator('.settings-scroll')
-    await expect.poll(()=>settings.evaluate(el=>el.scrollWidth-el.clientWidth),{message:'Enlarged settings fit without horizontal scrolling'}).toBeLessThanOrEqual(1)
+    await expect.poll(()=>settings.evaluate(el=>{
+      if(el.scrollWidth-el.clientWidth<=1) return null
+      const right=el.getBoundingClientRect().right
+      return {overflow:el.scrollWidth-el.clientWidth,elements:[...el.querySelectorAll<HTMLElement>('*')]
+        .filter(child=>child.getClientRects().length && (child.scrollWidth-child.clientWidth>1 || child.getBoundingClientRect().right>right+1))
+        .map(child=>({tag:child.tagName,label:child.getAttribute('aria-label') ?? child.textContent?.slice(0,60),overflow:child.scrollWidth-child.clientWidth}))}
+    }),{message:'Enlarged settings fit without horizontal scrolling'}).toBeNull()
     await settings.evaluate(el=>{el.scrollTop=el.scrollHeight})
     await inside(page.getByRole('button',{name:'Close settings',exact:true}),page)
     await info.attach(`${width}x${height}-settings-125`,{body:await page.screenshot({animations:'disabled'}),contentType:'image/png'})
