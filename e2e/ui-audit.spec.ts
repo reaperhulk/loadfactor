@@ -1,4 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { readFileSync } from 'node:fs'
+import type { GameState } from '../src/engine'
 import { openPanel } from './workspace'
 
 async function inside(control: Locator, page: Page) {
@@ -112,3 +114,49 @@ test('UI audit keyboard: disclosures, dialog focus and inspector return',async({
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('end-quarter')).toBeFocused()
 })
+
+
+const comparisonCareer = JSON.parse(readFileSync(new URL('./fixtures/density-career.json', import.meta.url), 'utf8')) as GameState
+for(const width of [320,390,1366]) {
+  test(`UI audit comparisons ${width}px: city search, empty results and pinned metrics`,async({page},info)=>{
+    await page.setViewportSize({width,height:width<700 ? 844 : 768})
+    await page.goto('/')
+    await page.getByTestId('start-jet_age').click()
+    await page.evaluate(snapshot=>{
+      Object.assign(window.__harness.getState()!,snapshot)
+      const route=snapshot.airlines[0]!.routes[0]!
+      window.__harness.dispatch({type:'set_fare',routeId:route.id,fareLevel:route.fareLevel})
+    },comparisonCareer)
+    await openPanel(page,'routes')
+    const before=await page.evaluate(()=>structuredClone(window.__harness.getState()))
+    await page.getByTestId('route-search').fill('New York')
+    const rows=page.getByTestId('routes-panel-table').locator('tbody tr')
+    expect(await rows.count()).toBeGreaterThan(0)
+    for(const row of await rows.all()) await expect(row).toContainText('JFK')
+    await page.getByTestId('route-search').fill('airport-does-not-exist')
+    await expect(page.getByTestId('route-search-results')).toContainText('No matching routes')
+    await page.getByRole('button',{name:'Clear route filters',exact:true}).click()
+    await expect(page.getByTestId('route-search')).toBeFocused()
+    await expect(rows).toHaveCount(comparisonCareer.airlines[0]!.routes.length)
+    await page.getByTestId('sort-load').click()
+    await expect(page.getByTestId('sort-load').locator('..')).toHaveAttribute('aria-sort','descending')
+    await info.attach(`${width}-route-comparison`,{body:await page.screenshot(),contentType:'image/png'})
+    await page.getByRole('button',{name:'Show all metrics',exact:true}).click()
+    const metrics=page.getByRole('region',{name:'All route metrics'})
+    await metrics.scrollIntoViewIfNeeded()
+    const firstCell=rows.first().locator('td').first()
+    const initialX=(await firstCell.boundingBox())!.x
+    await metrics.evaluate(el=>{ el.scrollLeft=350 })
+    expect(Math.abs((await firstCell.boundingBox())!.x-initialX)).toBeLessThanOrEqual(1)
+    await metrics.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(page.getByTestId('tab-routes')).toHaveClass(/active/)
+    expect(await page.evaluate(()=>window.__harness.getState())).toEqual(before)
+    await openPanel(page,'fleet')
+    await page.getByLabel('Find aircraft',{exact:true}).fill('no such aircraft')
+    await expect(page.getByTestId('page-fleet')).toContainText('No matching aircraft')
+    await page.getByRole('button',{name:'Clear aircraft filters',exact:true}).click()
+    await expect(page.getByTestId('fleet-table').locator('tbody tr')).toHaveCount(comparisonCareer.airlines[0]!.fleet.length)
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBe(0)
+  })
+}

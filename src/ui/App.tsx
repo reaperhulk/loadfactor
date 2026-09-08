@@ -753,6 +753,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         return
       }
       if (target?.closest('input, select, textarea, [contenteditable=true]')) return
+      if (target?.closest('.table-scroll[tabindex]') && [' ', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return
       if (e.altKey || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() !== 'z')) return
       if (target?.closest('button, summary, a[href], [role=button]') && [' ', 'e', 'E', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
@@ -981,279 +982,387 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         <p>Scheduled deliveries: {player.orders.length === 0 ? 'none' : player.orders.map((o) => `${o.type} in ${o.quartersLeft}q${o.replacesAircraftId ? ' (replacement)' : ''}`).join(' · ')}</p>
         <p>Aircraft entering the market within two years: {AIRCRAFT.filter((t) => t.availableFrom > yearOf(state) && t.availableFrom <= yearOf(state) + 2).map((t) => `${t.name} (${t.availableFrom})`).join(' · ') || 'none announced'}.</p>
         <p>Airport programmes on your network: {[...new Set([...Object.keys(player.slots), ...player.slotRequests.map((r) => r.city)])].map((city) => ({ city, ...nextExpansion(state, city) })).filter((e) => e.quartersAway <= 8).sort((a,b) => a.quartersAway-b.quartersAway).map((e) => `${e.city}: +${e.slots} slots in ${e.quartersAway}q`).join(' · ') || 'none opening in the next eight quarters'}.</p>
-        {state.airlines.filter((a) => a.campaign).map((a) => <p key={a.id}>{a.name}: {a.campaign!.kind} campaign at {a.campaign!.city}, through quarter {a.campaign!.untilTurn}.</p>)}
-      </details>}
-      </aside></div>
-      <CoachMarks state={state} />
-
-        </section>
-        <section className="workspace-page map-page" hidden={tab !== 'map'} data-testid="page-map">
-      <div className={`map-area split-view${selectedCity !== null || inspectedRoute !== undefined ? " has-inspector" : ""}`}>
-      {display.diagnostics && tab==='map' && <Suspense fallback={null}><FrameDiagnostics /></Suspense>}
-        <Suspense
-          fallback={
-            <div className="map-wrap map-loading" data-testid="map-loading" aria-busy="true">
-              <span>Loading route map…</span>
-            </div>
-          }
-        >
-          <MapView
-            flowRouteIds={flowFocus?.routes}
-          selectedRouteId={inspectedRoute?.id}
-            state={state}
-            active={tab === "map"}
-            selected={selectedCity}
-            routeFrom={routeFrom}
-            onCityClick={handleCityClick}
-            onRouteClick={inspectRoute}
-            newRouteIds={
-              new Set(
-                session.lastEvents
-                  .filter((e) => e.type === 'route_opened' && e.airline === viewSeat())
-                  .map((e) => (e.type === 'route_opened' ? e.routeId : -1)),
-              )
-            }
-            newSlotCities={
-              new Set(
-                session.lastEvents
-                  .filter((e) => e.type === 'slots_granted' && e.airline === viewSeat())
-                  .map((e) => (e.type === 'slots_granted' ? e.city : '')),
-              )
-            }
-            acquiredRouteIds={(() => {
-              // A takeover appends the target's routes with fresh ids — the
-              // last `routes` entries are the ones that just changed flags.
-              const deal = session.lastEvents.find((e) => e.type === 'rival_acquired' && e.airline === viewSeat())
-              if (!deal || deal.type !== 'rival_acquired' || deal.routes === 0) return new Set<number>()
-              return new Set(player.routes.slice(-deal.routes).map((r) => r.id))
-            })()}
-          />
-        </Suspense>
-        {state.turn === 0 && player.routes.length === 0 && !selectedCity && !inspectedRoute && !routeFrom && <aside className="first-flight" data-testid="first-flight">
-          <strong>Your aircraft are ready. Choose their first route.</strong>
-          <p>Compare launch costs and profit on your Desk, then review the quarter to fly.</p>
-          <button className="primary-action" onClick={() => setTab('desk')}>Compare first routes <span aria-hidden="true">→</span></button>
-        </aside>}
-        {flowFocus && <div className="flow-focus-banner" data-testid="flow-focus"><strong>{flowFocus.label}</strong><button onClick={()=>setFlowFocus(null)}>Clear journey</button></div>}
-        {tab === "map" && selectedCity !== null && (
-          <CityPanel
-            state={state}
-            cityId={selectedCity}
-            onHighlight={highlightFlow}
-            routeFrom={routeFrom}
-            onPlanRoute={(from) => { setRouteFrom(routeFrom === from ? null : from); setSelectedCity(null) }}
-            onPlanPair={(from, to) => {
-              setSelectedCity(null)
-              setRouteFrom(null)
-              setPendingRoute({ from, to })
-            }}
-            onClose={() => {
-              setSelectedCity(null)
-              setRouteFrom(null)
-              requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-testid=tab-map]')?.focus({preventScroll:true}))
-            }}
-          />
-        )}
-        {tab === "map" && inspectedRoute !== undefined && (
-          <RouteDossier
-            state={state}
-            routeId={inspectedRoute!.id}
-            onClose={() => { setSelectedRoute(null); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-testid=tab-map]')?.focus({preventScroll:true})) }}
-            onSelectRoute={setSelectedRoute}
-            onHighlight={highlightFlow}
-          />
-        )}
-      </div>
-
-        </section>
-        {visited.has('routes') && <section className={`workspace-page route-page split-view${inspectedRoute !== undefined ? ' has-inspector' : ''}`} hidden={tab !== 'routes'} data-testid="page-routes">
-          <div className="split-list"><div className="page-heading"><div><span className="eyebrow">Network</span><h2>Routes <span>{player.routes.length}</span></h2></div><span className="dim">Last quarter’s results</span></div><RoutesPanel state={state} selectedRouteId={selectedRoute} onInspect={inspectRoute} onPlan={(from, to, preset) => setPendingRoute({ from, to, preset })} onAirport={(city) => { setTab('map'); setSelectedCity(city); setSelectedRoute(null) }} /></div>
-          {tab === 'routes' && inspectedRoute !== undefined && <RouteDossier state={state} routeId={inspectedRoute!.id} onClose={closeRoute} onSelectRoute={setSelectedRoute} onHighlight={highlightFlow} />}
-        </section>}
-        {visited.has('fleet') && <section className={`workspace-page fleet-page split-view${inspectedAircraft ? ' has-inspector' : ''}`} hidden={tab !== 'fleet'} data-testid="page-fleet"><div className="split-list"><FleetPanel state={state} selectedAircraftId={selectedAircraft} onInspect={setSelectedAircraft} /></div>{tab === 'fleet' && inspectedAircraft && <AircraftDossier state={state} aircraftId={inspectedAircraft.id} onClose={() => { setSelectedAircraft(null); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-testid="inspect-aircraft-${inspectedAircraft.id}"]`)?.focus({ preventScroll:true })) }} />}</section>}
-        {visited.has('orders') && <section className="workspace-page" hidden={tab !== 'orders'} data-testid="page-orders"><FleetPanel state={state} view="orders" /></section>}
-        {visited.has('catalog') && <section className="workspace-page" hidden={tab !== 'catalog'} data-testid="page-catalog"><FleetPanel state={state} view="catalog" /></section>}
-        {visited.has('airports') && <section className="workspace-page" hidden={tab !== 'airports'} data-testid="page-airports"><div className="page-heading"><h2>Airports</h2></div><AirportsPanel state={state} /></section>}
-        {visited.has('rivals') && <section className="workspace-page" hidden={tab !== 'rivals'} data-testid="page-rivals"><Suspense fallback={<p role="status">Loading rival intelligence…</p>}><RivalsPanel state={state} /></Suspense></section>}
-        {visited.has('operations') && <section className="workspace-page" hidden={tab !== 'operations'} data-testid="page-operations"><Suspense fallback={<p role="status">Preparing operations calendar…</p>}><OperationsBoard state={state} active={tab==='operations'} /></Suspense></section>}
-        {visited.has('outlook') && <section className="workspace-page" hidden={tab !== 'outlook'} data-testid="page-outlook"><Suspense fallback={<p role="status">Preparing capital outlook…</p>}><CapitalOutlook state={state} active={tab==='outlook'} /></Suspense></section>}
-        {visited.has('finance') && <section className="workspace-page" hidden={tab !== 'finance'} data-testid="page-finance"><Suspense fallback={<p role="status">Loading finances…</p>}><FinancePanel state={state} /></Suspense></section>}
-        {visited.has('report') && <section className="workspace-page" hidden={tab !== 'report'} data-testid="page-report"><Suspense fallback={<p role="status">Loading reports…</p>}><ReportPanel state={state} archive={session.reportArchive} onInspect={(id) => { setTab('routes'); inspectRoute(id) }} /></Suspense></section>}
-      </div>
-      <PlanTray state={state} />
-    </section>
-    {celebration.milestones.length > 0 && <Celebration milestones={celebration.milestones} state={state} onClose={celebration.dismiss} />}
-    <ToastStack events={session.lastEvents} state={state} unlocks={session.lastUnlocks} onOpenRoute={inspectRoute} />
-    {showReview && <Suspense fallback={<Dialog label="Review quarter" className="gameover-overlay" onClose={() => setShowReview(false)}><p role="status">Loading quarter review…</p></Dialog>}><QuarterReview state={state} forecast={forecast} onClose={() => setShowReview(false)} onConfirm={endQuarter} /></Suspense>}
-    {showReport && !celebration.milestones.length && session.reportEvents.length > 0 && <Suspense fallback={<Dialog label="Quarterly report" className="gameover-overlay" onClose={() => setShowReport(false)}><p role="status">Loading quarterly report…</p></Dialog>}><ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} onInspect={(id) => { setShowReport(false); setTab('routes'); inspectRoute(id) }} /></Suspense>}
-    {pendingRoute !== null && <RouteSetupDialog state={state} from={pendingRoute.from} to={pendingRoute.to}
-        preset={pendingRoute.preset} onClose={() => setPendingRoute(null)} />}
-    {state.phase !== 'planning' && <GameOverOverlay state={state} earned={session.careerUnlocks} onWatchReplay={onWatchReplay} />}
-    {showSettings && <Dialog label="Settings" className="gameover-overlay" testId="settings-dialog" onClose={() => setShowSettings(false)}><div className="settings-card"><div className="dialog-heading"><h2>Settings</h2><button onClick={() => setShowSettings(false)} aria-label="Close settings">×</button></div>
-        <button
-          data-testid="share-challenge"
-          title="copy a challenge link — same scenario, same seed, same world for whoever opens it"
-          aria-label="copy challenge link"
-          onClick={() => {
-            // The link carries your current net worth as the number to beat —
-            // sharing mid-career throws down where you stand right now.
-            const me = state.airlines[viewSeat()]!
-            const url =
-              `${window.location.origin}${window.location.pathname}?scenario=${encodeURIComponent(
-                state.scenario,
-              )}&seed=${encodeURIComponent(state.seed)}` +
-              `&target=${objectiveScore(me, scenario.objective.kind)}&metric=${scenario.objective.kind}&rules=${identityOf(state).rulesVersion}&by=${encodeURIComponent(me.name)}`
-            copyText(url, 'Challenge link')
-          }}
-        >
-          <Icon name="share" /> share
-        </button>
-        <MuteToggle />
-        <AudioSettings />
-        <DisplaySettings />
-<button onClick={() => { setShowSettings(false); setShowHelp(true) }}>Open handbook</button></div></Dialog>}
-      {showHelp && (
-        <Dialog label="Airline handbook" className="gameover-overlay" testId="help-overlay" onClose={() => setShowHelp(false)}>
-          <div className="gameover-card report-card handbook" onClick={(e) => e.stopPropagation()}>
-            <h2>Handbook</h2>
-            <p className="dim" data-testid="handbook-intro">
-              Each scenario has its own goal, shown below. Each quarter you plan (open routes, assign jets, set fares, queue for
-              slots), then end the quarter — everyone flies, demand splits by appeal (schedule × cabin
-              × fare × service × brand), and the world moves. Every system below is explained where
-              you use it too.
-            </p>
-            <p className="dim" data-testid="handbook-objective">
-              <strong>This era: {scenario.objective.blurb}</strong>
-            </p>
-            <div data-testid="handbook-systems">
-              <HubLegend />
-              <SpoolLegend />
-              <SeasonLegend />
-              <SlotLegend />
-              <MarketingLegend />
-              <HedgeLegend />
-              <ReliabilityLegend />
-              <RivalryLegend />
-              <TakeoverLegend />
-              <CabinLegend />
-              <ServiceLegend />
-            </div>
-            <h2>Shortcuts</h2>
-            <table className="report-lines">
-              <tbody>
-                <tr>
-                  <td>Space / E</td>
-                  <td>review the next quarter before flying</td>
-                </tr>
-                <tr>
-                  <td>1–6</td>
-                  <td>switch panels</td>
-                </tr>
-                <tr>
-                  <td>← / →</td>
-                  <td>cycle the dossier through your network's cities</td>
-                </tr>
-                <tr>
-                  <td>Esc</td>
-                  <td>back out of route mode, panels, overlays</td>
-                </tr>
-                <tr>
-                  <td>Drag / wheel</td>
-                  <td>pan and zoom the map (spin the globe)</td>
-                </tr>
-                <tr>
-                  <td>⚔ / ◐ / 🌐</td>
-                  <td>rival overlay · data lens (load → P&L → season) · globe projection</td>
-                </tr>
-                <tr>
-                  <td>Fleet tab</td>
-                  <td>🛠 puts every idle plane on its best route in one click</td>
-                </tr>
-                <tr>
-                  <td>Finance tab</td>
-                  <td>marketing (brand appeal), fuel hedges, loans at today's rate</td>
-                </tr>
-                <tr>
-                  <td>?</td>
-                  <td>this card</td>
-                </tr>
-              </tbody>
-            </table>
-            <button data-testid="help-close" onClick={() => setShowHelp(false)}>
-              Close
-            </button>
-          </div>
-        </Dialog>
-      )}
-
-  </main>
-}
-
-// Which build is running. Small, dim, and selectable, in the footer of the
-// menu and of the game — the deployed page and the repo are otherwise
-// impossible to line up by eye. A trailing "+" means the build was made from
-// a working tree with uncommitted changes, so the hash alone would be a lie.
-function BuildStamp() {
-  return (
-    <span
-      className="build-stamp"
-      data-testid="build-stamp"
-      title={`build ${__BUILD_SHA__} · ${__BUILD_TIME__}`}
-    >
-      {__BUILD_SHA__}
-    </span>
-  )
-}
-
-export function App() {
-  const session = useSyncExternalStore(subscribe, getSession)
-  const [replay, setReplay] = useState<Replay | null>(null)
-  const [mpNotice, setMpNotice] = useState<string | null>(null)
-  // Turn links arrive as a URL fragment, and they must work from ANY screen —
-  // a player mid-game opens their opponent's reply directly. Same-page hash
-  // navigation fires hashchange rather than a reload, so both paths feed the
-  // same intake.
-  useEffect(() => {
-    const intake = (): void => {
-      const hash = window.location.hash
-      if (!hash.startsWith('#mpturn=')) return
-      void receiveTurn(hash.slice('#mpturn='.length)).then((res) => {
-        window.history.replaceState(null, '', window.location.pathname)
-        setMpNotice(res.ok ? null : res.reason)
-      })
+        {state.airlines.filter((a) => a.campaign).map((a) => <p key…8990 tokens truncated… geriatric territory on the way.
+  const maintAt = (turnsAhead: number): number => {
+    let total = 0
+    for (const a of player.fleet) {
+      const t = getAircraftType(a.type)
+      const aged = Math.floor(
+        (t.maintBase * (10000 + (player.operationsPolicy ? OPERATIONS_MAINT_AGE_BP_PER_QUARTER : MAINT_AGE_BP_PER_QUARTER) * (a.ageQuarters + turnsAhead))) / 10000,
+      )
+      total += Math.floor((aged * inflationBp(state.turn + turnsAhead)) / 10000)
     }
-    intake()
-    window.addEventListener('hashchange', intake)
-    return () => window.removeEventListener('hashchange', intake)
-  }, [])
-  if (replay)
-    return (
-      <Suspense fallback={<main className="menu">
-      <SaveWarning />Loading replay…</main>}>
-        <ReplayViewer replay={replay} onExit={() => setReplay(null)} />
-      </Suspense>
-    )
+    return Math.floor(total * fleetCommonalityBp(state, player) / 10000)
+  }
+  const geriatricNow = player.fleet.filter((a) => a.ageQuarters >= 48).length
+  const geriatricSoon = player.fleet.filter((a) => a.ageQuarters >= 40 && a.ageQuarters < 48).length
+  const fleetHeader = sortHeaderFactory<FleetSortKey>({
+    current: fleetSort,
+    asc: fleetAsc,
+    setKey: setFleetSort,
+    setAsc: setFleetAsc,
+    defaultAscFor: (k) => k === 'type',
+    testPrefix: 'fleet-sort-',
+  })
   return (
-    <>
-      {mpNotice !== null && (
-        <div className="mp-notice" data-testid="mp-notice" role="alert">
-          ✉ {mpNotice} <button onClick={() => setMpNotice(null)}>dismiss</button>
-        </div>
+    <div>
+      <div className="page-heading"><h2>{view === 'fleet' ? 'Owned aircraft' : view === 'orders' ? 'Orders & deliveries' : 'Aircraft market'}</h2><span className="dim">{year}</span></div>
+      {view === 'fleet' && <>
+      <details className="fleet-policy-disclosure"><summary>Fleet policy & actions</summary><OperationsPanel state={state} mode="policy" /><ReliabilityLegend modern={!!player.operationsPolicy} />
+      {player.fleet.some((a) => a.routeId === null && !a.reserve && !isGrounded(a, state.turn)) && player.routes.length > 0 && (
+        <button
+          data-testid="assign-all-idle"
+          title="assign every idle airframe to the in-range route most starved for seats"
+          onClick={assignAllIdle}
+        >
+          🛠 put idle fleet to work
+        </button>
       )}
-      {session ? <GameScreen key={`${session.state.scenario}-${session.state.seed}`} onWatchReplay={setReplay} /> : <ScenarioSelect onWatchReplay={setReplay} />}
-    </>
+      {player.fleet.length > 0 && (() => {
+        const rep = player.reputationBp ?? 10000
+        const atRisk = player.operationsPolicy ? 0 : player.fleet.filter((a) => a.ageQuarters >= GROUNDING_AGE_QUARTERS).length
+        if (atRisk === 0 && rep >= 10000) return null
+        return (
+          <p className={rep < 9500 ? 'neg' : 'dim'} data-testid="reliability-note">
+            {atRisk > 0 && (
+              <>
+                {atRisk} airframe{atRisk > 1 ? 's' : ''} past {GROUNDING_AGE_QUARTERS / 4} years — old metal
+                breaks, and a grounded plane still draws its crew.{' '}
+              </>
+            )}
+            Reputation {(rep / 100).toFixed(0)}%
+            {rep < 10000 && (player.operationsPolicy ? ' — uncovered passenger disruption reduces appeal' : ' — repeated groundings cost you appeal on contested pairs')}
+          </p>
+        )
+      })()}
+      {player.fleet.length > 0 && (
+        <p className="dim" data-testid="renewal-forecast">
+          Fleet maintenance {money(maintAt(0))}/q now → {money(maintAt(8))}/q in 2 years on the same metal
+          {!player.operationsPolicy && geriatricNow > 0 && <span className="neg"> · {geriatricNow} geriatric</span>}
+          {!player.operationsPolicy && geriatricSoon > 0 && <span> · {geriatricSoon} more turn geriatric within 2y</span>}{' '}
+          <button
+            className="link-btn"
+            data-testid="copy-fleet"
+            title="copy the fleet as TSV — paste into any spreadsheet (raw numbers, $k)"
+            onClick={() =>
+              copyTsv(
+                ['aircraft', 'seats', 'ageQuarters', 'leased', 'cabin', 'maintK', 'valueK', 'route'],
+                player.fleet.map((a) => {
+                  const t = getAircraftType(a.type)
+                  const r = player.routes.find((x) => x.id === a.routeId)
+                  return [
+                    t.name,
+                    cabinSeats(a.type, a.cabin),
+                    a.ageQuarters,
+                    a.leased ? 1 : 0,
+                    a.cabin,
+                    Math.floor(
+                      (Math.floor((t.maintBase * (10000 + (player.operationsPolicy ? OPERATIONS_MAINT_AGE_BP_PER_QUARTER : MAINT_AGE_BP_PER_QUARTER) * a.ageQuarters)) / 10000) *
+                        inflationBp(state.turn)) /
+                        10000,
+                    ),
+                    a.leased ? 0 : resaleValue(a.type, a.ageQuarters),
+                    r ? `${r.from}-${r.to}` : 'idle',
+                  ]
+                }),
+                'Fleet table',
+              )
+            }
+          >
+            ⎘ copy as spreadsheet
+          </button>
+        </p>
+      )}
+      </details>
+      <div className="fleet-filters"><input type="search" aria-label="Find aircraft" placeholder="Find aircraft or route…" value={fleetQuery} onChange={(e)=>setFleetQuery(e.target.value)} /><label><input type="checkbox" checked={idleOnly} onChange={(e)=>setIdleOnly(e.target.checked)} /> Unassigned only</label>{(fleetQuery || idleOnly) && <button onClick={() => { setFleetQuery(''); setIdleOnly(false) }}>Clear aircraft filters</button>}</div>
+      {(() => {
+        // Row models first so sorting works on exactly what the cells show.
+        const fleetRows = player.fleet.filter((a) => {
+          const r=player.routes.find((r)=>r.id===a.routeId)
+          return (!idleOnly || a.routeId===null && !a.reserve && !isGrounded(a,state.turn)) && `${a.id} ${getAircraftType(a.type).name} ${r ? `${r.from}-${r.to} ${getCity(r.from).name} ${getCity(r.to).name}` : ''}`.toLowerCase().includes(fleetQuery.trim().toLowerCase())
+        }).map((a) => {
+          const type = getAircraftType(a.type)
+          const route = player.routes.find((r) => r.id === a.routeId)
+          const utilBp = Math.min(10000, player.routes.reduce((total, r) => {
+            const alloc = allocateTrips(player, r, state.turn).find((x) => x.aircraftId === a.id)
+            const maxTrips = roundTripsPerWeek(a.type, distanceKm(r.from, r.to))
+            return total + (alloc && maxTrips > 0 ? Math.floor(alloc.trips * 10000 / maxTrips) : 0)
+          }, 0))
+          const maint = Math.floor(
+            (Math.floor((type.maintBase * (10000 + (player.operationsPolicy ? OPERATIONS_MAINT_AGE_BP_PER_QUARTER : MAINT_AGE_BP_PER_QUARTER) * a.ageQuarters)) / 10000) *
+              inflationBp(state.turn)) /
+              10000,
+          )
+          const value = a.leased ? 0 : resaleValue(a.type, a.ageQuarters)
+          return { a, type, route, utilBp, maint, value }
+        })
+        const fdir = fleetAsc ? 1 : -1
+        fleetRows.sort((x, y) => {
+          switch (fleetSort) {
+            case 'age':
+              return fdir * (x.a.ageQuarters - y.a.ageQuarters)
+            case 'util':
+              return fdir * (x.utilBp - y.utilBp)
+            case 'maint':
+              return fdir * (x.maint - y.maint)
+            case 'value':
+              return fdir * (x.value - y.value)
+            default:
+              return fdir * (x.type.name.localeCompare(y.type.name) || x.a.id - y.a.id)
+          }
+        })
+        const fheader = fleetHeader
+        return (
+      <><p className="search-feedback" role="status">{fleetRows.length} of {player.fleet.length} aircraft{fleetRows.length === 0 ? ' · No matching aircraft. Try another name or clear the filters.' : ''}</p>
+      <div className="table-scroll"><table className="fleet-table" data-testid="fleet-table">
+        <thead>
+          <tr>
+            {fheader('type', 'Aircraft')}
+            {fheader('age', 'Age')}
+            {fheader('util', 'Utilization', 'weekly utilization across primary, secondary and standby-cover assignments')}
+            {fheader('maint', 'Maint/q', 'maintenance before fleet commonality; the fleet total above includes the family adjustment')}
+            {player.operationsPolicy && <th>Readiness</th>}
+            {fheader('value', 'Value')}
+            <th>Cabin</th>
+            <th>Assignment</th>
+          </tr>
+        </thead>
+        <tbody>
+          {fleetRows.map(({ a, type, route, utilBp, maint, value }) => {
+            const geriatric = !player.operationsPolicy && a.ageQuarters >= 48
+            return (
+              <tr key={a.id} className={selectedAircraftId === a.id ? 'selected-row' : undefined}>
+                <td>
+                  <button className="link-btn entity-name" data-testid={`inspect-aircraft-${a.id}`} onClick={() => onInspect?.(a.id)}>{type.name} <small>#{a.id}</small></button> {a.leased && <span className="dim">(leased)</span>}{' '}
+                  <span className="dim">({cabinSeats(a.type, a.cabin)} seats, {type.rangeKm}km)</span>
+                </td>
+                <td className={geriatric ? 'neg' : ''} title={geriatric ? 'maintenance hog — consider retiring' : undefined}>
+                  {(a.ageQuarters / 4).toFixed(1)}y
+                </td>
+                <td>
+                  {route || utilBp > 0 ? (
+                    <>
+                      <span className="lf-bar">
+                        <span className="lf-fill" style={{ width: `${utilBp / 100}%` }} />
+                      </span>
+                      {Math.round(utilBp / 100)}%
+                    </>
+                  ) : (
+                    <>
+                      <span className="neg" title="idle metal still draws salaries and ownership">
+                        {a.reserve ? 'standby' : isGrounded(a, state.turn) ? 'maintenance' : 'parked'}
+                      </span>
+                      {(() => {
+                        // Best use for this airframe: the in-range route most
+                        // starved for seats — one click assigns and schedules.
+                        if (a.reserve || isGrounded(a, state.turn)) return null
+                        let bestRoute: (typeof player.routes)[number] | null = null
+                        let bestGap = 0
+                        for (const r of player.routes) {
+                          const rkm = distanceKm(r.from, r.to)
+                          if (rkm > type.rangeKm) continue
+                          const gap = pairWeeklyDemand(state, r.from, r.to) - routeWeeklyCapacity(player, r, state.turn)
+                          if (gap > bestGap) {
+                            bestGap = gap
+                            bestRoute = r
+                          }
+                        }
+                        if (!bestRoute) return null
+                        return (
+                          <button
+                            className="link-btn"
+                            data-testid={`suggest-${a.id}`}
+                            title={`${bestGap.toLocaleString('en-US')} unmet weekly seats there`}
+                            onClick={() => assignAndSchedule(state, a.id, bestRoute.id)}
+                          >
+                            → {bestRoute.from}–{bestRoute.to}?
+                          </button>
+                        )
+                      })()}
+                    </>
+                  )}
+                </td>
+                <td className={geriatric ? 'neg' : 'dim'}>{money(maint)}</td>
+                {player.operationsPolicy && <td>{readiness && <div>{(100 - (readiness.aircraft.find(f => f.aircraftId === a.id)?.unavailableMinutes ?? 0) * 100 / (13 * 7 * 24 * 60)).toFixed(1)}% available</div>}<span className="dim">{a.operations?.checkStart !== undefined ? 'Check booked' : checkDueIn(player, a, state.turn) === 0 ? 'Check due' : `Check in ${checkDueIn(player, a, state.turn)}q`}</span></td>}
+                <td className="dim">{a.leased ? '—' : money(value)}</td>
+                <td>{['','Dense','Standard','Premium'][a.cabin]}</td>
+                <td>{route ? `${route.from}–${route.to}` : a.reserve ? 'Standby' : isGrounded(a,state.turn) ? 'Maintenance' : 'Unassigned'}</td>
+              </tr>
+            )
+          })}
+
+        </tbody>
+      </table></div></>
+        )
+      })()}
+      <CabinLegend />
+      </>}
+      {view === 'orders' && <>{player.orders.length === 0 ? <p className="hint">No aircraft on order. Choose an aircraft in the market to compare purchase and lease options.</p> : <div className="table-scroll"><table><thead><tr><th>Aircraft</th><th colSpan={5}>Delivery</th><th>Actions</th></tr></thead><tbody>          {player.orders.map((o) => {
+            const refund = orderRefund(o), withdraw = canWithdrawOrder(o)
+            return (
+              <tr key={`order-${o.id}`} className="dim">
+                <td>{getAircraftType(o.type).name}</td>
+                <td colSpan={5}>
+                  on order — delivers in {o.quartersLeft} quarter(s)
+                  {withdraw && <small className="hint"> · Full refund until you advance the quarter</small>}
+                </td>
+                <td>
+                  <ConfirmButton
+                    data-testid={`cancel-order-${o.id}`}
+                    label={o.leased ? 'cancel lease' : withdraw ? `cancel (${money(refund)} back · full refund)` : `cancel (${money(refund)} back)`}
+                    confirmLabel="sure?"
+                    onConfirm={() => dispatch({ type: withdraw ? 'withdraw_order' : 'cancel_order', orderId: o.id })}
+                  />
+                </td>
+              </tr>
+            )
+          })}</tbody></table></div>}</>}
+      {view === 'catalog' && <><ReliabilityLegend modern={!!player.operationsPolicy} /><Shop state={state} /></>}
+    </div>
   )
 }
 
-function SaveWarning() {
-  const warning = useSyncExternalStore(subscribe, getStorageWarning)
-  if (!warning) return null
-  return <aside role="alert" className="save-warning">{warning} <button onClick={() => {
-    const text = exportCurrentCareer()
-    if (!text) return
-    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
-    const a = document.createElement('a')
-    a.href = url; a.download = 'loadfactor-career.json'; a.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-  }}>Download career</button></aside>
+export function AirportsPanel({ state }: { state: GameState }) {
+  const player = state.airlines[viewSeat()]!
+  const [onlyMine, setOnlyMine] = useState(true)
+  const [query, setQuery] = useState('')
+  // Your airports first (held slots, then usage), the rest of the world by
+  // city mass — one list, comparable, filterable, searchable.
+  const q = query.trim().toLowerCase()
+  const cities = [...CITIES]
+    .filter((c) => q === '' || c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q))
+    .filter(
+      (c) =>
+        q !== '' || // a search overrides the only-mine filter — you searched for a reason
+        !onlyMine ||
+        slotsHeld(player, c.id) > 0 ||
+        player.slotRequests.some((r) => r.city === c.id),
+    )
+    .sort((a, b) => {
+      const ha = slotsHeld(player, a.id)
+      const hb = slotsHeld(player, b.id)
+      if (ha !== hb) return hb - ha
+      const ma = a.pop * 4 + a.biz * 3 + a.tour * 2
+      const mb = b.pop * 4 + b.biz * 3 + b.tour * 2
+      return mb - ma
+    })
+  return (
+    <div data-testid="airports-panel">
+      <label className="dim">
+        <input
+          type="checkbox"
+          data-testid="airports-only-mine"
+          checked={onlyMine}
+          onChange={(e) => setOnlyMine(e.target.checked)}
+        />{' '}
+        only my airports
+      </label>{' '}
+      <input
+        placeholder="find a city…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        data-testid="airports-search"
+      />
+      <SlotLegend />
+      <div className="table-scroll"><table>
+        <thead>
+          <tr>
+            <th>City</th>
+            <th>Slots held / used</th>
+            <th title="allocated across all airlines vs the city's pool, and who is waiting">Pool</th>
+            <th title="quarterly rent on the slots you hold here">Rent/q</th>
+            <th title="last quarter's passengers on your routes touching this city">Pax/q</th>
+            <th title="last quarter's route P&L attributed here (half to each endpoint)">P&L/q</th>
+            <th title="the authority's next building programme">Next build</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {cities.map((c) => {
+            const held = slotsHeld(player, c.id)
+            const used = slotsUsed(player, c.id)
+            const allocated = slotsAllocated(state, c.id)
+            const pool = cityPool(state, c.id)
+            const remaining = slotsRemaining(state, c.id)
+            const queue = slotQueue(state, c.id)
+            const myPlace = queue.findIndex((entry) => entry.airline === viewSeat())
+            const expansion = nextExpansion(state, c.id)
+            const fee = slotFee(c.id)
+            // The city as a business: traffic and P&L across every route
+            // touching it (each route splits evenly between its endpoints).
+            let cityPax = 0
+            let cityProfitHalves = 0
+            for (const r of player.routes) {
+              if (r.from !== c.id && r.to !== c.id) continue
+              cityPax += r.lastPax
+              cityProfitHalves += r.lastRevenue - r.lastCost
+            }
+            const cityProfit = Math.floor(cityProfitHalves / 2)
+            // Capacity held with nothing flying it still bills every quarter.
+            const idle = c.id !== player.hq && held - used > 0
+            return (
+              <tr key={c.id}>
+                <td>
+                  {c.name} <span className="dim">({c.id})</span>
+                </td>
+                <td>
+                  {held} / {used}
+                  {idle && (
+                    <ConfirmButton
+                      className="link-btn neg"
+                      label={`⚠ hand back ${held - used}`}
+                      confirmLabel="give them up?"
+                      title={`${held - used} unused — ${money((held - used) * slotRent(c.id))}/q of rent buying nothing. Released slots go back to the pool.`}
+                      data-testid={`release-${c.id}`}
+                      onConfirm={() => dispatch({ type: 'release_slots', city: c.id, count: held - used })}
+                    />
+                  )}
+                </td>
+                <td className={remaining <= 0 ? 'neg' : 'dim'}>
+                  {allocated}/{pool}
+                  {queue.length > 0 && <span className="dim"> · {queue.length} in line</span>}
+                </td>
+                <td className={held > 0 ? '' : 'dim'}>{held > 0 ? money(held * slotRent(c.id)) : '—'}</td>
+                <td className="dim">{cityPax > 0 ? cityPax.toLocaleString('en-US') : '—'}</td>
+                <td className={cityPax === 0 ? 'dim' : cityProfit >= 0 ? 'pos' : 'neg'}>
+                  {cityPax > 0 ? money(cityProfit) : '—'}
+                </td>
+                <td className="dim" data-testid={`expansion-${c.id}`} title={expansion.name}>
+                  +{expansion.slots} in {expansion.quartersAway}q
+                </td>
+                <td>
+                  {myPlace >= 0 ? (
+                    <button
+                      data-testid={`cancel-${c.id}`}
+                      title={`#${myPlace + 1} in line — ${money(fee)} refunded if you leave`}
+                      onClick={() => dispatch({ type: 'cancel_slot_request', city: c.id })}
+                    >
+                      #{myPlace + 1} in line — leave
+                    </button>
+                  ) : (
+                    <button
+                      disabled={player.cash < fee}
+                      data-testid={`request-${c.id}`}
+                      title={
+                        remaining > 0
+                          ? `${SLOTS_PER_GRANT} slots, served from next quarter`
+                          : `full — the list moves when ${expansion.name} opens in ${expansion.quartersAway}q`
+                      }
+                      onClick={() => dispatch({ type: 'request_slots', city: c.id })}
+                    >
+                      request {money(fee)}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table></div>
+    </div>
+  )
 }
+
+// Split-out screens re-exported so callers keep one panels entry point.
+export { FinancePanel } from './FinancePanel'
+export { ReportPanel } from './ReportPanel'
