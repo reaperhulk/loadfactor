@@ -1086,11 +1086,11 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     {celebration.milestones.length > 0 && <Celebration milestones={celebration.milestones} state={state} onClose={celebration.dismiss} />}
     <ToastStack events={session.lastEvents} state={state} unlocks={session.lastUnlocks} onOpenRoute={inspectRoute} />
     {showReview && <Suspense fallback={<Dialog label="Review quarter" className="gameover-overlay" onClose={() => setShowReview(false)}><p role="status">Loading quarter review…</p></Dialog>}><QuarterReview state={state} forecast={forecast} onClose={() => setShowReview(false)} onConfirm={endQuarter} /></Suspense>}
-    {showReport && !celebration.milestones.length && session.reportEvents.length > 0 && <Suspense fallback={<Dialog label="Quarterly report" className="gameover-overlay" onClose={() => setShowReport(false)}><p role="status">Loading quarterly report…</p></Dialog>}><ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} onInspect={(id) => { setShowReport(false); setTab('routes'); inspectRoute(id) }} /></Suspense>}
+    {state.phase === 'planning' && showReport && !celebration.milestones.length && session.reportEvents.length > 0 && <Suspense fallback={<Dialog label="Quarterly report" className="gameover-overlay" onClose={() => setShowReport(false)}><p role="status">Loading quarterly report…</p></Dialog>}><ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} onInspect={(id) => { setShowReport(false); setTab('routes'); inspectRoute(id) }} /></Suspense>}
     {pendingRoute !== null && <RouteSetupDialog state={state} from={pendingRoute.from} to={pendingRoute.to}
         preset={pendingRoute.preset} onClose={() => setPendingRoute(null)} />}
     {state.phase !== 'planning' && <GameOverOverlay state={state} earned={session.careerUnlocks} onWatchReplay={onWatchReplay} />}
-    {showSettings && <Dialog label="Settings" className="gameover-overlay" testId="settings-dialog" onClose={() => setShowSettings(false)}><div className="settings-card"><div className="dialog-heading"><h2>Settings</h2><button onClick={() => setShowSettings(false)} aria-label="Close settings">×</button></div>
+    {showSettings && <Dialog label="Settings" className="gameover-overlay" testId="settings-dialog" onClose={() => setShowSettings(false)}><div className="settings-card"><div className="dialog-heading"><h2>Settings</h2><button onClick={() => setShowSettings(false)} aria-label="Close settings">×</button></div><div className="settings-scroll">
         <button
           data-testid="share-challenge"
           title="copy a challenge link — same scenario, same seed, same world for whoever opens it"
@@ -1112,7 +1112,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         <MuteToggle />
         <AudioSettings />
         <DisplaySettings />
-<button onClick={() => { setShowSettings(false); setShowHelp(true) }}>Open handbook</button></div></Dialog>}
+<button onClick={() => { setShowSettings(false); setShowHelp(true) }}>Open handbook</button></div></div></Dialog>}
       {showHelp && (
         <Dialog label="Airline handbook" className="gameover-overlay" testId="help-overlay" onClose={() => setShowHelp(false)}>
           <div className="gameover-card report-card handbook" onClick={(e) => e.stopPropagation()}>

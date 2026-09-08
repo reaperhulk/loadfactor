@@ -1446,7 +1446,7 @@ test('the handbook teaches every system, and legends live where they are used', 
   await startGame(page)
   // '?' opens the handbook: intro + all nine system legends + shortcuts.
   await page.keyboard.press('?')
-  await expect(page.getByTestId('handbook-intro')).toContainText('race')
+  await expect(page.getByTestId('handbook-intro')).toContainText('Each scenario has its own goal')
   for (const legend of [
     'hub-legend',
     'spool-legend',

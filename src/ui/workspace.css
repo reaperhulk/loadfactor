@@ -70,11 +70,14 @@ main.game-shell {
 .game-shell .events-strip { flex-wrap:wrap; overflow:visible; }
 .game-shell .toast-stack { bottom:18px; right:18px; max-width:min(440px,calc(100vw - 36px)); }
 .game-shell .save-warning { position:fixed; top:8px; left:8px; right:8px; z-index:100; max-height:50dvh; overflow:auto; }
-.settings-card { width:min(430px,calc(100vw - 28px)); max-height:85dvh; overflow:auto; background:var(--panel); border:1px solid var(--rule); padding:20px; border-radius:10px; }
-.settings-card > button { margin:8px 8px 8px 0; }
-.settings-card > .dialog-heading { position:sticky; top:-20px; margin:-20px -20px 12px; padding:12px 20px; background:var(--panel); z-index:2; }
+.settings-card { display:flex; flex-direction:column; width:min(430px,calc(100vw - 28px)); max-height:85dvh; overflow:hidden; background:var(--panel); border:1px solid var(--rule); padding:20px; border-radius:10px; }
+.settings-scroll { min-width:0; min-height:0; overflow:auto; overscroll-behavior:contain; padding-right:6px; }
+.settings-scroll > button { margin:8px 8px 8px 0; }
+.settings-card > .dialog-heading { flex-shrink:0; margin-bottom:12px; }
 .settings-card .audio-settings input { min-width:0; flex:1; }
 .settings-card :is(.audio-settings,.display-settings) { margin:10px 0; max-width:none; }
+.settings-card .display-settings label:has(select) { flex-direction:column; align-items:stretch; }
+.settings-card .display-settings select { width:100%; min-width:0; max-width:none; }
 .dialog-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
 .dialog-heading h2 { margin:0 0 8px; }
 .dialog-heading > button { flex-shrink:0; }
@@ -478,8 +481,6 @@ main.game-shell { padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 
   .game-shell .city-panel-head h2 { font-size:1rem; }
   .menu .seed-field { align-items:stretch; text-align:left; }
   .menu .seed-field > label { display:grid; gap:4px; min-width:0; }
-  .settings-card .display-settings label:has(select) { flex-direction:column; align-items:stretch; }
-  .settings-card .display-settings select { width:100%; max-width:none; }
 }
 /* Landscape phones use a rail: two bottom bars would consume the workspace. */
 @media(max-height:500px) and (max-width:1000px) and (min-width:560px) {
