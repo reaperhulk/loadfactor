@@ -185,8 +185,9 @@ the improvement programme and its validation.
 
 ## Deploying
 
-CI checks each push and pull request. The eager JavaScript bundle must stay below
-190 KiB gzip. Chromium covers the complete browser suite; WebKit covers planning,
+CI checks each push and pull request. The build reports the eager JavaScript
+bundle's gzip size and guards the map chunk; the shell itself is not gated.
+Chromium covers the complete browser suite; WebKit covers planning,
 responsive layouts, preferences and hot-seat recovery, with separate phone runs.
 On `main`, Pages receives the exact checked build artifact only after all checks
 and browser tests pass. Enable GitHub Pages with GitHub Actions as its source.

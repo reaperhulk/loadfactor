@@ -23,7 +23,7 @@ import { Sparkline } from './Sparkline'
 import { assignAndSchedule } from './assign'
 import { FuelExposure, RouteWhatIf } from './RouteWhatIf'
 import { rulesOf } from '../engine/version'
-import { HubLegend, SpoolLegend } from './legendsLazy'
+import { HubLegend, SpoolLegend } from './legends'
 import { viewSeat, dispatch } from './session'
 import { money } from './format'
 

@@ -1,6 +1,5 @@
-// Keep the menu and game shell quick to start. Run after `vite build`; the
-// module script referenced by index.html is the eager entry, while the map
-// and replay viewer are deliberately lazy chunks.
+// Run after `vite build`. The module script referenced by index.html is the
+// eager entry; the map and replay viewer are deliberately lazy chunks.
 import { readFileSync, readdirSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
 
@@ -9,13 +8,11 @@ const html = readFileSync(new URL('index.html', dist), 'utf8')
 const entry = html.match(/<script type="module" crossorigin src="\.\/(assets\/[^"]+\.js)"><\/script>/)?.[1]
 if (!entry) throw new Error('could not find the production entry script in dist/index.html')
 
+// The shell's size is reported, not gated: the simulation is eager by nature
+// and grows with every rules version, and the last budget bought lazy twins
+// of small components rather than a faster start.
 const bytes = gzipSync(readFileSync(new URL(entry, dist))).byteLength
-const limit = 190 * 1024
-if (bytes > limit) {
-  throw new Error(`initial bundle ${Math.ceil(bytes / 1024)} KiB gzip exceeds ${limit / 1024} KiB budget`)
-}
-
-console.log(`initial bundle ${Math.ceil(bytes / 1024)} KiB gzip (budget ${limit / 1024} KiB)`)
+console.log(`initial bundle ${Math.ceil(bytes / 1024)} KiB gzip (reported, not gated)`)
 
 // The map is the first game screen. Guard its own download as well as the
 // shell so optional globe coordinates cannot silently become eager again.

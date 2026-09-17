@@ -907,12 +907,17 @@ world view); the `demand` lens draws the twelve richest unflown markets from
 the player's network as dashed arcs weighted by unmet demand; rival arcs are
 legible at world view; an announced raid on one of the viewer's pairs is drawn
 on that pair in the raider's color (`route-threat`), named on the Desk and on
-the rivals page. The launch dialog, the aircraft shop, the handbook legends
-and the Desk brief load lazily like the report surfaces (warmed after
-startup), which keeps the eager shell inside its 190 KiB budget after the
-engine grew. Inspectors stay eager on purpose: they take focus when they
-mount and answer Escape, and a lazy mount can land after the keypress it was
-meant to answer (mobile WebKit showed exactly that).
+the rivals page.
+
+**The bundle gate.** The 190 KiB eager-shell budget is dropped:
+`tools/check-bundle.mjs` reports the shell's gzip size and still guards the
+map chunk. The simulation is eager by nature and grows with every rules
+version, and the last attempt to stay under the line bought lazy twins of
+small components, not a faster start, while lazily mounting an inspector
+broke keyboard focus on mobile WebKit (it mounted after the Escape it was
+meant to answer). Inspectors, legends, the brief, the shop and the launch
+dialog are eager; the reports, panels of the Company area, the map and the
+replay viewer stay lazy.
 
 Tests: `rivals.test.ts` (rules 5 block), `worldV5.test.ts`,
 `ui/__tests__/forecastRange.test.ts`; goldens regenerated for rules 5 with

@@ -11,10 +11,7 @@ import { AREA_PAGES, PAGE_LABELS, areaFor, type WorkspaceArea, type WorkspacePag
 import { DisplaySettings } from './DisplaySettings'
 import { Dialog } from './Dialog'
 import { AudioSettings } from './AudioSettings'
-// The brief is the Desk's first block; it loads with the first paint's
-// second frame and carries no focus of its own.
-const loadManagementBrief = () => import('./ManagementBrief').then((m) => ({ default: m.ManagementBrief }))
-const ManagementBrief = lazy(loadManagementBrief)
+import { ManagementBrief } from './ManagementBrief'
 import { rulesOf, identityOf } from '../engine/version'
 import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react'
 import { CITIES } from '../data/cities'
@@ -26,12 +23,9 @@ import { nextExpansion } from '../engine/slots'
 // Inspectors and the launch dialog are lazy like the report surfaces: they
 // open on a click, never on the first paint, and the eager shell has a
 // 190 KiB budget to keep.
-// Inspectors stay eager: they take focus when they mount and answer Escape,
-// and a lazy mount can land after the keypress it was meant to answer.
 import { CityPanel } from './CityPanel'
 import { RouteDossier } from './RouteDossier'
-const loadRouteSetupDialog = () => import('./RouteSetupDialog').then((m) => ({ default: m.RouteSetupDialog }))
-const RouteSetupDialog = lazy(loadRouteSetupDialog)
+import { RouteSetupDialog } from './RouteSetupDialog'
 import { CoachMarks } from './CoachMarks'
 import { ConfirmButton } from './ConfirmButton'
 import { useCountUp } from './countUp'
@@ -77,7 +71,7 @@ import {
   SlotLegend,
   SpoolLegend,
   TakeoverLegend,
-} from './legendsLazy'
+} from './legends'
 import { EVENT_ICONS, EVENT_NAMES, ToastStack } from './toasts'
 import type { GameState, Replay } from '../engine'
 import { copyText, money, objectiveValue } from './format'
@@ -688,7 +682,7 @@ function AnimatedMoney({ value }: { value: number }) {
 function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   useEffect(() => {
     // Keep first paint light, then warm the quarter flow for offline play.
-    const warm = () => { void Promise.allSettled([loadManagementBrief(), loadRouteSetupDialog(), loadQuarterReview(), loadReportCard(), loadReportPanel(), loadRivalsPanel(), loadFinancePanel(), loadOperationsBoard(), loadCapitalOutlook(), import('./PassengerFlows')]) }
+    const warm = () => { void Promise.allSettled([loadQuarterReview(), loadReportCard(), loadReportPanel(), loadRivalsPanel(), loadFinancePanel(), loadOperationsBoard(), loadCapitalOutlook(), import('./PassengerFlows')]) }
     const timer = window.setTimeout(warm, 500)
     window.addEventListener('online', warm)
     return () => { clearTimeout(timer); window.removeEventListener('online', warm) }
@@ -961,7 +955,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         )}
       {quietTurn===state.turn && <div className="quiet-result" role="status" data-testid="quiet-result"><strong>Quarter complete</strong><span>{money(player.history.at(-1)?.profit ?? 0)} profit · {money(player.cash)} cash</span><button onClick={()=>setShowReport(true)}>Read full report</button></div>}
       <div className="desk-columns"><div className="desk-priorities">
-      {state.phase === 'planning' && <Suspense fallback={<section className="management-brief" role="status"><h2>Needs attention</h2><p>Preparing the desk…</p></section>}><ManagementBrief state={state} onTab={setTab} onAircraft={(id) => { setSelectedAircraft(id); setTab('fleet') }} onInspect={(id) => { setSelectedRoute(id); setTab('routes') }} onPlan={(from, to, preset) => setPendingRoute({ from, to, preset })} /></Suspense>}
+      {state.phase === 'planning' && <ManagementBrief state={state} onTab={setTab} onAircraft={(id) => { setSelectedAircraft(id); setTab('fleet') }} onInspect={(id) => { setSelectedRoute(id); setTab('routes') }} onPlan={(from, to, preset) => setPendingRoute({ from, to, preset })} />}
       <OfferCard state={state} />
       </div><aside className="desk-agenda"><h2>Coming up</h2><DeskTimeline state={state} onTab={setTab} /><ActiveDeals state={state} />
       {state.world.events.length > 0 && (
@@ -1098,8 +1092,8 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     <ToastStack events={session.lastEvents} state={state} unlocks={session.lastUnlocks} onOpenRoute={inspectRoute} />
     {showReview && <Suspense fallback={<Dialog label="Review quarter" className="gameover-overlay" onClose={() => setShowReview(false)}><p role="status">Loading quarter review…</p></Dialog>}><QuarterReview state={state} forecast={forecast} onClose={() => setShowReview(false)} onConfirm={endQuarter} /></Suspense>}
     {state.phase === 'planning' && showReport && !celebration.milestones.length && session.reportEvents.length > 0 && <Suspense fallback={<Dialog label="Quarterly report" className="gameover-overlay" onClose={() => setShowReport(false)}><p role="status">Loading quarterly report…</p></Dialog>}><ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} onInspect={(id) => { setShowReport(false); setTab('routes'); inspectRoute(id) }} /></Suspense>}
-    {pendingRoute !== null && <Suspense fallback={<Dialog label="Open a route" className="gameover-overlay" onClose={() => setPendingRoute(null)}><p role="status">Loading launch review…</p></Dialog>}><RouteSetupDialog state={state} from={pendingRoute.from} to={pendingRoute.to}
-        preset={pendingRoute.preset} onClose={() => setPendingRoute(null)} /></Suspense>}
+    {pendingRoute !== null && <RouteSetupDialog state={state} from={pendingRoute.from} to={pendingRoute.to}
+        preset={pendingRoute.preset} onClose={() => setPendingRoute(null)} />}
     {state.phase !== 'planning' && <GameOverOverlay state={state} earned={session.careerUnlocks} onWatchReplay={onWatchReplay} />}
     {showSettings && <Dialog label="Settings" className="gameover-overlay" testId="settings-dialog" onClose={() => setShowSettings(false)}><div className="settings-card"><div className="dialog-heading"><h2>Settings</h2><button onClick={() => setShowSettings(false)} aria-label="Close settings">×</button></div><div className="settings-scroll">
         <button
