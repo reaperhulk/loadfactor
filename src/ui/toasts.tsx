@@ -9,6 +9,7 @@ import { ROUTE_SPOOL_BP } from '../data/constants'
 import type { GameEvent, GameState } from '../engine'
 import { quarterOf, yearOf } from '../engine/queries'
 import { viewSeat } from './session'
+import { money } from './format'
 
 export interface Toast {
   id: number
@@ -30,6 +31,8 @@ export const EVENT_ICONS: Record<string, string> = {
   tourism_wave: '🏖️',
   travel_slump: '😷',
   alliance_boom: '🤝',
+  airport_works: '🚧',
+  currency_crisis: '💱',
 }
 
 export const EVENT_NAMES: Record<string, string> = {
@@ -42,6 +45,8 @@ export const EVENT_NAMES: Record<string, string> = {
   tourism_wave: 'Tourism wave',
   travel_slump: 'Travel slump',
   alliance_boom: 'Alliance boom',
+  airport_works: 'Runway reconstruction',
+  currency_crisis: 'Currency crisis',
 }
 
 // Which events earn a toast, and how they read. Player-only for the personal
@@ -178,7 +183,13 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
         out.push({ kind: 'error', icon: '⌛', text: `Offer lapsed: ${e.headline}` })
         break
       case 'airline_entered':
-        out.push({ kind: 'event', icon: '🚀', text: `${e.name} enters the market from ${e.hq}` })
+        out.push({ kind: 'event', icon: e.backed ? '🏛️' : '🚀', text: `${e.name} enters the market from ${e.hq}${e.capitalK ? ` with ${money(e.capitalK)}` : ''}` })
+        break
+      case 'aircraft_introduced':
+        out.push({ kind: 'event', icon: '🆕', text: `${e.name} enters service — new types win extra appeal for two years` })
+        break
+      case 'strike_hit':
+        if (e.airline === viewSeat()) out.push({ kind: 'error', icon: '✊', text: `Strike at ${e.city}: ${e.trips} round trips cancelled this quarter` })
         break
       case 'game_over':
         out.push(

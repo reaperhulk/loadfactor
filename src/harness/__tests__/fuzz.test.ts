@@ -81,7 +81,7 @@ describe('build fuzzer', () => {
     expect(step.value).toEqual(fuzzBuilds(options))
     // Recorded from the synchronous search before introducing checkpoints.
     expect(step.value).toEqual({
-      bestFitness: 449273,
+      bestFitness: 424194,
       evaluated: 6,
       bestGenome: {
         buyLfBp: 6701, cabin: 1, cashBuffer: 10184, contestDiscountBp: 12608,

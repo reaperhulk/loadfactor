@@ -264,3 +264,63 @@ export const REPUTATION_APPEAL_WEIGHT_BP = 5000
 // is a terrible quarter, not an achievement — so rates mark the approach.
 export const MILESTONE_PCTS: readonly number[] = [25, 50, 75, 100]
 export const MILESTONE_PCTS_RATE: readonly number[] = [85, 95, 100]
+
+// --- Rules 5: the race (see engine/rivals.ts, engine/turn.ts) ---
+// A late entrant arrives capitalized against the FIELD, not the era's opening
+// stake: this share of the leader's net worth (floored at the scenario
+// stake), spent partly on metal so it can fly on arrival.
+export const ENTRANT_CAPITAL_LEADER_BP = 3000
+// When the leader is dominant (ahead of the runner-up by this multiple) the
+// empty seat draws a state-backed flag carrier with a deeper treasury.
+export const ENTRANT_BACKED_CAPITAL_BP = 5000
+export const DOMINANT_LEAD_MULT_BP = 20000
+// Metal on arrival: up to this many airframes, never more than half the
+// capital.
+export const ENTRANT_MAX_FRAMES = 8
+export const ENTRANT_EVERY_QUARTERS_V5 = 4
+// Chapter 11 under rules 5 recapitalizes against the field too, so a rival
+// that stumbles in year 12 comes back as an airline, not a footnote.
+export const RESTRUCTURE_LEADER_BP = 1000
+// A raid needs appetite: cash above this multiple of the operating buffer.
+export const RAID_CASH_BUFFER_MULT_BP = 15000
+// A held city stays held while some network anchor still offers a pair at
+// least this rich (competition-discounted weekly pax); the reference bot and
+// the rivals both keep such footholds instead of renting them twice.
+export const RELEASE_KEEP_PAIR_SCORE = 800
+
+// --- Rules 5: the world asks questions (see engine/offers.ts, worldEvents.ts) ---
+// Events land about every four quarters instead of every seven.
+export const EVENT_DRAW_CHANCE_BP_V5 = 2500
+// A type is news for its first eight quarters on sale: seats flown on it
+// carry this much extra appeal (capacity-weighted) — early adopters win share.
+export const DEBUT_APPEAL_BP = 1500
+export const DEBUT_APPEAL_QUARTERS = 8
+// One offer every four quarters, seven kinds; the answer window stays four.
+export const OFFER_EVERY_QUARTERS_V5 = 4
+// An unsettled hub strike grounds this share of the airline's trips touching
+// the struck city for one quarter.
+export const STRIKE_CAPACITY_BP = 7000
+// A production slot that jumps the queue costs this premium on list price.
+export const EARLY_DELIVERY_PREMIUM_BP = 1500
+// A liquidation sale prices used metal at this share of resale value.
+export const FLEET_SALE_PRICE_BP = 5500
+// Bilateral route rights: exclusivity on one pair for this many quarters.
+export const ROUTE_RIGHTS_QUARTERS = 8
+
+// --- Rules 5: the cabin is a product, not a seat count ---
+// Under rules 2-4 only business travellers saw the cabin (through yield),
+// so a high-density fit was 15% more seats for nothing: the one dominant
+// build every doctrine converged on. Now each segment weighs the fit:
+// business hates a dense cabin, leisure notices it, budget does not care.
+// Indexed by cabin - 1 (dense / standard / premium), bp.
+export const CABIN_SEGMENT_APPEAL_BP = {
+  business: [7000, 10000, 12000],
+  leisure: [8500, 10000, 11000],
+  budget: [10000, 10000, 10000],
+} as const
+// A rules-5 price campaign is a real war: fares go to the floor at the city.
+export const PRICE_WAR_FARE_LEVEL = -2
+// Rules 5 yields: a dense cabin sells cheaper seats (15% more of them at 92%
+// of the fare), so at full loads it earns only a little more and loses the
+// travellers who notice legroom wherever there is a choice.
+export const CABIN_YIELD_BP_V5: readonly number[] = [9200, 10000, 12000]

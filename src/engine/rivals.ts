@@ -11,6 +11,7 @@ import {
   cashBufferFor,
   hedgeCommands,
   launchCommands,
+  launchFrequency,
   marketingCommands,
   slotReleaseCommands,
   slotRequestCommands,
@@ -27,7 +28,11 @@ import {
   type PolicyDials,
 } from './policy'
 import { chanceBp } from './rng'
-import type { Command, GameEvent, GameState } from './types'
+import { getAircraftType, typesOnSale } from '../data/aircraft'
+import { distanceKm, pairKey } from '../data/cities'
+import { PRICE_WAR_FARE_LEVEL } from '../data/constants'
+import { slotsFree, yearOf } from './queries'
+import type { Command, GameEvent, GameState, RivalCampaign } from './types'
 
 // Re-exported for tests and callers that treat rivals.ts as the AI surface.
 export { expansionScore } from './policy'
@@ -124,8 +129,9 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
         serviceLevel: campaign.kind === 'premium' ? 3 : personality.serviceLevel,
         raidBonus: campaign.kind === 'expand' ? personality.raidBonus + 5 : personality.raidBonus,
       }
+      const warFare = (state.rulesVersion ?? 1) >= 5 ? PRICE_WAR_FARE_LEVEL : -1
       for (const r of airline.routes.filter((r) => r.from === campaign.city || r.to === campaign.city)) {
-        if (campaign.kind === 'price') apply(state, idx, { type: 'set_fare', routeId: r.id, fareLevel: -1 }, events)
+        if (campaign.kind === 'price') apply(state, idx, { type: 'set_fare', routeId: r.id, fareLevel: warFare }, events)
         if (campaign.kind === 'premium') apply(state, idx, { type: 'set_service', routeId: r.id, serviceLevel: 3 }, events)
       }
     }
@@ -155,12 +161,25 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   applyAll(state, idx, renewalCommands(state, idx), events)
   applyAll(state, idx, scheduleCommands(state, idx), events)
   applyAll(state, idx, refitCommands(state, idx, personality.cabin), events)
-  applyAll(state, idx, assignmentCommands(state, idx), events)
+  const modernRace = (state.rulesVersion ?? 1) >= 5
+  if (modernRace) {
+    // Rules 5: expansion BEFORE assignment, like the reference bot. Under the
+    // old order every arriving airframe was parked on the first route (its
+    // demand gap was always the largest) and the launch stage never saw an
+    // idle plane — a rival with four jets and one route for twelve quarters.
+    if (active?.kind === 'raid') applyAll(state, idx, raidCommands(state, idx, personality, active), events)
+    if (airline.fleet.some((a) => a.routeId === null) && !recovering) {
+      applyAll(state, idx, launchCommands(state, idx, personality).commands, events)
+    }
+    applyAll(state, idx, assignmentCommands(state, idx), events)
+  } else {
+    applyAll(state, idx, assignmentCommands(state, idx), events)
 
-  // Open the best reachable pair if an idle airframe can fly it.
-  const idle = airline.fleet.some((a) => a.routeId === null)
-  if (idle && !recovering) {
-    applyAll(state, idx, launchCommands(state, idx, personality).commands, events)
+    // Open the best reachable pair if an idle airframe can fly it.
+    const idle = airline.fleet.some((a) => a.routeId === null)
+    if (idle && !recovering) {
+      applyAll(state, idx, launchCommands(state, idx, personality).commands, events)
+    }
   }
 
   applyAll(state, idx, surplusCommands(state, idx), events)
@@ -180,6 +199,13 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   // names the authority it will court next. The queue is public and served in
   // order, so being early is the whole game.
   applyAll(state, idx, slotReleaseCommands(state, idx), events)
+  // A raid redirects the slot campaign at the airport the target market
+  // still needs — announced, like every other campaign, a quarter ahead.
+  if (modernRace && active?.kind === 'raid' && active.pair && !recovering) {
+    const [a, b] = active.pair.split('-') as [string, string]
+    const missing = slotsFree(airline, a) < 1 && (airline.slots[a] ?? 0) === 0 ? a : slotsFree(airline, b) < 1 && (airline.slots[b] ?? 0) === 0 ? b : null
+    if (missing !== null && airline.slotInterest !== missing) airline.slotInterest = missing
+  }
   const announced = airline.slotInterest ?? null
   if (!recovering) applyAll(state, idx, slotRequestCommands(state, idx, personality, announced), events)
   // A campaign runs until it lands. Re-picking the richest target every
@@ -198,7 +224,7 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   // the policy immediately overwrites its own public commitment.
   if (active) for (const route of airline.routes) {
     if (route.from !== active.city && route.to !== active.city) continue
-    if (active.kind === 'price') apply(state, idx, {type:'set_fare',routeId:route.id,fareLevel:-1}, events)
+    if (active.kind === 'price') apply(state, idx, {type:'set_fare',routeId:route.id,fareLevel:modernRace ? PRICE_WAR_FARE_LEVEL : -1}, events)
     if (active.kind === 'premium') apply(state, idx, {type:'set_service',routeId:route.id,serviceLevel:3}, events)
   }
 }
@@ -216,3 +242,28 @@ function distressSale(state: GameState, idx: number): Command[] {
   return byAge.map((ac) => ({ type: 'sell_aircraft' as const, aircraftId: ac.id }))
 }
 
+
+// The raid itself (rules 5): once both airports are held, open the target
+// pair with an idle airframe that can fly it — or order one sized for the
+// market when the fleet is fully committed. Discount fares are the weapon;
+// a premium carrier raids with its full-service product instead.
+function raidCommands(state: GameState, idx: number, personality: Personality, campaign: RivalCampaign): Command[] {
+  const airline = state.airlines[idx]!
+  if (!campaign.pair) return []
+  const [from, to] = campaign.pair.split('-') as [string, string]
+  if (airline.routes.some((r) => pairKey(r.from, r.to) === campaign.pair)) return []
+  if (slotsFree(airline, from) < 1 || slotsFree(airline, to) < 1) return []
+  const km = distanceKm(from, to)
+  const fareLevel = personality.fareLevel === 1 ? 0 : Math.max(-2, personality.fareLevel - 1)
+  const launch = airline.fleet.find((ac) => ac.routeId === null && !(airline.operationsPolicy && ac.reserve) && getAircraftType(ac.type).rangeKm >= km)
+  if (launch) {
+    return [{ type: 'open_route', from, to, aircraftId: launch.id, frequency: launchFrequency(state, from, to, launch.type, airline.operationsPolicy?.reserveBp), fareLevel, serviceLevel: personality.serviceLevel }]
+  }
+  if (airline.orders.length > 0 || airline.cash < 0) return []
+  const buffer = cashBufferFor(airline)
+  const candidates = typesOnSale(yearOf(state)).filter((t) => t.rangeKm >= km && t.price + buffer <= airline.cash)
+  if (candidates.length === 0) return []
+  let pick = candidates[0]!
+  for (const t of candidates) if (t.price < pick.price) pick = t
+  return [{ type: 'order_aircraft', aircraftType: pick.id }]
+}

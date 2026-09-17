@@ -56,7 +56,7 @@ export function ActiveDeals({ state }: { state: GameState }) {
     <p className="events-strip" data-testid="active-deals">
       {deals.map((d) => (
         <span key={d.offerId} className="event-chip" title={`runs until quarter ${d.untilTurn}`}>
-          🤝 {d.kind === 'capacity_commitment' ? `${d.city} commitment` : d.kind === 'regulator_slots' ? `${d.city} obligation` : 'fuel contract'}
+          {d.kind === 'hub_strike' ? '✊' : '🤝'} {d.kind === 'capacity_commitment' ? `${d.city} commitment` : d.kind === 'regulator_slots' ? `${d.city} obligation` : d.kind === 'hub_strike' ? `${d.city} strike` : d.kind === 'route_rights' ? `${d.pair?.replace('-', '–')} exclusive` : 'fuel contract'}
           {d.upkeepK > 0 && ` · ${money(d.upkeepK)}/q`}
         </span>
       ))}

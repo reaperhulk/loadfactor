@@ -43,7 +43,11 @@ function describeEvent(state: GameState, e: GameEvent): string | null {
     case 'airline_restructured':
       return `${name(e.airline)} restructured — ${money(e.debtWiped)} of debt written off, ${e.routesClosed} routes closed, ${e.fleetSold} aircraft sold`
     case 'airline_entered':
-      return `${e.name} enters the market from ${e.hq}`
+      return `${e.name} enters the market from ${e.hq}${e.capitalK ? ` with ${money(e.capitalK)} behind it` : ''}`
+    case 'aircraft_introduced':
+      return `New type on the market: ${e.name} — its seats carry extra appeal while it is news`
+    case 'strike_hit':
+      return e.airline === viewSeat() ? `Strike at ${e.city}: ${e.trips} round trips cancelled` : null
     case 'operations_report':
       return e.airline === viewSeat() && e.summary.affectedPassengers > 0 ? `Operations: ${e.summary.cancelledTrips} round trips cancelled; ${e.summary.coveredTrips} covered by other aircraft` : null
     case 'aircraft_grounded':
@@ -106,6 +110,8 @@ function eventSection(e: GameEvent): LogFilter {
     case 'airline_bankrupt':
     case 'airline_restructured':
     case 'airline_entered':
+    case 'aircraft_introduced':
+    case 'strike_hit':
     case 'offer_made':
     case 'offer_accepted':
     case 'offer_declined':

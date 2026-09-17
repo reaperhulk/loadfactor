@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { quietWorld } from './quietWorld'
 import { SLOTS_PER_GRANT } from '../../data/constants'
 import { applyCommand, newGame, type GameEvent, type GameState } from '../index'
 import { applyPlanningCommand } from '../commands'
@@ -14,7 +15,7 @@ function expectRejected(events: GameEvent[], reasonPart: string): void {
 }
 
 function fresh(): GameState {
-  return newGame('jet_age', 'test-seed')
+  return quietWorld(newGame('jet_age', 'test-seed'))
 }
 
 describe('command validation', () => {

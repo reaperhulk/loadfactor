@@ -25,6 +25,12 @@ import {
   REPUTATION_MIN_BP,
   REPUTATION_RECOVERY_BP,
   ENTRANT_EVERY_QUARTERS,
+  ENTRANT_EVERY_QUARTERS_V5,
+  ENTRANT_CAPITAL_LEADER_BP,
+  ENTRANT_BACKED_CAPITAL_BP,
+  ENTRANT_MAX_FRAMES,
+  DOMINANT_LEAD_MULT_BP,
+  RESTRUCTURE_LEADER_BP,
   RESTRUCTURE_CASH_K,
   RESTRUCTURE_KEEP_FLEET,
   RESTRUCTURE_KEEP_ROUTES,
@@ -73,7 +79,7 @@ function liquidate(airline: Airline): void {
 // Chapter 11, not the graveyard: creditors eat the debt, the fleet and
 // network shrink to a survivable core, and fresh capital arrives. The
 // airline keeps its slots and its seat in the race — weakened, not deleted.
-function restructure(airline: Airline, turn: number): GameEvent {
+function restructure(airline: Airline, turn: number, rescueK = 0): GameEvent {
   // Creditors take a haircut — half the principal, not a free clean slate.
   // A rival that fails must come back weaker than the airlines that never
   // did, or failure becomes the cheapest way to finance an airline.
@@ -102,7 +108,7 @@ function restructure(airline: Airline, turn: number): GameEvent {
   }
   airline.routes = airline.routes.filter((r) => keptRouteIds.has(r.id))
   airline.fleet = keptFleet
-  airline.cash = Math.max(airline.cash, Math.floor((RESTRUCTURE_CASH_K * inflationBp(turn)) / 10000))
+  airline.cash = Math.max(airline.cash, Math.floor((RESTRUCTURE_CASH_K * inflationBp(turn)) / 10000), rescueK)
   airline.insolventQuarters = 0
   airline.restructures = (airline.restructures ?? 0) + 1
   airline.fuelHedge = null
@@ -119,11 +125,20 @@ function grantWithinPools(state: GameState, wanted: Record<string, number>): Rec
   return out
 }
 
+// The field's top two by net worth, for rules-5 capitalization: entrants and
+// rescues are sized against the leader, and a dominant leader (ahead of the
+// runner-up by DOMINANT_LEAD_MULT_BP) draws a state-backed carrier.
+function fieldLeaders(state: GameState): { leader: number; second: number } {
+  const worths = state.airlines.filter((a) => !a.bankrupt).map((a) => Math.max(0, netWorth(a))).sort((a, b) => b - a)
+  return { leader: worths[0] ?? 0, second: worths[1] ?? 0 }
+}
+
 // A late entrant takes an empty seat: era-appropriate capital and metal, a
 // home the incumbents have not claimed, and a personality drawn from the
 // rivals stream. Ids equal the index, so entrants append.
 function admitEntrant(state: GameState, events: GameEvent[]): void {
   const scenario = getScenario(state.scenario)
+  const modernRace = (state.rulesVersion ?? 1) >= 5
   const taken = new Set(state.airlines.filter((a) => !a.bankrupt).map((a) => a.hq))
   const home = [...CITIES]
     .filter((c) => !taken.has(c.id) && c.slotPool >= 10 && slotsRemaining(state, c.id) >= 6)
@@ -147,6 +162,26 @@ function admitEntrant(state: GameState, events: GameEvent[]): void {
   if (onSale.length === 0) return
   let metal = onSale[0]!
   for (const t of onSale) if (t.seats < metal.seats) metal = t
+  // Rules 5: capital scaled to the FIELD. An entrant handed the era's opening
+  // stake in year 12 is a one-route footnote; one handed a share of the
+  // leader's worth is a competitor, and a dominant leader draws a flag
+  // carrier with a state treasury behind it. Half the capital becomes metal
+  // sized for the markets it will actually fly.
+  const { leader, second } = fieldLeaders(state)
+  const backed = modernRace && second > 0 && leader * 10000 >= second * DOMINANT_LEAD_MULT_BP
+  const stake = Math.floor((scenario.player.cash * 12) / 10)
+  const capital = modernRace ? Math.max(stake, Math.floor((leader * (backed ? ENTRANT_BACKED_CAPITAL_BP : ENTRANT_CAPITAL_LEADER_BP)) / 10000)) : stake
+  let frames = 2
+  if (modernRace) {
+    // Proven metal, not the biggest: the era's median-seat type (a 727 in
+    // 1976, not a 747 on a three-route network) — an entrant that can fly
+    // thin new markets profitably while it learns them.
+    const bySeats = [...onSale].sort((a, b) => a.seats - b.seats || a.id.localeCompare(b.id))
+    const median = bySeats[Math.floor((bySeats.length - 1) / 2)]!
+    if (median.price * 2 <= Math.floor(capital / 2)) metal = median
+    frames = Math.max(2, Math.min(ENTRANT_MAX_FRAMES, Math.floor(capital / 2 / metal.price)))
+  }
+  const cash = modernRace ? capital - Math.min(capital - stake, frames * metal.price) : capital
   // Reuse a liquidated seat when one exists — the field stays the size the
   // scenario intended instead of accumulating corpses (and the rivals panel,
   // the race chart, and the state hash stay bounded).
@@ -158,8 +193,9 @@ function admitEntrant(state: GameState, events: GameEvent[]): void {
     controller: 'rival',
     personality: personalities[pdraw.value]!,
     hq,
-    // Fresh capital, scaled to the era's opening stake.
-    cash: Math.floor((scenario.player.cash * 12) / 10),
+    // Fresh capital: the era's opening stake, or (rules 5) a share of the
+    // leader's worth net of the metal bought with it.
+    cash,
     loans: [],
     fleet: [],
     orders: [],
@@ -178,16 +214,17 @@ function admitEntrant(state: GameState, events: GameEvent[]): void {
     nextId: 1,
     enteredTurn: state.turn,
   }
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < frames; i++) {
     airline.fleet.push({ id: airline.nextId++, type: metal.id, ageQuarters: 0, routeId: null, leased: false, cabin: 2 })
   }
+  if (backed) airline.name = `${name} (state-backed)`
   if (modernOperations(state)) {
     airline.operationsPolicy = { reserveBp: 500, recovery: false }
     for (const ac of airline.fleet) ac.operations = aircraftOperations(airline, ac, state.turn + 1)
   }
   if (deadSeat >= 0) state.airlines[deadSeat] = airline
   else state.airlines.push(airline)
-  events.push({ type: 'airline_entered', airline: id, name, hq })
+  events.push({ type: 'airline_entered', airline: id, name: airline.name, hq, ...(modernRace ? { capitalK: capital, backed } : {}) })
 }
 
 // Startup names for late entrants, drawn deterministically.
@@ -412,7 +449,8 @@ function resolveQuarter(prev: GameState, outlook: boolean): EngineResult {
     if (airline.insolventQuarters >= INSOLVENCY_QUARTERS_TO_FAIL) {
       if (airline.controller === 'rival' && (airline.restructures ?? 0) < RESTRUCTURE_MAX) {
         // A rival gets its chapter-11 rounds before the receivers arrive.
-        events.push(restructure(airline, state.turn))
+        const rescueK = (state.rulesVersion ?? 1) >= 5 ? Math.floor((fieldLeaders(state).leader * RESTRUCTURE_LEADER_BP) / 10000) : 0
+        events.push(restructure(airline, state.turn, rescueK))
       } else {
         events.push({ type: 'airline_bankrupt', airline: airline.id })
         if (airline.controller === 'rival') liquidate(airline)
@@ -450,7 +488,7 @@ function resolveQuarter(prev: GameState, outlook: boolean): EngineResult {
   if (
     !outlook && liveRivals < getScenario(state.scenario).rivals.length &&
     state.turn > 0 &&
-    state.turn % ENTRANT_EVERY_QUARTERS === 0
+    state.turn % ((state.rulesVersion ?? 1) >= 5 ? ENTRANT_EVERY_QUARTERS_V5 : ENTRANT_EVERY_QUARTERS) === 0
   ) {
     admitEntrant(state, events)
   }

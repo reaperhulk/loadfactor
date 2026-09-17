@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { quietWorld } from './quietWorld'
 import { applyCommand, newGame } from '../index'
 import { baseFare, fareFor, pairWeeklyDemand, resolveMarket, seasonalBp } from '../market'
 import type { GameEvent, GameState } from '../types'
@@ -78,7 +79,7 @@ describe('demand model', () => {
 
 describe('market resolution', () => {
   it('caps pax at capacity and reports a load factor in [0, 10000]', () => {
-    const state = newGame('jet_age', 'market-seed')
+    const state = quietWorld(newGame('jet_age', 'market-seed'))
     const routeId = withRoute(state, 0, 'JFK', 'ORD')
     state.airlines[0]!.fleet[0]!.routeId = routeId
     const events: GameEvent[] = []
@@ -95,7 +96,7 @@ describe('market resolution', () => {
   })
 
   it('a route with no aircraft carries nobody but costs nothing', () => {
-    const state = newGame('jet_age', 'market-seed')
+    const state = quietWorld(newGame('jet_age', 'market-seed'))
     withRoute(state, 0, 'JFK', 'ORD')
     const events: GameEvent[] = []
     const totals = resolveMarket(state, events)
@@ -103,7 +104,7 @@ describe('market resolution', () => {
   })
 
   it('competition splits a pair and cheaper fares win share', () => {
-    const state = newGame('jet_age', 'market-seed')
+    const state = quietWorld(newGame('jet_age', 'market-seed'))
     // Both airlines fly JFK-ORD with one identical aircraft each; the rival
     // undercuts on fare. Fill JFK-ORD far beyond both capacities so the split
     // is demand-rich: with spill both fill up. Use a thin pair instead.
@@ -168,7 +169,7 @@ describe('market resolution', () => {
   })
 
   it('brand spend wins share on an otherwise identical contested pair', () => {
-    const state = newGame('jet_age', 'brand-seed')
+    const state = quietWorld(newGame('jet_age', 'brand-seed'))
     // Identical schedules, fares, service — the only difference is marketing.
     const playerRoute = withRoute(state, 0, 'MIA', 'YYZ', 0)
     const rivalRoute = withRoute(state, 1, 'MIA', 'YYZ', 0)
@@ -187,7 +188,7 @@ describe('market resolution', () => {
   })
 
   it('connecting pax ride spare seats over a hub on unserved pairs', () => {
-    const state = newGame('jet_age', 'connect-seed')
+    const state = quietWorld(newGame('jet_age', 'connect-seed'))
     const airline = state.airlines[0]!
     const type = airline.fleet[0]!.type
     // JFK–ORD and ORD–LAX exist; JFK–LAX does not. Via ORD is barely a detour,
@@ -221,7 +222,7 @@ describe('market resolution', () => {
   })
 
   it('nobody connects through an absurd detour', () => {
-    const state = newGame('jet_age', 'connect-seed')
+    const state = quietWorld(newGame('jet_age', 'connect-seed'))
     const airline = state.airlines[0]!
     const type = airline.fleet[0]!.type
     // JFK–LAX and LAX–ORD exist; the unserved pair JFK–ORD is short, and

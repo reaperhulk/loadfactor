@@ -1,4 +1,5 @@
-import { aircraftOperations, enableOperations, maintenanceQuote, QUARTER_MINUTES, WEEK_MINUTES } from './operations'
+import { aircraftOperations, enableOperations, maintenanceQuote, modernOperations, QUARTER_MINUTES, WEEK_MINUTES } from './operations'
+import { exclusiveHolder, strikeDeal } from './offers'
 // Planning-phase command validation and application, used identically by the
 // player (via applyCommand) and rival policies (via turn.ts). Invalid commands
 // reject with a command_rejected event — engine entry points never throw on
@@ -36,7 +37,7 @@ import {
   totalDebt,
   yearOf,
 } from './queries'
-import type { Airline, Command, GameEvent, GameState } from './types'
+import type { Airline, Command, GameEvent, GameState, OwnedAircraft } from './types'
 
 interface Applied {
   events: GameEvent[]
@@ -164,6 +165,10 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         return reject(airlineIdx, command, 'route must connect to your network (touch your HQ or a served city)')
       if (slotsFree(airline, a) < 1) return reject(airlineIdx, command, `no free slots at ${a}`)
       if (slotsFree(airline, b) < 1) return reject(airlineIdx, command, `no free slots at ${b}`)
+      if ((state.rulesVersion ?? 1) >= 5) {
+        const holder = exclusiveHolder(state, a, b)
+        if (holder && holder.id !== airlineIdx) return reject(airlineIdx, command, `${holder.name} holds exclusive bilateral rights on ${a}–${b}`)
+      }
       // A route launches with a real schedule: one idle aircraft and a weekly
       // frequency that aircraft can actually fly at this distance.
       const aircraft = airline.fleet.find((ac) => ac.id === command.aircraftId)
@@ -430,21 +435,37 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       if (airline.cash < offer.costK)
         return reject(airlineIdx, command, `not enough cash — this costs $${offer.costK}k up front`)
       airline.cash -= offer.costK
-      airline.deals = [
-        ...(airline.deals ?? []),
-        {
-          offerId: offer.id,
-          kind: offer.kind,
-          city: offer.city,
-          fromTurn: offer.benefitFromTurn,
-          untilTurn: offer.untilTurn,
-          upkeepK: offer.upkeepK,
-          demandBonusBp: offer.demandBonusBp,
-        },
-      ]
       const events: GameEvent[] = [
         { type: 'offer_accepted', offerId: offer.id, kind: offer.kind, costK: offer.costK },
       ]
+      // Immediate transactions leave no running deal behind.
+      if (offer.kind === 'early_delivery' && offer.aircraftType) {
+        const orderId = airline.nextId++
+        airline.orders.push({ id: orderId, type: offer.aircraftType, quartersLeft: 1, leased: false })
+        events.push({ type: 'aircraft_ordered', airline: airlineIdx, orderId, aircraftType: offer.aircraftType, price: offer.costK })
+      } else if (offer.kind === 'fleet_sale' && offer.aircraftType && offer.count) {
+        for (let i = 0; i < offer.count; i++) {
+          const ac: OwnedAircraft = { id: airline.nextId++, type: offer.aircraftType, ageQuarters: offer.ageQuarters ?? 0, routeId: null, leased: false, cabin: 2 }
+          if (modernOperations(state)) ac.operations = aircraftOperations(airline, ac, state.turn)
+          airline.fleet.push(ac)
+          events.push({ type: 'used_bought', airline: airlineIdx, aircraftId: ac.id, aircraftType: ac.type, price: Math.floor(offer.costK / offer.count), ageQuarters: ac.ageQuarters })
+        }
+      } else if (offer.kind !== 'hub_strike') {
+        // A settled strike is simply over; everything else runs as a deal.
+        airline.deals = [
+          ...(airline.deals ?? []),
+          {
+            offerId: offer.id,
+            kind: offer.kind,
+            city: offer.city,
+            fromTurn: offer.benefitFromTurn,
+            untilTurn: offer.untilTurn,
+            upkeepK: offer.upkeepK,
+            demandBonusBp: offer.demandBonusBp,
+            ...(offer.pair ? { pair: offer.pair } : {}),
+          },
+        ]
+      }
       // Slots land immediately; a fuel contract becomes the running hedge.
       if (offer.slots > 0 && offer.city !== null) {
         airline.slots[offer.city] = (airline.slots[offer.city] ?? 0) + offer.slots
@@ -471,6 +492,8 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       if (!offer) return reject(airlineIdx, command, 'that offer is no longer on the table')
       if ((state.rulesVersion ?? 1) >= 2 && airlineIdx !== (offer.airline ?? 0)) return reject(airlineIdx, command, 'this offer belongs to another airline')
       state.world.offers = state.world.offers.filter((o) => o.id !== offer.id)
+      // Refusing the ballot IS the strike: it starts with the quarter flown next.
+      if (offer.kind === 'hub_strike') airline.deals = [...(airline.deals ?? []), strikeDeal(offer, state.turn)]
       return { events: [{ type: 'offer_declined', offerId: offer.id }] }
     }
 

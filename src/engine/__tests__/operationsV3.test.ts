@@ -1,4 +1,4 @@
-import { ENTRANT_EVERY_QUARTERS } from '../../data/constants'
+import { ENTRANT_EVERY_QUARTERS_V5 } from '../../data/constants'
 import { describe, expect, it } from 'vitest'
 import { applyCommand, applyCommandBatch, newGame, runReplay } from '../index'
 import { recurringFinancials } from '../accounting'
@@ -205,7 +205,7 @@ describe('fractional operations', () => {
   })
   it('a new rival enters with reserve policy and fresh wear before its first planning turn', () => {
     const s = network()
-    s.turn = ENTRANT_EVERY_QUARTERS
+    s.turn = ENTRANT_EVERY_QUARTERS_V5
     const rival = s.airlines[1]!
     rival.bankrupt = true; rival.fleet = []; rival.routes = []; rival.slots = {}
     const result = applyCommand(s, { type: 'end_quarter' })

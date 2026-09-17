@@ -172,9 +172,12 @@ export interface PassengerPath {
 }
 export interface PassengerHistory { turn: number; journeys: number; boardings: number; own: PassengerPath[]; pathCount: number }
 export interface RivalCampaign {
-  kind: 'price' | 'premium' | 'defend' | 'expand' | 'recover'
+  kind: 'price' | 'premium' | 'defend' | 'expand' | 'recover' | 'raid'
   city: string; fromTurn: number; untilTurn: number
   evidence?: string; response?: string
+  // Rules 5 raids name the market they are coming for and whose it is, so
+  // the player can read the threat on the map before the first flight.
+  pair?: string; target?: number
 }
 export interface Airline {
   customerPreference?: { business: number; leisure: number; budget: number }
@@ -228,11 +231,28 @@ export interface ActiveEvent {
 // World events are weather — they happen TO you. Offers are questions: pay
 // now for a payoff later, take an asset and carry the obligation, bet on the
 // fuel curve. They expire if ignored.
+export type OfferKind =
+  | 'capacity_commitment'
+  | 'regulator_slots'
+  | 'fuel_contract'
+  // Rules 5 (engine/offers.ts): settle a hub strike or lose a quarter of
+  // capacity there; buy a production slot that delivers next quarter; take a
+  // liquidation lot of used metal before a rival does; bilateral rights that
+  // keep rivals off one pair for a while.
+  | 'hub_strike'
+  | 'early_delivery'
+  | 'fleet_sale'
+  | 'route_rights'
+
 export interface WorldOffer {
   airline?: number
   id: number
-  kind: 'capacity_commitment' | 'regulator_slots' | 'fuel_contract'
+  kind: OfferKind
   city: string | null
+  aircraftType?: string // early_delivery / fleet_sale: the metal on the table
+  count?: number // fleet_sale: how many airframes
+  ageQuarters?: number // fleet_sale: their age
+  pair?: string // route_rights: the exclusive pair
   expiresTurn: number // decide before this turn resolves
   costK: number // paid on acceptance
   upkeepK: number // charged each quarter until untilTurn
@@ -253,6 +273,8 @@ export interface ActiveDeal {
   untilTurn: number
   upkeepK: number
   demandBonusBp: number
+  capacityBp?: number // hub_strike: share of trips at `city` that still fly
+  pair?: string // route_rights: rivals may not open this pair while it runs
 }
 
 export interface WorldState {
@@ -358,6 +380,8 @@ export type GameEvent =
   | { type: 'loan_repaid'; airline: number; loanId: number; amount: number; remaining: number }
   | { type: 'world_event_started'; eventId: string; city: string | null; region: Region | null }
   | { type: 'world_event_ended'; eventId: string }
+  | { type: 'aircraft_introduced'; aircraftType: string; name: string }
+  | { type: 'strike_hit'; airline: number; city: string; trips: number }
   | { type: 'economy_updated'; economyBp: number; fuelBp: number }
   | {
       type: 'route_result'
@@ -385,7 +409,7 @@ export type GameEvent =
     }
   | { type: 'airline_bankrupt'; airline: number }
   | { type: 'airline_restructured'; airline: number; routesClosed: number; fleetSold: number; debtWiped: number }
-  | { type: 'airline_entered'; airline: number; name: string; hq: string }
+  | { type: 'airline_entered'; airline: number; name: string; hq: string; capitalK?: number; backed?: boolean }
   | { type: 'offer_made'; offerId: number; kind: WorldOffer['kind']; headline: string; expiresTurn: number }
   | { type: 'offer_accepted'; offerId: number; kind: WorldOffer['kind']; costK: number }
   | { type: 'offer_declined'; offerId: number }

@@ -14,6 +14,7 @@ import {
   CABIN_WEIGHT,
   CREW_SALARY_BP_PER_QUARTER,
   CABIN_YIELD_BP,
+  CABIN_YIELD_BP_V5,
   CONNECT_DETOUR_MAX_BP,
   CONNECT_FARE_DISCOUNT_BP,
   CONNECT_WILLING_BP,
@@ -44,12 +45,15 @@ import {
   SERVICE_COST_PER_PAX,
   TRANSFER_HANDLING_PER_PAX,
   SERVICE_LEVEL_WEIGHT,
+  CABIN_SEGMENT_APPEAL_BP,
+  DEBUT_APPEAL_BP,
   WEEKS_PER_QUARTER,
 } from '../data/constants'
-import { dealAppealBp } from './offers'
+import { dealAppealBp, strikeCapacityBp } from './offers'
+import { SEGMENTS } from './itineraries'
 import { hashNoiseBp } from './rng'
 import { allocateTrips, reputationAppealBp, roundTripsPerWeek } from './queries'
-import { cityDemandModBp, effEconomyBp, effFuelBp } from './worldEvents'
+import { cityDemandModBp, debutAppealBp, effEconomyBp, effFuelBp } from './worldEvents'
 import type { Airline, GameEvent, GameState, Route, OperationsSummary } from './types'
 
 function cityMass(cityId: string): number {
@@ -161,6 +165,8 @@ interface Entrant {
   weeklyRoundTrips: number
   weeklyCapacity: number // sellable seats, both directions, after cabin fits
   yieldBp: number // capacity-weighted cabin yield on revenue per pax
+  debutBp: number // capacity-weighted new-type fanfare (rules 5)
+  cabinAppeal?: Record<PassengerSegment, number> // capacity-weighted fit appeal per segment (rules 5)
   weight: number // attractiveness for market-share split
 }
 
@@ -220,6 +226,8 @@ export interface RouteAcc {
   weeklyTransfer: number
   weeklyCapacity: number
   yieldBp: number // capacity-weighted cabin yield on revenue per pax
+  debutBp?: number // capacity-weighted new-type fanfare (rules 5)
+  cabinAppeal?: Record<PassengerSegment, number> // per-segment fit appeal, bp (rules 5)
   weeklyRevenue: number // $
   weeklyFuel: number // $
   weeklyFees: number // $
@@ -280,10 +288,22 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
       let weeklyRoundTrips = 0
       let weeklyCapacity = 0
       let yieldNum = 0 // Σ seats × cabin yield — capacity-weighted revenue/pax
+      let debutNum = 0 // Σ seats × debut fanfare (rules 5)
+      const modernCabin = (state.rulesVersion ?? 1) >= 5
+      const cabinNum = { business: 0, leisure: 0, budget: 0 } // Σ seats × fit appeal per segment (rules 5)
+      // Rules 5: an unsettled hub strike cancels a share of the trips at the
+      // struck city. The operations pass already resolved the schedule, so
+      // the cut lands on trips and seats here, in whole round trips.
+      const strikeBp = (state.rulesVersion ?? 1) >= 5 ? strikeCapacityBp(state, airline.id, route.from, route.to) : 10000
+      let struck = 0
       for (const alloc of tripsFor(airline, route)) {
-        weeklyRoundTrips += alloc.trips
-        weeklyCapacity += alloc.seats * alloc.trips * 2
-        yieldNum += alloc.seats * alloc.trips * 2 * CABIN_YIELD_BP[alloc.cabin - 1]!
+        const trips = strikeBp === 10000 ? alloc.trips : Math.floor((alloc.trips * strikeBp) / 10000)
+        struck += alloc.trips - trips
+        weeklyRoundTrips += trips
+        weeklyCapacity += alloc.seats * trips * 2
+        yieldNum += alloc.seats * trips * 2 * (modernCabin ? CABIN_YIELD_BP_V5 : CABIN_YIELD_BP)[alloc.cabin - 1]!
+        debutNum += alloc.seats * trips * 2 * debutAppealBp(state, alloc.type, DEBUT_APPEAL_BP)
+        if (modernCabin) for (const segment of SEGMENTS) cabinNum[segment] += alloc.seats * trips * 2 * CABIN_SEGMENT_APPEAL_BP[segment][alloc.cabin - 1]!
       }
       // Accepted world offers can lift a route's appeal (a capacity
       // commitment paying off once the Games actually land).
@@ -294,10 +314,18 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
           reputationAppealBp(airline)) /
           10000,
       )
+      if (struck > 0) {
+        const city = strikeCapacityBp(state, airline.id, route.from, route.from) < 10000 ? route.from : route.to
+        events.push({ type: 'strike_hit', airline: airline.id, city, trips: struck * periodWeeks })
+      }
       const yieldBp = weeklyCapacity === 0 ? 10000 : Math.floor(yieldNum / weeklyCapacity)
+      const debutBp = weeklyCapacity === 0 ? 0 : Math.floor(debutNum / weeklyCapacity)
+      const cabinAppeal = modernCabin && weeklyCapacity > 0
+        ? { business: Math.floor(cabinNum.business / weeklyCapacity), leisure: Math.floor(cabinNum.leisure / weeklyCapacity), budget: Math.floor(cabinNum.budget / weeklyCapacity) }
+        : undefined
       const key = pairKey(route.from, route.to)
       const list = pairs.get(key) ?? []
-      list.push({ airlineIdx: airline.id, route, weeklyRoundTrips, weeklyCapacity, yieldBp, weight })
+      list.push({ airlineIdx: airline.id, route, weeklyRoundTrips, weeklyCapacity, yieldBp, debutBp, ...(cabinAppeal ? { cabinAppeal } : {}), weight })
       pairs.set(key, list)
     }
   }
@@ -355,12 +383,14 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
       let weeklyFuel = 0
       let weeklyFees = 0
       let weeklyCrewMin = 0
+      const strikeBp = (state.rulesVersion ?? 1) >= 5 ? strikeCapacityBp(state, e.airlineIdx, e.route.from, e.route.to) : 10000
       for (const alloc of tripsFor(airline, e.route)) {
         const t = getAircraftType(alloc.type)
-        weeklyFuel += Math.floor((alloc.trips * 2 * km * t.fuelPerKm * fuelBp) / 10000)
+        const trips = strikeBp === 10000 ? alloc.trips : Math.floor((alloc.trips * strikeBp) / 10000)
+        weeklyFuel += Math.floor((trips * 2 * km * t.fuelPerKm * fuelBp) / 10000)
         // Fees bill the physical airframe, not the cabin fit.
-        weeklyFees += alloc.trips * 2 * (LANDING_FEE_BASE + t.seats * LANDING_FEE_PER_SEAT)
-        weeklyCrewMin += alloc.trips * 2 * Math.floor((km * 60) / t.speedKmh)
+        weeklyFees += trips * 2 * (LANDING_FEE_BASE + t.seats * LANDING_FEE_PER_SEAT)
+        weeklyCrewMin += trips * 2 * Math.floor((km * 60) / t.speedKmh)
       }
       const weeklyCrew = Math.floor((weeklyCrewMin / 60) * CREW_COST_PER_BLOCK_HOUR)
       const weeklyService = weeklyPax * SERVICE_COST_PER_PAX[e.route.serviceLevel - 1]!
@@ -375,6 +405,8 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
         weeklyTransfer: 0,
         weeklyCapacity: e.weeklyCapacity,
         yieldBp: e.yieldBp,
+        ...(e.debutBp > 0 ? { debutBp: e.debutBp } : {}),
+        ...(e.cabinAppeal ? { cabinAppeal: e.cabinAppeal } : {}),
         weeklyRevenue: Math.floor((weeklyPax * fare * e.yieldBp) / 10000),
         weeklyFuel,
         weeklyFees: Math.floor((weeklyFees * inflBp) / 10000),

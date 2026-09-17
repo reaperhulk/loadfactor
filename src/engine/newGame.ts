@@ -1,6 +1,7 @@
 import { maxRouteFrequency } from './queries'
 import { enableOperations } from './operations'
 import { applyPlanningCommand } from './commands'
+import { runRivalTurn } from './rivals'
 import { pairKey } from '../data/cities'
 import { RULES_VERSION, rulesOf } from './version'
 import { getAircraftType } from '../data/aircraft'
@@ -137,6 +138,13 @@ export function newGame(
   if (rulesVersion >= 3) {
     enableOperations(state)
     for (const a of state.airlines) for (const r of a.routes) r.frequency = Math.max(1, Math.min(r.frequency, maxRouteFrequency(a, r)))
+  }
+  // Rules 5: the world is already flying when the player arrives. Every
+  // rival takes its opening planning turn now, so quarter one shows three
+  // networks on the map, announced campaigns, and slot queues to beat —
+  // instead of an empty world that fills in only after the first resolve.
+  if (rulesVersion >= 5) {
+    for (const a of state.airlines) if (a.controller === 'rival') runRivalTurn(state, a.id, [])
   }
   return state
 

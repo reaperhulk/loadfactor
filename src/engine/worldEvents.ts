@@ -8,15 +8,18 @@ import {
   ECONOMY_MIN_BP,
   ECONOMY_REVERSION_DIV,
   ECONOMY_STEP_BP,
+  DEBUT_APPEAL_QUARTERS,
   EVENT_DRAW_CHANCE_BP,
+  EVENT_DRAW_CHANCE_BP_V5,
   FUEL_MAX_BP,
   FUEL_MIN_BP,
   FUEL_REVERSION_DIV,
   FUEL_STEP_BP,
 } from '../data/constants'
-import { getEventDef, WORLD_EVENTS } from '../data/events'
+import { getEventDef, WORLD_EVENTS, WORLD_EVENTS_V5 } from '../data/events'
+import { AIRCRAFT } from '../data/aircraft'
 import { getScenario } from '../data/scenarios'
-import { yearOf } from './queries'
+import { quarterOf, yearOf } from './queries'
 import { chanceBp, nextInt } from './rng'
 import type { GameEvent, GameState, WorldState } from './types'
 
@@ -92,10 +95,11 @@ export function updateWorld(state: GameState): GameEvent[] {
   let evRng = state.rng.events
   const year = yearOf(state)
   const active = new Set(world.events.map((e) => e.id))
-  const eligible = WORLD_EVENTS.filter(
-    (def) => year >= def.fromYear && year <= def.toYear && !active.has(def.id),
+  const rules = state.rulesVersion ?? 1
+  const eligible = (rules >= 5 ? WORLD_EVENTS_V5 : WORLD_EVENTS).filter(
+    (def) => year >= def.fromYear && year <= def.toYear && !active.has(def.id) && (def.fromRules ?? 1) <= rules,
   )
-  const roll = chanceBp(evRng, EVENT_DRAW_CHANCE_BP)
+  const roll = chanceBp(evRng, rules >= 5 ? EVENT_DRAW_CHANCE_BP_V5 : EVENT_DRAW_CHANCE_BP)
   evRng = roll.rng
   if (roll.value && eligible.length > 0) {
     // Scenario era flavor: weight multipliers (oil_shock ×4 in Oil Crisis…).
@@ -137,10 +141,26 @@ export function updateWorld(state: GameState): GameEvent[] {
   }
   state.rng.events = evRng
 
+  // Rules 5: a new type's first quarter on sale is news. No draw — the
+  // catalog is data — and the fanfare is real: its seats carry extra appeal
+  // for DEBUT_APPEAL_QUARTERS (market.ts).
+  if (rules >= 5 && quarterOf(state) === 1) {
+    for (const type of AIRCRAFT) if (type.availableFrom === year) events.push({ type: 'aircraft_introduced', aircraftType: type.id, name: type.name })
+  }
+
   // Record the macro story: the settled indices for this quarter, capped to
   // a rolling window (charts don't need the whole century).
   world.indexHistory.push({ turn: state.turn, economyBp: world.economyBp, fuelBp: effFuelBp(world) })
   if (world.indexHistory.length > 60) world.indexHistory.shift()
   events.push({ type: 'economy_updated', economyBp: world.economyBp, fuelBp: world.fuelBp })
   return events
+}
+
+// Appeal bonus (bp) for seats on a type still in its debut window, 0 after.
+export function debutAppealBp(state: GameState, typeId: string, bonusBp: number): number {
+  if ((state.rulesVersion ?? 1) < 5) return 0
+  const type = AIRCRAFT.find((a) => a.id === typeId)
+  if (!type) return 0
+  const onSaleForQuarters = (yearOf(state) - type.availableFrom) * 4 + (quarterOf(state) - 1)
+  return onSaleForQuarters >= 0 && onSaleForQuarters < DEBUT_APPEAL_QUARTERS ? bonusBp : 0
 }

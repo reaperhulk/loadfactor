@@ -104,6 +104,13 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
         frequency: Math.floor(it.trips / periodWeeks),
         spool: spools[index]!,
         reputation: reputationAppealBp(airline), deal: dealAppealBp(state, airline.id, from, to),
+        debut: Math.floor(it.legs.reduce((sum, l) => sum + (l.debutBp ?? 0), 0) / it.legs.length),
+        // Rules 5: the fit as each segment sees it (undefined under older rules).
+        fit: it.legs.every((l) => l.cabinAppeal) ? {
+          business: Math.floor(it.legs.reduce((sum, l) => sum + l.cabinAppeal!.business, 0) / it.legs.length),
+          leisure: Math.floor(it.legs.reduce((sum, l) => sum + l.cabinAppeal!.leisure, 0) / it.legs.length),
+          budget: Math.floor(it.legs.reduce((sum, l) => sum + l.cabinAppeal!.budget, 0) / it.legs.length),
+        } : undefined,
       }
     })
     const cheapest = Math.min(...choices.map(it => it.fare))
@@ -116,10 +123,11 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
       apportioned += population
       const weights = choices.map((it, index) => {
         const airline = state.airlines[it.airline]!
-        const { service, cabin, priceAppeal, frequency, spool, reputation, deal } = attributes[index]!
+        const { service, cabin, priceAppeal, frequency, spool, reputation, deal, debut, fit } = attributes[index]!
         let weight = segment === 'business'
-          ? Math.max(1, frequency) * (6500 + service * 1700) * cabin / 10000
+          ? Math.max(1, frequency) * (6500 + service * 1700) * (fit ? fit.business : cabin) / 10000
           : (6 + Math.min(24, frequency)) * (segment === 'budget' ? priceAppeal * priceAppeal / 10000 : priceAppeal)
+        if (fit && segment !== 'business') weight *= fit[segment] / 10000
         if (it.legs.length === 2) {
           const banked = airline.hubMode === 'banked'
           const base = segment === 'business' ? 2000 : segment === 'leisure' ? 4500 : 6500
@@ -135,6 +143,7 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
         weight *= spool / 10000
         weight *= deal / 10000
         if ((state.rulesVersion ?? 1) >= 4) weight *= (airline.customerPreference?.[segment] ?? 10000) / 10000
+        if (debut > 0) weight *= (10000 + debut) / 10000 // rules 5 only: zero elsewhere
         return Math.max(1, Math.floor(weight))
       })
       // Expensive offers lose shoppers to the outside option. Connections

@@ -77,3 +77,12 @@ describe('rules 3 compatibility', () => {
     expect({ checkpointHashes: result.checkpointHashes, summary: result.summary }).toEqual(legacy[career.name])
   })
 })
+
+// Rules 4 (earned customer preference, responsive campaigns) stays frozen.
+describe('rules 4 compatibility', () => {
+  const legacy = JSON.parse(readFileSync(join(__dirname, '../../../fixtures/legacy-v4-goldens.json'), 'utf8')) as Record<string, Golden>
+  for (const career of CAREERS) it(`preserves ${career.name}`, () => {
+    const result = runCareer(career.scenario, career.seed, career.bot, career.quarters, 4)
+    expect({ checkpointHashes: result.checkpointHashes, summary: result.summary }).toEqual(legacy[career.name])
+  })
+})

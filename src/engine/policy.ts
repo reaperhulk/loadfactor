@@ -18,6 +18,7 @@ import {
   ROUTE_MEMORY_QUARTERS,
   ROUTE_SPOOL_BP,
   ENTRANT_GRACE_QUARTERS,
+  RELEASE_KEEP_PAIR_SCORE,
   TAKEOVER_BASE_K,
   TAKEOVER_PREMIUM_BP,
 } from '../data/constants'
@@ -557,11 +558,23 @@ export function slotReleaseCommands(state: GameState, idx: number): Command[] {
   // an outstanding order is a route about to open. Shedding capacity in that
   // window would just buy it back next quarter, fee and all.
   if (airline.fleet.some((a) => a.routeId === null && !(airline.operationsPolicy && a.reserve)) || airline.orders.length > 0) return []
+  // Rules 5: a foothold with a real market behind it is the next route, not
+  // waste. Under the old rule every rival handed back its starting footholds
+  // in quarter one (both starter jets on the first pair, nothing idle, no
+  // order yet) and then spent years queueing to get them back.
+  const modernRace = (state.rulesVersion ?? 1) >= 5
+  let reach = 0
+  if (modernRace) {
+    for (const ac of airline.fleet) reach = Math.max(reach, getAircraftType(ac.type).rangeKm)
+    for (const t of typesOnSale(yearOf(state))) reach = Math.max(reach, t.rangeKm)
+  }
+  const anchors = modernRace ? [...networkCities(airline)].sort() : []
   for (const city of slotCities(airline)) {
     if (city === airline.hq || touched.has(city)) continue
     if (city === airline.slotInterest) continue // the declared plan
     const free = slotsFree(airline, city)
     if (free <= 0) continue
+    if (modernRace && anchors.some((h) => h !== city && distanceKm(h, city) >= AI_MIN_ROUTE_KM && distanceKm(h, city) <= reach && pairScore(state, city, h, idx) >= RELEASE_KEEP_PAIR_SCORE)) continue
     commands.push({ type: 'release_slots', city, count: free })
   }
   return commands

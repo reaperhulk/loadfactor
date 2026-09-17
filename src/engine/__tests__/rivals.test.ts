@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { getCity } from '../../data/cities'
 import {
   ENTRANT_EVERY_QUARTERS,
+  ENTRANT_EVERY_QUARTERS_V5,
   INSOLVENCY_QUARTERS_TO_FAIL,
   RESTRUCTURE_MAX,
 } from '../../data/constants'
+import { chooseCampaign } from '../campaigns'
 import { applyCommand, endQuarter, newGame, type GameEvent } from '../index'
 import { slotRequestCommands, yieldCommands } from '../policy'
 import { slotFee } from '../slots'
@@ -256,5 +258,123 @@ describe('a field that fights back (F1)', () => {
     state = r.state
     expect(r.events.some((e) => e.type === 'airline_restructured' && e.airline === 0)).toBe(false)
     expect(state.phase).toBe('lost')
+  })
+})
+
+// Rules 5 rivals open the game already flying; these probes want a blank one.
+function idle<T extends { routes: unknown[]; fleet: { routeId: number | null; secondaryRouteId?: number }[]; campaign?: unknown; slotRequests: unknown[]; slotInterest?: string; servedUntil: Record<string, number> }>(rival: T): T {
+  rival.routes = []
+  for (const ac of rival.fleet) { ac.routeId = null; delete ac.secondaryRouteId }
+  delete rival.campaign
+  rival.slotRequests = []
+  delete rival.slotInterest
+  rival.servedUntil = {}
+  return rival
+}
+
+describe('rules 5: a race, not a procession', () => {
+  it('rivals are already flying when the player arrives', () => {
+    const state = newGame('jet_age', 'opening-seed')
+    for (const rival of state.airlines.filter((a) => a.controller === 'rival')) {
+      expect(rival.routes.length, rival.name).toBeGreaterThanOrEqual(1)
+      expect(rival.campaign, rival.name).toBeDefined()
+    }
+    expect(state.airlines[0]!.routes).toHaveLength(0)
+    expect(state.turn).toBe(0)
+    // Legacy openings stay empty, and a human seat is never moved.
+    const legacy = newGame('jet_age', 'opening-seed', undefined, undefined, 4)
+    expect(legacy.airlines.every((a) => a.routes.length === 0)).toBe(true)
+    const hotseat = newGame('jet_age', 'opening-seed', undefined, [1])
+    expect(hotseat.airlines[1]!.routes).toHaveLength(0)
+    expect(hotseat.airlines[2]!.routes.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('a rival opens a second market with an idle airframe instead of parking it on the first route', () => {
+    for (const [rules, expectedRoutes] of [[4, 1], [5, 2]] as const) {
+      let state = newGame('jet_age', 'launch-order', undefined, undefined, rules)
+      const rival = state.airlines[2]! // Pacific Crown: HND with HKG/SEL/PEK footholds
+      rival.cash = 60_000
+      runRivalTurn(state, rival.id, [])
+      expect(state.airlines[2]!.routes.length).toBe(1)
+      state = endQuarter(state).state
+      // A third airframe arrives idle; under the old stage order assignment
+      // ate it before the launch stage ever ran.
+      const again = state.airlines[2]!
+      again.fleet.push({ id: again.nextId++, type: 'caravelle', ageQuarters: 0, routeId: null, leased: false, cabin: 2 })
+      again.cash = 60_000
+      runRivalTurn(state, again.id, [])
+      expect(state.airlines[2]!.routes.length, `rules ${rules}`).toBe(expectedRoutes)
+    }
+  })
+
+  it('a raid names the leader\'s best reachable market, then opens it at a discount', () => {
+    const state = newGame('jet_age', 'raid-seed')
+    const player = state.airlines[0]!
+    const rival = idle(state.airlines[1]!) // Albion, premium: raids with full service at the standard fare
+    player.cash = 400_000
+    player.routes.push({ id: player.nextId++, from: 'JFK', to: 'ORD', fareLevel: 0, serviceLevel: 2, frequency: 10, lastPax: 30_000, lastCapacity: 32_000, lastLoadFactorBp: 9375, lastRevenue: 9_000, lastCost: 5_000, lastTransferPax: 0, history: [] })
+    rival.cash = 80_000
+    rival.slots['JFK'] = 2
+    rival.slots['ORD'] = 2
+    rival.routes.push({ id: rival.nextId++, from: 'JFK', to: 'LHR', fareLevel: 1, serviceLevel: 3, frequency: 4, lastPax: 5000, lastCapacity: 8000, lastLoadFactorBp: 6250, lastRevenue: 4000, lastCost: 3000, lastTransferPax: 0, history: [] })
+    rival.fleet[0]!.routeId = rival.routes[0]!.id
+    const campaign = chooseCampaign(state, rival.id)
+    expect(campaign.kind).toBe('raid')
+    expect(campaign.pair).toBe('JFK-ORD')
+    expect(campaign.target).toBe(0)
+    expect(campaign.evidence).toContain('JFK–ORD')
+    rival.campaign = { ...campaign, fromTurn: state.turn }
+    const events: GameEvent[] = []
+    runRivalTurn(state, rival.id, events)
+    const raid = state.airlines[1]!.routes.find((r) => r.from === 'JFK' && r.to === 'ORD')
+    expect(raid, 'the raid opened the market').toBeDefined()
+    expect(raid!.serviceLevel).toBe(3)
+    expect(events.some((e) => e.type === 'route_opened' && e.airline === 1)).toBe(true)
+    // A rival that already flies the pair does not raid it twice.
+    expect(chooseCampaign(state, rival.id).pair).not.toBe('JFK-ORD')
+  })
+
+  it('a raid queues for the airport it still needs before anything else', () => {
+    const state = newGame('jet_age', 'raid-queue')
+    const player = state.airlines[0]!, rival = idle(state.airlines[1]!)
+    player.cash = 400_000
+    player.routes.push({ id: player.nextId++, from: 'JFK', to: 'ORD', fareLevel: 0, serviceLevel: 2, frequency: 10, lastPax: 30_000, lastCapacity: 32_000, lastLoadFactorBp: 9375, lastRevenue: 9_000, lastCost: 5_000, lastTransferPax: 0, history: [] })
+    rival.cash = 80_000
+    rival.slots['JFK'] = 2 // reaches New York, but not Chicago
+    rival.routes.push({ id: rival.nextId++, from: 'JFK', to: 'LHR', fareLevel: 1, serviceLevel: 3, frequency: 4, lastPax: 5000, lastCapacity: 8000, lastLoadFactorBp: 6250, lastRevenue: 4000, lastCost: 3000, lastTransferPax: 0, history: [] })
+    rival.fleet[0]!.routeId = rival.routes[0]!.id
+    const campaign = chooseCampaign(state, rival.id)
+    expect(campaign.kind).toBe('raid')
+    expect(campaign.city).toBe('ORD')
+    expect(campaign.untilTurn - campaign.fromTurn).toBeGreaterThan(4)
+    rival.campaign = { ...campaign, fromTurn: state.turn }
+    runRivalTurn(state, rival.id, [])
+    expect(state.airlines[1]!.slotInterest).toBe('ORD')
+    expect(state.airlines[1]!.slotRequests.some((r) => r.city === 'ORD')).toBe(true)
+  })
+
+  it('a late entrant is capitalized against the field, and a dominant leader draws a state-backed carrier', () => {
+    const seat = (state: ReturnType<typeof newGame>, cash: number, seed: string) => {
+      const s = structuredClone(state)
+      s.turn = ENTRANT_EVERY_QUARTERS_V5 // the seat is filled on the cadence tick
+      s.seed = seed
+      s.airlines[3]!.bankrupt = true
+      s.airlines[3]!.routes = []; s.airlines[3]!.fleet = []; s.airlines[3]!.slots = {}
+      s.airlines[0]!.cash = cash
+      return s
+    }
+    const base = newGame('jet_age', 'entrant-capital')
+    const modest = endQuarter(seat(base, 30_000, 'entrant-capital')).state
+    const rich = endQuarter(seat(base, 900_000, 'entrant-capital')).state
+    const entrantOf = (s: ReturnType<typeof newGame>) => s.airlines.find((a) => a.enteredTurn !== undefined)!
+    expect(entrantOf(modest)).toBeDefined()
+    expect(entrantOf(rich).cash + entrantOf(rich).fleet.length * 1000).toBeGreaterThan(entrantOf(modest).cash + entrantOf(modest).fleet.length * 1000)
+    expect(entrantOf(rich).fleet.length).toBeGreaterThan(entrantOf(modest).fleet.length)
+    expect(entrantOf(rich).name).toContain('state-backed')
+    expect(entrantOf(modest).name).not.toContain('state-backed')
+    // A rules-4 world still seats the old modest entrant.
+    const legacy = endQuarter({ ...seat(newGame('jet_age', 'entrant-capital', undefined, undefined, 4), 900_000, 'entrant-capital'), turn: ENTRANT_EVERY_QUARTERS }).state
+    expect(entrantOf(legacy).fleet.length).toBe(2)
+    expect(entrantOf(legacy).name).not.toContain('state-backed')
   })
 })

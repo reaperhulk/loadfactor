@@ -4,13 +4,14 @@
 // that breaks the mirror shows up here.
 
 import { describe, expect, it } from 'vitest'
+import { quietWorld } from '../../engine/__tests__/quietWorld'
 import { DEMAND_NOISE_SPREAD_BP, ROUTE_SPOOL_BP } from '../../data/constants'
 import { applyCommand, newGame } from '../../engine'
 import { routeWeeklyCapacity } from '../../engine/queries'
 import { estimateWeeklyPax, tooCloseToCall } from '../estimate'
 
 function withRoute() {
-  const fresh = newGame('jet_age', 'estimate-seed')
+  const fresh = quietWorld(newGame('jet_age', 'estimate-seed'))
   const idle = fresh.airlines[0]!.fleet.find((a) => a.routeId === null)!
   const { state } = applyCommand(fresh, {
     type: 'open_route',
@@ -63,10 +64,16 @@ describe('estimateWeeklyPax', () => {
       ...route,
       id: rival.nextId++,
       fareLevel: 0,
-      frequency: 20,
+      frequency: 60,
     }
     rival.routes.push(rivalRoute)
-    for (const plane of rival.fleet) plane.routeId = rivalRoute.id
+    for (let i = 0; i < 4; i++) rival.fleet.push({ ...rival.fleet[0]!, id: rival.nextId++ })
+    // Based at New York so the operations pass actually dispatches them: a
+    // London-based fleet cannot ferry to a New York route.
+    for (const plane of rival.fleet) {
+      plane.routeId = rivalRoute.id
+      if (plane.operations) plane.operations = { ...plane.operations, base: 'JFK' }
+    }
     const contested = estimateWeeklyPax(state, { ...route, history: [{}, {}, {}] as typeof route.history })
     expect(contested.sharePct).toBeLessThan(100)
     expect(contested.pax).toBeLessThan(solo.pax)
@@ -111,7 +118,13 @@ describe('estimateWeeklyPax', () => {
     const rival = state.airlines[1]!
     const rivalRoute = { ...route, id: rival.nextId++, fareLevel: 0, frequency: 20 }
     rival.routes.push(rivalRoute)
-    for (const plane of rival.fleet) plane.routeId = rivalRoute.id
+    for (let i = 0; i < 4; i++) rival.fleet.push({ ...rival.fleet[0]!, id: rival.nextId++ })
+    // Based at New York so the operations pass actually dispatches them: a
+    // London-based fleet cannot ferry to a New York route.
+    for (const plane of rival.fleet) {
+      plane.routeId = rivalRoute.id
+      if (plane.operations) plane.operations = { ...plane.operations, base: 'JFK' }
+    }
     const established = { ...route, history: [{}, {}, {}] as typeof route.history }
     const here = estimateWeeklyPax(state, established)
     // A posture is never distinguishable from itself.

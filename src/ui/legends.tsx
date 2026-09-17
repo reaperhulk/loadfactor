@@ -9,6 +9,7 @@ import {
   CABIN_SEATS_BP,
   CABIN_WEIGHT,
   CABIN_YIELD_BP,
+  CABIN_YIELD_BP_V5,
   CONNECT_DETOUR_MAX_BP,
   CONNECT_FARE_DISCOUNT_BP,
   CONNECT_WILLING_BP,
@@ -48,7 +49,7 @@ const pctFrom = (bp: number): string => {
 const CABIN_NAMES = ['Dense', 'Standard', 'Premium']
 const SERVICE_NAMES = ['Basic', 'Standard', 'Premium']
 
-export function CabinLegend() {
+export function CabinLegend({ modern = false }: { modern?: boolean }) {
   return (
     <details className="game-legend" data-testid="cabin-legend">
       <summary className="dim">What do cabin fits do?</summary>
@@ -71,7 +72,7 @@ export function CabinLegend() {
             <tr key={name}>
               <td>{name}</td>
               <td>{pctFrom(CABIN_SEATS_BP[i]!)}</td>
-              <td>{pctFrom(CABIN_YIELD_BP[i]!)}</td>
+              <td>{pctFrom((modern ? CABIN_YIELD_BP_V5 : CABIN_YIELD_BP)[i]!)}</td>
               <td>{CABIN_WEIGHT[i]}</td>
             </tr>
           ))}

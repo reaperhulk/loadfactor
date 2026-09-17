@@ -18,6 +18,7 @@ export interface WorldEventDef {
   fuelModBp?: number // multiplier on effective fuel index
   demandModBp?: number // multiplier on demand at the target city/region
   region?: Region // fixed region, else drawn (target 'region')
+  fromRules?: number // deck membership is rules-gated so legacy draws never move
 }
 
 export const WORLD_EVENTS: readonly WorldEventDef[] = [
@@ -118,7 +119,36 @@ export const WORLD_EVENTS: readonly WorldEventDef[] = [
   },
 ]
 
-const byId = new Map(WORLD_EVENTS.map((e) => [e.id, e]))
+// Rules 5 additions: the deck gains two decisions-in-disguise. Runway works
+// close half a city for two quarters (move capacity or ride it out); a
+// currency crisis thins a whole region's demand for three.
+export const WORLD_EVENTS_V5: readonly WorldEventDef[] = [
+  ...WORLD_EVENTS,
+  {
+    id: 'airport_works',
+    name: 'Runway reconstruction',
+    target: 'city',
+    durationQuarters: 2,
+    weight: 14,
+    fromYear: 1950,
+    toYear: 2100,
+    demandModBp: 5000,
+    fromRules: 5,
+  },
+  {
+    id: 'currency_crisis',
+    name: 'Currency crisis',
+    target: 'region',
+    durationQuarters: 3,
+    weight: 10,
+    fromYear: 1950,
+    toYear: 2100,
+    demandModBp: 7000,
+    fromRules: 5,
+  },
+]
+
+const byId = new Map(WORLD_EVENTS_V5.map((e) => [e.id, e]))
 
 export function getEventDef(id: string): WorldEventDef {
   const e = byId.get(id)
