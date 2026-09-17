@@ -20,19 +20,26 @@ import { getEventDef } from '../data/events'
 import { SCENARIOS, SHORT_SCENARIOS, getScenario } from '../data/scenarios'
 import { netWorth, networkCities, objectiveQualified, objectiveScore, quarterOf, yearOf } from '../engine/queries'
 import { nextExpansion } from '../engine/slots'
-import { CityPanel } from './CityPanel'
+// Inspectors and the launch dialog are lazy like the report surfaces: they
+// open on a click, never on the first paint, and the eager shell has a
+// 190 KiB budget to keep.
+const loadCityPanel = () => import('./CityPanel').then((m) => ({ default: m.CityPanel }))
+const CityPanel = lazy(loadCityPanel)
+const loadRouteDossier = () => import('./RouteDossier').then((m) => ({ default: m.RouteDossier }))
+const RouteDossier = lazy(loadRouteDossier)
+const loadRouteSetupDialog = () => import('./RouteSetupDialog').then((m) => ({ default: m.RouteSetupDialog }))
+const RouteSetupDialog = lazy(loadRouteSetupDialog)
 import { CoachMarks } from './CoachMarks'
 import { ConfirmButton } from './ConfirmButton'
 import { useCountUp } from './countUp'
 import { isMuted, setMuted } from './sounds'
 import { ActiveDeals, OfferCard } from './OfferCard'
 import { DeskTimeline } from './DeskTimeline'
-import { AircraftDossier } from './AircraftDossier'
+const loadAircraftDossier = () => import('./AircraftDossier').then((m) => ({ default: m.AircraftDossier }))
+const AircraftDossier = lazy(loadAircraftDossier)
 import { AirportsPanel, FleetPanel, RoutesPanel } from './panels'
 const loadRivalsPanel = () => import('./RivalsPanel').then(m=>({default:m.RivalsPanel}))
 const RivalsPanel = lazy(loadRivalsPanel)
-import { RouteDossier } from './RouteDossier'
-import { RouteSetupDialog } from './RouteSetupDialog'
 import { ACHIEVEMENTS, loadAchievements } from './achievements'
 import { canEndQuarter, getLastSentLink, listMpGames, mpStatus, passSeat, receiveTurn, resumeMpGame, seatOrder, sendSitting, startLinkGame, viewSeat,
   clearAllData,
@@ -679,7 +686,7 @@ function AnimatedMoney({ value }: { value: number }) {
 function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   useEffect(() => {
     // Keep first paint light, then warm the quarter flow for offline play.
-    const warm = () => { void Promise.allSettled([loadQuarterReview(), loadReportCard(), loadReportPanel(), loadRivalsPanel(), loadFinancePanel(), loadOperationsBoard(), loadCapitalOutlook(), import('./PassengerFlows')]) }
+    const warm = () => { void Promise.allSettled([loadCityPanel(), loadRouteDossier(), loadRouteSetupDialog(), loadAircraftDossier(), loadQuarterReview(), loadReportCard(), loadReportPanel(), loadRivalsPanel(), loadFinancePanel(), loadOperationsBoard(), loadCapitalOutlook(), import('./PassengerFlows')]) }
     const timer = window.setTimeout(warm, 500)
     window.addEventListener('online', warm)
     return () => { clearTimeout(timer); window.removeEventListener('online', warm) }
@@ -1039,7 +1046,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         </aside>}
         {flowFocus && <div className="flow-focus-banner" data-testid="flow-focus"><strong>{flowFocus.label}</strong><button onClick={()=>setFlowFocus(null)}>Clear journey</button></div>}
         {tab === "map" && selectedCity !== null && (
-          <CityPanel
+          <Suspense fallback={<aside className="city-panel" role="status">Loading city…</aside>}><CityPanel
             state={state}
             cityId={selectedCity}
             onHighlight={highlightFlow}
@@ -1055,25 +1062,25 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
               setRouteFrom(null)
               requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-testid=tab-map]')?.focus({preventScroll:true}))
             }}
-          />
+          /></Suspense>
         )}
         {tab === "map" && inspectedRoute !== undefined && (
-          <RouteDossier
+          <Suspense fallback={<aside className="route-dossier" role="status">Loading route…</aside>}><RouteDossier
             state={state}
             routeId={inspectedRoute!.id}
             onClose={() => { setSelectedRoute(null); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-testid=tab-map]')?.focus({preventScroll:true})) }}
             onSelectRoute={setSelectedRoute}
             onHighlight={highlightFlow}
-          />
+          /></Suspense>
         )}
       </div>
 
         </section>
         {visited.has('routes') && <section className={`workspace-page route-page split-view${inspectedRoute !== undefined ? ' has-inspector' : ''}`} hidden={tab !== 'routes'} data-testid="page-routes">
           <div className="split-list"><div className="page-heading"><div><span className="eyebrow">Network</span><h2>Routes <span>{player.routes.length}</span></h2></div><span className="dim">Last quarter’s results</span></div><RoutesPanel state={state} selectedRouteId={selectedRoute} onInspect={inspectRoute} onPlan={(from, to, preset) => setPendingRoute({ from, to, preset })} onAirport={(city) => { setTab('map'); setSelectedCity(city); setSelectedRoute(null) }} /></div>
-          {tab === 'routes' && inspectedRoute !== undefined && <RouteDossier state={state} routeId={inspectedRoute!.id} onClose={closeRoute} onSelectRoute={setSelectedRoute} onHighlight={highlightFlow} />}
+          {tab === 'routes' && inspectedRoute !== undefined && <Suspense fallback={<aside className="route-dossier" role="status">Loading route…</aside>}><RouteDossier state={state} routeId={inspectedRoute!.id} onClose={closeRoute} onSelectRoute={setSelectedRoute} onHighlight={highlightFlow} /></Suspense>}
         </section>}
-        {visited.has('fleet') && <section className={`workspace-page fleet-page split-view${inspectedAircraft ? ' has-inspector' : ''}`} hidden={tab !== 'fleet'} data-testid="page-fleet"><div className="split-list"><FleetPanel state={state} selectedAircraftId={selectedAircraft} onInspect={setSelectedAircraft} /></div>{tab === 'fleet' && inspectedAircraft && <AircraftDossier state={state} aircraftId={inspectedAircraft.id} onClose={() => { setSelectedAircraft(null); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-testid="inspect-aircraft-${inspectedAircraft.id}"]`)?.focus({ preventScroll:true })) }} />}</section>}
+        {visited.has('fleet') && <section className={`workspace-page fleet-page split-view${inspectedAircraft ? ' has-inspector' : ''}`} hidden={tab !== 'fleet'} data-testid="page-fleet"><div className="split-list"><FleetPanel state={state} selectedAircraftId={selectedAircraft} onInspect={setSelectedAircraft} /></div>{tab === 'fleet' && inspectedAircraft && <Suspense fallback={<aside className="aircraft-dossier" role="status">Loading aircraft…</aside>}><AircraftDossier state={state} aircraftId={inspectedAircraft.id} onClose={() => { setSelectedAircraft(null); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-testid="inspect-aircraft-${inspectedAircraft.id}"]`)?.focus({ preventScroll:true })) }} /></Suspense>}</section>}
         {visited.has('orders') && <section className="workspace-page" hidden={tab !== 'orders'} data-testid="page-orders"><FleetPanel state={state} view="orders" /></section>}
         {visited.has('catalog') && <section className="workspace-page" hidden={tab !== 'catalog'} data-testid="page-catalog"><FleetPanel state={state} view="catalog" /></section>}
         {visited.has('airports') && <section className="workspace-page" hidden={tab !== 'airports'} data-testid="page-airports"><div className="page-heading"><h2>Airports</h2></div><AirportsPanel state={state} /></section>}
@@ -1089,8 +1096,8 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     <ToastStack events={session.lastEvents} state={state} unlocks={session.lastUnlocks} onOpenRoute={inspectRoute} />
     {showReview && <Suspense fallback={<Dialog label="Review quarter" className="gameover-overlay" onClose={() => setShowReview(false)}><p role="status">Loading quarter review…</p></Dialog>}><QuarterReview state={state} forecast={forecast} onClose={() => setShowReview(false)} onConfirm={endQuarter} /></Suspense>}
     {state.phase === 'planning' && showReport && !celebration.milestones.length && session.reportEvents.length > 0 && <Suspense fallback={<Dialog label="Quarterly report" className="gameover-overlay" onClose={() => setShowReport(false)}><p role="status">Loading quarterly report…</p></Dialog>}><ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} onInspect={(id) => { setShowReport(false); setTab('routes'); inspectRoute(id) }} /></Suspense>}
-    {pendingRoute !== null && <RouteSetupDialog state={state} from={pendingRoute.from} to={pendingRoute.to}
-        preset={pendingRoute.preset} onClose={() => setPendingRoute(null)} />}
+    {pendingRoute !== null && <Suspense fallback={<Dialog label="Open a route" className="gameover-overlay" onClose={() => setPendingRoute(null)}><p role="status">Loading launch review…</p></Dialog>}><RouteSetupDialog state={state} from={pendingRoute.from} to={pendingRoute.to}
+        preset={pendingRoute.preset} onClose={() => setPendingRoute(null)} /></Suspense>}
     {state.phase !== 'planning' && <GameOverOverlay state={state} earned={session.careerUnlocks} onWatchReplay={onWatchReplay} />}
     {showSettings && <Dialog label="Settings" className="gameover-overlay" testId="settings-dialog" onClose={() => setShowSettings(false)}><div className="settings-card"><div className="dialog-heading"><h2>Settings</h2><button onClick={() => setShowSettings(false)} aria-label="Close settings">×</button></div><div className="settings-scroll">
         <button

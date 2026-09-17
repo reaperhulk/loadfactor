@@ -160,3 +160,25 @@ describe('a louder world (rules 5)', () => {
     expect(getAircraftType('b727').availableFrom).toBe(1963)
   })
 })
+
+describe('mandates are challenges, eras are races (rules 5)', () => {
+  it('a short mandate is won on its own bar even when a rival out-earns you; a long era is not', () => {
+    const finish = (scenarioId: string, rules: number) => {
+      const state = newGame(scenarioId, 'mandate-seed', undefined, undefined, rules)
+      const scenario = { rescue: 16, jet_age: 80 }[scenarioId]!
+      state.turn = scenario - 1
+      const me = state.airlines[0]!, rival = state.airlines[1]!
+      // Both qualified; the rival ahead on the metric.
+      for (const a of [me, rival]) {
+        a.routes.push({ id: a.nextId++, from: a.hq, to: a.hq === 'JFK' ? 'ORD' : 'FCO', fareLevel: 0, serviceLevel: 2, frequency: 5, lastPax: 0, lastCapacity: 0, lastLoadFactorBp: 0, lastRevenue: 0, lastCost: 0, lastTransferPax: 0, history: [] })
+        for (let q = 0; q < scenario - 1; q++) a.history.push({ turn: q, cash: 0, revenue: 0, costs: 0, profit: a === me ? 5_000 : 9_000, pax: 100_000, netWorth: 0, breakdown: { fuel: 0, fees: 0, flightPay: 0, service: 0, salaries: 0, ownership: 0, maintenance: 0, admin: 0, slots: 0, overhead: 0, marketing: 0, interest: 0 } })
+      }
+      me.cash = 900_000
+      rival.cash = 2_000_000
+      return endQuarter(state).state.phase
+    }
+    expect(finish('rescue', 5)).toBe('won')
+    expect(finish('rescue', 4)).toBe('lost')
+    expect(finish('jet_age', 5)).toBe('lost')
+  })
+})

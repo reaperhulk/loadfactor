@@ -1556,6 +1556,24 @@ test('each era scores its own objective, not always net worth', async ({ page })
   await expect(page.getByTestId('scenario-deregulation')).toContainText('passengers flown')
 })
 
+test('an announced raid shows on the desk, the rivals page and the map before its first flight', async ({ page }) => {
+  await startGame(page)
+  await page.evaluate(() => {
+    const s = window.__harness.getState()!
+    const me = s.airlines[0]!
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: me.fleet.find((a) => a.routeId === null)!.id, frequency: 8 })
+    const st = window.__harness.getState()!
+    st.airlines[1]!.campaign = { kind: 'raid', city: 'ORD', pair: 'JFK-ORD', target: 0, fromTurn: st.turn + 1, untilTurn: st.turn + 9, evidence: 'Meridian Air earned $4,000k on JFK–ORD last quarter.', response: 'Enter JFK–ORD against Meridian Air, queueing for slots at ORD, with a full-service product.' }
+    window.__harness.dispatch({ type: 'set_marketing', level: 0 })
+  })
+  await openPanel(page, 'desk')
+  await expect(page.getByTestId('management-brief')).toContainText('is coming for JFK–ORD')
+  await openPanel(page, 'rivals')
+  await expect(page.getByTestId('campaign-1')).toContainText('raid campaign · JFK–ORD (your market)')
+  await openPanel(page, 'map')
+  await expect(page.getByTestId('threat-JFK-ORD')).toHaveCount(1)
+})
+
 test('the world asks questions: an offer can be taken or passed', async ({ page }) => {
   await startGame(page)
   // Put a concrete offer on the table through the engine, then answer it in

@@ -971,6 +971,21 @@ button.toast {
 }
 .map-data-legend .opportunity-key { color: #e8c46a; }
 
+/* An announced raid on one of your pairs: the raider's color, dashed and
+   pulsing over your own arc, until it lands or lapses. */
+.route-threat {
+  stroke-width: 2.4;
+  stroke-dasharray: 3 6;
+  stroke-linecap: round;
+  opacity: 0.9;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+  animation: threat-march 1.4s linear infinite;
+}
+@keyframes threat-march { to { stroke-dashoffset: -18; } }
+@media (prefers-reduced-motion: reduce) { .route-threat { animation: none; } }
+
 .route-rival {
   stroke: #8a5470;
   stroke-width: var(--cap-w, 0.8);

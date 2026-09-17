@@ -353,7 +353,7 @@ export function RivalsPanel({ state }: { state: GameState }) {
                 {rival.name} {rival.bankrupt && <span className="neg">— bankrupt</span>}
               </h4>
               <p className="dim">{PERSONALITY_BLURBS[rival.personality] ?? rival.personality}</p>
-              {rival.campaign && <p className="campaign" data-testid={`campaign-${rival.id}`}><strong>{rival.campaign.kind} campaign · {rival.campaign.city}</strong> · {Math.max(0, rival.campaign.untilTurn - state.turn)}q remaining{rival.campaign.fromTurn > state.turn ? ' · starts next quarter' : ''}</p>}
+              {rival.campaign && <p className="campaign" data-testid={`campaign-${rival.id}`}><strong>{rival.campaign.kind} campaign · {rival.campaign.kind === 'raid' && rival.campaign.pair ? `${rival.campaign.pair.replace('-', '–')}${rival.campaign.target === viewSeat() ? ' (your market)' : ''}` : rival.campaign.city}</strong> · {Math.max(0, rival.campaign.untilTurn - state.turn)}q remaining{rival.campaign.fromTurn > state.turn ? ' · starts next quarter' : ''}</p>}
               {rival.campaign?.evidence && <div className="campaign-evidence"><p><strong>Observed:</strong> {rival.campaign.evidence}</p><p><strong>Announced intent:</strong> {rival.campaign.response}</p><p className="hint">Intent can be constrained by cash, aircraft and airport access. Inspect affected routes to compare price, service or capacity responses in your plan.</p></div>}
               {rival.customerPreference && <CustomerIdentity airline={rival} compact />}
               {!rival.bankrupt && (

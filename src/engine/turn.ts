@@ -534,7 +534,11 @@ function resolveQuarter(prev: GameState, outlook: boolean): EngineResult {
         result: 'lost',
         reason: `missed the ${obj.label} target${(state.rulesVersion ?? 1) >= 2 ? ' or required operating scale' : ''}`,
       })
-    } else if (bestRival !== null && !objectiveBeats(myScore, bestRivalScore, obj.higherIsBetter)) {
+    } else if (bestRival !== null && !objectiveBeats(myScore, bestRivalScore, obj.higherIsBetter) && !(scenario.short && (state.rulesVersion ?? 1) >= 5)) {
+      // Rules 5: a short mandate is a challenge against its own bar ("earn
+      // $20M and carry 300,000 passengers"), not a race against a field that
+      // starts healthy while you start with old metal and debt. The long
+      // eras remain races.
       state.phase = 'lost'
       events.push({ type: 'game_over', result: 'lost', reason: `outscored by ${bestRival.name} on ${obj.label}` })
     } else {

@@ -14,6 +14,9 @@ import { CITIES, distanceKm, getCity, pairKey } from '../data/cities'
 import {
   AI_MIN_ROUTE_KM,
   CONNECT_DETOUR_MAX_BP,
+  ROUTE_OVERHEAD_QUAD,
+  SPRAWL_HURDLE_BP,
+  WEEKS_PER_QUARTER,
   SLOT_WAIT_PATIENCE,
   ROUTE_MEMORY_QUARTERS,
   ROUTE_SPOOL_BP,
@@ -22,7 +25,8 @@ import {
   TAKEOVER_BASE_K,
   TAKEOVER_PREMIUM_BP,
 } from '../data/constants'
-import { estimateAircraftQuarterCost, pairWeeklyDemand, routeSpoolBp } from './market'
+import { estimateAircraftQuarterCost, inflationBp, pairWeeklyDemand, routeSpoolBp } from './market'
+import { getScenario } from '../data/scenarios'
 import { nextExpansion, slotFee, slotsRemaining } from './slots'
 import {
   airlinesOnPair,
@@ -393,6 +397,7 @@ export function launchCommands(
   const airline = state.airlines[idx]!
   const pair = bestUnservedPair(state, idx, dials.contestDiscountBp, dials.connectionFocus)
   if (!pair || pair.score <= dials.expandMinDemand) return { commands: [], usedAircraft: null }
+  if ((state.rulesVersion ?? 1) >= 5 && !clearsSprawlHurdle(state, airline, pair.score)) return { commands: [], usedAircraft: null }
   const launch = airline.fleet.find(
     (ac) => ac.routeId === null && !(airline.operationsPolicy && ac.reserve) && getAircraftType(ac.type).rangeKm >= pair.km,
   )
@@ -411,6 +416,25 @@ export function launchCommands(
     ],
     usedAircraft: launch.id,
   }
+}
+
+// Rules 5: one more route costs ROUTE_OVERHEAD_QUAD × (2n+1) of quadratic
+// overhead every quarter. Judge the candidate by what this airline actually
+// earns per passenger on its existing network; a thin pair that cannot pay
+// for its own overhead is not expansion, it is dilution. Airlines with no
+// results yet (or a losing network) are not held back — they need markets.
+export function clearsSprawlHurdle(state: GameState, airline: Airline, weeklyPax: number): boolean {
+  let pax = 0
+  let contribution = 0
+  for (const r of airline.routes) {
+    pax += r.lastPax
+    contribution += r.lastRevenue - r.lastCost
+  }
+  if (pax <= 0 || contribution <= 0) return true
+  const n = airline.routes.length
+  const marginalK = Math.floor((ROUTE_OVERHEAD_QUAD * (2 * n + 1) * (getScenario(state.scenario).rules.routeOverheadBp ?? 10000)) / 10000 * inflationBp(state.turn) / 10000)
+  const expectedK = Math.floor((weeklyPax * WEEKS_PER_QUARTER * contribution) / pax)
+  return expectedK * 10000 >= marginalK * SPRAWL_HURDLE_BP
 }
 
 // Buy the biggest affordable jet when the network is actually full (or the

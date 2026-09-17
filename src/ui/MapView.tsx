@@ -1117,6 +1117,25 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opportunities, isGlobe, globe, projKey])
 
+  // Announced raids on the viewer's own markets: the threat drawn on the
+  // pair itself, in the raider's color, before its first flight.
+  const threatArcsLayer = useMemo(() => {
+    const seatId = viewSeat()
+    return state.airlines
+      .filter((a) => a.id !== seatId && !a.bankrupt && a.campaign?.kind === 'raid' && a.campaign.target === seatId && a.campaign.pair && state.turn < a.campaign.untilTurn)
+      .map((a) => {
+        const [from, to] = a.campaign!.pair!.split('-') as [string, string]
+        const d = routePathFor(from, to)
+        if (d === '') return null
+        return (
+          <path key={`threat-${a.id}`} d={d} className={`route-threat ${rivalColorClass(a.id)}`} data-testid={`threat-${from}-${to}`}>
+            <title>{`${a.name} has announced a raid on ${from}–${to}`}</title>
+          </path>
+        )
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, isGlobe, globe, projKey])
+
   const playerArcsLayer = useMemo(() => {
     return player.routes.map((r) => {
       const km = distanceKm(r.from, r.to)
@@ -1828,6 +1847,7 @@ export function MapView({
           {rivalArcsLayer}
           {opportunityArcsLayer}
           {playerArcsLayer}
+          {threatArcsLayer}
           {/* Constant traffic: planes shuttle back and forth on every served
               route — more of them the busier the schedule, and long-haul takes
               visibly longer than a hop. */}

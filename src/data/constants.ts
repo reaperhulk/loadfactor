@@ -324,3 +324,8 @@ export const PRICE_WAR_FARE_LEVEL = -2
 // of the fare), so at full loads it earns only a little more and loses the
 // travellers who notice legroom wherever there is a choice.
 export const CABIN_YIELD_BP_V5: readonly number[] = [9200, 10000, 12000]
+// Rules 5 brain: the (n+1)th route must be expected to contribute at least
+// this multiple of the quadratic overhead it adds, judged by the airline's
+// own contribution per passenger last quarter. Sprawl has a price, and the
+// reference bot, the rivals and the fuzz genome all read it.
+export const SPRAWL_HURDLE_BP = 15000

@@ -35,8 +35,8 @@ export function QuarterReview({ state, forecast, onClose, onConfirm }: {
       </dl>
       {(idle > 0 || losing > 0 || forecast.cashAfter < 0) && <section className="review-attention"><h3>Before you fly</h3>
         {forecast.cashAfter < 0 && <p className="neg">This plan ends with negative cash. Review borrowing and costs.</p>}
-        {idle > 0 && <p>{idle} unassigned aircraft still incur crew and ownership costs.</p>}
-        {losing > 0 && <p>{losing} routes forecast a loss before fixed company costs.</p>}
+        {idle > 0 && <p><strong>{idle}</strong> unassigned aircraft still incur crew and ownership costs.</p>}
+        {losing > 0 && <p><strong>{losing}</strong> route{losing === 1 ? '' : 's'} forecast a loss before fixed company costs.</p>}
       </section>}
       {forecast.operations && <OperationsSummary summary={forecast.operations} routes={airline.routes} forecast />}
       {adverse?.operations && <p className="review-attention" data-testid="operations-adverse">Stress case · one additional three-day repair: {adverse.operations.cancelledTrips} cancelled round trips; {money(adverse.profit)} company profit. This is an illustration, not a prediction of the next repair.</p>}

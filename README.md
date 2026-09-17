@@ -59,7 +59,9 @@ npm run dev     # http://localhost:5173
   and the airport it still needs a quarter ahead, then queues there and opens
   it at a discount. A rival that stumbles is recapitalized against the field,
   an empty seat draws an entrant sized to the leader, and a dominant leader
-  draws a state-backed carrier. Price wars go to the fare floor.
+  draws a state-backed carrier. Price wars go to the fare floor. An announced
+  raid on your market is named on the Desk and drawn on the map. Everyone's
+  brain now counts the overhead of one more route before opening it.
 - **Answer the world.** Every four quarters something asks a question: settle a
   ground-crew strike or lose a quarter of flights at your hub, buy a production
   slot that delivers next quarter, take a liquidation lot of used aircraft
@@ -95,7 +97,8 @@ Low-Cost Wars. Their objectives are net worth, cumulative profit, passenger
 boardings, connecting boardings and lifetime load factor respectively. Load-factor
 careers also require 1.5 million boardings and three active routes to qualify.
 
-Four shorter mandates use the full simulation:
+Four shorter mandates use the full simulation. Under rules 5 a mandate is won
+on its own bar; the long eras are races against the field:
 
 | Mandate | Length | Challenge |
 | --- | --- | --- |

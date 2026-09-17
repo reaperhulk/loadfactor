@@ -8,7 +8,7 @@ import {
 } from '../../data/constants'
 import { chooseCampaign } from '../campaigns'
 import { applyCommand, endQuarter, newGame, type GameEvent } from '../index'
-import { slotRequestCommands, yieldCommands } from '../policy'
+import { clearsSprawlHurdle, slotRequestCommands, yieldCommands } from '../policy'
 import { slotFee } from '../slots'
 import { pairWeeklySeats, routeWeeklyCapacity } from '../queries'
 import { expansionScore, runRivalTurn } from '../rivals'
@@ -376,5 +376,23 @@ describe('rules 5: a race, not a procession', () => {
     const legacy = endQuarter({ ...seat(newGame('jet_age', 'entrant-capital', undefined, undefined, 4), 900_000, 'entrant-capital'), turn: ENTRANT_EVERY_QUARTERS }).state
     expect(entrantOf(legacy).fleet.length).toBe(2)
     expect(entrantOf(legacy).name).not.toContain('state-backed')
+  })
+})
+
+describe('rules 5: sprawl has a price', () => {
+  it('a thin market cannot clear the overhead of one more route once the network is large', () => {
+    const state = newGame('jet_age', 'sprawl-seed')
+    const me = state.airlines[0]!
+    // A fresh airline with no results is never held back.
+    expect(clearsSprawlHurdle(state, me, 200)).toBe(true)
+    // Twenty routes earning $200 per passenger: the 21st adds 25 × 41 = $1.0M
+    // of overhead a quarter, so a 300 pax/week market (≈ $780k) is dilution
+    // and a 3,000 pax/week market is expansion.
+    for (let i = 0; i < 20; i++) me.routes.push({ id: me.nextId++, from: 'JFK', to: 'ORD', fareLevel: 0, serviceLevel: 2, frequency: 5, lastPax: 10_000, lastCapacity: 12_000, lastLoadFactorBp: 8333, lastRevenue: 3_000, lastCost: 1_000, lastTransferPax: 0, history: [] })
+    expect(clearsSprawlHurdle(state, me, 300)).toBe(false)
+    expect(clearsSprawlHurdle(state, me, 3000)).toBe(true)
+    // A losing network is not held back either: it needs markets, not discipline.
+    for (const r of me.routes) r.lastCost = 5_000
+    expect(clearsSprawlHurdle(state, me, 300)).toBe(true)
   })
 })

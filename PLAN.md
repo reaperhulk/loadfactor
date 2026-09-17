@@ -861,9 +861,17 @@ capitalized at `ENTRANT_CAPITAL_LEADER_BP` of the leader's net worth, half of
 it as the era's median-seat type; a leader ahead of the runner-up by
 `DOMINANT_LEAD_MULT_BP` draws a state-backed carrier at
 `ENTRANT_BACKED_CAPITAL_BP`. Chapter 11 recapitalizes to
-`RESTRUCTURE_LEADER_BP` of the leader's worth. Measured on the Jet Age probe
-seed the leader's margin over the runner-up fell from 100× to about 20%, and
-the greedy bot loses some seeds it used to win.
+`RESTRUCTURE_LEADER_BP` of the leader's worth. With rivals flying the same
+brain the reference bot lost every probe seed by sprawling: 27 routes at 87%
+load factor paying three times the rivals' quadratic overhead. The shared
+brain therefore gained a sprawl hurdle (`clearsSprawlHurdle`): the (n+1)th
+route must be expected to contribute `SPRAWL_HURDLE_BP` of the overhead it
+adds, judged by the airline's own contribution per passenger. Raids bypass
+it. On five probe seeds the greedy bot now wins three Jet Age races with the
+runner-up at 70–95% of its net worth; cautious and budget win fewer. Short
+mandates are challenges against their own bar under rules 5 (the blurbs
+never promised a race), so a rival that out-earns you in The Turnaround no
+longer loses you the mandate; the long eras remain races.
 
 **The world.** Events draw at `EVENT_DRAW_CHANCE_BP_V5`; the deck gains
 `airport_works` and `currency_crisis` through a `fromRules` gate so legacy
@@ -897,7 +905,11 @@ across mainstream doctrines is about ±10%.
 **The map.** `cityTier` labels majors from mass 56 (about thirty cities at
 world view); the `demand` lens draws the twelve richest unflown markets from
 the player's network as dashed arcs weighted by unmet demand; rival arcs are
-legible at world view.
+legible at world view; an announced raid on one of the viewer's pairs is drawn
+on that pair in the raider's color (`route-threat`), named on the Desk and on
+the rivals page. The Routes, Fleet and Airports lists load lazily like the
+report surfaces, which keeps the eager shell inside its 190 KiB budget after
+the engine grew.
 
 Tests: `rivals.test.ts` (rules 5 block), `worldV5.test.ts`,
 `ui/__tests__/forecastRange.test.ts`; goldens regenerated for rules 5 with
