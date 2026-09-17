@@ -907,9 +907,12 @@ world view); the `demand` lens draws the twelve richest unflown markets from
 the player's network as dashed arcs weighted by unmet demand; rival arcs are
 legible at world view; an announced raid on one of the viewer's pairs is drawn
 on that pair in the raider's color (`route-threat`), named on the Desk and on
-the rivals page. The Routes, Fleet and Airports lists load lazily like the
-report surfaces, which keeps the eager shell inside its 190 KiB budget after
-the engine grew.
+the rivals page. The launch dialog, the aircraft shop, the handbook legends
+and the Desk brief load lazily like the report surfaces (warmed after
+startup), which keeps the eager shell inside its 190 KiB budget after the
+engine grew. Inspectors stay eager on purpose: they take focus when they
+mount and answer Escape, and a lazy mount can land after the keypress it was
+meant to answer (mobile WebKit showed exactly that).
 
 Tests: `rivals.test.ts` (rules 5 block), `worldV5.test.ts`,
 `ui/__tests__/forecastRange.test.ts`; goldens regenerated for rules 5 with

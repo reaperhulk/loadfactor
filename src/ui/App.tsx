@@ -11,7 +11,10 @@ import { AREA_PAGES, PAGE_LABELS, areaFor, type WorkspaceArea, type WorkspacePag
 import { DisplaySettings } from './DisplaySettings'
 import { Dialog } from './Dialog'
 import { AudioSettings } from './AudioSettings'
-import { ManagementBrief } from './ManagementBrief'
+// The brief is the Desk's first block; it loads with the first paint's
+// second frame and carries no focus of its own.
+const loadManagementBrief = () => import('./ManagementBrief').then((m) => ({ default: m.ManagementBrief }))
+const ManagementBrief = lazy(loadManagementBrief)
 import { rulesOf, identityOf } from '../engine/version'
 import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react'
 import { CITIES } from '../data/cities'
@@ -23,10 +26,10 @@ import { nextExpansion } from '../engine/slots'
 // Inspectors and the launch dialog are lazy like the report surfaces: they
 // open on a click, never on the first paint, and the eager shell has a
 // 190 KiB budget to keep.
-const loadCityPanel = () => import('./CityPanel').then((m) => ({ default: m.CityPanel }))
-const CityPanel = lazy(loadCityPanel)
-const loadRouteDossier = () => import('./RouteDossier').then((m) => ({ default: m.RouteDossier }))
-const RouteDossier = lazy(loadRouteDossier)
+// Inspectors stay eager: they take focus when they mount and answer Escape,
+// and a lazy mount can land after the keypress it was meant to answer.
+import { CityPanel } from './CityPanel'
+import { RouteDossier } from './RouteDossier'
 const loadRouteSetupDialog = () => import('./RouteSetupDialog').then((m) => ({ default: m.RouteSetupDialog }))
 const RouteSetupDialog = lazy(loadRouteSetupDialog)
 import { CoachMarks } from './CoachMarks'
@@ -35,8 +38,7 @@ import { useCountUp } from './countUp'
 import { isMuted, setMuted } from './sounds'
 import { ActiveDeals, OfferCard } from './OfferCard'
 import { DeskTimeline } from './DeskTimeline'
-const loadAircraftDossier = () => import('./AircraftDossier').then((m) => ({ default: m.AircraftDossier }))
-const AircraftDossier = lazy(loadAircraftDossier)
+import { AircraftDossier } from './AircraftDossier'
 import { AirportsPanel, FleetPanel, RoutesPanel } from './panels'
 const loadRivalsPanel = () => import('./RivalsPanel').then(m=>({default:m.RivalsPanel}))
 const RivalsPanel = lazy(loadRivalsPanel)
@@ -75,7 +77,7 @@ import {
   SlotLegend,
   SpoolLegend,
   TakeoverLegend,
-} from './legends'
+} from './legendsLazy'
 import { EVENT_ICONS, EVENT_NAMES, ToastStack } from './toasts'
 import type { GameState, Replay } from '../engine'
 import { copyText, money, objectiveValue } from './format'
@@ -686,7 +688,7 @@ function AnimatedMoney({ value }: { value: number }) {
 function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   useEffect(() => {
     // Keep first paint light, then warm the quarter flow for offline play.
-    const warm = () => { void Promise.allSettled([loadCityPanel(), loadRouteDossier(), loadRouteSetupDialog(), loadAircraftDossier(), loadQuarterReview(), loadReportCard(), loadReportPanel(), loadRivalsPanel(), loadFinancePanel(), loadOperationsBoard(), loadCapitalOutlook(), import('./PassengerFlows')]) }
+    const warm = () => { void Promise.allSettled([loadManagementBrief(), loadRouteSetupDialog(), loadQuarterReview(), loadReportCard(), loadReportPanel(), loadRivalsPanel(), loadFinancePanel(), loadOperationsBoard(), loadCapitalOutlook(), import('./PassengerFlows')]) }
     const timer = window.setTimeout(warm, 500)
     window.addEventListener('online', warm)
     return () => { clearTimeout(timer); window.removeEventListener('online', warm) }
@@ -959,7 +961,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         )}
       {quietTurn===state.turn && <div className="quiet-result" role="status" data-testid="quiet-result"><strong>Quarter complete</strong><span>{money(player.history.at(-1)?.profit ?? 0)} profit · {money(player.cash)} cash</span><button onClick={()=>setShowReport(true)}>Read full report</button></div>}
       <div className="desk-columns"><div className="desk-priorities">
-      {state.phase === 'planning' && <ManagementBrief state={state} onTab={setTab} onAircraft={(id) => { setSelectedAircraft(id); setTab('fleet') }} onInspect={(id) => { setSelectedRoute(id); setTab('routes') }} onPlan={(from, to, preset) => setPendingRoute({ from, to, preset })} />}
+      {state.phase === 'planning' && <Suspense fallback={<section className="management-brief" role="status"><h2>Needs attention</h2><p>Preparing the desk…</p></section>}><ManagementBrief state={state} onTab={setTab} onAircraft={(id) => { setSelectedAircraft(id); setTab('fleet') }} onInspect={(id) => { setSelectedRoute(id); setTab('routes') }} onPlan={(from, to, preset) => setPendingRoute({ from, to, preset })} /></Suspense>}
       <OfferCard state={state} />
       </div><aside className="desk-agenda"><h2>Coming up</h2><DeskTimeline state={state} onTab={setTab} /><ActiveDeals state={state} />
       {state.world.events.length > 0 && (
@@ -1046,7 +1048,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         </aside>}
         {flowFocus && <div className="flow-focus-banner" data-testid="flow-focus"><strong>{flowFocus.label}</strong><button onClick={()=>setFlowFocus(null)}>Clear journey</button></div>}
         {tab === "map" && selectedCity !== null && (
-          <Suspense fallback={<aside className="city-panel" role="status">Loading city…</aside>}><CityPanel
+          <CityPanel
             state={state}
             cityId={selectedCity}
             onHighlight={highlightFlow}
@@ -1062,25 +1064,25 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
               setRouteFrom(null)
               requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-testid=tab-map]')?.focus({preventScroll:true}))
             }}
-          /></Suspense>
+          />
         )}
         {tab === "map" && inspectedRoute !== undefined && (
-          <Suspense fallback={<aside className="route-dossier" role="status">Loading route…</aside>}><RouteDossier
+          <RouteDossier
             state={state}
             routeId={inspectedRoute!.id}
             onClose={() => { setSelectedRoute(null); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-testid=tab-map]')?.focus({preventScroll:true})) }}
             onSelectRoute={setSelectedRoute}
             onHighlight={highlightFlow}
-          /></Suspense>
+          />
         )}
       </div>
 
         </section>
         {visited.has('routes') && <section className={`workspace-page route-page split-view${inspectedRoute !== undefined ? ' has-inspector' : ''}`} hidden={tab !== 'routes'} data-testid="page-routes">
           <div className="split-list"><div className="page-heading"><div><span className="eyebrow">Network</span><h2>Routes <span>{player.routes.length}</span></h2></div><span className="dim">Last quarter’s results</span></div><RoutesPanel state={state} selectedRouteId={selectedRoute} onInspect={inspectRoute} onPlan={(from, to, preset) => setPendingRoute({ from, to, preset })} onAirport={(city) => { setTab('map'); setSelectedCity(city); setSelectedRoute(null) }} /></div>
-          {tab === 'routes' && inspectedRoute !== undefined && <Suspense fallback={<aside className="route-dossier" role="status">Loading route…</aside>}><RouteDossier state={state} routeId={inspectedRoute!.id} onClose={closeRoute} onSelectRoute={setSelectedRoute} onHighlight={highlightFlow} /></Suspense>}
+          {tab === 'routes' && inspectedRoute !== undefined && <RouteDossier state={state} routeId={inspectedRoute!.id} onClose={closeRoute} onSelectRoute={setSelectedRoute} onHighlight={highlightFlow} />}
         </section>}
-        {visited.has('fleet') && <section className={`workspace-page fleet-page split-view${inspectedAircraft ? ' has-inspector' : ''}`} hidden={tab !== 'fleet'} data-testid="page-fleet"><div className="split-list"><FleetPanel state={state} selectedAircraftId={selectedAircraft} onInspect={setSelectedAircraft} /></div>{tab === 'fleet' && inspectedAircraft && <Suspense fallback={<aside className="aircraft-dossier" role="status">Loading aircraft…</aside>}><AircraftDossier state={state} aircraftId={inspectedAircraft.id} onClose={() => { setSelectedAircraft(null); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-testid="inspect-aircraft-${inspectedAircraft.id}"]`)?.focus({ preventScroll:true })) }} /></Suspense>}</section>}
+        {visited.has('fleet') && <section className={`workspace-page fleet-page split-view${inspectedAircraft ? ' has-inspector' : ''}`} hidden={tab !== 'fleet'} data-testid="page-fleet"><div className="split-list"><FleetPanel state={state} selectedAircraftId={selectedAircraft} onInspect={setSelectedAircraft} /></div>{tab === 'fleet' && inspectedAircraft && <AircraftDossier state={state} aircraftId={inspectedAircraft.id} onClose={() => { setSelectedAircraft(null); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-testid="inspect-aircraft-${inspectedAircraft.id}"]`)?.focus({ preventScroll:true })) }} />}</section>}
         {visited.has('orders') && <section className="workspace-page" hidden={tab !== 'orders'} data-testid="page-orders"><FleetPanel state={state} view="orders" /></section>}
         {visited.has('catalog') && <section className="workspace-page" hidden={tab !== 'catalog'} data-testid="page-catalog"><FleetPanel state={state} view="catalog" /></section>}
         {visited.has('airports') && <section className="workspace-page" hidden={tab !== 'airports'} data-testid="page-airports"><div className="page-heading"><h2>Airports</h2></div><AirportsPanel state={state} /></section>}

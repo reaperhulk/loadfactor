@@ -41,7 +41,9 @@ import {
   slotsUsed,
   yearOf,
 } from '../engine/queries'
-import { Shop } from './Shop'
+// The catalog's shop is lazy: it opens on a tab, never on first paint, and
+// has no focus behavior of its own.
+const Shop = lazy(() => import('./Shop').then((m) => ({ default: m.Shop })))
 import { assignAllIdle, assignAndSchedule, balancedScheduleCommands } from './assign'
 import { sortHeaderFactory } from './sortHeader'
 import { ConfirmButton } from './ConfirmButton'
@@ -53,7 +55,7 @@ import {
   ReliabilityLegend,
   ServiceLegend,
   SlotLegend,
-} from './legends'
+} from './legendsLazy'
 
 // Sort keys for the routes comparison table. Each computes from the same row
 // model the cells render, so what you sort is exactly what you see.
@@ -650,7 +652,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
               </tr>
             )
           })}</tbody></table></div>}</>}
-      {view === 'catalog' && <><ReliabilityLegend modern={!!player.operationsPolicy} /><Shop state={state} /></>}
+      {view === 'catalog' && <><ReliabilityLegend modern={!!player.operationsPolicy} /><Suspense fallback={<p role="status">Loading catalog…</p>}><Shop state={state} /></Suspense></>}
     </div>
   )
 }

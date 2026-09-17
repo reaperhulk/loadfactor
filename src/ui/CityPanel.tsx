@@ -6,7 +6,7 @@ const PassengerFlows = lazy(() => import('./PassengerFlows').then(m=>({default:m
 // presence, and slot negotiations. Opens when a city is clicked on the map.
 
 import { useMemo } from 'react'
-import { SeasonLegend } from './legends'
+import { SeasonLegend } from './legendsLazy'
 import { CITIES, distanceKm, getCity } from '../data/cities'
 import { SEASON_TOUR_BP_PER_POINT, SLOTS_PER_GRANT } from '../data/constants'
 import { getEventDef } from '../data/events'
