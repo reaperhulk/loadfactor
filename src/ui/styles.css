@@ -958,6 +958,19 @@ button.toast {
   pointer-events: none;
 }
 
+/* Unserved-demand lens: markets nobody flies yet, dashed so they never read
+   as a route that exists. */
+.route-opportunity {
+  stroke: #e8c46a;
+  stroke-width: var(--cap-w, 1);
+  stroke-dasharray: 6 5;
+  opacity: 0.7;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+}
+.map-data-legend .opportunity-key { color: #e8c46a; }
+
 .route-rival {
   stroke: #8a5470;
   stroke-width: var(--cap-w, 0.8);

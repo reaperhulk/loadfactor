@@ -628,7 +628,7 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
       </table></div></>
         )
       })()}
-      <CabinLegend />
+      <CabinLegend modern={(state.rulesVersion ?? 1) >= 5} />
       </>}
       {view === 'orders' && <>{player.orders.length === 0 ? <p className="hint">No aircraft on order. Choose an aircraft in the market to compare purchase and lease options.</p> : <div className="table-scroll"><table><thead><tr><th>Aircraft</th><th colSpan={5}>Delivery</th><th>Actions</th></tr></thead><tbody>          {player.orders.map((o) => {
             const refund = orderRefund(o), withdraw = canWithdrawOrder(o)

@@ -842,3 +842,63 @@ advice, outlook, calendar, repeated navigation and save/load on desktop/mobile
 and enlarged text. Optional device diagnostics retain 120 frame samples and
 stop when hidden. PERFORMANCE.md records matched rules-3 timing comparisons and
 the separate 108-career rules-4 strategy probe; bundle limits remain unchanged.
+
+### Rules 5: a race, a louder world, a cabin that is a product (September 2026)
+
+New careers use rules 5; rules 1–4 golden careers stay pinned in their own
+fixtures. Everything below is gated on `rulesVersion >= 5`.
+
+**The race.** Rival planning now expands before it assigns (an arriving
+airframe opens the next market instead of flooding the first), keeps any
+foothold with a pair richer than `RELEASE_KEEP_PAIR_SCORE` behind it, and
+takes an opening turn inside `newGame` so quarter one already shows three
+networks and three announced campaigns. A `raid` campaign names the leader's
+most profitable reachable market and the airport it still needs, runs eight
+quarters, queues there first, and opens the pair with an idle airframe or an
+order sized to it (discount fares; premium carriers raid with service). Price
+campaigns go to `PRICE_WAR_FARE_LEVEL`. Entrants arrive every four quarters
+capitalized at `ENTRANT_CAPITAL_LEADER_BP` of the leader's net worth, half of
+it as the era's median-seat type; a leader ahead of the runner-up by
+`DOMINANT_LEAD_MULT_BP` draws a state-backed carrier at
+`ENTRANT_BACKED_CAPITAL_BP`. Chapter 11 recapitalizes to
+`RESTRUCTURE_LEADER_BP` of the leader's worth. Measured on the Jet Age probe
+seed the leader's margin over the runner-up fell from 100× to about 20%, and
+the greedy bot loses some seeds it used to win.
+
+**The world.** Events draw at `EVENT_DRAW_CHANCE_BP_V5`; the deck gains
+`airport_works` and `currency_crisis` through a `fromRules` gate so legacy
+draws never move. A type's first quarter on sale emits `aircraft_introduced`
+and its seats carry `DEBUT_APPEAL_BP` for `DEBUT_APPEAL_QUARTERS`. Offers
+arrive every four quarters from seven kinds: the three classics plus
+`hub_strike` (settle, or a refused or ignored ballot cancels
+`STRIKE_CAPACITY_BP` of trips at the hub for one quarter — `strike_hit`
+reports it), `early_delivery` (list plus `EARLY_DELIVERY_PREMIUM_BP`, delivers
+next quarter), `fleet_sale` (a lot of used metal at `FLEET_SALE_PRICE_BP` of
+resale, decided this quarter or the richest rival that can pay takes it) and
+`route_rights` (two slots and `ROUTE_RIGHTS_QUARTERS` of exclusivity on one
+pair; `open_route` rejects other carriers there while it runs).
+
+**The forecast.** `src/ui/forecastRange.ts` (presentation only) brackets the
+point forecast with named drivers: half the demand noise spread plus one
+economy step on revenue, one fuel step on the unhedged fuel bill, the reversal
+of any event in its last quarter (world update precedes the market in §3.3),
+±15% of revenue on contested pairs, and −25% of revenue on pairs named by an
+active raid or price campaign. The HUD shows the range; the quarter review
+lists the drivers.
+
+**The cabin.** `CABIN_SEGMENT_APPEAL_BP` gives each passenger segment its own
+view of the fit (business 70/100/120, leisure 85/100/110, budget flat) and
+`CABIN_YIELD_BP_V5` prices dense seats at 92%. Before this, only business
+travellers saw the cabin and a dense fit was 15% free seats — the one build
+every doctrine converged on (+16% net worth alone, +27% with the budget
+posture on the lever probe). After it the standard fit leads and the spread
+across mainstream doctrines is about ±10%.
+
+**The map.** `cityTier` labels majors from mass 56 (about thirty cities at
+world view); the `demand` lens draws the twelve richest unflown markets from
+the player's network as dashed arcs weighted by unmet demand; rival arcs are
+legible at world view.
+
+Tests: `rivals.test.ts` (rules 5 block), `worldV5.test.ts`,
+`ui/__tests__/forecastRange.test.ts`; goldens regenerated for rules 5 with
+rules 4 pinned in `fixtures/legacy-v4-goldens.json`.

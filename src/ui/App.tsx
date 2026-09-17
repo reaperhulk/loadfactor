@@ -6,6 +6,7 @@ import type { ExpansionOption } from '../engine/expansion'
 import { useInbox } from './inbox'
 import { Celebration, useCelebration } from './Celebration'
 import { planningForecast } from './forecast'
+import { forecastRange } from './forecastRange'
 import { AREA_PAGES, PAGE_LABELS, areaFor, type WorkspaceArea, type WorkspacePage } from './workspace'
 import { DisplaySettings } from './DisplaySettings'
 import { Dialog } from './Dialog'
@@ -711,6 +712,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const [showHelp, setShowHelp] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const forecast = planningForecast(state, seat)
+  const range = forecastRange(state, seat, forecast)
   const attentionCount = useInbox(state, seat, forecast.cashAfter, tab === 'desk')
   const highlightFlow = (focus: FlowFocus) => { setFlowFocus(focus); setSelectedCity(null); setSelectedRoute(null); setTab('map') }
   const handleCityClick = (cityId: string): void => {
@@ -785,7 +787,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       <button className="inbox-button" data-testid="open-inbox" aria-label={attentionCount ? `Inbox, ${attentionCount} unseen items` : 'Inbox'} title="New items since your last Desk visit. Opening the Desk marks them as seen." onClick={() => setTab('desk')}><Icon name="inbox" /><span>Inbox</span>{attentionCount > 0 && <b aria-label={`${attentionCount} unseen items`}>{attentionCount}</b>}</button>
       <button className="settings-button" data-testid="open-settings" aria-label="Open settings" onClick={() => setShowSettings(true)}><Icon name="settings" /></button>
     </header>
-    <div className="turn-actions" data-testid="turn-actions"><span className="mobile-profit"><small>Planned net profit</small><strong className={forecast.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.profit)}</strong></span>
+    <div className="turn-actions" data-testid="turn-actions"><span className="mobile-profit"><small>Planned net profit</small><strong className={forecast.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.profit)}</strong>{range.low !== range.high && <small className="hud-range">{money(range.low)} to {money(range.high)}</small>}</span>
         {state.phase === 'planning' &&
           (() => {
             const sess = getSession()!
@@ -861,7 +863,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     </div>
     <section className="status-bar" aria-label="Airline status" data-testid="status-bar">
       <span className="hud-stat hud-figure" data-label="Cash now" data-testid="cash"><AnimatedMoney value={player.cash} /></span>
-      <span className={`hud-stat hud-figure planned-profit ${forecast.profit >= 0 ? 'pos' : 'neg'}`} data-label="Planned net profit / q" data-testid="planned-profit">{money(forecast.profit)}</span>
+      <span className={`hud-stat hud-figure planned-profit ${forecast.profit >= 0 ? 'pos' : 'neg'}`} data-label="Planned net profit / q" data-testid="planned-profit" title={`Likely ${money(range.low)} to ${money(range.high)} — ${range.drivers.map((d) => d.label).join('; ') || 'nothing in play'}`}>{money(forecast.profit)}{range.low !== range.high && <span className="hud-range" data-testid="planned-range">{money(range.low)} to {money(range.high)}</span>}</span>
       <button className="hud-stat hud-figure planned-cash" data-label="Planned ending cash" onClick={() => setShowReview(true)}>{money(forecast.cashAfter)}</button>
         <span className="hud-stat hud-figure hud-objective" data-label="Objective" data-testid="networth">
           {scenario.objective.kind === 'netWorth' ? (
@@ -1136,7 +1138,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
               <ReliabilityLegend />
               <RivalryLegend />
               <TakeoverLegend />
-              <CabinLegend />
+              <CabinLegend modern={(state.rulesVersion ?? 1) >= 5} />
               <ServiceLegend />
             </div>
             <h2>Shortcuts</h2>

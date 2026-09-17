@@ -9,7 +9,8 @@ import type { MouseEvent as ReactMouseEvent, PointerEvent } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { getEventDef } from '../data/events'
-import { seasonalBp } from '../engine/market'
+import { pairWeeklyDemand, seasonalBp } from '../engine/market'
+import { MIN_ROUTE_KM } from '../data/constants'
 import { Icon } from './Icon'
 import { loadGlobeGeometry, type GlobeGeometry } from './globeGeometry'
 import { aircraftGlyph } from './AircraftArt'
@@ -34,7 +35,9 @@ import {
   isGrounded,
   operatingFleet,
   networkCities,
+  pairWeeklySeats,
   routeWeeklyCapacity,
+  slotCities,
   slotsAllocated,
   slotsHeld,
   yearOf,
@@ -48,8 +51,8 @@ import { viewSeat } from './session'
 // property so hover/transition rules still win.
 function capWidth(airline: Airline, route: Route, thin: boolean, turn: number): number {
   const cap = routeWeeklyCapacity(airline, route, turn)
-  const w = (thin ? 0.4 : 0.7) + Math.sqrt(cap) / (thin ? 90 : 40)
-  return Math.min(thin ? 1.4 : 4, Math.max(thin ? 0.4 : 0.9, w))
+  const w = (thin ? 0.6 : 0.7) + Math.sqrt(cap) / (thin ? 90 : 40)
+  return Math.min(thin ? 1.6 : 4, Math.max(thin ? 0.7 : 0.9, w))
 }
 
 function slotsUsedAt(routes: readonly Route[], city: string): number {
@@ -1020,14 +1023,14 @@ export function MapView({
   }
   // Data lens: recolor your arcs by an operational metric so the network's
   // health reads at a glance.
-  const [lens, setLens] = useState<'none' | 'load' | 'profit' | 'season'>('none')
+  const [lens, setLens] = useState<'none' | 'load' | 'profit' | 'season' | 'demand'>('none')
   const lensClass = (r: Route): string => {
     if (lens === 'season') {
       // The calendar's lean on this pair right now (tourism seasonality).
       const bp = Math.floor((seasonalBp(r.from, state.turn) * seasonalBp(r.to, state.turn)) / 10000)
       return bp > 10100 ? ' lens-good' : bp < 9900 ? ' lens-bad' : ''
     }
-    if (lens === 'none' || r.lastCapacity === 0) return ''
+    if (lens === 'none' || lens === 'demand' || r.lastCapacity === 0) return ''
     if (lens === 'load') {
       return r.lastLoadFactorBp >= 8000 ? ' lens-good' : r.lastLoadFactorBp >= 5500 ? ' lens-mid' : ' lens-bad'
     }
@@ -1068,6 +1071,51 @@ export function MapView({
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, seat, showRivals, isGlobe, globe, projKey])
+
+  // Demand lens: the richest markets nobody is flying from the player's own
+  // network — the map as a spatial puzzle, not a list. Faint arcs, thicker
+  // where more weekly demand goes unmet by everyone's seats combined.
+  const opportunities = useMemo(() => {
+    if (lens !== 'demand') return []
+    const anchors = [...new Set([...networkCities(player), ...slotCities(player)])].sort()
+    const served = new Set(player.routes.map((r) => pairKey(r.from, r.to)))
+    const seen = new Set<string>()
+    const out: { from: string; to: string; demand: number; score: number }[] = []
+    for (const a of anchors) {
+      for (const c of CITIES) {
+        if (c.id === a) continue
+        const key = pairKey(a, c.id)
+        if (served.has(key) || seen.has(key)) continue
+        seen.add(key)
+        if (distanceKm(a, c.id) < MIN_ROUTE_KM) continue
+        const demand = pairWeeklyDemand(state, a, c.id)
+        const score = demand - pairWeeklySeats(state, a, c.id)
+        if (score <= 0) continue
+        out.push({ from: a < c.id ? a : c.id, to: a < c.id ? c.id : a, demand, score })
+      }
+    }
+    return out.sort((x, y) => y.score - x.score || `${x.from}-${x.to}`.localeCompare(`${y.from}-${y.to}`)).slice(0, 12)
+  }, [state, player, lens])
+  const opportunityArcsLayer = useMemo(() => {
+    if (opportunities.length === 0) return null
+    const top = opportunities[0]!.score
+    return opportunities.map((o) => {
+      const d = routePathFor(o.from, o.to)
+      if (d === '') return null
+      return (
+        <path
+          key={`opp-${o.from}-${o.to}`}
+          d={d}
+          className="route-opportunity"
+          data-testid={`opportunity-${o.from}-${o.to}`}
+          style={{ '--cap-w': 0.7 + (2.6 * o.score) / Math.max(1, top) } as React.CSSProperties}
+        >
+          <title>{`${o.from}–${o.to}: ${o.demand.toLocaleString('en-US')} pax/wk demand, ${o.score.toLocaleString('en-US')} unmet`}</title>
+        </path>
+      )
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opportunities, isGlobe, globe, projKey])
 
   const playerArcsLayer = useMemo(() => {
     return player.routes.map((r) => {
@@ -1778,6 +1826,7 @@ export function MapView({
           {/* Rival networks, thin and color-coded per airline, under the
               player's arcs. Toggleable for decluttering. */}
           {rivalArcsLayer}
+          {opportunityArcsLayer}
           {playerArcsLayer}
           {/* Constant traffic: planes shuttle back and forth on every served
               route — more of them the busier the schedule, and long-haul takes
@@ -2041,9 +2090,12 @@ export function MapView({
       </div>}
       <div className="map-data-control">
         <label>Map colors <select aria-label="map colors" value={lens} onChange={(e) => setLens(e.target.value as typeof lens)}>
-          <option value="none">Ownership</option><option value="load">Load factor</option><option value="profit">Route margin</option><option value="season">Season</option>
+          <option value="none">Ownership</option><option value="load">Load factor</option><option value="profit">Route margin</option><option value="season">Season</option><option value="demand">Unserved demand</option>
         </select></label>
-        {lens !== 'none' && <span className="map-data-legend" data-testid="map-data-legend">
+        {lens === 'demand' && <span className="map-data-legend" data-testid="map-data-legend">
+          <span className="opportunity-key">┅┅ {opportunities.length > 0 ? `${opportunities.length} richest unflown markets from your network — thicker is more unmet demand` : 'No unflown market reachable from your network'}</span>
+        </span>}
+        {lens !== 'none' && lens !== 'demand' && <span className="map-data-legend" data-testid="map-data-legend">
           <span className="pos">━━ {lens === 'load' ? '≥80%' : lens === 'profit' ? '≥15%' : 'High season'}</span>
           <span>┄┄ {lens === 'load' ? '55–79%' : lens === 'profit' ? '0–14%' : 'Neutral'}</span>
           <span className="neg">···· {lens === 'load' ? '<55%' : lens === 'profit' ? 'Loss' : 'Low season'}</span>

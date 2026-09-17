@@ -15,5 +15,8 @@ export function rivalColorClass(airlineId: number): string {
 // fields only up close — plus anything the player has a stake in.
 export function cityTier(city: City): 1 | 2 | 3 {
   const mass = cityMass(city)
-  return mass >= 62 ? 1 : mass >= 45 ? 2 : 3
+  // Majors are labeled at world view: the bar sits where the map still reads
+  // as a world of named places (about thirty labels) rather than ten capitals
+  // and a hundred anonymous dots.
+  return mass >= 56 ? 1 : mass >= 40 ? 2 : 3
 }

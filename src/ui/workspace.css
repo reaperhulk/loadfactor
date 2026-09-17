@@ -85,6 +85,13 @@ main.game-shell {
 .review-profit { margin:16px 0; }
 .review-profit small { display:block; font-size:.8rem; color:var(--dim); }
 .review-profit strong { display:block; font-size:2rem; font-weight:550; font-variant-numeric:tabular-nums; }
+.review-range { display:block; font-size:.85rem; color:var(--dim); font-variant-numeric:tabular-nums; }
+.review-drivers h3 { font-size:1rem; margin:14px 0 6px; }
+.review-drivers ul { list-style:none; margin:0; padding:0; }
+.review-drivers li { display:flex; justify-content:space-between; gap:16px; padding:6px 0; border-bottom:1px solid var(--rule); font-size:.85rem; }
+.review-drivers .driver-swing { white-space:nowrap; font-variant-numeric:tabular-nums; }
+.hud-range { display:block; font-size:.68rem; font-weight:400; color:var(--dim); font-variant-numeric:tabular-nums; }
+.mobile-profit .hud-range { display:inline; margin-left:6px; }
 .cash-bridge { margin:0; }
 .cash-bridge > div { display:flex; justify-content:space-between; gap:16px; padding:9px 0; border-bottom:1px solid var(--rule); font-size:.87rem; }
 .cash-bridge dd { margin:0; white-space:nowrap; font-variant-numeric:tabular-nums; }
@@ -254,7 +261,7 @@ main.game-shell { --bg:#10232c; --panel:#19333e; --ink:#ede9de; --dim:#a4b4b9; -
 .game-shell .coach { font-size:.78rem; border:0; border-top:1px solid var(--rule); border-radius:0; background:transparent; }
 .game-shell .route-selected { stroke:#f6ebcc; stroke-width:3.4px; opacity:1; }
 .game-shell .map-wrap:has(.route-selected) .route-player:not(.route-selected) { opacity:.32; }
-.game-shell .route-rival { opacity:.25; }
+.game-shell .route-rival { opacity:.5; }
 .game-shell .map-data-control { border-color:var(--rule); background:#102b3eeb; border-radius:4px; }
 .game-shell .map-data-control label { font-size:.72rem; }
 .game-shell .map-data-control select { font-size:.76rem; min-height:32px; }

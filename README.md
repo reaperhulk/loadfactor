@@ -9,7 +9,7 @@ through fuel shocks, recessions and changing aviation eras.
 The simulation is deterministic and runs without a browser. A career records its
 scenario, seed, rules/content versions and commands. Saves, replays, multiplayer
 turn links, bot playtesting and golden tests all use that same record. Existing
-unversioned careers keep their original rules; new careers use rules 4. Rules 1, 2 and 3 retain their original deterministic behavior. Rules-2 solo careers can opt into improved operations in Fleet policy.
+unversioned careers keep their original rules; new careers use rules 5. Rules 1, 2, 3 and 4 retain their original deterministic behavior. Rules-2 solo careers can opt into improved operations in Fleet policy.
 
 ## Playing
 
@@ -53,6 +53,31 @@ npm run dev     # http://localhost:5173
   an airframe between two routes, keep standby cover and book preventive
   maintenance. Repairs now remove hours or days, with reserve hours and compatible standby aircraft covering disrupted flights. Book 7–10-day checks, choose reserve hours and optional paid recovery in Fleet policy and aircraft details. Fleet commonality changes upkeep. Replacement plans preview costs
   and keep the old aircraft working until its successor arrives.
+- **Race a field that fights back.** Rules-5 rivals are already flying when you
+  arrive, open new markets as their fleets grow, keep the footholds their
+  networks can use, and raid your most profitable route: a raid names the pair
+  and the airport it still needs a quarter ahead, then queues there and opens
+  it at a discount. A rival that stumbles is recapitalized against the field,
+  an empty seat draws an entrant sized to the leader, and a dominant leader
+  draws a state-backed carrier. Price wars go to the fare floor.
+- **Answer the world.** Every four quarters something asks a question: settle a
+  ground-crew strike or lose a quarter of flights at your hub, buy a production
+  slot that delivers next quarter, take a liquidation lot of used aircraft
+  before your strongest rival does, or sign bilateral rights that keep rivals
+  off one pair for two years. World events land about twice as often, runway
+  works and currency crises join the deck, and every new aircraft type is
+  announced on the day it goes on sale: its seats carry extra appeal for its
+  first two years.
+- **Know what could move the number.** The planned profit shows a likely range
+  beside the point forecast: one step of the fuel and demand walks, events
+  ending before the quarter flies, rivals on your pairs and announced campaigns
+  aimed at your markets, each named in the quarter review.
+- **Choose a cabin, not a seat count.** Under rules 5 a high-density fit sells
+  cheaper seats and loses the business and leisure travellers who notice; a
+  premium fit wins them. Every fit earns about the same at full loads.
+- **See the world at once.** Thirty major cities are labeled at world view, and
+  the map's "Unserved demand" lens draws the richest markets nobody flies from
+  your network, thicker where more demand goes unmet.
 - **Read the competition.** Rivals announce sustained campaigns that respond to
   cash pressure, repeated losses and contested markets. Dossiers distinguish
   observed evidence from announced intent. Customer preference grows gradually
