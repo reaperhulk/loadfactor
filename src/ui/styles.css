@@ -847,9 +847,17 @@ html.map-gesture * {
 }
 .globe-limb {
   fill: none;
-  stroke: #35415d;
-  stroke-width: 1.2;
+  stroke: #4c6591;
+  stroke-opacity: 0.7;
+  stroke-width: 1;
   vector-effect: non-scaling-stroke;
+}
+
+/* The atmosphere halo is a gradient-filled circle over the limb (see the
+   globeAtmosphere gradient in MapView). It reads the same at any zoom: the
+   band is a fraction of the radius, not a fixed pixel width. */
+.globe-atmosphere {
+  mix-blend-mode: screen;
 }
 
 /* Toasts are buttons now (click to dismiss) — keep their toast look. */

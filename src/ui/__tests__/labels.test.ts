@@ -183,3 +183,14 @@ describe('placeLabels', () => {
     expect(placeLabels([{ id: 'Y', x: 300, y: 300, r: 2, w: 20, optional: true }], 9, 3)).toHaveLength(1)
   })
 })
+
+describe('spreadLabels', () => {
+  it('pushes close labels apart, keeps order, and stays inside the band', async () => {
+    const { spreadLabels } = await import('../Sparkline')
+    expect(spreadLabels([50, 52, 30], 8, 118, 9)).toEqual([50, 59, 30])
+    // Crowded at the bottom: the stack closes upward from the edge.
+    expect(spreadLabels([117, 118, 116], 8, 118, 9)).toEqual([109, 118, 100])
+    // A series without a line is left alone.
+    expect(spreadLabels([40, Number.NaN, 41], 8, 118, 9)).toEqual([40, Number.NaN, 49])
+  })
+})

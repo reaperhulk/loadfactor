@@ -419,7 +419,9 @@ main.game-shell { --bg:#10232c; --panel:#19333e; --ink:#ede9de; --dim:#a4b4b9; -
 .fleet-calendar td { padding:0; }
 .fleet-calendar td button { min-width:62px; min-height:58px; width:100%; padding:5px; background:var(--panel); }
 /* Collapsed rows: one span per unchanged run of weeks, a third the height. */
-.fleet-calendar tr:not(.calendar-open) td button { min-height:34px; padding:3px 5px; display:flex; align-items:baseline; justify-content:center; gap:6px; }
+/* Left-aligned: a centred label in a 13-column span sat off screen on any
+   viewport narrow enough to scroll the calendar sideways. */
+.fleet-calendar tr:not(.calendar-open) td button { min-height:34px; padding:3px 10px; display:flex; align-items:baseline; justify-content:flex-start; gap:6px; }
 .fleet-calendar tr:not(.calendar-open) td button small { display:inline; }
 .fleet-calendar tr.calendar-open th { background:var(--panel); }
 .fleet-calendar th button[aria-expanded=true] { color:var(--accent); }

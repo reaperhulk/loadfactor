@@ -1791,6 +1791,18 @@ export function MapView({
                   <stop offset=".5" stopColor="#06121e" stopOpacity="0" />
                   <stop offset="1" stopColor="#030b15" stopOpacity=".65" />
                 </radialGradient>
+                {/* Atmosphere: a thin band of scattered blue that peaks just
+                    outside the limb and fades both ways — a faint rim-light
+                    on the terrain's edge and a soft halo into space. The
+                    gradient is relative to the halo circle (1.12R), so the
+                    limb sits at 1/1.12 ≈ 0.893 of it. */}
+                <radialGradient id="globeAtmosphere" cx="50%" cy="50%" r="50%">
+                  <stop offset=".80" stopColor="#8fc4ff" stopOpacity="0" />
+                  <stop offset=".875" stopColor="#8fc4ff" stopOpacity=".14" />
+                  <stop offset=".895" stopColor="#b9dcff" stopOpacity=".42" />
+                  <stop offset=".93" stopColor="#6aa8f0" stopOpacity=".16" />
+                  <stop offset="1" stopColor="#4a86d8" stopOpacity="0" />
+                </radialGradient>
               </defs>
               <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} fill="url(#globeShade)" className="globe-disc" />
               <path d={globeGraticule(globe)} className="graticule" />
@@ -1821,6 +1833,7 @@ export function MapView({
                 )
               })}
               <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} fill="url(#globeLighting)" pointerEvents="none" />
+              <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s * 1.12} fill="url(#globeAtmosphere)" className="globe-atmosphere" data-testid="globe-atmosphere" pointerEvents="none" />
               <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} className="globe-limb" />
             </>
           ) : (

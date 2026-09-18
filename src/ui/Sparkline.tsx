@@ -25,6 +25,22 @@ function path(points: readonly number[], w: number, h: number, lo: number, hi: n
     .join('')
 }
 
+// Nudge a set of label baselines apart by at least `gap`, inside [top, bottom],
+// keeping their order. NaN entries (series with no line) pass through.
+export function spreadLabels(ys: readonly number[], top: number, bottom: number, gap: number): number[] {
+  const order = ys.map((y, i) => ({ y, i })).filter((e) => !Number.isNaN(e.y)).sort((a, b) => a.y - b.y)
+  const placed = order.map((e) => Math.max(top, Math.min(bottom, e.y)))
+  for (let k = 1; k < placed.length; k++) placed[k] = Math.max(placed[k]!, placed[k - 1]! + gap)
+  // Ran off the bottom: walk back up, closing from the last label.
+  for (let k = placed.length - 1; k >= 0; k--) {
+    const limit = k === placed.length - 1 ? bottom : placed[k + 1]! - gap
+    if (placed[k]! > limit) placed[k] = limit
+  }
+  const out = [...ys]
+  order.forEach((e, k) => { out[e.i] = placed[k]! })
+  return out
+}
+
 export function Sparkline({ points, width = 120, height = 28, className, min, max }: SparklineProps) {
   if (points.length < 2) return <span className="dim">—</span>
   const lo = min ?? Math.min(...points)
@@ -68,6 +84,14 @@ export function RaceChart({
   const yFor = (v: number) => height - ((v - lo) / span) * (height - 2) - 1
   const gridLines = [0.25, 0.5, 0.75].map((f) => ({ v: lo + span * f, y: yFor(lo + span * f) }))
   const plotW = width - 56 // reserve a gutter for end labels
+  // End labels sit where each line ends, then get pushed apart so two
+  // airlines finishing neck and neck do not overprint into one smudge.
+  const endLabelY = spreadLabels(
+    series.map((s) => (s.points.length >= 2 ? yFor(s.points[s.points.length - 1]!) + 3 : Number.NaN)),
+    8,
+    height - 2,
+    9,
+  )
   const plotX0 = 40 // and one on the left for the scale, clear of the line starts
   return (
     <svg
@@ -113,15 +137,11 @@ export function RaceChart({
           )
         })}
       </g>
-      {series.map((s) =>
+      {series.map((s, i) =>
         s.points.length >= 2 ? (
           <g key={s.label}>
             <path d={path(s.points, plotW, height, lo, hi, plotX0)} fill="none" className={s.className} />
-            <text
-              x={plotW + 3}
-              y={Math.max(8, Math.min(height - 2, yFor(s.points[s.points.length - 1]!) + 3))}
-              className={`chart-end-label ${s.className}`}
-            >
+            <text x={plotW + 3} y={endLabelY[i]} className={`chart-end-label ${s.className}`}>
               {format(Math.round(s.points[s.points.length - 1]!))}
             </text>
           </g>
