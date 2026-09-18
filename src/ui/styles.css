@@ -226,7 +226,10 @@ button .icon {
   margin-right: 0.25em;
 }
 
-.map-controls button .icon,
+.map-controls button .icon {
+  margin-right: 0;
+}
+
 .end-quarter {
   margin-left: auto;
   background: var(--accent);
@@ -494,6 +497,14 @@ html.map-gesture * {
 .icon-btn {
   font-family: 'Segoe UI Symbol', 'Noto Sans Symbols 2', system-ui, sans-serif;
   text-indent: 0;
+}
+
+/* The two toggles (globe, rival networks) show their state; the three
+   view actions above them do not toggle anything. */
+.map-controls button.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: #1d2f4ae6;
 }
 
 /* Narrow screens: the control column would outgrow the short map and blanket

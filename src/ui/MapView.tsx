@@ -2103,6 +2103,7 @@ export function MapView({
         <button
           data-testid="zoom-in"
           aria-label="zoom in"
+          title="zoom in"
           onClick={() =>
             isGlobe
               ? applyGlobe({ ...globeTarget.current, s: globeTarget.current.s * 1.5 }, false)
@@ -2114,6 +2115,7 @@ export function MapView({
         <button
           data-testid="zoom-out"
           aria-label="zoom out"
+          title="zoom out"
           onClick={() =>
             isGlobe
               ? applyGlobe({ ...globeTarget.current, s: globeTarget.current.s / 1.5 }, false)
@@ -2125,6 +2127,7 @@ export function MapView({
         <button
           data-testid="zoom-reset"
           aria-label="reset zoom"
+          title="reset the view"
           onClick={() => (isGlobe ? applyGlobe(GLOBE_HOME, false) : applyView(homeView(), false))}
         >
           <Icon name="reset" />
@@ -2133,7 +2136,7 @@ export function MapView({
           data-testid="map-projection"
           aria-label={projection === 'globe' ? 'switch to flat map' : 'switch to globe'}
           aria-busy={globeLoading}
-          title={isGlobe ? 'flat map' : 'globe'}
+          title={isGlobe ? 'switch to flat map' : 'switch to globe'}
           className={isGlobe ? 'active' : ''}
           onClick={() => {
             const next = projection === 'globe' ? 'flat' : 'globe'
@@ -2146,6 +2149,7 @@ export function MapView({
         <button
           data-testid="toggle-rivals"
           aria-label={showRivals ? 'hide rival networks' : 'show rival networks'}
+          title={showRivals ? 'hide rival networks' : 'show rival networks'}
           className={showRivals ? 'active' : ''}
           onClick={() => setShowRivals((v) => !v)}
         >
