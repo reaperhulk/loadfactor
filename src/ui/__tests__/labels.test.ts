@@ -166,4 +166,20 @@ describe('placeLabels', () => {
       placeLabels(sites, 9, 3, Number.POSITIVE_INFINITY),
     )
   })
+
+  it('drops an optional label that finds no free slot, and keeps a required one', () => {
+    // Four labels boxed in around one marker leave no slot for a fifth.
+    const ring: LabelSite[] = [
+      { id: 'E', x: 100, y: 100, r: 2, w: 20 },
+      { id: 'W', x: 100, y: 100, r: 2, w: 20 },
+      { id: 'N', x: 100, y: 100, r: 2, w: 20 },
+      { id: 'S', x: 100, y: 100, r: 2, w: 20 },
+    ]
+    const required = placeLabels([...ring, { id: 'X', x: 100, y: 100, r: 2, w: 20 }], 9, 3)
+    expect(required.map((p) => p.id)).toEqual(['E', 'W', 'N', 'S', 'X'])
+    const optional = placeLabels([...ring, { id: 'X', x: 100, y: 100, r: 2, w: 20, optional: true }], 9, 3)
+    expect(optional.map((p) => p.id)).toEqual(['E', 'W', 'N', 'S'])
+    // With room to spare an optional label is placed like any other.
+    expect(placeLabels([{ id: 'Y', x: 300, y: 300, r: 2, w: 20, optional: true }], 9, 3)).toHaveLength(1)
+  })
 })

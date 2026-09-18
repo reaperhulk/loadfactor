@@ -42,6 +42,10 @@ export interface LabelSite {
   y: number
   r: number // marker radius, so the label clears the dot
   w: number // rendered width of the label
+  // An optional label is dropped rather than shingled when no slot is free:
+  // a cluster of network cities at world view keeps its majors named and
+  // lets the rest wait for the zoom that gives them room.
+  optional?: boolean
 }
 
 export interface LabelPlacement {
@@ -146,13 +150,16 @@ export function placeLabels(
       { x: site.x, y: site.y + site.r + fs, anchor: 'middle' },
     ]
     let pick = spots[0]!
+    let fit = false
     for (const spot of spots) {
       const x1 = leftEdge(spot.x, site.w, spot.anchor)
       if (!clashes({ x1, y1: spot.y - fs, x2: x1 + site.w, y2: spot.y })) {
         pick = spot
+        fit = true
         break
       }
     }
+    if (!fit && site.optional === true) continue
     const px1 = leftEdge(pick.x, site.w, pick.anchor)
     keep({ x1: px1, y1: pick.y - fs, x2: px1 + site.w, y2: pick.y })
     out.push({ id: site.id, x: pick.x, y: pick.y, anchor: pick.anchor })

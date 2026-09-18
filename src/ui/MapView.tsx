@@ -1127,6 +1127,10 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, isGlobe, globe, projKey])
 
+  // A selected city pulls its own arcs forward: the rest of the network drops
+  // to context so the hub's spokes read at a glance. A selected route or a
+  // flow highlight already does its own focusing and takes precedence.
+  const cityFocus = selectedRouteId === undefined && !flowRouteIds?.length && selected !== null && player.routes.some((r) => r.from === selected || r.to === selected) ? selected : null
   const playerArcsLayer = useMemo(() => {
     return player.routes.map((r) => {
       const km = distanceKm(r.from, r.to)
@@ -1150,7 +1154,7 @@ export function MapView({
             d={d}
             pathLength={1}
             data-acquired={isAcquired || undefined}
-            className={`route-player ${haulClass(km)}${r.id === selectedRouteId || flowRouteIds?.includes(r.id) ? ' route-selected' : flowRouteIds?.length ? ' route-context' : ''}${isNew ? ' route-new' : ''}${isAcquired ? ' route-acquired' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
+            className={`route-player ${haulClass(km)}${r.id === selectedRouteId || flowRouteIds?.includes(r.id) ? ' route-selected' : flowRouteIds?.length ? ' route-context' : cityFocus !== null && r.from !== cityFocus && r.to !== cityFocus ? ' route-context' : ''}${isNew ? ' route-new' : ''}${isAcquired ? ' route-acquired' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
             style={
               {
                 '--cap-w': capWidth(player, r, false, state.turn),
@@ -1176,7 +1180,7 @@ export function MapView({
       )
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, seat, isGlobe, globe, projKey, newRouteIds, acquiredRouteIds, lens, pulseUi, onRouteClick, selectedRouteId, flowRouteIds])
+  }, [state, seat, isGlobe, globe, projKey, newRouteIds, acquiredRouteIds, lens, pulseUi, onRouteClick, selectedRouteId, flowRouteIds, cityFocus])
 
   // Constant traffic: planes shuttle back and forth on every served route —
   // more of them the busier the schedule, and long-haul takes visibly longer
@@ -2054,6 +2058,10 @@ export function MapView({
                 y: p.Y,
                 r: dotRadius(c),
                 w: c.id.length * fs * 0.66,
+                // A major, the HQ or the selected city is always named, even
+                // shingled; anything else yields when a cluster of network
+                // cities (JFK/PHL/DCA at world view) leaves it no room.
+                optional: cityTier(c) !== 1 && c.id !== player.hq && c.id !== selected,
               }))
             return placeLabels(sites, fs, gap).map((l) => (
               <text
