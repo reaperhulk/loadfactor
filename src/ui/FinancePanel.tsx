@@ -172,9 +172,9 @@ export function FinancePanel({ state }: { state: GameState }) {
   }
   return (
     <div className="finance-page">
-      <CustomerIdentity airline={player} />
       <div className="page-heading"><h2>Finance</h2><span className="dim">Company totals</span></div>
       <dl className="company-summary"><div><dt>Cash now</dt><dd>{money(player.cash)}</dd></div><div><dt>Last quarter · net profit</dt><dd>{last ? money(last.profit) : 'Not flown yet'}</dd></div><div><dt>Next quarter · planned profit</dt><dd className={plan.profit >= 0 ? 'pos':'neg'}>{money(plan.profit)}</dd></div><div><dt>Next quarter · ending cash</dt><dd>{money(plan.cashAfter)}</dd></div></dl>
+      <CustomerIdentity airline={player} />
       {u && (
         <div data-testid="unit-economics">
           <h3>Unit economics — last quarter</h3>

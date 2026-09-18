@@ -13,12 +13,12 @@ interface SparklineProps {
   max?: number
 }
 
-function path(points: readonly number[], w: number, h: number, lo: number, hi: number): string {
+function path(points: readonly number[], w: number, h: number, lo: number, hi: number, x0 = 0): string {
   const span = hi - lo || 1
-  const step = points.length > 1 ? w / (points.length - 1) : 0
+  const step = points.length > 1 ? (w - x0) / (points.length - 1) : 0
   return points
     .map((p, i) => {
-      const px = (i * step).toFixed(1)
+      const px = (x0 + i * step).toFixed(1)
       const py = (h - ((p - lo) / span) * (h - 2) - 1).toFixed(1)
       return `${i === 0 ? 'M' : 'L'}${px},${py}`
     })
@@ -68,6 +68,7 @@ export function RaceChart({
   const yFor = (v: number) => height - ((v - lo) / span) * (height - 2) - 1
   const gridLines = [0.25, 0.5, 0.75].map((f) => ({ v: lo + span * f, y: yFor(lo + span * f) }))
   const plotW = width - 56 // reserve a gutter for end labels
+  const plotX0 = 40 // and one on the left for the scale, clear of the line starts
   return (
     <svg
       width="100%"
@@ -78,7 +79,7 @@ export function RaceChart({
     >
       {gridLines.map((g) => (
         <g key={g.y}>
-          <line x1={0} x2={plotW} y1={g.y} y2={g.y} className="chart-grid" />
+          <line x1={plotX0} x2={plotW} y1={g.y} y2={g.y} className="chart-grid" />
           <text x={2} y={g.y - 2} className="chart-grid-label">
             {format(Math.round(g.v))}
           </text>
@@ -86,8 +87,8 @@ export function RaceChart({
       ))}
       {target && (
         <g data-testid="race-target">
-          <line x1={0} x2={plotW} y1={yFor(target.v)} y2={yFor(target.v)} className="race-target-line" />
-          <text x={2} y={Math.max(8, yFor(target.v) - 3)} className="race-target-label">
+          <line x1={plotX0} x2={plotW} y1={yFor(target.v)} y2={yFor(target.v)} className="race-target-line" />
+          <text x={plotX0 + 2} y={Math.max(8, yFor(target.v) - 3)} className="race-target-label">
             {target.label} {format(Math.round(target.v))}
           </text>
         </g>
@@ -95,14 +96,14 @@ export function RaceChart({
       {/* A time axis. The chart had a y-scale but nothing saying the x was
           quarters at all, so a rising line carried no sense of HOW LONG. */}
       <g className="chart-axis">
-        <line x1={0} x2={plotW} y1={height - 0.5} y2={height - 0.5} />
+        <line x1={plotX0} x2={plotW} y1={height - 0.5} y2={height - 0.5} />
         {[0, 0.5, 1].map((f) => {
           const q = Math.max(1, Math.round(f * (all.length / series.length || 1)))
-          const qx = f * plotW
+          const qx = plotX0 + f * (plotW - plotX0)
           return (
             <text
               key={f}
-              x={Math.min(plotW - 12, Math.max(2, qx))}
+              x={Math.min(plotW - 12, Math.max(plotX0, qx))}
               y={height - 3}
               className="chart-axis-label"
               textAnchor={f === 0 ? 'start' : f === 1 ? 'end' : 'middle'}
@@ -115,7 +116,7 @@ export function RaceChart({
       {series.map((s) =>
         s.points.length >= 2 ? (
           <g key={s.label}>
-            <path d={path(s.points, plotW, height, lo, hi)} fill="none" className={s.className} />
+            <path d={path(s.points, plotW, height, lo, hi, plotX0)} fill="none" className={s.className} />
             <text
               x={plotW + 3}
               y={Math.max(8, Math.min(height - 2, yFor(s.points[s.points.length - 1]!) + 3))}

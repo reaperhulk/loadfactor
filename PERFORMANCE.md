@@ -48,6 +48,41 @@ Twenty-eight pinned careers cover current and legacy rules. Independent cached
 versus uncached checks include service/fare/frequency changes, route replacement,
 closures, unassigned aircraft, adverse operations, and cache eviction.
 
+## Map rendering: the idle cost
+
+Measured on a rules-5 65-quarter greedy career (43 routes, 80 aircraft) in
+headless Chromium at 1440×900, as main-thread task time per second while the
+map sits untouched, with the CDP `Performance` metrics. Before the September
+2026 rendering pass the planes were SMIL `animateMotion` nodes inside the map
+SVG and the negotiating rings, event halos and raid dashes were CSS animations
+on SVG elements; each of those re-laid-out the SVG every frame.
+
+| Idle map | Task ms/s | Layouts/s |
+| --- | --- | --- |
+| SMIL planes and SVG CSS animations | ~425 | ~350 |
+| Canvas traffic, default density | 38 | 0 |
+| Canvas traffic, low density | 30 | 0 |
+| Reduced motion | 1 | 0 |
+
+Traffic and those effects now draw on one frame-sized `<canvas>` over the map
+layer (`src/ui/traffic.ts`, `src/ui/TrafficCanvas.tsx`): a single
+`requestAnimationFrame` loop throttled to 30 fps that stops while the map tab
+is off screen, the document is hidden, motion is reduced or nothing flies. It
+re-projects through the SVG viewBox and the layer's gesture transform each
+frame, so traffic stays on its routes through pans and zooms, and its clock
+freezes during a gesture. Density caps are unchanged (24/8 player planes,
+12/4 rival planes). The static SVG twins of the rings, halos and threat arcs
+remain for reduced motion and for tests, which read the canvas's
+`data-planes` and `data-rival-planes` counts.
+
+Two other tab costs from the same pass: the operations calendar folds
+unchanged runs of weeks into one span (about 1,000 DOM nodes at 80 aircraft,
+down from 11,000), and the Routes tab defers the adviser's and workbench's
+company forecasts until their disclosures open (under 100 ms to switch on
+the same career, from 250–600 ms). Remaining infinite SVG animations are
+transient interaction states only: the selection ring, the planning target
+blink and the insolvency pulse.
+
 ## Browser workload and device diagnostics
 
 `e2e/performance.spec.ts` restores a genuine rules-4 65-quarter replay with 34

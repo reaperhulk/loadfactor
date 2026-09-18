@@ -12,13 +12,13 @@
 .celebration-ground { position:absolute; width:250%; left:-75%; height:1000px; top:0; transform-origin:50% 0; transform:rotateX(68deg); background:repeating-linear-gradient(0deg,#6e977e 0 70px,#7ca188 70px 140px); animation:celebration-ground 700ms linear infinite; }
 .celebration-runway { position:absolute; width:24%; left:38%; height:100%; background:#354c55; border-inline:8px solid #d7cfac; }
 .celebration-runway::after { content:''; position:absolute; width:8px; height:100%; left:calc(50% - 4px); background:repeating-linear-gradient(0deg,#fff0cb 0 50px,transparent 50px 140px); }
-.celebration-plane { position:absolute; width:74%; left:50%; top:56%; transform-origin:50% 55%; animation:celebration-arrival 3.8s ease-in-out both; }
+.celebration-plane { position:absolute; width:74%; left:50%; top:56%; transform-origin:50% 55%; animation:celebration-arrival 2s ease-in-out both; }
 .runway-aircraft { display:block; width:100%; height:auto; overflow:visible; }
 .celebration-runway::after { animation:celebration-ground 700ms linear infinite; }
-.celebration-shadow { position:absolute; left:50%; top:81%; width:42%; height:6%; background:#152b4260; border-radius:50%; animation:celebration-shadow-arrival 3.8s ease-in-out both; }
+.celebration-shadow { position:absolute; left:50%; top:81%; width:42%; height:6%; background:#152b4260; border-radius:50%; animation:celebration-shadow-arrival 2s ease-in-out both; }
 .inauguration .celebration-plane { animation-name:celebration-departure; }
 .inauguration .celebration-shadow { animation-name:celebration-shadow-departure; }
-.inauguration .runway-gear { animation:celebration-gear 3.8s linear both; }
+.inauguration .runway-gear { animation:celebration-gear 2s linear both; }
 .inauguration .celebration-ground { background-color:#588982; }
 .celebration-scene-label { position:absolute; left:22px; bottom:14px; font:11px monospace; letter-spacing:.2em; color:#fff2cd; }
 .celebration-copy { padding:24px 28px 20px; }
@@ -26,7 +26,7 @@
 .celebration-copy p { margin:0; font-size:clamp(15px,2.5vw,21px); }
 .celebration-footer { margin-top:22px; display:flex; align-items:center; justify-content:space-between; gap:16px; font-size:12px; color:#acc5cd; }
 .celebration-footer button { flex-shrink:0; background:transparent; }
-.celebration-progress { height:3px; background:#f3cb82; transform-origin:left; animation:celebration-progress 3.8s linear both; }
+.celebration-progress { height:3px; background:#f3cb82; transform-origin:left; animation:celebration-progress 2s linear both; }
 @keyframes celebration-ground { to { background-position:0 140px; } }
 @keyframes celebration-arrival { from { transform:translate(-50%,-55%) scale(.16); } 75%,to { transform:translate(-50%,-40%) scale(1.08); } }
 @keyframes celebration-departure { from { transform:translate(-50%,-40%) scale(1.08); } 35% { transform:translate(-50%,-60%) scale(.8); } to { transform:translate(-50%,-85%) scale(.16); } }

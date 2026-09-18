@@ -1,11 +1,11 @@
 import { planningForecast } from './forecast'
-import { checkDueIn } from '../engine/operations'
+import { aircraftBase, checkDueIn } from '../engine/operations'
 import { PlanningWorkbench } from './PlanningWorkbench'
 import { OperationsPanel } from './OperationsPanel'
 // Management panels: routes, fleet, airports, finance, and the quarterly
 // report. Every button is a Command dispatch — no state is touched directly.
 
-import { lazy, Suspense, useMemo, useRef, useState } from 'react'
+import { Fragment, lazy, Suspense, useMemo, useRef, useState } from 'react'
 import { usePlanningLocks } from './planningLocks'
 import type { ExpansionOption } from '../engine/expansion'
 const NetworkAdvisor = lazy(() => import('./NetworkAdvisor').then(m => ({ default: m.NetworkAdvisor })))
@@ -283,7 +283,7 @@ export function RoutesPanel({
           {header('revenue', 'Rev')}
           {header('cost', 'Cost')}
           {header('margin', 'Margin')}
-          {header('profit', 'Contribution', 'route revenue minus flight costs; company fixed costs are reported separately')}
+          {header('profit', 'Contribution', 'route revenue minus flight costs; ▲▼ compares with the previous quarter; company fixed costs are reported separately')}
         </tr>
       </thead>
       <tbody>
@@ -363,6 +363,7 @@ export function RoutesPanel({
     <Suspense fallback={<p role="status">Loading network adviser…</p>}><NetworkAdvisor key={`${state.turn}-${seat}`} state={state} locks={locks} onToggle={toggle} /></Suspense>
     <PlanningWorkbench key={`${state.turn}-${seat}`} state={state} suggestions={[]} onSuggest={() => balancedScheduleCommands(state, seat, locks)} />
     <p className="dim" data-testid="network-overhead">
+      <span className="trend-key">▲▼ contribution vs the previous quarter · ⏳ still ramping · ⚔ rivals on the pair</span><br />
       Network management: {money(networkOverhead)}/quarter for {player.routes.length} routes (grows with the
       square of the network — quality beats sprawl){' '}
       <button
@@ -563,10 +564,22 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
           </tr>
         </thead>
         <tbody>
-          {fleetRows.map(({ a, type, route, utilBp, maint, value }) => {
+          {fleetRows.map(({ a, type, route, utilBp, maint, value }, i) => {
             const geriatric = !player.operationsPolicy && a.ageQuarters >= 48
-            return (
-              <tr key={a.id} className={selectedAircraftId === a.id ? 'selected-row' : undefined}>
+            // Sorted by type, each family opens with one summary row — how
+            // many, how many idle, average age, where they are based — so a
+            // long fleet reads as a handful of groups rather than sixty rows.
+            const family = fleetSort === 'type' && fleetRows[i - 1]?.type.id !== type.id ? fleetRows.filter((x) => x.type.id === type.id) : null
+            const summary = family && family.length >= 2 ? (() => {
+              const idle = family.filter((x) => !x.route && !x.a.reserve && !isGrounded(x.a, state.turn)).length
+              const bases = new Map<string, number>()
+              for (const x of family) bases.set(aircraftBase(player, x.a), (bases.get(aircraftBase(player, x.a)) ?? 0) + 1)
+              const avgAge = family.reduce((n, x) => n + x.a.ageQuarters, 0) / family.length / 4
+              return `${family.length} × ${type.name} · ${idle ? `${idle} idle · ` : ''}avg age ${avgAge.toFixed(1)}y · ${[...bases.entries()].sort((p, q) => q[1] - p[1]).map(([b, n]) => `${b} ${n}`).join(', ')}`
+            })() : null
+            return (<Fragment key={a.id}>
+              {summary && <tr className="fleet-group" data-testid={`fleet-group-${type.id}`}><td colSpan={player.operationsPolicy ? 8 : 7}>{summary}</td></tr>}
+              <tr className={selectedAircraftId === a.id ? 'selected-row' : undefined}>
                 <td>
                   <button className="link-btn entity-name" data-testid={`inspect-aircraft-${a.id}`} onClick={() => onInspect?.(a.id)}>{type.name} <small>#{a.id}</small></button> {a.leased && <span className="dim">(leased)</span>}{' '}
                   <span className="dim">({cabinSeats(a.type, a.cabin)} seats, {type.rangeKm}km)</span>
@@ -618,12 +631,16 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
                   )}
                 </td>
                 <td className={geriatric ? 'neg' : 'dim'}>{money(maint)}</td>
-                {player.operationsPolicy && <td>{readiness && <div>{(100 - (readiness.aircraft.find(f => f.aircraftId === a.id)?.unavailableMinutes ?? 0) * 100 / (13 * 7 * 24 * 60)).toFixed(1)}% available</div>}<span className="dim">{a.operations?.checkStart !== undefined ? 'Check booked' : checkDueIn(player, a, state.turn) === 0 ? 'Check due' : `Check in ${checkDueIn(player, a, state.turn)}q`}</span></td>}
+                {player.operationsPolicy && <td>{readiness && (() => {
+                  // Fully available is the norm and says nothing; only downtime is worth a number.
+                  const off = readiness.aircraft.find(f => f.aircraftId === a.id)?.unavailableMinutes ?? 0
+                  return off > 0 ? <div className="neg">{(100 - off * 100 / (13 * 7 * 24 * 60)).toFixed(1)}% available</div> : null
+                })()}<span className="dim">{a.operations?.checkStart !== undefined ? 'Check booked' : checkDueIn(player, a, state.turn) === 0 ? 'Check due' : `Check in ${checkDueIn(player, a, state.turn)}q`}</span></td>}
                 <td className="dim">{a.leased ? '—' : money(value)}</td>
                 <td>{['','Dense','Standard','Premium'][a.cabin]}</td>
                 <td>{route ? `${route.from}–${route.to}` : a.reserve ? 'Standby' : isGrounded(a,state.turn) ? 'Maintenance' : 'Unassigned'}</td>
               </tr>
-            )
+            </Fragment>)
           })}
 
         </tbody>
@@ -744,8 +761,10 @@ export function AirportsPanel({ state }: { state: GameState }) {
                   {held} / {used}
                   {idle && (
                     <ConfirmButton
-                      className="link-btn neg"
-                      label={`⚠ hand back ${held - used}`}
+                      // Idle slots are a warning only when the rent is real money;
+                      // one spare slot at a small field is a quiet link, not an alarm.
+                      className={`link-btn ${(held - used) * slotRent(c.id) >= 200 ? 'neg' : 'dim'}`}
+                      label={`${(held - used) * slotRent(c.id) >= 200 ? '⚠ ' : ''}hand back ${held - used}`}
                       confirmLabel="give them up?"
                       title={`${held - used} unused — ${money((held - used) * slotRent(c.id))}/q of rent buying nothing. Released slots go back to the pool.`}
                       data-testid={`release-${c.id}`}

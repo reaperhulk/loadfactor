@@ -227,10 +227,6 @@ button .icon {
 }
 
 .map-controls button .icon,
-.mute-toggle .icon {
-  margin-right: 0;
-}
-
 .end-quarter {
   margin-left: auto;
   background: var(--accent);
@@ -1703,18 +1699,12 @@ input[type='number'] {
 
 /* A square icon button, so it lines up with the chip-shaped buttons beside it
    instead of floating as a bare glyph on its own baseline. */
+/* A labeled button like its neighbours: an icon alone read as decoration. */
 .mute-toggle {
-  background: none;
-  border: 1px solid transparent;
-  font-size: 1rem;
-  padding: 0;
-  width: 28px;
-  height: 28px;
+  font-size: 0.85rem;
 }
-
-.mute-toggle:hover:not(:disabled) {
-  border-color: #35415d;
-  background: #1d2740;
+.mute-toggle .icon {
+  margin-right: 6px;
 }
 
 .toast-stack {

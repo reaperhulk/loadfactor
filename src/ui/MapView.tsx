@@ -442,7 +442,8 @@ interface ViewBox {
 }
 
 const FULL_VIEW: ViewBox = { x: 0, y: 0, w: W, h: H }
-const MAX_SCALE = 6
+// Past 4× the frame holds nothing but dots and one label; 6× was empty.
+const MAX_SCALE = 4
 
 function clampView(v: ViewBox): ViewBox {
   const w = Math.min(W, Math.max(W / MAX_SCALE, v.w))

@@ -176,7 +176,7 @@ for(const width of [320,390,1366]) {
     await page.getByLabel('Find aircraft',{exact:true}).fill('no such aircraft')
     await expect(page.getByTestId('page-fleet')).toContainText('No matching aircraft')
     await page.getByRole('button',{name:'Clear aircraft filters',exact:true}).click()
-    await expect(page.getByTestId('fleet-table').locator('tbody tr')).toHaveCount(comparisonCareer.airlines[0]!.fleet.length)
+    await expect(page.getByTestId('fleet-table').locator('tbody tr:not(.fleet-group)')).toHaveCount(comparisonCareer.airlines[0]!.fleet.length)
     expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBe(0)
   })
 }

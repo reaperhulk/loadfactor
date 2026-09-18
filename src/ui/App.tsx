@@ -534,7 +534,7 @@ function MuteToggle() {
         setMutedState(!muted)
       }}
     >
-      <Icon name={muted ? 'mute' : 'volume'} />
+      <Icon name={muted ? 'mute' : 'volume'} /> {muted ? 'unmute' : 'mute'}
     </button>
   )
 }
@@ -689,7 +689,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   }, [])
   const session = getSession()!
   const state = session.state, seat = viewSeat(), player = state.airlines[seat]!
-  const celebration = useCelebration(session.lastEvents, seat, state.phase === 'planning')
+  const celebration = useCelebration(session.lastEvents, seat, state.phase === 'planning', state.turn)
   const scenario = getScenario(state.scenario)
   const [tab, setTabState] = useState<WorkspacePage>('map')
   const [visited, setVisited] = useState<ReadonlySet<WorkspacePage>>(new Set(['map']))

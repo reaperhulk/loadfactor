@@ -9,18 +9,30 @@ import './celebration.css'
 
 type Milestone = Extract<GameEvent, { type: 'aircraft_delivered' | 'route_opened' }>
 
+// How long a scene plays before the report takes over, and how soon the same
+// kind of scene may play again. A mature career takes sixty-odd deliveries;
+// the first in a year is the moment, the rest are a toast.
+export const CELEBRATION_MS = 2000
+const REPEAT_QUARTERS = 4
+
 // Consume each engine event batch once, including batches received while
 // disabled. Preferences, rerenders, loading a save and changing seats must
 // never replay a previous celebration. No presentation state enters the sim.
-export function useCelebration(events: GameEvent[], seat: number, planning: boolean) {
+export function useCelebration(events: GameEvent[], seat: number, planning: boolean, turn = 0) {
   const preferences = useDisplayPreferences(), reduced = useReducedMotion()
   const enabled = preferences.celebrations && !reduced && planning
-  const [observed, setObserved] = useState({ events, seat })
+  // `shown` is the last turn each kind of scene played for this seat —
+  // presentation memory only, carried in state so render stays pure.
+  const [observed, setObserved] = useState<{ events: GameEvent[]; seat: number; shown: Record<string, number> }>({ events, seat, shown: {} })
   const [pending, setPending] = useState<Milestone[]>([])
   if (observed.events !== events || observed.seat !== seat) {
-    setObserved({ events, seat })
-    setPending(enabled && observed.events !== events ? events.filter((e): e is Milestone =>
-      (e.type === 'aircraft_delivered' || e.type === 'route_opened') && e.airline === seat) : [])
+    const shown = observed.seat === seat ? { ...observed.shown } : {}
+    const fresh = enabled && observed.events !== events ? events.filter((e): e is Milestone =>
+      (e.type === 'aircraft_delivered' || e.type === 'route_opened') && e.airline === seat) : []
+    const kinds = [...new Set(fresh.map((e) => e.type))].filter((k) => turn - (shown[k] ?? -REPEAT_QUARTERS) >= REPEAT_QUARTERS)
+    for (const k of kinds) shown[k] = turn
+    setObserved({ events, seat, shown })
+    setPending(fresh.filter((e) => kinds.includes(e.type)))
   } else if (!enabled && pending.length) setPending([])
   const dismiss = useCallback(() => setPending([]), [])
   return { milestones: enabled ? pending : [], dismiss }
@@ -38,7 +50,7 @@ export function Celebration({ milestones, state, onClose }: {
     ? [...new Set(milestones.filter((e) => e.type === 'aircraft_delivered').map((e) => getAircraftType(e.aircraftType).name))].join(' · ')
     : `${getCity(event.from).name} — ${getCity(event.to).name}`
   useEffect(() => {
-    const timer = window.setTimeout(onClose, 3800)
+    const timer = window.setTimeout(onClose, CELEBRATION_MS)
     // Returning to a hidden tab should not strand a modal or restart a flyby.
     const hide = () => { if (document.hidden) onClose() }
     document.addEventListener('visibilitychange', hide)
