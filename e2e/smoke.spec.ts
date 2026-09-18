@@ -223,7 +223,7 @@ test('the quarterly report reflects the resolved quarter', async ({ page }) => {
     }
   })
   // Serving a route puts an ambient plane on the map.
-  await expect(page.locator('[data-testid^="plane-"]')).toHaveCount(1)
+  await expect(page.getByTestId('map-traffic')).toHaveAttribute('data-planes', '1')
   // Unassign one plane, then the bulk button puts the idle fleet back to work.
   await page.evaluate(() => {
     const s = window.__harness.getState()!
@@ -856,11 +856,11 @@ test('a drag at low zoom never rewrites the viewBox, however long', async ({ pag
   expect(dv[0]!, 'the committed view moved off the anchor').not.toBeCloseTo(vb[0]!, 1)
 })
 
-// Two animation systems live inside the composited layer, and content that
-// changes inside one invalidates it — which puts a full re-raster back into
-// every frame of a drag. The planes are SMIL, which ignores
-// `animation-play-state` entirely, so this has to be checked rather than
-// assumed: it silently regressed once already.
+// Content that changes inside the composited layer invalidates it — which
+// puts a full re-raster back into every frame of a drag. The SVG's own
+// animations are paused through their APIs and the traffic canvas freezes
+// its clock, so this has to be checked rather than assumed: it silently
+// regressed once already.
 test('a drag stops everything that animates inside the map', async ({ page }) => {
   await startGame(page)
   // A career with planes in the air.
@@ -878,7 +878,7 @@ test('a drag stops everything that animates inside the map', async ({ page }) =>
   })
   await page.getByTestId('zoom-in').click()
   await page.waitForTimeout(800)
-  await expect(page.locator('svg.map .plane').first()).toBeAttached()
+  await expect.poll(() => page.getByTestId('map-traffic').getAttribute('data-planes').then(Number)).toBeGreaterThan(0)
 
   const smilPaused = async (): Promise<boolean> =>
     page.evaluate(() => (document.querySelector('svg.map') as SVGSVGElement).animationsPaused())
@@ -1345,7 +1345,7 @@ test('the late-game map stays within its structural render budget', async ({ pag
   })
   expect(await page.evaluate(() => window.__harness.getState()!.phase)).toBe('planning')
   // Decorative traffic is hard-capped by design: at most 12 rival planes.
-  expect(await page.locator('.plane-rival').count()).toBeLessThanOrEqual(12)
+  expect(Number(await page.getByTestId('map-traffic').getAttribute('data-rival-planes'))).toBeLessThanOrEqual(12)
   const total = await page.evaluate(() => document.querySelectorAll('svg.map *').length)
   expect(total, 'world-view element count').toBeLessThan(1600)
   // Zooming in reveals the small airfields, still bounded.

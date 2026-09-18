@@ -3,7 +3,7 @@
 // tells you short-haul from long-haul at a glance. Presentation-only floats
 // are fine here — the engine never sees screen coordinates.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { MouseEvent as ReactMouseEvent, PointerEvent } from 'react'
 import { getAircraftType } from '../data/aircraft'
@@ -16,7 +16,9 @@ import { loadGlobeGeometry, type GlobeGeometry } from './globeGeometry'
 import { aircraftGlyph } from './AircraftArt'
 import { reducedMotion, useDisplayPreferences, useReducedMotion } from './display'
 import { placeLabels } from './labels'
-import { cityMass, cityTier, rivalColorClass } from './mapStyle'
+import { RIVAL_COLORS, cityMass, cityTier, rivalColorClass } from './mapStyle'
+import { TrafficCanvas } from './TrafficCanvas'
+import { polylineLeg, quadraticLeg, type TrafficCamera, type TrafficEffect, type TrafficLeg, type TrafficPlane } from './traffic'
 import {
   BORDERS_PATH,
   ISLETS_PATH,
@@ -95,9 +97,9 @@ const layerSpan = (viewW: number, frameAspect: number): number => {
 const x = projectLon
 const y = projectLat
 
-// Top-view airliner silhouette, nose on the +x axis — animateMotion's
-// rotate="auto" aligns +x with the direction of travel, so this glyph always
-// flies nose-first.
+// Top-view airliner silhouette, nose on the +x axis — the traffic canvas
+// rotates it to the direction of travel, so this glyph always flies
+// nose-first.
 const PLANE_GLYPH =
   'M 7 0 C 6 -0.9 5 -1 4 -1 L 1.2 -1 L -1.8 -5 L -3.6 -5 L -1.9 -1 L -4.6 -1 ' +
   'L -6.2 -2.6 L -6.8 -2.6 L -5.8 0 L -6.8 2.6 L -6.2 2.6 L -4.6 1 L -1.9 1 ' +
@@ -108,8 +110,9 @@ const PLANE_GLYPH =
 // labels for non-majors at 1.5×. Implemented via lodKey in the render memo.
 
 // Quadratic arc between two cities, lifted perpendicular to the chord — reads
-// as a flight path instead of a fence line.
-function arcPath(fromId: string, toId: string): string {
+// as a flight path instead of a fence line. The control point is shared by
+// the drawn arc and the traffic shuttle that rides it.
+function arcControl(fromId: string, toId: string): { x1: number; y1: number; mx: number; my: number; x2: number; y2: number } {
   const a = getCity(fromId)
   const b = getCity(toId)
   const x1 = x(a.lon)
@@ -120,31 +123,19 @@ function arcPath(fromId: string, toId: string): string {
   const dy = y2 - y1
   const len = Math.sqrt(dx * dx + dy * dy) || 1
   const lift = Math.min(40, len * 0.18)
-  const mx = (x1 + x2) / 2 + (dy / len) * lift
-  const my = (y1 + y2) / 2 - (dx / len) * lift
+  return { x1, y1, mx: (x1 + x2) / 2 + (dy / len) * lift, my: (y1 + y2) / 2 - (dx / len) * lift, x2, y2 }
+}
+
+function arcPath(fromId: string, toId: string): string {
+  const { x1, y1, mx, my, x2, y2 } = arcControl(fromId, toId)
   return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`
 }
 
-// The same arc out AND back in one path. Traffic animation uses this so
-// rotate="auto" always sees the true direction of travel. Reversing via
-// keyPoints instead relies on each engine negating the tangent — WebKit
-// (and others) get that wrong and planes flew tail-first on the return
-// leg. With the return baked into the geometry, forward-only traversal is
-// correct everywhere, even in engines that ignore keyPoints outright.
-function roundTripPath(fromId: string, toId: string): string {
-  const a = getCity(fromId)
-  const b = getCity(toId)
-  const x1 = x(a.lon)
-  const y1 = y(a.lat)
-  const x2 = x(b.lon)
-  const y2 = y(b.lat)
-  const dx = x2 - x1
-  const dy = y2 - y1
-  const len = Math.sqrt(dx * dx + dy * dy) || 1
-  const lift = Math.min(40, len * 0.18)
-  const mx = (x1 + x2) / 2 + (dy / len) * lift
-  const my = (y1 + y2) / 2 - (dx / len) * lift
-  return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2} Q ${mx} ${my} ${x1} ${y1}`
+// The same arc as a sampled polyline for the traffic canvas, which paces the
+// shuttle by arc length and orients the glyph along each segment.
+function flatTripLeg(fromId: string, toId: string): TrafficLeg {
+  const { x1, y1, mx, my, x2, y2 } = arcControl(fromId, toId)
+  return quadraticLeg(x1, y1, mx, my, x2, y2)
 }
 
 // Meridians and parallels on the flat map. Baked once — the flat projection
@@ -187,14 +178,14 @@ function haulClass(km: number): string {
 // Bézier math. A globe move changes the projection key and flushes the
 // globe entries. Presentation-only mutable state; the engine sees none of it.
 const routePathCache = new Map<string, string>()
-const tripPathCache = new Map<string, string | null>()
+const tripLegCache = new Map<string, TrafficLeg | null>()
 let cachedProjKey = 'flat'
 
 function flushOnProjChange(projKey: string): void {
   if (projKey === cachedProjKey) return
   cachedProjKey = projKey
   routePathCache.clear()
-  tripPathCache.clear()
+  tripLegCache.clear()
 }
 
 function cachedRoutePath(projKey: string, globe: GlobeView | null, fromId: string, toId: string): string {
@@ -208,15 +199,15 @@ function cachedRoutePath(projKey: string, globe: GlobeView | null, fromId: strin
   return d
 }
 
-function cachedTripPath(projKey: string, globe: GlobeView | null, fromId: string, toId: string): string | null {
+function cachedTripLeg(projKey: string, globe: GlobeView | null, fromId: string, toId: string): TrafficLeg | null {
   flushOnProjChange(projKey)
   const k = `${fromId}|${toId}`
-  let d = tripPathCache.get(k)
-  if (d === undefined) {
-    d = globe !== null ? globeTripPath(globe, fromId, toId) : roundTripPath(fromId, toId)
-    tripPathCache.set(k, d)
+  let leg = tripLegCache.get(k)
+  if (leg === undefined) {
+    leg = globe !== null ? globeTripLeg(globe, fromId, toId) : flatTripLeg(fromId, toId)
+    tripLegCache.set(k, leg)
   }
-  return d
+  return leg
 }
 
 // ---- Globe (orthographic) projection ----------------------------------
@@ -430,18 +421,17 @@ function globeRoutePath(g: GlobeView, fromId: string, toId: string): string {
   return d
 }
 
-// Out-and-back great circle for the traffic shuttle — only when the whole
-// leg faces the viewer (a plane vanishing mid-flight reads as a glitch).
-function globeTripPath(g: GlobeView, fromId: string, toId: string): string | null {
+// The great circle for the traffic shuttle — only when the whole leg faces
+// the viewer (a plane vanishing mid-flight reads as a glitch).
+function globeTripLeg(g: GlobeView, fromId: string, toId: string): TrafficLeg | null {
   const pts = greatCircle(fromId, toId).map(([lon, lat]) => globeProject(g, lon, lat))
   if (pts.some((p) => !p.vis)) return null
-  const fwd = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.X.toFixed(1)} ${p.Y.toFixed(1)}`).join('')
-  const back = pts
-    .slice(0, -1)
-    .reverse()
-    .map((p) => `L${p.X.toFixed(1)} ${p.Y.toFixed(1)}`)
-    .join('')
-  return fwd + back
+  const flat = new Float64Array(pts.length * 2)
+  pts.forEach((p, i) => {
+    flat[i * 2] = p.X
+    flat[i * 2 + 1] = p.Y
+  })
+  return polylineLeg(flat)
 }
 
 interface ViewBox {
@@ -603,12 +593,12 @@ export function MapView({
     const svg = svgRef.current
     if (svg === null) return
     if (on) {
-      // Two animation systems, two APIs, and neither is a CSS class. Toggling
-      // a class meant a descendant-selector restyle over the whole map to
-      // reach two elements that usually are not even there, and it measured
-      // ~12ms of the first frame of a drag. These reach exactly what is
-      // actually animating and cost no style recalc at all.
-      svg.pauseAnimations() // SMIL: the planes, which ignore CSS entirely
+      // Reached through the animation APIs, not a CSS class: toggling a class
+      // meant a descendant-selector restyle over the whole map to reach two
+      // elements that usually are not even there, and it measured ~12ms of
+      // the first frame of a drag. The traffic canvas freezes its own clock
+      // off movingRef; the SVG pause covers any SMIL that ever returns.
+      svg.pauseAnimations()
       paused.current = svg.getAnimations({ subtree: true }).filter((a) => a.playState === 'running')
       for (const a of paused.current) a.pause() // CSS: selection ring, target blink
     } else if (active && !document.hidden && !reduceMotion) {
@@ -653,7 +643,9 @@ export function MapView({
   //   T = s*k*(B.x - v.x) - (1 - s)*B.w*k/2
   //
   // which for a pure pan (s = 1) is just k*(B.x - v.x).
+  const layerXf = useRef({ tx: 0, ty: 0, s: 1 })
   const paintLayer = (tx: number, ty: number, s: number): void => {
+    layerXf.current = { tx, ty, s }
     const el = layerRef.current
     if (el === null) return
     if (Math.abs(s - 1) < 1e-9 && Math.abs(tx) < 0.01 && Math.abs(ty) < 0.01) {
@@ -996,8 +988,8 @@ export function MapView({
   const projKey = isGlobe ? `g:${globe.cLon}:${globe.cLat}:${globe.s}` : 'flat'
   const routePathFor = (fromId: string, toId: string): string =>
     cachedRoutePath(projKey, isGlobe ? globe : null, fromId, toId)
-  const tripPathFor = (fromId: string, toId: string): string | null =>
-    cachedTripPath(projKey, isGlobe ? globe : null, fromId, toId)
+  const tripLegFor = (fromId: string, toId: string): TrafficLeg | null =>
+    cachedTripLeg(projKey, isGlobe ? globe : null, fromId, toId)
   const flyingFleet = useMemo(() => operatingFleet(player, state.turn), [player, state.turn])
   const flownRoutes = useMemo(() => player.routes.filter((r) => effectiveFrequency(player, r, state.turn) > 0), [player, state.turn])
   const network = useMemo(() => networkCities(player), [player])
@@ -1051,7 +1043,6 @@ export function MapView({
   // rebuild only when the data or the projection moves, not on every frame
   // of a zoom ease or an unrelated interaction (selection, planning mode).
   // Decorative glyph sizes quantize to quarter steps for the same reason.
-  const glyphUi = Math.max(0.25, Math.round(uiScale * 4) / 4)
   const pulseUi = newRouteIds.size > 0 ? uiScale : 1
   const rivalArcsLayer = useMemo(() => {
     if (!showRivals) return null
@@ -1187,17 +1178,25 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, seat, isGlobe, globe, projKey, newRouteIds, acquiredRouteIds, lens, pulseUi, onRouteClick, selectedRouteId, flowRouteIds])
 
-  const playerPlanesLayer = useMemo(() => {
-    if (reduceMotion || (isGlobe && rotating)) return []
+  // Constant traffic: planes shuttle back and forth on every served route —
+  // more of them the busier the schedule, and long-haul takes visibly longer
+  // than a hop. Rival traffic is one small plane per rival route (capped) in
+  // the rival's own color. All of it is drawn by the traffic canvas; this
+  // memo only describes what flies where, and the whole set is empty while
+  // motion is reduced or the globe is turning (its projection changes every
+  // frame, and traffic that lags the terrain reads as a glitch).
+  const traffic = useMemo((): { planes: TrafficPlane[]; rivalCount: number } => {
+    if (reduceMotion || (isGlobe && rotating)) return { planes: [], rivalCount: 0 }
+    const planes: TrafficPlane[] = []
     let remaining = display.traffic === 'low' ? 8 : 24
-    return flownRoutes.flatMap((r) => {
+    for (const r of flownRoutes) {
       const km = distanceKm(r.from, r.to)
       const freq = effectiveFrequency(player, r, state.turn)
-      const planes = Math.min(remaining, Math.max(1, Math.min(4, Math.round(freq / 8))))
-      if (!planes) return []
-      const path = tripPathFor(r.from, r.to)
-      if (path === null) return [] // route crosses the horizon — no shuttle
-      remaining -= planes
+      const count = Math.min(remaining, Math.max(1, Math.min(4, Math.round(freq / 8))))
+      if (!count) continue
+      const leg = tripLegFor(r.from, r.to)
+      if (leg === null) continue // route crosses the horizon — no shuttle
+      remaining -= count
       // The glyph wears the metal: widebodies render visibly larger than
       // regional jets, and fast airframes visibly outrun the fleet
       // (Concorde zips). Biggest/fastest airframe assigned to the route.
@@ -1211,65 +1210,100 @@ export function MapView({
         biggestSeats = Math.max(biggestSeats, t.seats)
         fastestKmh = Math.max(fastestKmh, t.speedKmh)
       }
-      const glyphScale = (0.62 + Math.min(0.5, biggestSeats / 800)) / glyphUi
+      const size = 0.62 + Math.min(0.5, biggestSeats / 800)
       const dur = (4 + Math.min(14, km / 900)) * (850 / Math.max(1, fastestKmh))
-      return Array.from({ length: planes }, (_, i) => (
-        <g key={`plane-${r.id}-${i}`} className="plane" data-testid={i === 0 ? `plane-${r.id}` : undefined}>
-          {/* A silhouette whose nose points along +x: rotate="auto" then
-              keeps it flying nose-first on BOTH legs of the shuttle — the
-              ✈ text glyph points 45° off-axis and read as flying
-              backwards on the return leg. */}
-          <path d={aircraftGlyph(aircraftType)} transform={`scale(${glyphScale.toFixed(3)})`} />
-          {/* The path itself runs out AND back, traversed forward only —
-              brief dwells at each end, correct nose-first orientation on
-              both legs in every engine (keyPoints reversal breaks
-              rotate="auto" in WebKit; if an engine ignores keyPoints the
-              shuttle still reads correctly, just without the dwells). */}
-          <animateMotion
-            dur={`${dur.toFixed(1)}s`}
-            begin={`${(-((r.id * 13) % 60) / 10 - (i * dur) / planes).toFixed(1)}s`}
-            repeatCount="indefinite"
-            keyPoints="0;0.5;0.5;1;1"
-            keyTimes="0;0.45;0.5;0.95;1"
-            calcMode="linear"
-            rotate="auto"
-            path={path}
-          />
-        </g>
-      ))
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, seat, isGlobe, globe, projKey, glyphUi, reduceMotion, display.traffic, rotating])
-
-  const rivalPlanesLayer = useMemo(() => {
-    if (reduceMotion || !showRivals || (isGlobe && rotating)) return null
-    return state.airlines
-      .filter((a) => a.id !== viewSeat())
-      .flatMap((airline) => airline.routes.map((r) => ({ airline, r })))
-      .slice(0, display.traffic === 'low' ? 4 : 12)
-      .map(({ airline, r }) => {
-        const path = tripPathFor(r.from, r.to)
-        if (path === null) return null
+      const glyph = aircraftGlyph(aircraftType)
+      for (let i = 0; i < count; i++) {
+        planes.push({
+          leg,
+          dur,
+          phase: ((r.id * 13) % 60) / 10 + (i * dur) / count,
+          glyph,
+          size,
+          fill: '#cfe3ff',
+          stroke: '#0b2332',
+          alpha: 1,
+        })
+      }
+    }
+    let rivalCount = 0
+    if (showRivals) {
+      const rivalRoutes = state.airlines
+        .filter((a) => a.id !== seat)
+        .flatMap((airline) => airline.routes.map((r) => ({ airline, r })))
+        .slice(0, display.traffic === 'low' ? 4 : 12)
+      for (const { airline, r } of rivalRoutes) {
+        const leg = tripLegFor(r.from, r.to)
+        if (leg === null) continue
         const km = distanceKm(r.from, r.to)
-        const dur = 5 + Math.min(15, km / 900)
-        return (
-          <g key={`rplane-${airline.id}-${r.id}`} className={`plane plane-rival ${rivalColorClass(airline.id)}`}>
-            <path d={PLANE_GLYPH} transform={`scale(${0.55 / glyphUi})`} />
-            <animateMotion
-              dur={`${dur.toFixed(1)}s`}
-              begin={`${(-((r.id * 17 + airline.id * 7) % 70) / 10).toFixed(1)}s`}
-              repeatCount="indefinite"
-              keyPoints="0;0.5;0.5;1;1"
-              keyTimes="0;0.45;0.5;0.95;1"
-              calcMode="linear"
-              rotate="auto"
-              path={path}
-            />
-          </g>
-        )
-      })
+        planes.push({
+          leg,
+          dur: 5 + Math.min(15, km / 900),
+          phase: ((r.id * 17 + airline.id * 7) % 70) / 10,
+          glyph: PLANE_GLYPH,
+          size: 0.55,
+          fill: RIVAL_COLORS[(airline.id + RIVAL_COLORS.length - 1) % RIVAL_COLORS.length]!,
+          stroke: '#0b2332',
+          alpha: 0.7,
+        })
+        rivalCount++
+      }
+    }
+    return { planes, rivalCount }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, seat, showRivals, isGlobe, globe, projKey, glyphUi, reduceMotion, display.traffic, rotating])
+  }, [state, seat, showRivals, isGlobe, globe, projKey, reduceMotion, display.traffic, rotating])
+  // Ambient motion beyond the planes, on the same canvas: a sweep around each
+  // airport the player is negotiating with, breathing halos on cities under a
+  // world event, and dashes marching along a pair a rival has announced a
+  // raid on. Each has a static SVG twin (what reduced motion shows, and what
+  // tests look for); a CSS animation on those twins would re-lay-out the SVG
+  // every frame, which is exactly the cost this canvas exists to remove.
+  const effects = useMemo((): TrafficEffect[] => {
+    if (reduceMotion || (isGlobe && rotating)) return []
+    const out: TrafficEffect[] = []
+    for (const req of player.slotRequests) {
+      const c = getCity(req.city)
+      const p = pt(c.lon, c.lat)
+      if (!p.vis) continue
+      out.push({ kind: 'sweep', x: p.X, y: p.Y, r: dotRadius(c) + 4 / uiScale, width: 1.6, color: '#ffd166', period: 6 })
+    }
+    for (const e of state.world.events) {
+      const def = getEventDef(e.id)
+      if (def.demandModBp === undefined) continue
+      const good = def.demandModBp >= 10000
+      const cities = e.city !== null ? [getCity(e.city)] : CITIES.filter((c) => c.region === e.region)
+      for (const c of cities) {
+        const p = pt(c.lon, c.lat)
+        if (!p.vis) continue
+        out.push({ kind: 'breathe', x: p.X, y: p.Y, r: 12 / uiScale, width: 2 * Math.min(2, uiScale), color: good ? '#ffd166' : '#e06c6c', period: 2.2 })
+      }
+    }
+    for (const a of state.airlines) {
+      if (a.id === seat || a.bankrupt || a.campaign?.kind !== 'raid' || a.campaign.target !== seat || !a.campaign.pair || state.turn >= a.campaign.untilTurn) continue
+      const [from, to] = a.campaign.pair.split('-') as [string, string]
+      const leg = tripLegFor(from, to)
+      if (leg === null) continue
+      out.push({ kind: 'march', leg, width: 2.4, color: RIVAL_COLORS[(a.id + RIVAL_COLORS.length - 1) % RIVAL_COLORS.length]! })
+    }
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, seat, isGlobe, globe, projKey, uiScale, reduceMotion, rotating])
+  // What the canvas draws through, read per frame: the viewBox React has
+  // written plus whatever transform the last gesture or ease left on the
+  // layer. A ref, so the animation loop never closes over a stale render.
+  const cameraRef = useRef<() => TrafficCamera>(() => ({ vb: FULL_VIEW, fw: W, fh: H, tx: 0, ty: 0, s: 1 }))
+  useLayoutEffect(() => {
+    cameraRef.current = () => ({
+      vb: isGlobe ? FULL_VIEW : baseRef.current,
+      fw: frame.width,
+      fh: frame.height,
+      tx: layerXf.current.tx,
+      ty: layerXf.current.ty,
+      s: layerXf.current.s,
+    })
+  })
+  const trafficCamera = useCallback(() => cameraRef.current(), [])
+  const trafficFrozen = useCallback(() => movingRef.current, [])
 
   // Visibility only changes when the game state, selection, an LOD threshold
   // crossing, or the visible window changes — not on every animation frame of
@@ -1848,13 +1882,6 @@ export function MapView({
           {opportunityArcsLayer}
           {playerArcsLayer}
           {threatArcsLayer}
-          {/* Constant traffic: planes shuttle back and forth on every served
-              route — more of them the busier the schedule, and long-haul takes
-              visibly longer than a hop. */}
-          {playerPlanesLayer}
-          {/* Rival traffic: one small plane per rival route (capped) so their
-              networks read as alive, in the rival's own color. */}
-          {rivalPlanesLayer}
           {/* Fresh slot wins ping gold at the airport. */}
           {[...newSlotCities].sort().map((cityId) => {
             const p = cityPt(cityId)
@@ -2044,6 +2071,19 @@ export function MapView({
         </g>
       </svg>
       </div>
+      {/* Traffic floats over the layer in its own frame-sized canvas: it
+          re-projects through the layer's transform each frame instead of
+          living inside the SVG, where every moving node re-rastered the
+          composited map. Sits under the vignette and the controls. */}
+      <TrafficCanvas
+        planes={traffic.planes}
+        effects={effects}
+        rivalCount={traffic.rivalCount}
+        frame={frame}
+        active={active}
+        camera={trafficCamera}
+        frozen={trafficFrozen}
+      />
       {/* The frame falls off into the dark so the middle of the world holds
           the eye. It belongs to the frame, not the world, so it sits outside
           the layer entirely — a gesture must not drag it around. A CSS

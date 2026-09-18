@@ -385,11 +385,11 @@ html.map-gesture * {
    mesh) is rastered once and carried by the compositor, so it costs nothing
    to keep and none of it is given up.
 
-   There is no CSS for it, deliberately. MapView pauses the two animation
-   systems through their own APIs — pauseAnimations() for the planes' SMIL,
-   the Web Animations API for the CSS ones — because a class toggle here meant
-   a descendant restyle across the whole map to reach two elements that are
-   usually not even present. */
+   There is no CSS for it, deliberately. MapView pauses what animates
+   through the animation APIs — the Web Animations API for the CSS ones, the
+   traffic canvas's own clock for the planes — because a class toggle here
+   meant a descendant restyle across the whole map to reach two elements
+   that are usually not even present. */
 
 /* Political borders: a hairline INSIDE the landmass. Deliberately weaker than
    the coast — the shape of the world is the story, borders are context. */
@@ -690,21 +690,10 @@ html.map-gesture * {
   stroke-width: 1.2;
   stroke-dasharray: 3 3;
   opacity: 0.8;
-  animation: negotiating-spin 6s linear infinite;
-  transform-box: fill-box;
-  transform-origin: center;
   pointer-events: none;
+  /* The sweep that circles it is drawn by the traffic canvas: a CSS
+     animation here re-laid-out the whole SVG every frame. */
 }
-
-@keyframes negotiating-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-:root[data-motion=reduced] .negotiating-ring {
-    animation: none;
-  }
 
 /* Year-in-review block on the Q1 report card. */
 .year-review {
@@ -940,12 +929,12 @@ button.toast {
 
 }
 
-.plane {
-  fill: #cfe3ff;
+.map-traffic {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  stroke: #0b2332;
-  stroke-width: .6;
-  paint-order: stroke;
 }
 
 .slots-ping {
@@ -981,10 +970,10 @@ button.toast {
   fill: none;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
-  animation: threat-march 1.4s linear infinite;
 }
-@keyframes threat-march { to { stroke-dashoffset: -18; } }
-@media (prefers-reduced-motion: reduce) { .route-threat { animation: none; } }
+/* Under full motion the traffic canvas marches the dashes instead; the static
+   twin stays in the SVG for reduced motion (and keeps its title). */
+:root[data-motion=full] .route-threat { opacity: 0.35; }
 
 .route-rival {
   stroke: #8a5470;
@@ -1003,21 +992,6 @@ button.toast {
 }
 .rival-c2 {
   stroke: #d8a052;
-}
-
-/* Rival planes fly in their airline's color, dimmer than yours. */
-.plane-rival {
-  opacity: 0.7;
-  filter: none;
-}
-.plane-rival.rival-c0 {
-  fill: #d0636e;
-}
-.plane-rival.rival-c1 {
-  fill: #9d7bd8;
-}
-.plane-rival.rival-c2 {
-  fill: #d8a052;
 }
 
 /* A pair a rival also serves: your arc runs hot. */
@@ -1293,10 +1267,11 @@ td {
   fill: none;
   stroke-width: 2;
   pointer-events: none;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: halo-breathe 2200ms ease-in-out infinite;
+  opacity: 0.6;
 }
+/* Under full motion the traffic canvas breathes the halo; the static twin is
+   hidden so the two never stack. */
+:root[data-motion=full] .event-halo { visibility: hidden; }
 
 .halo-boom {
   stroke: #ffd166;
@@ -1304,18 +1279,6 @@ td {
 
 .halo-bust {
   stroke: var(--neg);
-}
-
-@keyframes halo-breathe {
-  0%,
-  100% {
-    transform: scale(0.75);
-    opacity: 0.9;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 0.35;
-  }
 }
 
 .gameover-overlay {
@@ -1820,7 +1783,7 @@ input[type='number'] {
 :root[data-motion=reduced] .slots-ping {
     animation: none;
   }
-:root[data-motion=reduced] .plane {
+:root[data-motion=reduced] .map-traffic {
     display: none;
   }
 :root[data-motion=reduced] .route-new {
