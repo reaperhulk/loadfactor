@@ -537,7 +537,8 @@ main.game-shell { padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 
 .review-layout > .dialog-heading { flex-shrink:0; margin-bottom:12px; align-items:center; }
 .review-layout > .dialog-heading h2 { font-family:inherit; font-size:1.2rem; letter-spacing:-.02em; margin:0; }
 .review-layout > .dialog-heading button { min-width:44px; min-height:44px; }
-.dialog-scroll { flex:1 1 auto; min-height:0; min-width:0; overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; padding-right:6px; scroll-padding-block:12px; }
+/* No scrollbar-gutter here: with a stable gutter desktop Chromium skipped painting the first glyph of lines at the container edge (the leading digit of the review forecast went missing). */
+.dialog-scroll { flex:1 1 auto; min-height:0; min-width:0; overflow:auto; overscroll-behavior:contain; padding-right:6px; scroll-padding-block:12px; }
 .review-layout > .dialog-actions { flex-shrink:0; border-top:1px solid var(--rule); padding-top:12px; margin-top:12px; flex-wrap:wrap; }
 .review-layout > .dialog-actions button { min-width:0; min-height:44px; }
 .route-launch-review .dialog-scroll > p:first-child { margin-top:0; }
