@@ -5,7 +5,7 @@ import { OperationsPanel } from './OperationsPanel'
 // Management panels: routes, fleet, airports, finance, and the quarterly
 // report. Every button is a Command dispatch — no state is touched directly.
 
-import { lazy, Suspense, useRef, useState } from 'react'
+import { lazy, Suspense, useMemo, useRef, useState } from 'react'
 import { usePlanningLocks } from './planningLocks'
 import type { ExpansionOption } from '../engine/expansion'
 const NetworkAdvisor = lazy(() => import('./NetworkAdvisor').then(m => ({ default: m.NetworkAdvisor })))
@@ -102,25 +102,9 @@ export function RoutesPanel({
   const [allMetrics, setAllMetrics] = useState(false)
   const seat = viewSeat()
   const { locks, toggle } = usePlanningLocks(state, seat)
-  if (player.routes.length === 0) {
-    // Even before the first route, the opportunities list is the guidance
-    // that matters most.
-    return (
-      <div>
-        <p className="hint">No routes yet. Click a city on the map, then “Open route from here”.</p>
-        <Suspense fallback={<p role="status">Loading expansion planner…</p>}><ExpansionPlanner state={state} onPlan={onPlan} onAirport={onAirport} /></Suspense>
-      </div>
-    )
-  }
-  const networkOverhead = Math.floor(
-    (ROUTE_OVERHEAD_QUAD *
-      player.routes.length *
-      player.routes.length *
-      inflationBp(state.turn) *
-      (getScenario(state.scenario).rules.routeOverheadBp ?? 10000)) /
-      100_000_000,
-  )
-  const allRows = player.routes.map((r) => {
+  // Rows depend on the snapshot alone; a sort, filter or search keystroke
+  // must not re-derive capacity and rivals for every route.
+  const allRows = useMemo(() => player.routes.map((r) => {
     const prev = r.history.length >= 2 ? r.history[r.history.length - 2] : undefined
     const profit = r.lastRevenue - r.lastCost
     const km = distanceKm(r.from, r.to)
@@ -150,7 +134,25 @@ export function RoutesPanel({
       profitTrend: prev === undefined ? 0 : profit - (prev.revenue - prev.cost),
       ramping: routeSpoolBp(player, r, state.turn) < 10000,
     }
-  })
+  }), [state, player])
+  if (player.routes.length === 0) {
+    // Even before the first route, the opportunities list is the guidance
+    // that matters most.
+    return (
+      <div>
+        <p className="hint">No routes yet. Click a city on the map, then “Open route from here”.</p>
+        <Suspense fallback={<p role="status">Loading expansion planner…</p>}><ExpansionPlanner state={state} onPlan={onPlan} onAirport={onAirport} /></Suspense>
+      </div>
+    )
+  }
+  const networkOverhead = Math.floor(
+    (ROUTE_OVERHEAD_QUAD *
+      player.routes.length *
+      player.routes.length *
+      inflationBp(state.turn) *
+      (getScenario(state.scenario).rules.routeOverheadBp ?? 10000)) /
+      100_000_000,
+  )
   // Filters answer the questions actually asked of this table: what is losing
   // money, where am I being fought, what is still ramping, what is long-haul.
   const rows = allRows.filter((x) => {

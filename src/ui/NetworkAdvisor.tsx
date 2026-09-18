@@ -13,6 +13,9 @@ export function NetworkAdvisor({ state, locks, onToggle }: { state: GameState; l
   const seat = viewSeat(), airline = state.airlines[seat]!
   const { preference, update } = usePlanningPreference(state, seat)
   const [run, setRun] = useState(false)
+  // Closed by default, and nothing is forecast until it opens: two company
+  // forecasts per mount was the Routes tab's biggest hitch on a mature career.
+  const [open, setOpen] = useState(false)
   const commands = usePlanningCommands()
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
@@ -23,14 +26,16 @@ export function NetworkAdvisor({ state, locks, onToggle }: { state: GameState; l
   const clearSelection = () => { for (const s of suggestions.filter(s => selected.includes(key(s)))) for (const c of s.commands) removePlanningCommand(commandKey(c)) }
   const signature = JSON.stringify(commands)
   const comparison = useMemo(() => {
+    if (!open) return null
     const evaluate = createForecastPlanner(state, seat)
     return { before: evaluate(), after: evaluate(JSON.parse(signature)) }
-  }, [state, seat, signature])
-  const goalChange = planningValue(state, seat, comparison.after, preference.goal)-planningValue(state, seat, comparison.before, preference.goal)
-  const belowReserve = comparison.after.cashAfter < preference.minCash
+  }, [state, seat, signature, open])
+  const goalChange = comparison ? planningValue(state, seat, comparison.after, preference.goal)-planningValue(state, seat, comparison.before, preference.goal) : 0
+  const belowReserve = comparison ? comparison.after.cashAfter < preference.minCash : false
   const gain = (n:number) => resolvedGoal(state,preference.goal) === 'profit' ? money(n) : resolvedGoal(state,preference.goal) === 'loadFactor' ? `${(n/100).toFixed(2)} percentage points` : `${n.toLocaleString('en-US')} ${resolvedGoal(state,preference.goal) === 'resilience' ? 'fewer cancelled trips' : 'boardings'}`
-  return <details className="network-advisor" data-testid="network-advisor">
+  return <details className="network-advisor" data-testid="network-advisor" onToggle={(e) => setOpen(e.currentTarget.open)}>
     <summary>Network adviser · choose changes and protect your strategy</summary>
+    {comparison && <>
     <p className="hint">Choose what to improve. Profit and your selected goal are shown separately; locks protect your strategy. Advice must retain the cash reserve below.</p>
     <div className="plan-inputs"><label>Priority <select aria-label="Advice priority" value={preference.goal} onChange={e=>{update({...preference,goal:e.target.value as PlanningGoal});setRun(false)}}>{Object.entries(GOAL_LABELS).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label>Minimum ending cash ($M) <input aria-label="Minimum cash reserve" type="number" min="0" step="1" value={preference.minCash/1000} onChange={e=>update({...preference,minCash:Math.max(0,Number(e.target.value)||0)*1000})} /></label></div>
     <details><summary>Lock route settings</summary><div className="adviser-locks">{airline.routes.map(r => <fieldset key={r.id}><legend>{r.from}–{r.to}</legend>{(['fare','service','frequency'] as const).map(setting => <label key={setting}><input type="checkbox" aria-label={`Lock ${r.from}-${r.to} ${setting}`} checked={locks[r.id]?.includes(setting) ?? false} onChange={() => { onToggle(r.id, setting) }} />{setting}</label>)}</fieldset>)}</div></details>
@@ -40,6 +45,7 @@ export function NetworkAdvisor({ state, locks, onToggle }: { state: GameState; l
       <p className="hint">Combined effects are recalculated; individual improvements may overlap. Current world and rival schedules are held fixed.</p>
       <p>{GOAL_LABELS[preference.goal]}: {gain(goalChange)} improvement.</p>{(goalChange < 0 || belowReserve) && <p className="neg">This combination misses the selected goal or cash reserve. Select fewer changes or compare individually.</p>}
       <button data-testid="apply-advice" disabled={!commands.length || !!comparison.after.errors.length || goalChange < 0 || belowReserve} onClick={() => { applyPlanningDraft(); setRun(false) }}>Apply selected changes</button><button disabled={!selected.length} onClick={clearSelection}>Clear selection</button></div>
+    </>}
     </>}
   </details>
 }

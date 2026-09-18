@@ -16,16 +16,19 @@ export function PlanningWorkbench({ state, suggestions, onSuggest }: { state: Ga
   const [frequency, setFrequency] = useState(airline.routes[0]?.frequency ?? 1)
   const draft = usePlanningCommands()
   const [stress, setStress] = useState(false)
+  const [open, setOpen] = useState(false) // forecasts wait for the disclosure
   const route = airline.routes.find((r) => r.id === routeId) ?? airline.routes[0]
   const forecast = useMemo(() => {
+    if (!open) return null
     const before = planningForecast(state, seat)
     const after = draft.length ? forecastQuarter(state, seat, draft) : before
     const headwind = stress ? forecastQuarter(state, seat, draft, { fuelBp: Math.floor(state.world.fuelBp * 1.2), economyBp: Math.floor(state.world.economyBp * 0.9) }) : null
     return { before, after, headwind }
-  }, [state, seat, draft, stress])
+  }, [state, seat, draft, stress, open])
   if (!route) return null
-  return <details className="planning-workbench" data-testid="planning-workbench">
+  return <details className="planning-workbench" data-testid="planning-workbench" onToggle={(e) => setOpen(e.currentTarget.open)}>
     <summary>Planning workbench · compare changes before committing</summary>
+    {forecast && <>
     <p className="dim">Changes join your shared quarter plan. Add routes here, review the combined result, and apply everything as one undoable action.</p>
     <div className="plan-inputs">
       <label>Route <select aria-label="plan route" value={route.id} onChange={(e) => {
@@ -49,5 +52,6 @@ export function PlanningWorkbench({ state, suggestions, onSuggest }: { state: Ga
     {forecast.after.errors.length > 0 && <p role="alert" className="neg">{forecast.after.errors.map((e) => e.reason).join(' · ')}</p>}
     <button data-testid="commit-plan" disabled={draft.length === 0 || forecast.after.errors.length > 0} onClick={() => { applyPlanningDraft() }}>Commit plan</button>{' '}
     <button disabled={draft.length === 0} onClick={clearPlanningDraft}>Discard draft</button>
+    </>}
   </details>
 }
