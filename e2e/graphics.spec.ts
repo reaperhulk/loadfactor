@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test'
-import { openPanel } from './workspace'
+import { flyQuarter, openPanel } from './workspace'
 import { readFileSync } from 'node:fs'
 import type { GameState } from '../src/engine'
 
@@ -229,4 +229,30 @@ test('a world event gets a legend line and a bounded number of halos', async ({ 
   await expect(page.getByTestId('event-region-na')).toHaveCount(0)
   await expect.poll(() => page.locator('[data-testid^="event-halo-"]').count()).toBeGreaterThan(0)
   expect(await page.locator('[data-testid^="event-halo-"]').count()).toBeLessThanOrEqual(6)
+})
+
+test('the map shows the quarter result once the report closes', async ({ page }) => {
+  await page.addInitScript(quiet)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await page.evaluate(() => {
+    const s = window.__harness.getState()!
+    const [a, b] = s.airlines[0]!.fleet.filter((ac) => ac.routeId === null)
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: a!.id, frequency: 5 })
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'MIA', aircraftId: b!.id, frequency: 5 })
+  })
+  await flyQuarter(page)
+  await expect(page.getByTestId('report-card')).toBeVisible()
+  // Nothing flashes behind the report...
+  await page.waitForTimeout(600)
+  await expect(page.getByTestId('map-quarter-result')).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('report-card')).toHaveCount(0)
+  // ...then every flown route shows which way its profit went.
+  await expect(page.getByTestId('map-quarter-result')).toBeVisible()
+  await expect(page.getByTestId('map-quarter-result')).toContainText('Last quarter')
+  await expect.poll(() => page.locator('.route-result-up, .route-result-down').count()).toBeGreaterThan(0)
+  // And it is transient.
+  await expect(page.getByTestId('map-quarter-result')).toHaveCount(0, { timeout: 8000 })
+  await expect(page.locator('.route-result-up, .route-result-down')).toHaveCount(0)
 })

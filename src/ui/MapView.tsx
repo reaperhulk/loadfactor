@@ -18,6 +18,7 @@ import { placeLabels } from './labels'
 import { cityMass, cityTier, rivalColor, rivalColorClass, type MapLens } from './mapStyle'
 import { MapLegend } from './legends'
 import { REGION_COLLAPSE_BELOW_SCALE, eventHalos, regionHaloShape } from './map/eventHalos'
+import { QUARTER_RESULT_MS, quarterTrends } from './map/quarterResult'
 import { TrafficCanvas } from './TrafficCanvas'
 import { polylineLeg, quadraticLeg, type TrafficCamera, type TrafficEffect, type TrafficLeg, type TrafficPlane } from './traffic'
 import {
@@ -446,6 +447,9 @@ interface MapViewProps {
   // Routes that just arrived via a takeover — they flash from rival gold
   // into the player's color so the map narrates the acquisition.
   acquiredRouteIds?: ReadonlySet<number>
+  // Flash each route by its profit change once a quarter's report closes. Off
+  // for the replay viewer, where quarters advance on a timer.
+  announceQuarter?: boolean
 }
 
 export function MapView({
@@ -460,6 +464,7 @@ export function MapView({
   newRouteIds,
   newSlotCities,
   acquiredRouteIds,
+  announceQuarter = true,
 }: MapViewProps) {
   const display = useDisplayPreferences()
   const reduceMotion = useReducedMotion()
@@ -1063,6 +1068,41 @@ export function MapView({
   // of a zoom ease or an unrelated interaction (selection, planning mode).
   // Decorative glyph sizes quantize to quarter steps for the same reason.
   const pulseUi = newRouteIds.size > 0 ? uiScale : 1
+
+  // The quarter's result, on the map. A turn that advanced by one is noted
+  // while rendering; the flash waits until the report (or any other modal)
+  // has closed and the map is on screen, then holds for a few seconds.
+  const [seenTurn, setSeenTurn] = useState(state.turn)
+  const [pendingResult, setPendingResult] = useState<number | null>(null)
+  const [shownResult, setShownResult] = useState<number | null>(null)
+  if (state.turn !== seenTurn) {
+    setSeenTurn(state.turn)
+    setPendingResult(announceQuarter && state.turn === seenTurn + 1 ? state.turn : null)
+    setShownResult(null)
+  }
+  useEffect(() => {
+    if (pendingResult === null) return
+    let timer = 0
+    const poll = (): void => {
+      if (active && !document.hidden && document.querySelector('dialog[open]') === null) {
+        setPendingResult(null)
+        setShownResult(pendingResult)
+        return
+      }
+      timer = window.setTimeout(poll, 250)
+    }
+    timer = window.setTimeout(poll, 250)
+    return () => clearTimeout(timer)
+  }, [pendingResult, active])
+  useEffect(() => {
+    if (shownResult === null) return
+    const timer = window.setTimeout(() => setShownResult(null), QUARTER_RESULT_MS)
+    return () => clearTimeout(timer)
+  }, [shownResult])
+  const quarterResult = useMemo(
+    () => (shownResult === null ? null : quarterTrends(player.routes, shownResult)),
+    [shownResult, player],
+  )
   const rivalArcsLayer = useMemo(() => {
     if (!showRivals) return null
     return state.airlines.filter((a) => a.id !== viewSeat()).map((airline) =>
@@ -1156,6 +1196,7 @@ export function MapView({
       const isNew = newRouteIds.has(r.id)
       const isAcquired = acquiredRouteIds?.has(r.id) ?? false
       const contested = rivalPairs.has(pairKey(r.from, r.to))
+      const trend = quarterResult?.byRoute.get(r.id)
       const d = routePathFor(r.from, r.to)
       if (d === '') return null
       return (
@@ -1173,7 +1214,7 @@ export function MapView({
             d={d}
             pathLength={1}
             data-acquired={isAcquired || undefined}
-            className={`route-player ${haulClass(km)}${r.id === selectedRouteId || flowRouteIds?.includes(r.id) ? ' route-selected' : flowRouteIds?.length ? ' route-context' : cityFocus !== null && r.from !== cityFocus && r.to !== cityFocus ? ' route-context' : ''}${isNew ? ' route-new' : ''}${isAcquired ? ' route-acquired' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}`}
+            className={`route-player ${haulClass(km)}${r.id === selectedRouteId || flowRouteIds?.includes(r.id) ? ' route-selected' : flowRouteIds?.length ? ' route-context' : cityFocus !== null && r.from !== cityFocus && r.to !== cityFocus ? ' route-context' : ''}${isNew ? ' route-new' : ''}${isAcquired ? ' route-acquired' : ''}${contested ? ' route-contested' : ''}${lensClass(r)}${trend === 'up' ? ' route-result-up' : trend === 'down' ? ' route-result-down' : ''}`}
             style={
               {
                 '--cap-w': capWidth(player, r, false, state.turn),
@@ -1199,7 +1240,7 @@ export function MapView({
       )
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, seat, isGlobe, globe, projKey, newRouteIds, acquiredRouteIds, lens, pulseUi, onRouteClick, selectedRouteId, flowRouteIds, cityFocus])
+  }, [state, seat, isGlobe, globe, projKey, newRouteIds, acquiredRouteIds, lens, pulseUi, onRouteClick, selectedRouteId, flowRouteIds, cityFocus, quarterResult])
 
   // Constant traffic: planes shuttle back and forth on every served route —
   // more of them the busier the schedule, and long-haul takes visibly longer
@@ -2196,6 +2237,14 @@ export function MapView({
         </button>
 
       </div>
+      {quarterResult !== null && quarterResult.up + quarterResult.down > 0 && (
+        <div className="map-quarter-result" role="status" data-testid="map-quarter-result">
+          Last quarter{' '}
+          {quarterResult.up > 0 && <span className="pos">▲ {quarterResult.up} {quarterResult.up === 1 ? 'route' : 'routes'} earned more</span>}
+          {quarterResult.up > 0 && quarterResult.down > 0 && ' · '}
+          {quarterResult.down > 0 && <span className="neg">▼ {quarterResult.down} earned less</span>}
+        </div>
+      )}
       {globeLoading && <div className="map-load-status" role="status">Loading globe…</div>}
       {projection === 'globe' && globeError && <div className="map-load-status" role="status">
         Globe unavailable. <button onClick={() => { setGlobeError(false); setGlobeRetry((n) => n + 1) }}>Try again</button>

@@ -80,6 +80,56 @@
   font-size: inherit;
 }
 
+/* The quarter's result: for a few seconds after the report closes, each route
+   shows how its profit moved — green earned more, red earned less. A static
+   recolor (reduced motion keeps just that); full motion adds one soft swell. */
+.route-player.route-result-up {
+  stroke: #5fcf78;
+  stroke-width: calc(var(--cap-w, 1.6) + 1.2);
+  opacity: 1;
+}
+.route-player.route-result-down {
+  stroke: #e0707a;
+  stroke-width: calc(var(--cap-w, 1.6) + 1.2);
+  opacity: 1;
+}
+:root[data-motion=full] .route-player:is(.route-result-up, .route-result-down) {
+  animation: route-result-swell 1100ms ease-in-out 2;
+}
+@keyframes route-result-swell {
+  50% {
+    stroke-width: calc(var(--cap-w, 1.6) + 3);
+  }
+}
+.map-quarter-result {
+  position: absolute;
+  /* Beside the zoom column, clear of the map key in the other corner. */
+  top: 10px;
+  left: 56px;
+  z-index: 3;
+  max-width: calc(50% - 60px);
+  padding: 5px 10px;
+  border: 1px solid var(--rule, #38505e);
+  border-radius: 4px;
+  background: #102b3eeb;
+  color: #e7edf0;
+  font-size: 0.75rem;
+  pointer-events: none;
+}
+.map-quarter-result .pos {
+  color: var(--pos);
+}
+.map-quarter-result .neg {
+  color: var(--neg);
+}
+@media (max-width: 700px) {
+  .map-quarter-result {
+    top: 64px;
+    left: 8px;
+    max-width: calc(100% - 16px);
+  }
+}
+
 /* Landscape phones lay the zoom controls along the top edge (workspace.css),
    so the map-colors box and its key must stop short of that row. */
 @media (max-height: 500px) and (max-width: 1000px) and (min-width: 560px) {
