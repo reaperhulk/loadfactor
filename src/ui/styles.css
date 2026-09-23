@@ -1006,13 +1006,13 @@ button.toast {
 
 /* Each rival's network keeps one color everywhere: map arcs, panel chips. */
 .rival-c0 {
-  stroke: #d0636e;
+  stroke: #9a7cf5;
 }
 .rival-c1 {
-  stroke: #9d7bd8;
+  stroke: #b8d85c;
 }
 .rival-c2 {
-  stroke: #d8a052;
+  stroke: #e67ad8;
 }
 
 /* A pair a rival also serves: your arc runs hot. */
@@ -1049,13 +1049,13 @@ button.toast {
   fill: var(--accent);
 }
 .chart-end-label.race-rival-1 {
-  fill: #d0636e;
+  fill: #9a7cf5;
 }
 .chart-end-label.race-rival-2 {
-  fill: #9d7bd8;
+  fill: #b8d85c;
 }
 .chart-end-label.race-rival-3 {
-  fill: #d8a052;
+  fill: #e67ad8;
 }
 
 /* The duel ghost: the challenger's number to beat, haunting the race chart. */
@@ -1620,15 +1620,15 @@ input[type='number'] {
 }
 
 .race-rival-1 {
-  stroke: #d0636e;
+  stroke: #9a7cf5;
 }
 
 .race-rival-2 {
-  stroke: #9d7bd8;
+  stroke: #b8d85c;
 }
 
 .race-rival-3 {
-  stroke: #d8a052;
+  stroke: #e67ad8;
 }
 
 .race-legend {
@@ -1644,15 +1644,15 @@ input[type='number'] {
 }
 
 .race-key.rival-1 {
-  color: #d0636e;
+  color: #9a7cf5;
 }
 
 .race-key.rival-2 {
-  color: #9d7bd8;
+  color: #b8d85c;
 }
 
 .race-key.rival-3 {
-  color: #d8a052;
+  color: #e67ad8;
 }
 
 .rival-cards {

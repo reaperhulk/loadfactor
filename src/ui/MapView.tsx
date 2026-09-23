@@ -8,7 +8,6 @@ import { flushSync } from 'react-dom'
 import type { MouseEvent as ReactMouseEvent, PointerEvent } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
-import { getEventDef } from '../data/events'
 import { pairWeeklyDemand, seasonalBp } from '../engine/market'
 import { MIN_ROUTE_KM } from '../data/constants'
 import { Icon } from './Icon'
@@ -16,7 +15,9 @@ import { loadGlobeGeometry, type GlobeGeometry } from './globeGeometry'
 import { aircraftGlyph } from './AircraftArt'
 import { reducedMotion, useDisplayPreferences, useReducedMotion } from './display'
 import { placeLabels } from './labels'
-import { RIVAL_COLORS, cityMass, cityTier, rivalColorClass } from './mapStyle'
+import { cityMass, cityTier, rivalColor, rivalColorClass, type MapLens } from './mapStyle'
+import { MapLegend } from './legends'
+import { REGION_COLLAPSE_BELOW_SCALE, eventHalos, regionHaloShape } from './map/eventHalos'
 import { TrafficCanvas } from './TrafficCanvas'
 import { polylineLeg, quadraticLeg, type TrafficCamera, type TrafficEffect, type TrafficLeg, type TrafficPlane } from './traffic'
 import {
@@ -47,6 +48,7 @@ import {
 import { cityPool } from '../engine/slots'
 import type { Airline } from '../engine'
 import { viewSeat } from './session'
+import './map.css'
 import {
   FULL_VIEW,
   HOME_SCALE_COMPACT,
@@ -1032,7 +1034,7 @@ export function MapView({
   }
   // Data lens: recolor your arcs by an operational metric so the network's
   // health reads at a glance.
-  const [lens, setLens] = useState<'none' | 'load' | 'profit' | 'season' | 'demand'>('none')
+  const [lens, setLens] = useState<MapLens>('none')
   const lensClass = (r: Route): string => {
     if (lens === 'season') {
       // The calendar's lean on this pair right now (tourism seasonality).
@@ -1263,7 +1265,7 @@ export function MapView({
           phase: ((r.id * 17 + airline.id * 7) % 70) / 10,
           glyph: PLANE_GLYPH,
           size: 0.55,
-          fill: RIVAL_COLORS[(airline.id + RIVAL_COLORS.length - 1) % RIVAL_COLORS.length]!,
+          fill: rivalColor(airline.id),
           stroke: '#0b2332',
           alpha: 0.7,
         })
@@ -1279,6 +1281,10 @@ export function MapView({
   // raid on. Each has a static SVG twin (what reduced motion shows, and what
   // tests look for); a CSS animation on those twins would re-lay-out the SVG
   // every frame, which is exactly the cost this canvas exists to remove.
+  // World events on the map: one labeled halo per region-wide event at world
+  // zoom, rings on individual cities once they are separate places.
+  const haloZoom = scale >= REGION_COLLAPSE_BELOW_SCALE ? REGION_COLLAPSE_BELOW_SCALE : 1
+  const halos = useMemo(() => eventHalos(state.world.events, haloZoom), [state.world.events, haloZoom])
   const effects = useMemo((): TrafficEffect[] => {
     if (reduceMotion || (isGlobe && rotating)) return []
     const out: TrafficEffect[] = []
@@ -1288,27 +1294,22 @@ export function MapView({
       if (!p.vis) continue
       out.push({ kind: 'sweep', x: p.X, y: p.Y, r: dotRadius(c) + 4 / uiScale, width: 1.6, color: '#ffd166', period: 6 })
     }
-    for (const e of state.world.events) {
-      const def = getEventDef(e.id)
-      if (def.demandModBp === undefined) continue
-      const good = def.demandModBp >= 10000
-      const cities = e.city !== null ? [getCity(e.city)] : CITIES.filter((c) => c.region === e.region)
-      for (const c of cities) {
-        const p = pt(c.lon, c.lat)
-        if (!p.vis) continue
-        out.push({ kind: 'breathe', x: p.X, y: p.Y, r: 12 / uiScale, width: 2 * Math.min(2, uiScale), color: good ? '#ffd166' : '#e06c6c', period: 2.2 })
-      }
+    // Event halos breathe softly — context, never louder than the airports.
+    for (const h of halos.cities) {
+      const p = pt(h.city.lon, h.city.lat)
+      if (!p.vis) continue
+      out.push({ kind: 'breathe', x: p.X, y: p.Y, r: 12 / uiScale, width: 1.2, color: h.good ? '#ffd166' : '#e06c6c', period: 2.6, alpha: 0.5 })
     }
     for (const a of state.airlines) {
       if (a.id === seat || a.bankrupt || a.campaign?.kind !== 'raid' || a.campaign.target !== seat || !a.campaign.pair || state.turn >= a.campaign.untilTurn) continue
       const [from, to] = a.campaign.pair.split('-') as [string, string]
       const leg = tripLegFor(from, to)
       if (leg === null) continue
-      out.push({ kind: 'march', leg, width: 2.4, color: RIVAL_COLORS[(a.id + RIVAL_COLORS.length - 1) % RIVAL_COLORS.length]! })
+      out.push({ kind: 'march', leg, width: 2.4, color: rivalColor(a.id) })
     }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, seat, isGlobe, globe, projKey, uiScale, reduceMotion, rotating])
+  }, [state, seat, isGlobe, globe, projKey, uiScale, reduceMotion, rotating, halos])
   // What the canvas draws through, read per frame: the viewBox React has
   // written plus whatever transform the last gesture or ease left on the
   // layer. A ref, so the animation loop never closes over a stale render.
@@ -1933,25 +1934,34 @@ export function MapView({
           })}
           {/* Active world events glow on the map: gold halo on boosted cities and
               regions (Olympics, fairs, tourism waves), red on conflict zones. */}
-          {state.world.events.map((e) => {
-            const def = getEventDef(e.id)
-            if (def.demandModBp === undefined) return null
-            const good = def.demandModBp >= 10000
-            const cities = e.city !== null ? [getCity(e.city)] : CITIES.filter((c) => c.region === e.region)
-            return cities.map((c) => {
-              const p = pt(c.lon, c.lat)
-              if (!p.vis) return null
-              return (
-                <circle
-                  key={`${e.id}-${c.id}`}
-                  cx={p.X}
-                  cy={p.Y}
-                  r={12 / uiScale}
-                  className={good ? 'event-halo halo-boom' : 'event-halo halo-bust'}
-                  data-testid={`event-halo-${c.id}`}
-                />
-              )
-            })
+          {halos.regions.map((h) => {
+            const shape = regionHaloShape(
+              h.core.map((c) => pt(c.lon, c.lat)).filter((p) => p.vis),
+              14 / uiScale,
+            )
+            if (shape === null) return null
+            return (
+              <g key={h.key} className={h.good ? 'event-region halo-boom' : 'event-region halo-bust'} data-testid={`event-region-${h.region}`}>
+                <ellipse cx={shape.cx} cy={shape.cy} rx={shape.rx} ry={shape.ry} className="event-region-halo" />
+                <text x={shape.cx} y={shape.cy - shape.ry - 4 / uiScale} fontSize={10 / uiScale} textAnchor="middle" className="event-region-label">
+                  {h.name}
+                </text>
+              </g>
+            )
+          })}
+          {halos.cities.map((h) => {
+            const p = pt(h.city.lon, h.city.lat)
+            if (!p.vis) return null
+            return (
+              <circle
+                key={h.key}
+                cx={p.X}
+                cy={p.Y}
+                r={12 / uiScale}
+                className={h.good ? 'event-halo halo-boom' : 'event-halo halo-bust'}
+                data-testid={`event-halo-${h.city.id}`}
+              />
+            )
           })}
           {/* Planning a route: a dashed ring shows how far the longest-legged
               idle airframe can fly from the origin — why a target is (or isn't)
@@ -2194,14 +2204,14 @@ export function MapView({
         <label>Map colors <select aria-label="map colors" value={lens} onChange={(e) => setLens(e.target.value as typeof lens)}>
           <option value="none">Ownership</option><option value="load">Load factor</option><option value="profit">Route margin</option><option value="season">Season</option><option value="demand">Unserved demand</option>
         </select></label>
-        {lens === 'demand' && <span className="map-data-legend" data-testid="map-data-legend">
-          <span className="opportunity-key">┅┅ {opportunities.length > 0 ? `${opportunities.length} richest unflown markets from your network — thicker is more unmet demand` : 'No unflown market reachable from your network'}</span>
-        </span>}
-        {lens !== 'none' && lens !== 'demand' && <span className="map-data-legend" data-testid="map-data-legend">
-          <span className="pos">━━ {lens === 'load' ? '≥80%' : lens === 'profit' ? '≥15%' : 'High season'}</span>
-          <span>┄┄ {lens === 'load' ? '55–79%' : lens === 'profit' ? '0–14%' : 'Neutral'}</span>
-          <span className="neg">···· {lens === 'load' ? '<55%' : lens === 'profit' ? 'Loss' : 'Low season'}</span>
-        </span>}
+        <MapLegend
+          lens={lens}
+          opportunities={opportunities.length}
+          owners={state.airlines
+            .filter((a) => !a.bankrupt && (a.id === seat || (showRivals && a.routes.length > 0)))
+            .map((a) => ({ id: a.id, name: a.name, color: rivalColor(a.id), you: a.id === seat }))}
+          events={halos.legend}
+        />
       </div>
       {/* Minimap inset: once zoomed in, a world thumbnail shows where the
           viewport sits — click (or drag) to jump the view there. Flat map

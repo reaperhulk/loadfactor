@@ -1,0 +1,89 @@
+/* Map-only rules added with the map/ modules. Loaded with the lazy map chunk,
+   after styles.css, so equal-specificity rules here win. */
+
+/* World events are context: thin, translucent rings that never outshout the
+   airports under them (the canvas breathes them under full motion). */
+.event-halo {
+  stroke-width: 1.2px;
+  opacity: 0.45;
+  vector-effect: non-scaling-stroke;
+}
+
+/* A region-wide event at world zoom: one faint, labeled region instead of a
+   ring on every city in it. */
+.event-region {
+  pointer-events: none;
+}
+.event-region.halo-boom {
+  color: #ffd166;
+  stroke: none;
+}
+.event-region.halo-bust {
+  color: var(--neg);
+  stroke: none;
+}
+.event-region-halo {
+  fill: currentColor;
+  fill-opacity: 0.05;
+  stroke: currentColor;
+  stroke-opacity: 0.38;
+  stroke-width: 1px;
+  stroke-dasharray: 4 5;
+  vector-effect: non-scaling-stroke;
+}
+.event-region-label {
+  fill: currentColor;
+  opacity: 0.85;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  paint-order: stroke;
+  stroke: #0e1522;
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The map key: who flies which network, and what the halos stand for. */
+.map-owner-key .owner,
+.map-event-key .event-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.owner-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--livery, var(--accent));
+}
+.map-owner-key .owner.you {
+  font-weight: 600;
+}
+.event-key.boom {
+  color: #ffd166;
+}
+.event-key.bust {
+  color: var(--neg);
+}
+.event-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px dashed currentColor;
+}
+.event-key small {
+  color: var(--dim);
+  font-size: inherit;
+}
+
+/* Landscape phones lay the zoom controls along the top edge (workspace.css),
+   so the map-colors box and its key must stop short of that row. */
+@media (max-height: 500px) and (max-width: 1000px) and (min-width: 560px) {
+  .game-shell .map-data-control {
+    max-width: calc(100% - 272px);
+  }
+}

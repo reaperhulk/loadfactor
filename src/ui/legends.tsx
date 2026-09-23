@@ -41,6 +41,8 @@ import {
   TRANSFER_HANDLING_PER_PAX,
 } from '../data/constants'
 
+import type { MapLens } from './mapStyle'
+
 const pctFrom = (bp: number): string => {
   const delta = (bp - 10000) / 100
   return `${delta >= 0 ? '+' : ''}${delta.toFixed(0)}%`
@@ -306,5 +308,48 @@ export function ReliabilityLegend({ modern = false }: { modern?: boolean }) {
         breaks more often, and the bills arrive exactly when the schedule can least afford the gap.
       </p>
     </details>
+  )
+}
+
+export interface MapOwner {
+  id: number
+  name: string
+  color: string // CSS color; the viewer's own entry uses their livery
+  you: boolean
+}
+
+export interface MapEventEntry {
+  key: string
+  name: string
+  place: string
+  good: boolean
+  pct: number
+}
+
+// The map's key, under the map-colors picker: what the active lens means,
+// whose network is whose (ownership lens), and which world events the halos
+// on the map stand for. Kept terse — it floats over the map itself.
+export function MapLegend({ lens, opportunities, owners, events }: { lens: MapLens; opportunities: number; owners: readonly MapOwner[]; events: readonly MapEventEntry[] }) {
+  return (
+    <>
+      {lens === 'demand' && <span className="map-data-legend" data-testid="map-data-legend">
+        <span className="opportunity-key">┅┅ {opportunities > 0 ? `${opportunities} richest unflown markets from your network — thicker is more unmet demand` : 'No unflown market reachable from your network'}</span>
+      </span>}
+      {lens !== 'none' && lens !== 'demand' && <span className="map-data-legend" data-testid="map-data-legend">
+        <span className="pos">━━ {lens === 'load' ? '≥80%' : lens === 'profit' ? '≥15%' : 'High season'}</span>
+        <span>┄┄ {lens === 'load' ? '55–79%' : lens === 'profit' ? '0–14%' : 'Neutral'}</span>
+        <span className="neg">···· {lens === 'load' ? '<55%' : lens === 'profit' ? 'Loss' : 'Low season'}</span>
+      </span>}
+      {lens === 'none' && owners.length > 1 && <span className="map-data-legend map-owner-key" data-testid="map-ownership-key" aria-label="route owners">
+        {owners.map((o) => <span key={o.id} className={o.you ? 'owner you' : 'owner'}>
+          <i className="owner-swatch" style={o.you ? undefined : { background: o.color }} aria-hidden="true" />{o.name}{o.you ? ' (you)' : ''}
+        </span>)}
+      </span>}
+      {events.length > 0 && <span className="map-data-legend map-event-key" data-testid="map-event-legend">
+        {events.map((e) => <span key={e.key} className={e.good ? 'event-key boom' : 'event-key bust'}>
+          <i className="event-swatch" aria-hidden="true" />{e.name} · {e.place} <small>{e.pct > 0 ? '+' : '−'}{Math.abs(e.pct)}% demand</small>
+        </span>)}
+      </span>}
+    </>
   )
 }

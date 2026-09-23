@@ -34,7 +34,7 @@ export type TrafficEffect =
   // A bright arc sweeping around a ring: a negotiation in progress.
   | { kind: 'sweep'; x: number; y: number; r: number; width: number; color: string; period: number }
   // A ring breathing in and out: a world event on a city.
-  | { kind: 'breathe'; x: number; y: number; r: number; width: number; color: string; period: number }
+  | { kind: 'breathe'; x: number; y: number; r: number; width: number; color: string; period: number; alpha?: number }
   // Dashes marching along a leg: a raid announced on the pair.
   | { kind: 'march'; leg: TrafficLeg; width: number; color: string }
 
@@ -196,7 +196,7 @@ export function drawTraffic(
     } else {
       const w = (1 - Math.cos(u * TAU)) / 2 // ease in and out, 0 → 1 → 0
       ctx.arc(cx, cy, r * (0.75 + 0.4 * w), 0, TAU)
-      ctx.globalAlpha = 0.9 - 0.55 * w
+      ctx.globalAlpha = (0.9 - 0.55 * w) * (fx.alpha ?? 1)
     }
     ctx.lineWidth = fx.width * dpr
     ctx.stroke()

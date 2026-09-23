@@ -191,3 +191,42 @@ test('desktop home frames the network clear of the map controls', async ({ page 
   })
   expect(text.need, 'Unserved demand fits its select').toBeLessThan(text.have - 16)
 })
+
+test('the ownership key names every network in its map color', async ({ page }) => {
+  await page.addInitScript(quiet)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await page.evaluate(() => { window.__harness.endQuarter(); window.__harness.endQuarter() })
+  const key = page.getByTestId('map-ownership-key')
+  await expect(key).toContainText('Meridian Air (you)')
+  await expect(key).toContainText('Albion Airways')
+  // The swatch is the very color of that airline's arcs.
+  const swatch = await key.locator('.owner', { hasText: 'Albion Airways' }).locator('.owner-swatch').evaluate((el) => getComputedStyle(el).backgroundColor)
+  const arc = await page.locator('.route-rival.rival-c0').first().evaluate((el) => getComputedStyle(el).stroke)
+  expect(swatch).toBe(arc)
+  await page.getByLabel('map colors', { exact: true }).selectOption('load')
+  await expect(key).toHaveCount(0)
+})
+
+test('a world event gets a legend line and a bounded number of halos', async ({ page }) => {
+  await page.addInitScript(quiet)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await expect(page.getByTestId('map-event-legend')).toHaveCount(0)
+  await page.evaluate(() => {
+    const s = window.__harness.getState()!
+    s.world.events.push({ id: 'tourism_wave', quartersLeft: 2, city: null, region: 'na' })
+    const idle = s.airlines[0]!.fleet.find((a) => a.routeId === null)!
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
+  })
+  await expect(page.getByTestId('map-event-legend')).toContainText('Tourism wave · North America')
+  // World zoom: one labeled region, not a ring on every North American city.
+  await expect(page.getByTestId('event-region-na')).toHaveCount(1)
+  await expect(page.getByTestId('event-region-na')).toContainText('Tourism wave')
+  expect(await page.locator('[data-testid^="event-halo-"]').count()).toBe(0)
+  // Close up, individual rings — only for the region's biggest markets.
+  for (let i = 0; i < 3; i++) await page.getByTestId('zoom-in').click()
+  await expect(page.getByTestId('event-region-na')).toHaveCount(0)
+  await expect.poll(() => page.locator('[data-testid^="event-halo-"]').count()).toBeGreaterThan(0)
+  expect(await page.locator('[data-testid^="event-halo-"]').count()).toBeLessThanOrEqual(6)
+})
