@@ -922,3 +922,85 @@ replay viewer stay lazy.
 Tests: `rivals.test.ts` (rules 5 block), `worldV5.test.ts`,
 `ui/__tests__/forecastRange.test.ts`; goldens regenerated for rules 5 with
 rules 4 pinned in `fixtures/legacy-v4-goldens.json`.
+
+### Rules 6: price is a lever, the world warns, cash has a use (September 2026)
+
+New careers use rules 6; rules 1–5 golden careers stay pinned in their own
+fixtures (rules 5 in `fixtures/legacy-v5-goldens.json`). Everything below is
+gated on `rulesVersion >= 6`. A project review found these problems with rules 5:
+the fare decision collapsed to +2 (the profit-maximizing fare was +2 on 94%
+of late-game routes), service cost more than it earned, the reference bot
+won 1 Jet Age seed in 8 by expanding while a passive bot won 5, cash piled up
+with nothing to buy, oil shocks landed unannounced, and a route's result
+never said why.
+
+**Price.** Below the standard ladder, a fare stimulates new leisure and
+budget travellers (`FARE_STIMULATION_V6`, capped at
+`FARE_STIMULATION_CAP_BP`). Above it, `FARE_ELASTICITY_V6` sheds demand
+more steeply than before, and business travellers weigh price through
+`BUSINESS_PRICE_DAMPING`. Service earns revenue per passenger
+(`SERVICE_YIELD_BP_V6`: basic 98%, standard 100%, full 109%), billed on
+revenue only: shoppers compare the ticket. On the probe the profit-maximizing
+fare at year 15 is now 0/+1/+2 on 27/41/32% of routes. A doctrine raises a
+full route's fare at most two steps above its posture (`fareCeilingFor`), so
+a discount carrier stays one. Indexing fares to inflation was tried and
+rejected: at half the cost drift it doubled late-career net worth.
+
+**Warnings.** Every drawn event goes to `world.announced`
+(`world_event_announced`) and lands one quarter later
+(`EVENT_WARNING_QUARTERS_V6`). The planning forecast and the capital outlook
+price announced events in. Hedges cost `HEDGE_PREMIUM_BP_OF_FUEL_V6` of last
+quarter's fuel bill per quarter covered and may cover half the burn
+(`HEDGE_COVER_OPTIONS_BP`). A new hedge locks halfway between today's index
+and the announced one (`hedgeLockBp`), so hedging early beats hedging on the
+headline. Announced demand events that touch a human network put a question
+on the table (`eventOffers`, no RNG):
+- `official_carrier` before a surge: appeal plus `OFFICIAL_CARRIER_DEMAND_BP_V6`
+  more travel on the host's pairs;
+- `airlift_contract` through a slump: `AIRLIFT_CAPACITY_BP_V6` of your trips
+  there fly for the government for a fixed quarterly fee (`dealIncome`,
+  reported as `airlift_flown`).
+
+**Capital.**
+- `fund_terminal` pays `terminalCost` to open a city's next programme next
+  quarter. The funder takes `TERMINAL_FUNDER_SLOTS_V6` slots and the rest
+  serve the list; each city allows one funded programme per half-cadence.
+  The shared brain funds only when rich, locked out, and with
+  `TERMINAL_MIN_HORIZON` quarters left.
+- Takeovers transfer the target's cash.
+- The engine enforces `ENTRANT_GRACE_QUARTERS` for every buyer.
+- The brain buys only when the premium over book value is cheaper than the
+  target's slots (`takeoverPaysFor`).
+- New-build orders are capped at `ORDERS_PER_QUARTER_V6` per airline per
+  quarter, leases included.
+
+**Rivals.** A raid picks among the leader's top `RAID_CHOICES_V6` markets by
+a stateless hash. A price war names its contested pair and cuts fares only
+there.
+
+**Mandates.** A load-factor mandate qualifies only an airline flying at
+least `LF_FIELD_SCALE_BP_V6` of the median competitor's seats
+(`fliesAtFieldScale`).
+
+**Explanations.** Route results carry `lastMarket` (standard-fare demand,
+carried, own nonstop, unserved, sold out) and `lastCostParts`, and so do
+their `route_result` events. The route dossier turns them into sentences.
+
+**Balance contract.** `balanceV2.test.ts` keeps survival, the runaway bound,
+live rivals and the naive-bot bar. Each scenario must be winnable by at
+least one of five doctrines. On Jet Age and Oil Crisis (four seeds each)
+the reference bot must win most races, and every mainstream doctrine must
+win some, within a spread of four. When this shipped, wins out of 8 were:
+
+| Doctrine  | Wins |
+|-----------|------|
+| greedy    | 6    |
+| budget    | 6    |
+| connector | 5    |
+| premium   | 3    |
+
+The full matrix is `fixtures/balance-v6-report.json`
+(`tools/balance-report.ts`).
+
+Tests: `rulesV6.test.ts` checks every mechanic against rules 5;
+`e2e/rules6.spec.ts` covers the UI.

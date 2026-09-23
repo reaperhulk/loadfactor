@@ -55,11 +55,16 @@ export function ManagementBrief({ state, onTab, onInspect, onPlan, onAircraft }:
   if (raid) items.push({ priority: 75, title: `${raid.name} is coming for ${raid.campaign!.pair!.replace('-', '–')}`, detail: `A raid on your market, announced ${raid.campaign!.fromTurn > state.turn ? 'for next quarter' : `${Math.max(0, raid.campaign!.untilTurn - state.turn)} quarters to run`}. Compare fare, service and frequency on the pair before their first flight.`, action: 'Read rival plans', run: () => onTab('rivals') })
   if (campaign && campaign !== raid) items.push({ priority: 40, title: `${campaign.name} has a plan`, detail: `${campaign.campaign!.kind} campaign${campaign.campaign!.pair ? ` on ${campaign.campaign!.pair.replace('-', '–')}` : ` at ${campaign.campaign!.city}`} · ${Math.max(0, campaign.campaign!.untilTurn-state.turn)} quarters remaining.`, action: 'Read rival plans', run: () => onTab('rivals') })
   // Rules 6: announced events are the quarter's decision window.
+  // Global news always matters; a city or region only if the network touches it.
+  const touches = (city: string) => (news: { city: string | null; region: string | null }) => news.city === city || (news.region !== null && getCity(city).region === news.region)
+  const networkCities = airline.routes.flatMap((r) => [r.from, r.to])
   for (const news of state.world.announced ?? []) {
+    if ((news.city !== null || news.region !== null) && !networkCities.some((c) => touches(c)(news))) continue
     const def = getEventDef(news.id)
     const where = news.city ? ` at ${getCity(news.city).name}` : news.region ? ` in ${news.region.toUpperCase()}` : ''
     const fuel = (def.fuelModBp ?? 10000) > 10000
-    items.push({ priority: fuel ? 85 : 65, title: `${def.name}${where} lands next quarter`, detail: `${eventImpact(news.id)}. ${fuel ? 'Hedge now (the desk has priced in half of it), trim thin routes, or keep extra cash.' : 'The plan above already includes it. Move capacity, reprice, or answer the question it put on your desk.'}`,
+    const asked = state.world.offers.some((o) => (o.airline ?? 0) === seat && o.eventId === news.id)
+    items.push({ priority: fuel ? 85 : 65, title: `${def.name}${where} lands next quarter`, detail: `${eventImpact(news.id)}. ${fuel ? 'Hedge now (the desk has priced in half of it), trim thin routes, or keep extra cash.' : `The plan above already includes it. Move capacity or reprice${asked ? ', and answer the offer it put on your desk' : ''}.`}`,
       action: fuel ? 'Review fuel protection' : 'Plan route changes', run: () => onTab(fuel ? 'finance' : 'routes') })
   }
   if (!items.length) items.push({ priority: 0, title: 'Choose your next move', detail: 'Compare an expansion with improving the network you already have. Retain enough cash for a difficult quarter.', action: 'Plan route changes', run: () => onTab('routes') })

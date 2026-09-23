@@ -285,7 +285,9 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
               onConfirm={() => dispatch({ type: 'fund_terminal', city: cityId })}
             />{' '}
             <span className="dim">
-              {blocker ?? `opens +${expansionSize(cityId)} slots next quarter instead of in ${expansion.quartersAway}q; you take the first ${Math.min(TERMINAL_FUNDER_SLOTS_V6, expansionSize(cityId))}, the rest serve the list`}
+              {blocker ?? (remaining > 0
+                ? `${remaining} slots are still free here: joining the list is far cheaper than building`
+                : `opens +${expansionSize(cityId)} slots next quarter instead of in ${expansion.quartersAway}q; you take the first ${Math.min(TERMINAL_FUNDER_SLOTS_V6, expansionSize(cityId))}, the rest serve the list`)}
             </span>
           </div>
         )

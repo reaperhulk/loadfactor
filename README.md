@@ -9,7 +9,7 @@ through fuel shocks, recessions and changing aviation eras.
 The simulation is deterministic and runs without a browser. A career records its
 scenario, seed, rules/content versions and commands. Saves, replays, multiplayer
 turn links, bot playtesting and golden tests all use that same record. Existing
-unversioned careers keep their original rules; new careers use rules 5. Rules 1, 2, 3 and 4 retain their original deterministic behavior. Rules-2 solo careers can opt into improved operations in Fleet policy.
+unversioned careers keep their original rules; new careers use rules 6. Rules 1 to 5 retain their original deterministic behavior. Rules-2 solo careers can opt into improved operations in Fleet policy.
 
 ## Playing
 
@@ -70,6 +70,20 @@ npm run dev     # http://localhost:5173
   works and currency crises join the deck, and every new aircraft type is
   announced on the day it goes on sale: its seats carry extra appeal for its
   first two years.
+- **Price, and hear the news first (rules 6).** A discount below the standard
+  fare brings new leisure and budget travellers into a market, and the top fare
+  sheds real demand, so the right fare depends on the route. Full service earns
+  more per passenger. Every world event is announced a quarter before it lands,
+  and the plan is priced with it. Hedge early (the fuel desk prices in half an
+  announced shock), cover half your burn or all of it, or take the question the
+  news puts on your desk: an official-carrier deal before the Games, or a
+  government airlift through a regional crisis.
+- **Spend the treasury (rules 6).** Pay an airport to open its next building
+  programme next quarter and take the first slots. A takeover buys the rival's
+  cash too, but new carriers are protected for two years from everyone. The
+  aircraft lines take four new-build orders a quarter. Every route result now
+  says why: how many wanted the pair, your share, who took the rest, whether
+  travellers were turned away for lack of seats, and the largest flying cost.
 - **Know what could move the number.** The planned profit shows a likely range
   beside the point forecast: one step of the fuel and demand walks, events
   ending before the quarter flies, rivals on your pairs and announced campaigns
@@ -95,7 +109,8 @@ npm run dev     # http://localhost:5173
 Five long careers follow the Jet Age, Oil Crisis, Deregulation, Open Skies and
 Low-Cost Wars. Their objectives are net worth, cumulative profit, passenger
 boardings, connecting boardings and lifetime load factor respectively. Load-factor
-careers also require 1.5 million boardings and three active routes to qualify.
+careers also require 1.5 million boardings and three active routes to qualify;
+under rules 6 they also need at least half the seats of the median competitor.
 
 Four shorter mandates use the full simulation. Under rules 5 a mandate is won
 on its own bar; the long eras are races against the field:
@@ -172,10 +187,14 @@ npx vite-node tools/profile-decisions.ts
 npx vite-node tools/balance-report.ts experiment 6 /tmp/balance.json
 ```
 
-The held-out rules-2 release matrix is in
-[fixtures/balance-v2-report.json](fixtures/balance-v2-report.json): 162 careers,
-nine scenarios, six seeds and three policies. Independent CI seeds guard survival,
-winnability and runaway growth. Original rules-1 golden fixtures remain separate.
+The rules-6 release matrix is in
+[fixtures/balance-v6-report.json](fixtures/balance-v6-report.json): nine
+scenarios, four held-out seeds and six policies. Independent CI seeds guard
+survival, winnability, runaway growth and the doctrine race: the reference bot
+wins most Jet Age and Oil Crisis seeds and every mainstream doctrine wins some.
+The historical rules-2 matrix remains in
+[fixtures/balance-v2-report.json](fixtures/balance-v2-report.json), and the
+rules-1 to rules-5 golden fixtures remain separate.
 
 The browser's developer harness is `window.__harness`: `getState()`,
 `dispatch(command)`, `endQuarter()`, `newGame(scenario, seed)`, `getReplay()` and
