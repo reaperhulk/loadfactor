@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Locator } from '@playwright/test'
 import { openPanel } from './workspace'
 import { readFileSync } from 'node:fs'
 import type { GameState } from '../src/engine'
@@ -143,4 +143,51 @@ for (const width of [1440,390]) test(`route selection ${width}px accepts a click
     await expect(page.getByTestId('route-dossier')).toBeVisible()
     await page.keyboard.press('Escape')
   }
+})
+
+// ---- The map as a board: framing, key, events, result, keyboard ----------
+
+const quiet = () => localStorage.setItem('loadfactor:display:v1', JSON.stringify({ celebrations: false }))
+const centreOf = async (el: Locator) => {
+  const b = (await el.boundingBox())!
+  return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
+}
+const inside = (p: { x: number; y: number }, b: { x: number; y: number; width: number; height: number }) =>
+  p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height
+
+test('desktop home frames the network clear of the map controls', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.addInitScript(quiet)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  const wrap = (await page.getByTestId('map-wrap').boundingBox())!
+  const controls = (await page.locator('.map-controls').boundingBox())!
+  // The west coast used to sit under the zoom column, cropped off the frame.
+  for (const id of ['SFO', 'LAX', 'JFK', 'ORD', 'MIA']) {
+    const c = await centreOf(page.getByTestId(`city-${id}`))
+    expect(inside(c, wrap), `${id} is inside the frame`).toBe(true)
+    expect(inside(c, controls), `${id} is not under the controls`).toBe(false)
+  }
+  await info.attach('jet_age-home', { body: await page.screenshot(), contentType: 'image/png' })
+  // A Singapore airline opens centred on Asia, not pinned to the right edge.
+  await page.evaluate(() => window.__harness.newGame('open_skies', 'framing'))
+  await expect.poll(async () => {
+    const sin = await centreOf(page.getByTestId('city-SIN'))
+    return (sin.x - wrap.x) / wrap.width
+  }).toBeGreaterThan(0.3)
+  const sin = await centreOf(page.getByTestId('city-SIN'))
+  expect((sin.x - wrap.x) / wrap.width).toBeLessThan(0.85)
+  expect(inside(await centreOf(page.getByTestId('city-HND')), wrap), 'Tokyo is on screen').toBe(true)
+  await info.attach('open_skies-home', { body: await page.screenshot(), contentType: 'image/png' })
+  // The map-colors picker shows its longest option in full.
+  const select = page.getByLabel('map colors', { exact: true })
+  await select.selectOption('demand')
+  expect(await select.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+  const text = await select.evaluate((el) => {
+    const s = el as HTMLSelectElement
+    const ctx = document.createElement('canvas').getContext('2d')!
+    ctx.font = getComputedStyle(s).font
+    return { need: ctx.measureText(s.options[s.selectedIndex]!.text).width, have: s.clientWidth }
+  })
+  expect(text.need, 'Unserved demand fits its select').toBeLessThan(text.have - 16)
 })

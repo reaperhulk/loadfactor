@@ -47,6 +47,22 @@ import {
 import { cityPool } from '../engine/slots'
 import type { Airline } from '../engine'
 import { viewSeat } from './session'
+import {
+  FULL_VIEW,
+  HOME_SCALE_COMPACT,
+  HOME_SCALE_DESKTOP,
+  MAX_SCALE,
+  SPAN_MIN,
+  layerSpan,
+  NO_INSETS,
+  clampView,
+  homeViewFor,
+  overlayInsets,
+  viewToCss,
+  visibleRect,
+  type Insets,
+  type ViewBox,
+} from './map/camera'
 
 // Arc weight tells capacity: seats/wk drive stroke width, so the map itself
 // shows where an airline's hardware is concentrated. Fed to CSS as a custom
@@ -69,30 +85,6 @@ function slotsUsedAt(routes: readonly Route[], city: string): number {
 const W = MAP_W
 const H = MAP_H
 
-// How many frames wide the moving layer is. The overhang past each edge is
-// (SPAN - 1) / 2 of the frame, and that is the budget a gesture spends before
-// the layer runs out of painted world and has to be re-centred — which rewrites
-// the viewBox and throws away the cached texture, the one genuinely expensive
-// thing a drag can do.
-//
-// So the layer is sized to hold the WHOLE WORLD whenever that is affordable.
-// Zoomed out two steps the world is only 2.25 frames across, so the layer
-// covers all of it and a drag of any length re-centres zero times: the
-// compositor just slides a texture that already has everywhere on it. Past the
-// cap the world no longer fits and re-centres come back, but by then the view
-// holds few enough cities that the render behind one is cheap.
-// The choice is deliberately all-or-nothing. Either the layer holds the whole
-// world, and a drag of any length re-centres zero times, or it takes the
-// smallest useful overhang and re-centres often but cheaply. A middle size
-// gets the worst of both: re-centres still happen, and the wider cull that a
-// wider layer forces drags more cities into every render — at max zoom that
-// was 48 of them instead of 12, to remove only two thirds of the re-centres.
-const SPAN_MIN = 1.5
-const SPAN_WHOLE_WORLD_UP_TO = 2.5
-const layerSpan = (viewW: number, frameAspect: number): number => {
-  const whole = W / viewW
-  return whole <= SPAN_WHOLE_WORLD_UP_TO && frameAspect >= 1.5 ? Math.max(SPAN_MIN, whole * Math.max(1, (W/H)/frameAspect, frameAspect/(W/H))) : SPAN_MIN
-}
 
 const x = projectLon
 const y = projectLat
@@ -156,18 +148,22 @@ function graticulePath(): string {
   return GRATICULE_PATH
 }
 
-// The SVG covers its box (preserveAspectRatio="slice"), so viewBox units map
-// to CSS pixels by the LARGER of the two ratios with the surplus split either
-// side. Every pointer conversion — tap, drag, pinch, zoom-to-cursor — must use
-// this, or input lands in the wrong place the moment the element's box stops
-// carrying the viewBox's aspect (which is what a phone-height map does).
-function viewToCss(rect: { width: number; height: number }, w: number, h: number) {
-  const k = Math.max(rect.width / w, rect.height / h)
-  return { k, offX: (rect.width - w * k) / 2, offY: (rect.height - h * k) / 2 }
-}
-
 // Short hops, medium stages, and long-haul trunks each get their own line
 // language (width/dash), on top of the arc lift that grows with distance.
+// Home for the airline in the viewer's seat: its HQ, served cities and
+// footholds, framed by homeViewFor for this frame. A phone opens on the home
+// region, a desktop on nearly the whole world centred on the network.
+function networkHome(state: GameState, frame: { width: number; height: number }, insets: Insets): ViewBox {
+  const me = state.airlines[viewSeat()]!
+  const ids = [...new Set([me.hq, ...networkCities(me), ...slotCities(me)])].sort()
+  const points = ids.map((id) => {
+    const c = getCity(id)
+    return { x: x(c.lon), y: y(c.lat) }
+  })
+  const compact = typeof window !== 'undefined' && window.innerWidth <= 1100
+  return homeViewFor({ points, frame, insets, maxScale: compact ? HOME_SCALE_COMPACT : HOME_SCALE_DESKTOP })
+}
+
 function haulClass(km: number): string {
   return km >= 4500 ? 'route-long' : km >= 1500 ? 'route-medium' : 'route-short'
 }
@@ -434,28 +430,6 @@ function globeTripLeg(g: GlobeView, fromId: string, toId: string): TrafficLeg | 
   return polylineLeg(flat)
 }
 
-interface ViewBox {
-  x: number
-  y: number
-  w: number
-  h: number
-}
-
-const FULL_VIEW: ViewBox = { x: 0, y: 0, w: W, h: H }
-// Past 4× the frame holds nothing but dots and one label; 6× was empty.
-const MAX_SCALE = 4
-
-function clampView(v: ViewBox): ViewBox {
-  const w = Math.min(W, Math.max(W / MAX_SCALE, v.w))
-  const h = (w / W) * H
-  return {
-    x: Math.min(W - w, Math.max(0, v.x)),
-    y: Math.min(H - h, Math.max(0, v.y)),
-    w,
-    h,
-  }
-}
-
 interface MapViewProps {
   flowRouteIds?: number[]
   selectedRouteId?: number
@@ -487,25 +461,32 @@ export function MapView({
 }: MapViewProps) {
   const display = useDisplayPreferences()
   const reduceMotion = useReducedMotion()
-  // A phone's map box is nearly square; the world is 2.7:1. Covering that box
-  // with the WHOLE world would crop 60% of its width — measured, Chicago
-  // rendered at x = -45. So on a narrow screen "home" is the player's own
-  // region, not the whole planet: the crop then shows the network you fly.
-  // Desktop keeps the full world, where the box already carries the viewBox's
-  // aspect and nothing is cropped at all.
+  const svgRef = useRef<SVGSVGElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  // The frame's size in CSS px — state for rendering, and a ref for the input
+  // and framing paths that must see a measurement taken this very tick.
+  const [frame, setFrame] = useState({ width: W, height: H })
+  const frameRef = useRef(frame)
+  const frameAspect = frame.width / frame.height
+  const aspectNow = (): number => frameRef.current.width / frameRef.current.height
+  // Home frames the player's own network — HQ, served cities, footholds —
+  // in the part of the frame the map's chrome does not cover (see
+  // homeViewFor). A phone's box is nearly square against a 2.7:1 world, so it
+  // opens on the home region; a desktop opens on nearly the whole world,
+  // centred where the airline actually flies instead of on the Atlantic.
   const homeView = (): ViewBox => {
-    if (typeof window === 'undefined' || window.innerWidth > 1100) return FULL_VIEW
-    const hq = getCity(state.airlines[viewSeat()]!.hq)
-    const w = W / 2.2
-    const h = (w * H) / W
-    return {
-      x: Math.max(0, Math.min(W - w, x(hq.lon) - w / 2)),
-      y: Math.max(0, Math.min(H - h, y(hq.lat) - h / 2)),
-      w,
-      h,
-    }
+    const wrap = wrapRef.current
+    const rect = wrap?.getBoundingClientRect()
+    const measured = rect !== undefined && rect.width > 0 && rect.height > 0
+    const insets = measured
+      ? overlayInsets(rect, [...wrap!.querySelectorAll('.map-controls, .map-data-control')].map((el) => el.getBoundingClientRect()))
+      : NO_INSETS
+    return networkHome(state, measured ? rect : frameRef.current, insets)
   }
-  const [view, setView] = useState<ViewBox>(homeView)
+  // Before the frame is measured, home is a guess at the world's own aspect;
+  // the first measurement (below) frames it for real, before first paint.
+  const [initialView] = useState<ViewBox>(() => networkHome(state, { width: W, height: H }, NO_INSETS))
+  const [view, setView] = useState<ViewBox>(initialView)
   // What the SVG rasters, as opposed to what React knows. `view` is the
   // logical view — taps, cull-adjacent reads, the minimap, data-view — and
   // `anchor` is the viewBox actually written to the DOM. They part ways after
@@ -514,26 +495,19 @@ export function MapView({
   // no viewBox rewrite, no re-raster, nothing. Only a zoom (new resolution)
   // or a re-centre (new world content) moves the anchor, and each is a single
   // raster taken at rest.
-  const [anchor, setAnchor] = useState<ViewBox>(homeView)
-  const svgRef = useRef<SVGSVGElement>(null)
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const [frame, setFrame] = useState({ width: W, height: H })
-  const frameAspect = frame.width / frame.height
-  useEffect(() => {
-    const el = wrapRef.current
-    if (!el) return
-    const observer = new ResizeObserver(([entry]) => {
-      const { width, height } = entry!.contentRect
-      if (width > 0 && height > 0) setFrame({ width, height })
-    })
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
+  const [anchor, setAnchor] = useState<ViewBox>(initialView)
+  // Called with every new frame measurement (see the observer below): the
+  // first real one frames home, since nothing before it knew the frame's
+  // shape; later ones only re-clamp, so a resize never strands the view off
+  // the world's edge. A ref, refreshed each render, so the once-attached
+  // observer always runs against current state.
+  const homed = useRef(false)
+  const onFrameRef = useRef<(width: number, height: number) => void>(() => {})
   const drag = useRef<{ px: number; py: number; moved: boolean } | null>(null)
   // Zoom eases toward targetRef via exponential smoothing in a rAF loop;
   // panning writes through immediately. Wheel/button handlers mutate the
   // TARGET, so rapid inputs compound smoothly instead of stacking jumps.
-  const targetRef = useRef<ViewBox>(homeView())
+  const targetRef = useRef<ViewBox>(initialView)
   const rafRef = useRef(0)
 
   // Projection: the flat overview or a rotatable orthographic globe. The
@@ -622,7 +596,7 @@ export function MapView({
   const layerRef = useRef<HTMLDivElement>(null)
   const minimapRef = useRef<HTMLDivElement>(null)
   // The viewBox actually in the DOM. The transform maps it to the live view.
-  const baseRef = useRef<ViewBox>(homeView())
+  const baseRef = useRef<ViewBox>(initialView)
   // The globe equivalents: what is committed to state, and where a zoom-only
   // ease has got to on top of it.
   const [globe, setGlobe] = useState<GlobeView>(GLOBE_HOME)
@@ -724,7 +698,7 @@ export function MapView({
 
   // The flat view most recently painted to the DOM — where a new ease starts
   // from, now that the committed view and the rastered anchor can differ.
-  const paintedRef = useRef<ViewBox>(homeView())
+  const paintedRef = useRef<ViewBox>(initialView)
 
   const paintView = (v: ViewBox): void => {
     const rect = frameRect()
@@ -770,7 +744,8 @@ export function MapView({
     // the committed render puts the new size on when the zoom lands.
     const mm = minimapRef.current
     if (mm !== null && Math.abs(v.w - baseRef.current.w) < 0.5) {
-      mm.style.transform = `translate3d(${(v.x / v.w) * 100}%, ${(v.y / v.h) * 100}%, 0)`
+      const vis = visibleRect(v, aspectNow())
+      mm.style.transform = `translate3d(${(vis.x / vis.w) * 100}%, ${(vis.y / vis.h) * 100}%, 0)`
     }
   }
 
@@ -782,7 +757,7 @@ export function MapView({
   useLayoutEffect(() => {
     baseRef.current = anchor
     globeBaseRef.current = globe
-    spanRef.current = isGlobe ? SPAN_MIN : layerSpan(anchor.w, frameAspect)
+    spanRef.current = isGlobe ? SPAN_MIN : layerSpan(anchor, frameAspect)
     // A render can land mid-ease — starting one drops detail, and a quarter
     // can resolve underneath it. The ease repaints the transform from its own
     // rAF every frame, so this effect must not paint the committed view over
@@ -798,7 +773,7 @@ export function MapView({
 
   // Where an eased view has got to, and whether one is in flight. When it is
   // not, the committed `view` is the truth.
-  const easeRef = useRef<ViewBox>(homeView())
+  const easeRef = useRef<ViewBox>(initialView)
   const easing = useRef(false)
   const stopEase = (): void => {
     if (rafRef.current) {
@@ -840,7 +815,7 @@ export function MapView({
 
   const applyView = (target: ViewBox, immediate: boolean): void => {
     immediate = immediate || reduceMotion
-    targetRef.current = clampView(target)
+    targetRef.current = clampView(target, aspectNow())
     if (gesturing.current) {
       // Mid-gesture: straight to the DOM, no render, no media query. A pinch
       // changes the width and pays the same scaling bill as an eased zoom.
@@ -862,6 +837,47 @@ export function MapView({
       rafRef.current = requestAnimationFrame(settleView)
     }
   }
+
+  useLayoutEffect(() => {
+    onFrameRef.current = (width: number, height: number): void => {
+      const prev = frameRef.current
+      if (prev.width === width && prev.height === height && homed.current) return
+      frameRef.current = { width, height }
+      setFrame(frameRef.current)
+      if (!homed.current) {
+        homed.current = true
+        applyView(homeView(), true)
+      } else if (!gesturing.current && !rafRef.current) {
+        const t = targetRef.current
+        const c = clampView(t, width / height)
+        if (Math.abs(c.x - t.x) > 0.01 || Math.abs(c.y - t.y) > 0.01) applyView(c, true)
+      }
+    }
+  })
+  // Measured before the first paint so home is framed for the real frame
+  // rather than flashing the guess the initial state had to make.
+  useLayoutEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    if (r.width > 0 && r.height > 0) onFrameRef.current(r.width, r.height)
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry!.contentRect
+      if (width > 0 && height > 0) onFrameRef.current(width, height)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  // A different airline in the seat (a new career, the next hotseat player)
+  // opens on its own network.
+  const homeKey = `${viewSeat()}:${state.airlines[viewSeat()]!.hq}`
+  const lastHomeKey = useRef(homeKey)
+  useEffect(() => {
+    if (lastHomeKey.current === homeKey) return
+    lastHomeKey.current = homeKey
+    if (homed.current && !gesturing.current) applyView(homeView(), true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [homeKey])
 
   useEffect(() => {
     return () => {
@@ -1329,7 +1345,7 @@ export function MapView({
   // the pan-commit path exists to keep.
   const cull = anchor
   // The globe re-projects rather than panning, so it needs no overhang.
-  const span = isGlobe ? SPAN_MIN : layerSpan(anchor.w, frameAspect)
+  const span = isGlobe ? SPAN_MIN : layerSpan(anchor, frameAspect)
   const { visible, labeled } = useMemo(() => {
     // Cities the player has a stake in stay visible at any zoom.
     const stakes = new Set<string>()
@@ -1350,7 +1366,7 @@ export function MapView({
     // whole overhang with room to spare, so nothing culled here can be
     // revealed by a gesture before the layer re-centres and this runs again.
     // The globe does its own culling, by hemisphere.
-    const pad = (layerSpan(cull.w, frameAspect) - 1) / 2 + 0.1
+    const pad = (layerSpan(cull, frameAspect) - 1) / 2 + 0.1
     const inFrame = (c: City): boolean =>
       isGlobe ||
       (x(c.lon) >= cull.x - cull.w * pad &&
@@ -2219,16 +2235,23 @@ export function MapView({
               the marker's OWN box, which is exactly view.w wide — so
               translating it 100% of itself moves it one view across the
               world, and no pixel measurement is needed. */}
-          <div
-            ref={minimapRef}
-            className="minimap-viewport"
-            data-testid="minimap-viewport"
-            style={{
-              width: `${(view.w / W) * 100}%`,
-              height: `${(view.h / H) * 100}%`,
-              transform: `translate3d(${(view.x / view.w) * 100}%, ${(view.y / view.h) * 100}%, 0)`,
-            }}
-          />
+          {/* The marker outlines what the frame SHOWS — the viewBox minus
+              what `slice` crops — so it never claims the cropped edges. */}
+          {(() => {
+            const vis = visibleRect(view, frameAspect)
+            return (
+              <div
+                ref={minimapRef}
+                className="minimap-viewport"
+                data-testid="minimap-viewport"
+                style={{
+                  width: `${(vis.w / W) * 100}%`,
+                  height: `${(vis.h / H) * 100}%`,
+                  transform: `translate3d(${(vis.x / vis.w) * 100}%, ${(vis.y / vis.h) * 100}%, 0)`,
+                }}
+              />
+            )
+          })()}
         </div>
       )}
     </div>

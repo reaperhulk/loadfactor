@@ -2309,7 +2309,7 @@ th { font-size:.78rem; letter-spacing:.02em; }
 .map-area .city-panel { position:relative; top:auto; right:auto; width:auto; max-height:72vh; background:var(--panel); border-color:var(--rule); font-size:.88rem; backdrop-filter:none; }
 .map-area .map-wrap { min-width:0; }
 .map-data-control { position:absolute; right:12px; left:auto; top:10px; z-index:3; max-width:calc(100% - 80px); background:#102b3eee; border:1px solid #4b6878; border-radius:6px; padding:5px 8px; font-size:.73rem; color:#e7edf0; }
-.map-data-control select { font-size:.74rem; max-width:140px; }
+.map-data-control select { font-size:.74rem; min-width:9.5em; max-width:none; }
 .map-data-legend { display:flex; flex-wrap:wrap; gap:9px; margin-top:6px; }
 .route-player.lens-mid { stroke-dasharray:7 3; }
 .route-player.lens-bad { stroke-dasharray:2 4; }
