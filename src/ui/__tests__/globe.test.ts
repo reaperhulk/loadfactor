@@ -55,7 +55,7 @@ function filled(path: string, x: number, y: number): boolean {
   return winding !== 0
 }
 
-import { globeLandPath } from '../MapView'
+import { globeLandPath, ringTrigTables } from '../MapView'
 import geometry from '../../data/globemap.gen.json'
 import type { GlobeGeometry } from '../globeGeometry'
 
@@ -82,5 +82,56 @@ it('keeps Atlantic water clear while Africa rotates across the horizon', () => {
       const africa = globeProjectFull(g, 20, 0)
       expect(filled(path,africa.X,africa.Y), 'Africa remains filled').toBe(true)
     }
+  }
+})
+
+// The land path used to call the full projection (five trig calls) per
+// vertex per frame of rotation. It now reads cached per-vertex trig; this is
+// the old, direct version, kept as the reference the cache must reproduce.
+function referenceLandPath(g: { cLon: number; cLat: number; s: number }, rings: readonly (readonly (readonly [number, number])[])[]): string {
+  const R = 160 * g.s
+  const cx = 960 / 2
+  const cy = 352 / 2
+  const parts: string[] = []
+  for (const ring of rings) {
+    const points = ring.map(([lon, lat]) => globeProjectFull(g, lon, lat))
+    const start = points.findIndex((p) => p.cosc > 0.001)
+    if (start < 0) continue
+    let d = ''
+    let prevLimbAz: number | null = null
+    const emit = (px: number, py: number): void => { d += `${d === '' ? 'M' : 'L'}${px.toFixed(1)} ${py.toFixed(1)}` }
+    for (let i = 0; i < points.length; i++) {
+      const p = points[(start + i) % points.length]!
+      if (p.cosc > 0.001) { emit(p.X, p.Y); prevLimbAz = null; continue }
+      if (p.cosc < -0.55) continue
+      const az = Math.atan2(p.Y - cy, p.X - cx)
+      if (prevLimbAz !== null) {
+        let delta = az - prevLimbAz
+        while (delta > Math.PI) delta -= 2 * Math.PI
+        while (delta < -Math.PI) delta += 2 * Math.PI
+        const steps = Math.floor(Math.abs(delta) / 0.2)
+        for (let s = 1; s <= steps; s++) { const a = prevLimbAz + (delta * s) / (steps + 1); emit(cx + R * Math.cos(a), cy + R * Math.sin(a)) }
+      }
+      emit(cx + R * Math.cos(az), cy + R * Math.sin(az))
+      prevLimbAz = az
+    }
+    parts.push(d + 'Z')
+  }
+  return parts.join('')
+}
+
+it('projects land from cached ring trig, identical to the direct projection', () => {
+  const data = geometry as unknown as GlobeGeometry
+  // Cached once per ring set, reused by every later view.
+  expect(ringTrigTables(data.WORLD_RINGS)).toBe(ringTrigTables(data.WORLD_RINGS))
+  for (const g of [{ cLon: -40, cLat: 30, s: 1 }, { cLon: 137.3, cLat: -12.8, s: 2.2 }, { cLon: -179.9, cLat: 79, s: 1.4 }]) {
+    const fast = globeLandPath(g, data.WORLD_RINGS)
+    const ref = referenceLandPath(g, data.WORLD_RINGS)
+    const nums = (d: string) => [...d.matchAll(/-?[\d.]+/g)].map((m) => Number(m[0]))
+    const a = nums(fast)
+    const b = nums(ref)
+    expect(a.length).toBe(b.length)
+    // Equal up to the last printed digit (a rounding boundary may flip).
+    for (let i = 0; i < a.length; i++) expect(Math.abs(a[i]! - b[i]!)).toBeLessThanOrEqual(0.1 + 1e-9)
   }
 })

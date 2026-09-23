@@ -278,17 +278,73 @@ export function globeUnproject(g: GlobeView, X: number, Y: number): { lon: numbe
 // azimuth is numerically meaningless and used to fling chords across the
 // disc), and consecutive limb points bridge along the limb ARC in short
 // steps instead of a straight chord.
-export function globeLandPath(
-  g: GlobeView,
-  rings: readonly (readonly (readonly [number, number])[])[],
-): string {
+//
+// Rotation re-runs this every frame over the whole coastline, so the per-vertex
+// trigonometry is paid once: each ring's vertices are cached as
+// (cos lat, sin lat, cos lon, sin lon), and a view only needs the four trig
+// values of its own centre — every vertex is then a handful of multiplies
+// (angle-difference identities) instead of five transcendental calls.
+type Rings = readonly (readonly (readonly [number, number])[])[]
+const ringTrig = new WeakMap<Rings, Float64Array[]>()
+export function ringTrigTables(rings: Rings): Float64Array[] {
+  let tables = ringTrig.get(rings)
+  if (tables === undefined) {
+    tables = rings.map((ring) => {
+      const t = new Float64Array(ring.length * 4)
+      ring.forEach(([lon, lat], i) => {
+        const lam = (lon * Math.PI) / 180
+        const phi = (lat * Math.PI) / 180
+        t[i * 4] = Math.cos(phi)
+        t[i * 4 + 1] = Math.sin(phi)
+        t[i * 4 + 2] = Math.cos(lam)
+        t[i * 4 + 3] = Math.sin(lam)
+      })
+      return t
+    })
+    ringTrig.set(rings, tables)
+  }
+  return tables
+}
+
+// Per-call scratch for the projected ring, reused so a rotation frame does not
+// allocate an object per coastline vertex.
+let scratchX = new Float64Array(0)
+let scratchY = new Float64Array(0)
+let scratchC = new Float64Array(0)
+
+export function globeLandPath(g: GlobeView, rings: Rings): string {
   const R = GLOBE_R * g.s
   const cx = W / 2
   const cy = H / 2
+  const c0 = Math.cos((g.cLon * Math.PI) / 180)
+  const s0 = Math.sin((g.cLon * Math.PI) / 180)
+  const sinPhi0 = Math.sin((g.cLat * Math.PI) / 180)
+  const cosPhi0 = Math.cos((g.cLat * Math.PI) / 180)
   const parts: string[] = []
-  for (const ring of rings) {
-    const points = ring.map(([lon, lat]) => globeProjectFull(g, lon, lat))
-    const start = points.findIndex((p) => p.cosc > 0.001)
+  const tables = ringTrigTables(rings)
+  for (const t of tables) {
+    const n = t.length / 4
+    if (scratchX.length < n) {
+      scratchX = new Float64Array(n * 2)
+      scratchY = new Float64Array(n * 2)
+      scratchC = new Float64Array(n * 2)
+    }
+    const PX = scratchX
+    const PY = scratchY
+    const PC = scratchC
+    let start = -1
+    for (let i = 0; i < n; i++) {
+      const cosLat = t[i * 4]!
+      const sinLat = t[i * 4 + 1]!
+      // lam = lon - cLon, by the angle-difference identities.
+      const cosLam = t[i * 4 + 2]! * c0 + t[i * 4 + 3]! * s0
+      const sinLam = t[i * 4 + 3]! * c0 - t[i * 4 + 2]! * s0
+      const cosc = sinPhi0 * sinLat + cosPhi0 * cosLat * cosLam
+      PX[i] = cx + R * cosLat * sinLam
+      PY[i] = cy - R * (cosPhi0 * sinLat - sinPhi0 * cosLat * cosLam)
+      PC[i] = cosc
+      if (start < 0 && cosc > 0.001) start = i
+    }
     if (start < 0) continue
     // A ring has no privileged first vertex. Start on the visible coastline
     // so every hidden run (including one spanning the stored ring's seam)
@@ -296,18 +352,19 @@ export function globeLandPath(
     // joins two limb points with a chord and fills a wedge of ocean.
     let d = ''
     let prevLimbAz: number | null = null
+    // A tenth of a unit, as toFixed(1) printed it, at a fraction of the cost.
     const emit = (px: number, py: number): void => {
-      d += `${d === '' ? 'M' : 'L'}${px.toFixed(1)} ${py.toFixed(1)}`
+      d += `${d === '' ? 'M' : 'L'}${Math.round(px * 10) / 10} ${Math.round(py * 10) / 10}`
     }
-    for (let i = 0; i < points.length; i++) {
-      const p = points[(start + i) % points.length]!
-      if (p.cosc > 0.001) {
-        emit(p.X, p.Y)
+    for (let k = 0; k < n; k++) {
+      const i = (start + k) % n
+      if (PC[i]! > 0.001) {
+        emit(PX[i]!, PY[i]!)
         prevLimbAz = null
         continue
       }
-      if (p.cosc < -0.55) continue // antipode zone: azimuth is noise
-      const az = Math.atan2(p.Y - cy, p.X - cx)
+      if (PC[i]! < -0.55) continue // antipode zone: azimuth is noise
+      const az = Math.atan2(PY[i]! - cy, PX[i]! - cx)
       if (prevLimbAz !== null) {
         // Bridge along the limb, shorter way round, in ≤12° steps.
         let delta = az - prevLimbAz
@@ -1387,6 +1444,25 @@ export function MapView({
     [isGlobe, globe, rotating, globeGeometry],
   )
 
+  // The rest of the globe's geography, memoized like the land: a render that
+  // did not move the globe (selection, a lens, a quarter) re-projects nothing.
+  const globeGrid = useMemo(() => (isGlobe ? globeGraticule(globe) : ''), [isGlobe, globe])
+  const globeBorders = useMemo(
+    () => (isGlobe && globe.s >= 1.35 && !rotating ? globeLinesPath(globe, globeGeometry!.BORDER_LINES) : ''),
+    [isGlobe, globe, rotating, globeGeometry],
+  )
+  const globeIslets = useMemo(() => {
+    if (!isGlobe) return null
+    // The flat islet is r=1.6 in a map where 360 degrees is 960 units; the
+    // globe's equator is 2*pi*R, so the same island is scaled by the ratio.
+    const r = (1.6 * (2 * Math.PI * GLOBE_R * globe.s)) / W
+    return globeGeometry!.ISLET_POINTS.map(([lon, lat]) => {
+      const p = globeProjectFull(globe, lon, lat)
+      if (p.cosc <= 0.001) return null
+      return <circle key={`islet-${lon},${lat}`} cx={p.X} cy={p.Y} r={r} className="map-land map-islet" />
+    })
+  }, [isGlobe, globe, globeGeometry])
+
   // Culling follows the ANCHOR — the window the layer is actually painted
   // around — not the logical view. A pan commit moves only the view; if it
   // moved the cull too, the city set would change and invalidate the raster
@@ -1964,7 +2040,7 @@ export function MapView({
                 </radialGradient>
               </defs>
               <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} fill="url(#globeShade)" className="globe-disc" />
-              <path d={globeGraticule(globe)} className="graticule" />
+              <path d={globeGrid} className="graticule" />
               {/* Same quality ladder as the flat map: coast glow under the
                   land, fine coastline and borders past the same thresholds,
                   islets for the airports whose islands do not survive 1:50m.
@@ -1973,24 +2049,9 @@ export function MapView({
               <path d={globeLand} className="map-coast-glow" />
               <path d={globeLand} className="map-land" data-testid="globe-land" />
               {globe.s >= 1.35 && !rotating && (
-                <path d={globeLinesPath(globe, globeGeometry!.BORDER_LINES)} className="map-border" />
+                <path d={globeBorders} className="map-border" />
               )}
-              {globeGeometry!.ISLET_POINTS.map(([lon, lat]) => {
-                const p = globeProjectFull(globe, lon, lat)
-                if (p.cosc <= 0.001) return null
-                // The flat islet is r=1.6 in a map where 360 degrees is 960
-                // units; the globe's equator is 2*pi*R, so the same island is
-                // scaled by the ratio of the two.
-                return (
-                  <circle
-                    key={`islet-${lon},${lat}`}
-                    cx={p.X}
-                    cy={p.Y}
-                    r={(1.6 * (2 * Math.PI * GLOBE_R * globe.s)) / W}
-                    className="map-land map-islet"
-                  />
-                )
-              })}
+              {globeIslets}
               <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} fill="url(#globeLighting)" pointerEvents="none" />
               <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s * 1.12} fill="url(#globeAtmosphere)" className="globe-atmosphere" data-testid="globe-atmosphere" pointerEvents="none" />
               <circle cx={W / 2} cy={H / 2} r={GLOBE_R * globe.s} className="globe-limb" />
