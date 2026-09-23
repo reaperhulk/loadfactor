@@ -1368,6 +1368,7 @@ export function MapView({
       tx: layerXf.current.tx,
       ty: layerXf.current.ty,
       s: layerXf.current.s,
+      zoom: (isGlobe ? globe.s : W / baseRef.current.w) * layerXf.current.s,
     })
   })
   const trafficCamera = useCallback(() => cameraRef.current(), [])

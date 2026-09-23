@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { cameraAffine, drawTraffic, polylineLeg, posePlane, quadraticLeg, type TrafficEffect } from '../traffic'
+import { PLANE_SCALE_WORLD, cameraAffine, contrailPoints, drawTraffic, planeScaleForZoom, polylineLeg, posePlane, quadraticLeg, type TrafficEffect } from '../traffic'
 
 describe('traffic shuttles', () => {
   const leg = quadraticLeg(0, 0, 50, -20, 100, 0)
@@ -81,5 +81,44 @@ describe('traffic shuttles', () => {
     expect(calls.at(-1)).toBe('fill(Path2D(M0 0L1 0Z))')
     vi.unstubAllGlobals()
     expect(calls).toContain('setTransform(1,0,0,1,0,0)')
+  })
+})
+
+describe('traffic at world zoom', () => {
+  it('grows the glyphs modestly as the map zooms out, never below base size', () => {
+    expect(planeScaleForZoom(1)).toBeCloseTo(PLANE_SCALE_WORLD)
+    expect(planeScaleForZoom(0.5)).toBeCloseTo(PLANE_SCALE_WORLD) // clamped
+    expect(planeScaleForZoom(3)).toBe(1)
+    expect(planeScaleForZoom(4)).toBe(1)
+    let prev = Infinity
+    for (let z = 1; z <= 4; z += 0.25) {
+      const s = planeScaleForZoom(z)
+      expect(s).toBeLessThanOrEqual(prev)
+      expect(s).toBeGreaterThanOrEqual(1)
+      prev = s
+    }
+    expect(PLANE_SCALE_WORLD).toBeLessThanOrEqual(1.5) // "modestly"
+  })
+
+  it('trails a short wake behind a moving plane, none at the gate', () => {
+    const leg = polylineLeg(new Float64Array([0, 0, 100, 0]))
+    const plane = { leg, dur: 10, phase: 0, glyph: 'M0 0Z', size: 1, fill: '#fff', stroke: '#000', alpha: 1 }
+    // Mid-flight eastbound: every wake point is behind (west of) the plane,
+    // oldest farthest back.
+    const now = posePlane(leg, 2 / 10)
+    const wake = contrailPoints(plane, 2)
+    expect(wake.length).toBeGreaterThan(1)
+    let last = now.x
+    for (const p of wake) {
+      expect(p.x).toBeLessThan(last)
+      last = p.x
+    }
+    // Wake length is a fraction of the leg, not a streak across the map.
+    expect(now.x - wake.at(-1)!.x).toBeLessThan(20)
+    // Dwelling at the far end (4.5s-5s of the cycle): where it stood still,
+    // the wake collapses onto the plane — nothing is drawn for a parked jet.
+    const dwell = contrailPoints(plane, 4.95)
+    expect(dwell[0]!.x).toBeCloseTo(100)
+    expect(dwell[1]!.x).toBeCloseTo(100)
   })
 })
