@@ -5,6 +5,7 @@ async function start(page: Page) {
   await page.goto('/')
   await page.getByTestId('seed-input').fill('modern-flow')
   await page.getByTestId('start-jet_age').click()
+  await openPanel(page, 'map')
   await expect(page.getByTestId('map')).toBeVisible()
 }
 async function launch(page: Page) {

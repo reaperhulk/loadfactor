@@ -74,7 +74,7 @@ import {
 } from './legends'
 import { EVENT_ICONS, EVENT_NAMES, ToastStack } from './toasts'
 import type { GameState, Replay } from '../engine'
-import { copyText, money, objectiveValue } from './format'
+import { copyText, money, objectiveValue, tone, signed } from './format'
 import { Icon } from './Icon'
 
 type Tab = 'routes' | 'fleet' | 'airports' | 'rivals' | 'finance' | 'report'
@@ -317,7 +317,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           </select>
         </label>
         <div className="livery-row">
-          Livery:{' '}
+          <span className="livery-label">Livery:</span>{' '}
           {LIVERY_COLORS.map((c) => (
             <button
               key={c}
@@ -443,6 +443,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           <ConfirmButton label={`Start · ${s.quarters} quarters`} confirmLabel={overwrites ? 'Replace oldest save and start?' : 'Take the mandate?'} onConfirm={() => startGame(s.id, seed.trim() || crypto.randomUUID().slice(0, 8), custom(), undefined, players)} />
         </article>)}
       </section>
+      <section className="era-scenarios" aria-label="Full careers">
       {SCENARIOS.map((s, si) => {
         // The unlock chain: each era opens when the previous one is WON —
         // but it's an invitation, not a wall (start anyway, twice).
@@ -516,6 +517,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
         </div>
         )
       })}
+      </section>
     </main>
   )
 }
@@ -691,8 +693,10 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   const state = session.state, seat = viewSeat(), player = state.airlines[seat]!
   const celebration = useCelebration(session.lastEvents, seat, state.phase === 'planning', state.turn)
   const scenario = getScenario(state.scenario)
-  const [tab, setTabState] = useState<WorkspacePage>('map')
-  const [visited, setVisited] = useState<ReadonlySet<WorkspacePage>>(new Set(['map']))
+  // A new career opens on the Desk, where the first-market choices and the
+  // flight-school card live; a career already under way reopens on the map.
+  const [tab, setTabState] = useState<WorkspacePage>(() => state.turn === 0 && player.routes.length === 0 ? 'desk' : 'map')
+  const [visited, setVisited] = useState<ReadonlySet<WorkspacePage>>(() => new Set(['map', 'desk']))
   const lastPage = useRef<Record<WorkspaceArea, WorkspacePage>>({ desk: 'desk', network: 'map', fleet: 'fleet', company: 'finance' })
   const setTab = useCallback((page: WorkspacePage) => {
     lastPage.current[areaFor(page)] = page
@@ -790,7 +794,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       <button className="inbox-button" data-testid="open-inbox" aria-label={attentionCount ? `Inbox, ${attentionCount} unseen items` : 'Inbox'} title="New items since your last Desk visit. Opening the Desk marks them as seen." onClick={() => setTab('desk')}><Icon name="inbox" /><span>Inbox</span>{attentionCount > 0 && <b aria-label={`${attentionCount} unseen items`}>{attentionCount}</b>}</button>
       <button className="settings-button" data-testid="open-settings" aria-label="Open settings" onClick={() => setShowSettings(true)}><Icon name="settings" /></button>
     </header>
-    <div className="turn-actions" data-testid="turn-actions"><span className="mobile-profit"><small>Planned net profit</small><strong className={forecast.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.profit)}</strong>{range.low !== range.high && <small className="hud-range">{money(range.low)} to {money(range.high)}</small>}</span>
+    <div className="turn-actions" data-testid="turn-actions"><span className="mobile-profit"><small>Planned net profit</small><strong className={tone(forecast.profit)}>{money(forecast.profit)}</strong>{range.low !== range.high && <small className="hud-range">{money(range.low)} to {money(range.high)}</small>}</span>
         {state.phase === 'planning' &&
           (() => {
             const sess = getSession()!
@@ -866,7 +870,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     </div>
     <section className="status-bar" aria-label="Airline status" data-testid="status-bar">
       <span className="hud-stat hud-figure" data-label="Cash now" data-testid="cash"><AnimatedMoney value={player.cash} /></span>
-      <span className={`hud-stat hud-figure planned-profit ${forecast.profit >= 0 ? 'pos' : 'neg'}`} data-label="Planned net profit / q" data-testid="planned-profit" title={`Likely ${money(range.low)} to ${money(range.high)} — ${range.drivers.map((d) => d.label).join('; ') || 'nothing in play'}`}>{money(forecast.profit)}{range.low !== range.high && <span className="hud-range" data-testid="planned-range">{money(range.low)} to {money(range.high)}</span>}</span>
+      <span className={`hud-stat hud-figure planned-profit ${tone(forecast.profit)}`} data-label="Planned net profit / q" data-testid="planned-profit" title={`Likely ${money(range.low)} to ${money(range.high)} — ${range.drivers.map((d) => d.label).join('; ') || 'nothing in play'}`}>{money(forecast.profit)}{range.low !== range.high && <span className="hud-range" data-testid="planned-range">{money(range.low)} to {money(range.high)}</span>}</span>
       <button className="hud-stat hud-figure planned-cash" data-label="Planned ending cash" onClick={() => setShowReview(true)}>{money(forecast.cashAfter)}</button>
         <span className="hud-stat hud-figure hud-objective" data-label="Objective" data-testid="networth">
           {scenario.objective.kind === 'netWorth' ? (
@@ -968,10 +972,9 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
                 {EVENT_ICONS[e.id] ?? '🌍'} {EVENT_NAMES[e.id] ?? def.name}
                 {e.city ? ` · ${e.city}` : e.region ? ` · ${e.region.toUpperCase()}` : ''}
                 {pct !== null && (
-                  <span className={pct >= 0 ? 'pos' : 'neg'}>
+                  <span className={tone(pct)}>
                     {' '}
-                    {pct >= 0 ? '+' : ''}
-                    {pct.toFixed(0)}%
+                    {signed(pct)}%
                   </span>
                 )}
                 <span className="dim"> · {e.quartersLeft}q</span>

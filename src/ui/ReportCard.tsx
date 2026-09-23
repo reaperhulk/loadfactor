@@ -12,7 +12,7 @@ import { pairKey } from '../data/cities'
 import { getEventDef } from '../data/events'
 import type { GameEvent, GameState } from '../engine'
 import { objectiveScoreAt, quarterOf, yearOf } from '../engine/queries'
-import { COST_LABELS, money } from './format'
+import { COST_LABELS, money, tone } from './format'
 import { Sparkline } from './Sparkline'
 import { viewSeat } from './session'
 
@@ -89,7 +89,7 @@ export function ReportCard({ state, events, onClose, onInspect }: ReportCardProp
           <div className="report-hero-label">
             {yearOf({ ...state, turn: now.turn })} Q{quarterOf({ ...state, turn: now.turn })} · {now.profit >= 0 ? 'profit' : 'loss'}
           </div>
-          <div className={`report-hero-figure ${now.profit >= 0 ? 'pos' : 'neg'}`}>
+          <div className={`report-hero-figure ${tone(now.profit)}`}>
             {money(Math.abs(now.profit))}
           </div>
           <div className="report-hero-sub">
@@ -101,6 +101,7 @@ export function ReportCard({ state, events, onClose, onInspect }: ReportCardProp
               points={player.history.slice(-12).map((h) => h.profit)}
               width={220}
               className="sparkline spark-profit report-hero-spark"
+              label="Net profit per quarter"
             />
           )}
         </div>
@@ -125,13 +126,13 @@ export function ReportCard({ state, events, onClose, onInspect }: ReportCardProp
             </tr>
             <tr>
               <td>Profit</td>
-              <td className={now.profit >= 0 ? 'pos' : 'neg'}>{money(now.profit)}</td>
+              <td className={tone(now.profit)}>{money(now.profit)}</td>
               <td className="dim">{delta(now.profit, prev?.profit)}</td>
             </tr>
             {now.revenue > 0 && (
               <tr>
                 <td className="dim">margin</td>
-                <td className={now.profit >= 0 ? 'pos' : 'neg'}>
+                <td className={tone(now.profit)}>
                   {((now.profit * 100) / now.revenue).toFixed(1)}%
                 </td>
                 <td />
@@ -232,7 +233,7 @@ export function ReportCard({ state, events, onClose, onInspect }: ReportCardProp
             {worst && worst.routeId !== best.routeId && (
               <>
                 {' · '}worst: <strong>{routeName(worst.routeId)}</strong>{' '}
-                <span className={worst.revenue - worst.cost >= 0 ? 'pos' : 'neg'}>
+                <span className={tone(worst.revenue - worst.cost)}>
                   {money(worst.revenue - worst.cost)}
                 </span>
               </>
@@ -303,10 +304,10 @@ export function ReportCard({ state, events, onClose, onInspect }: ReportCardProp
               <h3>{yearOf(state) - 1} in review</h3>
               <p>
                 Revenue {money(revenue)} · profit{' '}
-                <span className={profit >= 0 ? 'pos' : 'neg'}>{money(profit)}</span> ·{' '}
+                <span className={tone(profit)}>{money(profit)}</span> ·{' '}
                 {pax.toLocaleString('en-US')} pax
                 {paxGrowth !== null && (
-                  <span className={paxGrowth >= 0 ? 'pos' : 'neg'}>
+                  <span className={tone(paxGrowth)}>
                     {' '}
                     ({paxGrowth >= 0 ? '▲' : '▼'}
                     {Math.abs(paxGrowth)}% vs prior year)
@@ -342,7 +343,7 @@ export function ReportCard({ state, events, onClose, onInspect }: ReportCardProp
             <p className="dim" data-testid="report-macro">
               Macro: economy {(nowIdx.economyBp / 100).toFixed(0)}%
               {Math.abs(dEcon) >= 100 && (
-                <span className={dEcon > 0 ? 'pos' : 'neg'}>
+                <span className={tone(dEcon)}>
                   {' '}
                   ({dEcon > 0 ? '▲' : '▼'}
                   {Math.abs(dEcon / 100).toFixed(0)})

@@ -31,10 +31,12 @@ for (const [width, height] of [[390,844], [1366,768]]) {
     await page.getByTestId('airline-name').fill('Audit Air')
     await page.getByTestId('start-first-career').click()
     await expect(page.getByRole('heading', {name:'Audit Air'})).toBeVisible()
-    await page.getByRole('button', {name:'Compare first routes'}).click()
+    // New careers land on the Desk, where the first-market quotes are.
     await expect(page.getByTestId('tab-desk')).toHaveClass(/active/)
+    await expect(page.getByTestId('coach')).toBeVisible()
     await page.getByRole('button', {name:'Compare this launch'}).first().click()
     await page.getByTestId('route-setup-confirm').click()
+    await expect(page.getByTestId('coach')).toHaveCount(0)
     await openPanel(page, 'map')
     await expect(page.getByTestId('first-flight')).toHaveCount(0)
     expect(await page.evaluate(() => window.__harness.getState()!.airlines[0]!.routes.length)).toBe(1)
@@ -46,6 +48,7 @@ for (const [width,height] of [[320,568],[667,375],[844,390],[768,1024],[1024,768
     await page.setViewportSize({width,height})
     await page.goto('/')
     await page.getByTestId('start-jet_age').click()
+    await openPanel(page, 'map')
     await expect(page.getByTestId('map')).toBeVisible()
     expect((await page.getByTestId('map').boundingBox())!.height).toBeGreaterThan(150)
     for(const id of ['zoom-in','zoom-out','zoom-reset','map-projection','toggle-rivals']) await inside(page.getByTestId(id),page)
@@ -228,4 +231,66 @@ test('UI audit career ending: the final screen stays interactive over the report
   await expect(page.getByTestId('gameover-overlay')).toBeVisible()
   await page.getByTestId('new-game').click()
   await expect(page.getByTestId('start-first-career')).toBeVisible()
+})
+
+// WCAG contrast for the report and review dialogs: every visible text run is
+// measured against the surface it actually sits on (translucent layers are
+// composited up to the dialog's opaque fill). Body text needs 4.5:1, large
+// text (24px, or 18.66px bold) 3:1.
+async function lowContrastText(page: Page, testId: string) {
+  return page.getByTestId(testId).evaluate((root) => {
+    const parse = (c: string) => { const m = c.match(/rgba?\(([^)]+)\)/); if (!m) return null; const [r, g, b, a = '1'] = m[1]!.split(/[ ,/]+/).filter(Boolean); return [Number(r), Number(g), Number(b), Number(a)] as const }
+    const lum = ([r, g, b]: readonly number[]) => { const f = (v: number) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }; return 0.2126 * f(r!) + 0.7152 * f(g!) + 0.0722 * f(b!) }
+    const over = (top: readonly number[], under: readonly number[]) => [0, 1, 2].map((i) => top[i]! * top[3]! + under[i]! * (1 - top[3]!))
+    const background = (el: Element): number[] => {
+      const layers: (readonly number[])[] = []
+      for (let n: Element | null = el; n; n = n.parentElement) {
+        const c = parse(getComputedStyle(n).backgroundColor)
+        if (c && c[3] > 0) { layers.push(c); if (c[3] >= 1) break }
+      }
+      let base: number[] = [0, 0, 0]
+      for (const layer of layers.reverse()) base = over(layer, base)
+      return base
+    }
+    const bad: { text: string; ratio: number; need: number }[] = []
+    for (const el of root.querySelectorAll<HTMLElement>('*')) {
+      if (el.closest('svg') || !el.getClientRects().length) continue
+      const text = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent ?? '').join('').trim()
+      if (!text) continue
+      const style = getComputedStyle(el)
+      if (style.visibility === 'hidden' || (el as HTMLButtonElement).disabled) continue
+      const fg = parse(style.color)!
+      const bg = background(el)
+      const color = over(fg, bg)
+      const [hi, lo] = [lum(color), lum(bg)].sort((a, b) => b - a)
+      const ratio = (hi! + 0.05) / (lo! + 0.05)
+      const size = parseFloat(style.fontSize), weight = Number(style.fontWeight)
+      const need = size >= 24 || (size >= 18.66 && weight >= 700) ? 3 : 4.5
+      if (ratio < need) bad.push({ text: text.slice(0, 40), ratio: Math.round(ratio * 100) / 100, need })
+    }
+    return bad
+  })
+}
+
+test('UI audit contrast: review and report dialogs keep readable text on the dark surface', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/')
+  await page.getByTestId('seed-input').fill('audit-contrast')
+  await page.getByTestId('start-jet_age').click()
+  await page.evaluate((snapshot) => {
+    Object.assign(window.__harness.getState()!, snapshot)
+    const route = snapshot.airlines[0]!.routes[0]!
+    window.__harness.dispatch({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel })
+  }, comparisonCareer)
+  await page.getByTestId('end-quarter').click()
+  await expect(page.getByTestId('quarter-review')).toBeVisible()
+  await expect.poll(() => lowContrastText(page, 'quarter-review'), { message: 'quarter review text contrast' }).toEqual([])
+  await page.getByTestId('confirm-quarter').click()
+  await expect(page.getByTestId('report-card')).toBeVisible()
+  // The report is a dark, elevated surface — not the old cream paper.
+  const fill = await page.locator('.report-card').first().evaluate((el) => getComputedStyle(el).backgroundColor)
+  const [r, g, b] = fill.match(/\d+/g)!.map(Number)
+  expect(0.2126 * r! + 0.7152 * g! + 0.0722 * b!, 'report surface is dark').toBeLessThan(80)
+  await expect.poll(() => lowContrastText(page, 'report-card'), { message: 'report text contrast' }).toEqual([])
 })

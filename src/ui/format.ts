@@ -3,15 +3,56 @@ import { announce } from './toasts'
 // single definition means every panel rounds and tiers the same way —
 // comparisons only work when the numbers are presented identically.
 
+// Negative amounts lead with a true minus sign (U+2212) before the currency
+// symbol: "−$1.9M", never "$-1.9M". Every signed figure in the UI uses the
+// same glyph so columns of gains and losses line up.
+export const MINUS = '\u2212'
+
+function magnitude(abs: number): string {
+  if (abs >= 1_000_000) return `$${(abs / 1_000_000).toFixed(2)}B`
+  if (abs >= 1000) return `$${(abs / 1000).toFixed(1)}M`
+  return `$${abs}k`
+}
+
 export function money(k: number): string {
-  const abs = Math.abs(k)
-  if (abs >= 1_000_000) return `$${(k / 1_000_000).toFixed(2)}B`
-  if (abs >= 1000) return `$${(k / 1000).toFixed(1)}M`
-  return `$${k}k`
+  return k < 0 ? `${MINUS}${magnitude(-k)}` : magnitude(k)
+}
+
+// A change, always signed: "+$5.6M", "−$1.9M", and an unsigned "$0k" for no
+// change at all.
+export function signedMoney(k: number): string {
+  return k > 0 ? `+${magnitude(k)}` : money(k)
+}
+
+// Plain signed number with the same minus glyph ("+12", "−3", "0").
+export function signed(n: number, digits = 0): string {
+  const text = Math.abs(n).toFixed(digits)
+  if (Number(text) === 0) return (0).toFixed(digits)
+  return n > 0 ? `+${text}` : `${MINUS}${text}`
+}
+
+// Signed whole count with thousands separators ("+1,200", "−35", "0").
+export function signedCount(n: number): string {
+  const text = Math.abs(n).toLocaleString('en-US')
+  return n > 0 ? `+${text}` : n < 0 ? `${MINUS}${text}` : '0'
+}
+
+// Sign colour for any figure where up is good (or, with `invert`, where up is
+// bad — costs, fuel). Zero is neutral: an empty class, never green or red.
+export type Tone = 'pos' | 'neg' | ''
+export function tone(n: number, invert = false): Tone {
+  if (n === 0 || Number.isNaN(n)) return ''
+  return (n > 0) !== invert ? 'pos' : 'neg'
 }
 
 export function pct(bp: number, digits = 0): string {
-  return `${(bp / 100).toFixed(digits)}%`
+  const text = (Math.abs(bp) / 100).toFixed(digits)
+  return bp < 0 && Number(text) !== 0 ? `${MINUS}${text}%` : `${text}%`
+}
+
+// A signed percentage from basis points: "+2.5%", "−0.4%", "0.0%".
+export function signedPct(bp: number, digits = 0): string {
+  return `${signed(bp / 100, digits)}%`
 }
 
 export function count(n: number): string {
@@ -59,11 +100,17 @@ export const COST_LABELS: Record<keyof CostBreakdown, string> = {
   interest: 'Interest',
 }
 
+// Highlight for the best value in a comparison column. A column where the
+// "best" is zero (nobody has flown yet, everybody broke even) has no leader.
+export function leaderTone(value: number, best: number): Tone {
+  return best > 0 && value === best ? 'pos' : ''
+}
+
 // An objective score rendered in its own units: money, a passenger count, or
 // a load-factor rate. One formatter so the HUD, the menu, the standings and
 // the game-over card all read identically.
 export function objectiveValue(score: number, unit: 'money' | 'count' | 'rate'): string {
   if (unit === 'money') return money(score)
-  if (unit === 'rate') return `${(score / 100).toFixed(1)}%`
+  if (unit === 'rate') return pct(score, 1)
   return score.toLocaleString('en-US')
 }

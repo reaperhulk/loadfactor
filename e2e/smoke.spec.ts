@@ -19,6 +19,7 @@ async function startGame(page: Page): Promise<void> {
   // MapView is a lazy production chunk. Wait for the real interactive map,
   // not merely the game shell, before a test starts sampling animation frames
   // or computing gesture coordinates.
+  await openPanel(page, 'map')
   await expect(page.getByTestId('map')).toBeVisible()
   // Coordinate gestures need the complete map in the viewport; the operations
   // brief can legitimately put it below the fold.
@@ -1008,6 +1009,30 @@ test('the route dossier and rivals intel expose the numbers', async ({ page }) =
   await expect(page.locator('.route-rival').first()).toBeVisible()
   await page.getByTestId('toggle-rivals').click()
   await expect(page.locator('.route-rival')).toHaveCount(0)
+})
+
+test('a new career lands on the Desk and the market coach steps aside once a route exists', async ({ page }) => {
+  await page.goto('/')
+  await page.getByTestId('seed-input').fill('e2e-landing')
+  await page.getByTestId('start-jet_age').click()
+  // The coach card and the first-market quotes live on the Desk, so that is
+  // where a new player starts — not on a map telling them to go there.
+  await expect(page.getByTestId('tab-desk')).toHaveClass(/active/)
+  await expect(page.getByTestId('nav-desk')).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByTestId('page-desk')).toBeVisible()
+  await expect(page.getByTestId('page-map')).toBeHidden()
+  await expect(page.getByTestId('coach')).toContainText('first-market choices on the Desk')
+  // Pick a first market from the Desk: the choose-a-market coach dismisses
+  // itself without the player having to wave it off.
+  await page.getByRole('button', { name: 'Compare this launch' }).first().click()
+  await page.getByTestId('route-setup-confirm').click()
+  expect(await page.evaluate(() => window.__harness.getState()!.airlines[0]!.routes.length)).toBe(1)
+  await expect(page.getByTestId('coach')).toHaveCount(0)
+  // It was not a permanent dismissal: the next quarter's flight-school step returns.
+  await flyQuarter(page)
+  await page.getByTestId('report-card-close').click()
+  await openPanel(page, 'desk')
+  await expect(page.getByTestId('coach')).toContainText('Flight school · 2 of 3')
 })
 
 test('the shop estimates per-route economics, coach marks guide, mute persists', async ({ page }) => {

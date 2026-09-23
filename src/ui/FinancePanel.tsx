@@ -22,7 +22,7 @@ import { HedgeLegend, MarketingLegend, RivalryLegend } from './legends'
 import { planningForecast } from './forecast'
 import { Sparkline } from './Sparkline'
 import { viewSeat, dispatch } from './session'
-import { COST_LABELS, money } from './format'
+import { COST_LABELS, money, pct, tone } from './format'
 
 // The cost buckets in a stable presentation order, labelled from the shared
 // format module so every surface names them identically.
@@ -173,7 +173,7 @@ export function FinancePanel({ state }: { state: GameState }) {
   return (
     <div className="finance-page">
       <div className="page-heading"><h2>Finance</h2><span className="dim">Company totals</span></div>
-      <dl className="company-summary"><div><dt>Cash now</dt><dd>{money(player.cash)}</dd></div><div><dt>Last quarter · net profit</dt><dd>{last ? money(last.profit) : 'Not flown yet'}</dd></div><div><dt>Next quarter · planned profit</dt><dd className={plan.profit >= 0 ? 'pos':'neg'}>{money(plan.profit)}</dd></div><div><dt>Next quarter · ending cash</dt><dd>{money(plan.cashAfter)}</dd></div></dl>
+      <dl className="company-summary"><div><dt>Cash now</dt><dd>{money(player.cash)}</dd></div><div><dt>Last quarter · net profit</dt><dd className={last ? tone(last.profit) : ''}>{last ? money(last.profit) : 'Not flown yet'}</dd></div><div><dt>Next quarter · planned profit</dt><dd className={plan.profit >= 0 ? 'pos':'neg'}>{money(plan.profit)}</dd></div><div><dt>Next quarter · ending cash</dt><dd>{money(plan.cashAfter)}</dd></div></dl>
       <CustomerIdentity airline={player} />
       {u && (
         <div data-testid="unit-economics">
@@ -186,7 +186,7 @@ export function FinancePanel({ state }: { state: GameState }) {
                 </td>
                 <td>
                   ${u.revPerPax}
-                  <span className={u.revPerPax >= (up?.revPerPax ?? 0) ? 'pos' : 'neg'}>
+                  <span className={tone(u.revPerPax - (up?.revPerPax ?? u.revPerPax))}>
                     {delta(u.revPerPax, up?.revPerPax)}
                   </span>
                 </td>
@@ -195,7 +195,7 @@ export function FinancePanel({ state }: { state: GameState }) {
                 </td>
                 <td>
                   ${u.costPerPax}
-                  <span className={u.costPerPax <= (up?.costPerPax ?? 0) ? 'pos' : 'neg'}>
+                  <span className={tone(u.costPerPax - (up?.costPerPax ?? u.costPerPax), true)}>
                     {delta(u.costPerPax, up?.costPerPax)}
                   </span>
                 </td>
@@ -206,7 +206,7 @@ export function FinancePanel({ state }: { state: GameState }) {
                 </td>
                 <td>
                   ${u.costPerSeat}
-                  <span className={u.costPerSeat <= (up?.costPerSeat ?? 0) ? 'pos' : 'neg'}>
+                  <span className={tone(u.costPerSeat - (up?.costPerSeat ?? u.costPerSeat), true)}>
                     {delta(u.costPerSeat, up?.costPerSeat)}
                   </span>
                 </td>
@@ -215,14 +215,14 @@ export function FinancePanel({ state }: { state: GameState }) {
                 </td>
                 <td>
                   {(u.loadBp / 100).toFixed(0)}%
-                  <span className={u.loadBp >= (up?.loadBp ?? 0) ? 'pos' : 'neg'}>
+                  <span className={tone(u.loadBp - (up?.loadBp ?? u.loadBp))}>
                     {delta(u.loadBp, up?.loadBp)}
                   </span>
                 </td>
               </tr>
               <tr>
                 <td className="dim">Margin</td>
-                <td className={u.marginBp >= 0 ? 'pos' : 'neg'}>{(u.marginBp / 100).toFixed(1)}%</td>
+                <td className={tone(u.marginBp)}>{pct(u.marginBp, 1)}</td>
                 <td className="dim" title="every passenger you carried, including connections">
                   Passengers
                 </td>
@@ -260,8 +260,8 @@ export function FinancePanel({ state }: { state: GameState }) {
                       <td className="dim">t{h.turn}</td>
                       <td>{money(h.revenue)}</td>
                       <td className="dim">{money(h.costs)}</td>
-                      <td className={h.profit >= 0 ? 'pos' : 'neg'}>{money(h.profit)}</td>
-                      <td className={m >= 0 ? 'pos' : 'neg'}>{(m / 100).toFixed(0)}%</td>
+                      <td className={tone(h.profit)}>{money(h.profit)}</td>
+                      <td className={tone(m)}>{(m / 100).toFixed(0)}%</td>
                       <td>{h.pax.toLocaleString('en-US')}</td>
                       <td>{money(h.netWorth)}</td>
                     </tr>
@@ -276,14 +276,14 @@ export function FinancePanel({ state }: { state: GameState }) {
         <div className="finance-trends">
           <div className="trend-row">
             <span className="dim">net worth</span>
-            <Sparkline points={player.history.map((h) => h.netWorth)} width={180} />
+            <Sparkline points={player.history.map((h) => h.netWorth)} width={180} label="Net worth" />
             <span>{money(player.history[player.history.length - 1]!.netWorth)}</span>
           </div>
           <div className="trend-row">
             <span className="dim">profit</span>
-            <Sparkline points={player.history.map((h) => h.profit)} width={180} className="sparkline spark-profit" />
+            <Sparkline points={player.history.map((h) => h.profit)} width={180} className="sparkline spark-profit" label="Net profit per quarter" />
             <span
-              className={player.history[player.history.length - 1]!.profit >= 0 ? 'pos' : 'neg'}
+              className={tone(player.history[player.history.length - 1]!.profit)}
             >
               {money(player.history[player.history.length - 1]!.profit)}/q
             </span>
@@ -299,8 +299,10 @@ export function FinancePanel({ state }: { state: GameState }) {
               points={state.world.indexHistory.map((h) => h.economyBp)}
               width={180}
               className="sparkline spark-profit"
+              format={(v) => pct(v)}
+              label="Economy index"
             />
-            <span className={state.world.economyBp >= 10000 ? 'pos' : 'neg'}>
+            <span className={tone(state.world.economyBp - 10000)}>
               {(state.world.economyBp / 100).toFixed(0)}%
             </span>
           </div>
@@ -312,6 +314,8 @@ export function FinancePanel({ state }: { state: GameState }) {
               points={state.world.indexHistory.map((h) => h.fuelBp)}
               width={180}
               className="sparkline spark-lf"
+              format={(v) => pct(v)}
+              label="Fuel price index"
             />
             <span
               className={
@@ -472,7 +476,7 @@ export function FinancePanel({ state }: { state: GameState }) {
               <td>{h.turn + 1}</td>
               <td>{money(h.revenue)}</td>
               <td>{money(h.costs)}</td>
-              <td className={h.profit >= 0 ? 'pos' : 'neg'}>{money(h.profit)}</td>
+              <td className={tone(h.profit)}>{money(h.profit)}</td>
               <td>{money(h.netWorth)}</td>
             </tr>
           ))}

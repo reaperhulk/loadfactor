@@ -2313,13 +2313,18 @@ th { font-size:.78rem; letter-spacing:.02em; }
 .map-data-legend { display:flex; flex-wrap:wrap; gap:9px; margin-top:6px; }
 .route-player.lens-mid { stroke-dasharray:7 3; }
 .route-player.lens-bad { stroke-dasharray:2 4; }
-.gameover-card,.report-card { --ink:#19313f; --dim:#516571; --pos:#196947; --neg:#a2392b; --accent:#176582; --panel:#ece9dd; --rule:#b9c1bc; background:#f5f1e5; color:var(--ink); box-shadow:0 30px 100px #0009; border:1px solid #d1cfc1; }
-.game .gameover-card h3,.game .report-card h3,.game .report-card .report-hero-figure.pos { color:var(--pos); }
-.gameover-card button,.report-card button { background:#e1e5dc; color:var(--ink); border-color:#899d9e; }
-.gameover-card select,.gameover-card input:not([type=range]),.report-card select { color:var(--ink); background:#fffdf4; border:1px solid #899d9e; color-scheme:light; }
-.gameover-card .me,.report-card .me { background:#dce8de; }
-.gameover-card .event-chip,.report-card .event-chip { background:#e4e7dd; color:var(--ink); border-color:#a1b0a6; }
+/* Reports and reviews are the app's elevated surface: the same dark tokens
+   as the workspace, lifted one step (lighter fill, brighter rule, a lit top
+   edge and a deep shadow) so they read as a document on the desk rather
+   than a different application. Body text keeps >= 4.5:1 on this fill. */
+.gameover-card,.report-card { --raised:#1c3a46; --panel:#234552; --rule:#46666f; background:var(--raised); color:var(--ink); border:1px solid #4d6f79; border-top:3px solid var(--era-heading,var(--accent)); box-shadow:0 30px 100px #000b,0 0 0 1px #0006; }
+.game .gameover-card h3,.game .report-card h3,.game .report-card .report-hero-figure.pos { color:var(--era-heading,var(--pos)); }
+.gameover-card button,.report-card button { background:#2a4f5d; color:var(--ink); border-color:#5f808a; }
+.gameover-card select,.gameover-card input:not([type=range]),.report-card select { color:var(--ink); background:#132b35; border:1px solid #5f808a; }
+.gameover-card .me,.report-card .me { background:#2b5261; }
+.gameover-card .event-chip,.report-card .event-chip { background:var(--panel); color:var(--ink); border-color:var(--rule); }
 .report-card table { border-color:var(--rule); }
+.report-card .report-hero-figure.neg { color:var(--neg); }
 .tutorial-steps { display:flex; gap:22px; flex-wrap:wrap; padding-left:20px; font-size:.8rem; color:var(--dim); }
 .tutorial-steps [aria-current=step] { color:var(--accent); font-weight:700; }
 :root[data-motion=reduced] *, :root[data-motion=reduced] *::before, :root[data-motion=reduced] *::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; }

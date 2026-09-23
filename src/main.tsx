@@ -6,6 +6,7 @@ import { installHarness } from './ui/harness'
 import { installSounds } from './ui/sounds'
 import './ui/styles.css'
 import './ui/workspace.css'
+import './ui/refinements.css'
 
 installDisplay()
 installHarness()

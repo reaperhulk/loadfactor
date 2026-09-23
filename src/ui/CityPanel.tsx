@@ -17,7 +17,7 @@ import { airlinesOnPair, networkCities, slotsAllocated, slotsFree, slotsHeld, sl
 import { cityMass, cityTier } from './mapStyle'
 import { ConfirmButton } from './ConfirmButton'
 import { viewSeat, dispatch } from './session'
-import { money } from './format'
+import { money, signed, tone } from './format'
 
 const REGION_NAMES: Record<string, string> = {
   na: 'North America',
@@ -149,9 +149,8 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
             const def = getEventDef(e.id)
             const pct = ((def.demandModBp ?? 10000) - 10000) / 100
             return (
-              <span key={e.id} className={pct >= 0 ? 'pos' : 'neg'}>
-                {def.name}: demand {pct >= 0 ? '+' : ''}
-                {pct.toFixed(0)}% ({e.quartersLeft}q left)
+              <span key={e.id} className={tone(pct)}>
+                {def.name}: demand {signed(pct)}% ({e.quartersLeft}q left)
               </span>
             )
           })}
@@ -323,7 +322,7 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
                     {r.from}–{r.to}
                   </td>
                   <td>{(r.lastLoadFactorBp / 100).toFixed(0)}% full</td>
-                  <td className={r.lastRevenue - r.lastCost >= 0 ? 'pos' : 'neg'}>
+                  <td className={tone(r.lastRevenue - r.lastCost)}>
                     {money(r.lastRevenue - r.lastCost)}/q
                   </td>
                 </tr>

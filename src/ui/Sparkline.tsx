@@ -11,6 +11,10 @@ interface SparklineProps {
   // Optional fixed bounds (e.g. 0..10000 for load factor); else auto-fit.
   min?: number
   max?: number
+  // How a value reads in the end labels and the accessible summary.
+  format?: (v: number) => string
+  // What the series is ("Profit per quarter"), for screen readers.
+  label?: string
 }
 
 function path(points: readonly number[], w: number, h: number, lo: number, hi: number, x0 = 0): string {
@@ -23,6 +27,50 @@ function path(points: readonly number[], w: number, h: number, lo: number, hi: n
       return `${i === 0 ? 'M' : 'L'}${px},${py}`
     })
     .join('')
+}
+
+// The pure geometry behind a sparkline, kept apart from the markup so it can
+// be tested. A plot band sits under a strip of end-value labels; each point
+// gets a quarter tick on the bottom edge, and a zero baseline is drawn only
+// when the series actually crosses zero (a line hovering at $40M does not
+// need a floor forty million below it).
+export const SPARK_LABEL_BAND = 11
+export interface SparkGeometry {
+  d: string
+  top: number
+  bottom: number
+  zeroY: number | null
+  ticks: number[]
+  first: { x: number; y: number }
+  last: { x: number; y: number }
+}
+export function sparkGeometry(points: readonly number[], width: number, height: number, min?: number, max?: number): SparkGeometry {
+  const lo = min ?? Math.min(...points)
+  const hi = max ?? Math.max(...points)
+  const top = SPARK_LABEL_BAND, bottom = height - 3 // leave room for tick marks
+  const plotH = bottom - top
+  const span = hi - lo || 1
+  const step = points.length > 1 ? width / (points.length - 1) : 0
+  const xAt = (i: number) => Math.min(width - 0.5, Math.max(0.5, i * step))
+  const yAt = (v: number) => top + plotH - ((v - lo) / span) * (plotH - 2) - 1
+  const round = (n: number) => Math.round(n * 10) / 10
+  const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${xAt(i).toFixed(1)},${yAt(p).toFixed(1)}`).join('')
+  return {
+    d,
+    top,
+    bottom,
+    zeroY: lo < 0 && hi > 0 ? round(yAt(0)) : null,
+    ticks: points.map((_, i) => round(xAt(i))),
+    first: { x: round(xAt(0)), y: round(yAt(points[0]!)) },
+    last: { x: round(xAt(points.length - 1)), y: round(yAt(points[points.length - 1]!)) },
+  }
+}
+
+// One sentence a screen reader can use in place of the picture.
+export function sparkSummary(points: readonly number[], format: (v: number) => string, label = 'Trend'): string {
+  if (points.length === 0) return `${label}: no data`
+  const lo = Math.min(...points), hi = Math.max(...points)
+  return `${label} over ${points.length} quarters: from ${format(points[0]!)} to ${format(points[points.length - 1]!)}; low ${format(lo)}, high ${format(hi)}`
 }
 
 // Nudge a set of label baselines apart by at least `gap`, inside [top, bottom],
@@ -41,13 +89,20 @@ export function spreadLabels(ys: readonly number[], top: number, bottom: number,
   return out
 }
 
-export function Sparkline({ points, width = 120, height = 28, className, min, max }: SparklineProps) {
+export function Sparkline({ points, width = 120, height = 28, className, min, max, format = money, label }: SparklineProps) {
   if (points.length < 2) return <span className="dim">—</span>
-  const lo = min ?? Math.min(...points)
-  const hi = max ?? Math.max(...points)
+  const svgH = height + SPARK_LABEL_BAND
+  const g = sparkGeometry(points, width, svgH, min, max)
+  const summary = sparkSummary(points, format, label)
   return (
-    <svg width={width} height={height} className={className ?? 'sparkline'} aria-hidden="true">
-      <path d={path(points, width, height, lo, hi)} fill="none" />
+    <svg width={width} height={svgH} viewBox={`0 0 ${width} ${svgH}`} className={className ?? 'sparkline'} role="img" aria-label={summary} data-testid="sparkline">
+      <title>{summary}</title>
+      {g.ticks.map((x, i) => <line key={i} className="spark-tick" x1={x} x2={x} y1={g.bottom + 1} y2={svgH} />)}
+      {g.zeroY !== null && <line className="spark-zero" x1={0} x2={width} y1={g.zeroY} y2={g.zeroY} />}
+      <path d={g.d} fill="none" />
+      <circle className="spark-end" cx={g.last.x} cy={g.last.y} r={1.8} />
+      <text className="spark-label" x={0} y={8} textAnchor="start">{format(points[0]!)}</text>
+      <text className="spark-label spark-label-last" x={width} y={8} textAnchor="end">{format(points[points.length - 1]!)}</text>
     </svg>
   )
 }

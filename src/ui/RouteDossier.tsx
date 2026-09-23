@@ -25,7 +25,7 @@ import { FuelExposure, RouteWhatIf } from './RouteWhatIf'
 import { rulesOf } from '../engine/version'
 import { HubLegend, SpoolLegend } from './legends'
 import { viewSeat, dispatch } from './session'
-import { money } from './format'
+import { money, tone, pct } from './format'
 
 interface RouteDossierProps {
   onHighlight?: (focus:FlowFocus)=>void
@@ -158,13 +158,13 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute, onHighlig
       <h3>Trend (last {route.history.length}q)</h3>
       <div className="trend-row">
         <span className="dim">load</span>
-        <Sparkline points={lfTrend} min={0} max={10000} className="sparkline spark-lf" />
+        <Sparkline points={lfTrend} min={0} max={10000} className="sparkline spark-lf" format={(v) => pct(v)} label="Load factor" />
         <span>{(route.lastLoadFactorBp / 100).toFixed(0)}%</span>
       </div>
       <div className="trend-row">
         <span className="dim">contribution</span>
-        <Sparkline points={profitTrend} className="sparkline spark-profit" />
-        <span className={route.lastRevenue - route.lastCost >= 0 ? 'pos' : 'neg'}>
+        <Sparkline points={profitTrend} className="sparkline spark-profit" label="Route contribution per quarter" />
+        <span className={tone(route.lastRevenue - route.lastCost)}>
           {money(route.lastRevenue - route.lastCost)}/q
         </span>
       </div>
@@ -198,7 +198,7 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute, onHighlig
                   <td className="dim">{h.transferPax}</td>
                   <td>{(h.loadFactorBp / 100).toFixed(0)}%</td>
                   <td>{money(h.revenue)}</td>
-                  <td className={h.revenue - h.cost >= 0 ? 'pos' : 'neg'}>{money(h.revenue - h.cost)}</td>
+                  <td className={tone(h.revenue - h.cost)}>{money(h.revenue - h.cost)}</td>
                 </tr>
               ))}
             </tbody>

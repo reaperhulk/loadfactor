@@ -6,7 +6,7 @@ import { viewSeat } from './session'
 import { planningForecast } from './forecast'
 import { clearPlanningDraft, stagePlanningCommands, usePlanningCommands } from './planningDrafts'
 import { applyPlanningDraft } from './planActions'
-import { money } from './format'
+import { money, tone } from './format'
 
 export function PlanningWorkbench({ state, suggestions, onSuggest }: { state: GameState; suggestions: Command[]; onSuggest?: () => Command[] }) {
   const seat = viewSeat(), airline = state.airlines[seat]!
@@ -43,7 +43,7 @@ export function PlanningWorkbench({ state, suggestions, onSuggest }: { state: Ga
     <button disabled={suggestions.length === 0 && !onSuggest} onClick={() => stagePlanningCommands(onSuggest?.() ?? suggestions)}>Preview recommended schedules</button>
     {draft.length > 0 && <ul className="staged-changes">{draft.map((c, i) => <li key={i}>{'routeId' in c ? (() => { const r = airline.routes.find((r) => r.id === c.routeId); return r ? `${r.from}–${r.to}: ` : '' })() : ''}{c.type === 'set_fare' ? `fare ${c.fareLevel}` : c.type === 'set_service' ? `service ${c.serviceLevel}` : c.type === 'set_frequency' ? `${c.frequency} round trips/week` : c.type}</li>)}</ul>}
     <div className="table-scroll"><table className="forecast-comparison" data-testid="plan-comparison"><thead><tr><th>Planned quarter</th><th>Current plan</th><th>With changes</th>{stress && <th>Headwind</th>}</tr></thead><tbody>
-      <tr><th>Airline net profit</th><td>{money(forecast.before.profit)}</td><td className={forecast.after.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.after.profit)}</td>{stress && <td>{money(forecast.headwind!.profit)}</td>}</tr>
+      <tr><th>Airline net profit</th><td>{money(forecast.before.profit)}</td><td className={tone(forecast.after.profit)}>{money(forecast.after.profit)}</td>{stress && <td>{money(forecast.headwind!.profit)}</td>}</tr>
       <tr><th>Cash after quarter</th><td>{money(forecast.before.cashAfter)}</td><td>{money(forecast.after.cashAfter)}</td>{stress && <td>{money(forecast.headwind!.cashAfter)}</td>}</tr>
       <tr><th>Change in profit</th><td>—</td><td>{money(forecast.after.profit - forecast.before.profit)}</td>{stress && <td>{money(forecast.headwind!.profit - forecast.before.profit)}</td>}</tr>
     </tbody></table></div>
