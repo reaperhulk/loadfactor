@@ -112,6 +112,7 @@ test('mobile: fat-finger taps select cities and the chrome stays usable', async 
   await page.getByTestId('start-jet_age').click()
   await expect(page.getByTestId('date')).toHaveText('1960 Q1')
 
+  await openPanel(page, 'map')
   await expect(page.getByTestId('map')).toBeVisible()
   await page.getByTestId('map-wrap').scrollIntoViewIfNeeded()
 
@@ -152,6 +153,7 @@ test('mobile: the map opens on the home region, with the network on screen', asy
   // Covering a near-square phone box with a 2.7:1 world would crop 60% of its
   // width — measured, that put Chicago at x = -45. Opening on the home region
   // instead means the cities you actually fly from are on screen.
+  await openPanel(page, 'map')
   const box = await page.getByTestId('map').boundingBox()
   for (const id of ['JFK', 'ORD', 'MIA']) {
     const dot = await page.getByTestId(`city-${id}`).boundingBox()
@@ -183,4 +185,31 @@ test('mobile: the game-over card scrolls its buttons into reach', async ({ page 
   // fails if the card clips its buttons instead of scrolling.
   await page.getByTestId('new-game').click()
   await expect(page.getByTestId('start-jet_age')).toBeVisible()
+})
+
+// Phone chrome budget: header, status strip, tabs and the two bottom bars
+// once left the Desk and Routes pages under a third of an iPhone screen. The
+// scrolling page area must keep at least ~45% of the viewport height, the
+// status strip must stay a single compact row, and the start screen's livery
+// swatches must sit on one line.
+test('phone 390x844: chrome leaves the workspace most of the screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  const swatchTops = await page.locator('[data-testid^=livery-]').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)))
+  expect(swatchTops.length).toBeGreaterThan(1)
+  expect(new Set(swatchTops).size, 'livery swatches share one row').toBe(1)
+  await page.getByTestId('seed-input').fill('phone-chrome')
+  await page.getByTestId('start-jet_age').click()
+  await expect(page.getByTestId('page-desk')).toBeVisible()
+  const status = (await page.getByTestId('status-bar').boundingBox())!
+  expect(status.height, 'status strip is one compact row').toBeLessThanOrEqual(48)
+  for (const panel of ['desk', 'routes'] as const) {
+    await openPanel(page, panel)
+    const content = (await page.getByTestId(`page-${panel}`).boundingBox())!
+    expect(content.height / 844, `${panel} content share of the viewport`).toBeGreaterThanOrEqual(0.45)
+  }
+  for (const id of ['nav-desk', 'end-quarter', 'open-settings']) {
+    const box = (await page.getByTestId(id).boundingBox())!
+    expect(box.height, `${id} keeps a 44px target`).toBeGreaterThanOrEqual(44)
+  }
 })

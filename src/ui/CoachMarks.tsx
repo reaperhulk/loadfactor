@@ -53,6 +53,10 @@ export function CoachMarks({ state }: { state: GameState }) {
     }
   })
   if (dismissed || state.turn > 2) return null
+  // The opening card's job is choosing a market. Once a route is on the board
+  // it steps aside on its own — the review button is the next move, and the
+  // later quarters bring their own flight-school step.
+  if (state.turn === 0 && state.airlines[viewSeat()]!.routes.length > 0) return null
   const hint = nextHint(state)
   if (hint === null) return null
   return (

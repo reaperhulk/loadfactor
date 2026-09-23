@@ -30,6 +30,7 @@ async function startMature(page: Page) {
     window.__harness.getState()!.airlines[0]!.name = 'Intercontinental Air Transport & Regional Services'
     window.__harness.dispatch({type:'set_fare',routeId:snapshot.airlines[0]!.routes[0]!.id,fareLevel:snapshot.airlines[0]!.routes[0]!.fareLevel})
   }, mature)
+  await openPanel(page, 'map')
   await expect(page.getByTestId('map')).toBeVisible()
 }
 for(const [width,height] of viewports) {

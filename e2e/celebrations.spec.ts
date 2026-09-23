@@ -4,6 +4,7 @@ import { flyQuarter, openPanel } from './workspace'
 async function start(page: Page) {
   await page.goto('/')
   await page.getByTestId('start-jet_age').click()
+  await openPanel(page, 'map')
   await expect(page.getByTestId('map')).toBeVisible()
 }
 async function route(page: Page, to = 'ORD') {
@@ -34,6 +35,10 @@ async function checkRunwayHeading(page: Page, approaching: boolean) {
 }
 for (const width of [1440, 390]) test(`celebrations ${width}px: route skip and delivery completion`, async ({ page }, info) => {
   await page.setViewportSize({ width, height: 844 })
+  // Scenes close themselves after two seconds of wall-clock time. Own the
+  // clock so a slow runner cannot lose the scene mid-measurement; the
+  // self-close is then exercised explicitly by advancing time below.
+  await page.clock.install()
   await start(page)
   await route(page)
   const scene = page.getByTestId('celebration')
@@ -56,7 +61,8 @@ for (const width of [1440, 390]) test(`celebrations ${width}px: route skip and d
   await expect(page.getByTestId('report-card')).toHaveCount(0)
   await checkRunwayHeading(page, true)
   await info.attach(`${width}-delivery`, { body: await page.screenshot(), contentType: 'image/png' })
-  await expect(scene).toHaveCount(0, { timeout: 6000 })
+  await page.clock.runFor(2500)
+  await expect(scene).toHaveCount(0)
   await expect(page.getByTestId('report-card')).toBeVisible()
   await page.getByTestId('report-card-close').click()
   await openPanel(page, 'fleet')
@@ -88,17 +94,19 @@ test('celebrations can be permanently disabled and obey reduced motion', async (
 })
 
 test('inbox acknowledges viewed issues and stays clear across navigation and reload', async ({ page }) => {
-  await start(page)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  // A new career opens on the Desk, which is the inbox: its items are seen.
   const badge = page.getByTestId('open-inbox').locator('b')
-  await expect(badge).toBeVisible()
-  await page.getByTestId('open-inbox').click()
-  await expect(badge).toHaveCount(0)
   await expect(page.getByTestId('management-brief')).toBeVisible()
+  await expect(badge).toHaveCount(0)
   await openPanel(page, 'fleet')
   await expect(badge).toHaveCount(0)
   await page.reload()
   await page.getByTestId('continue-save').click()
   await expect(badge).toHaveCount(0)
+  // Fly from somewhere other than the Desk so the new quarter's items stay unseen.
+  await openPanel(page, 'fleet')
   await flyQuarter(page)
   await page.getByTestId('report-card-close').click()
   await expect(badge).toBeVisible()
