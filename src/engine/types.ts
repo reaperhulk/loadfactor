@@ -91,6 +91,8 @@ export interface UsedOffer {
 export interface FuelHedge {
   bp: number
   quartersLeft: number
+  // Rules 6: share of the fuel burn the hedge covers (bp); absent = all of it.
+  coverBp?: number
 }
 
 export interface RouteQuarter {
@@ -103,7 +105,20 @@ export interface RouteQuarter {
   cost: number // $k
 }
 
+// Rules 6: why a route earned what it did — the pair's market and where the
+// route's money went last quarter. Quarterly passengers and $k.
+export interface RouteMarketResult {
+  demand: number // travellers wanting this city pair at the standard fare
+  carried: number // flown by anyone, direct or connecting (discounts can push this past demand)
+  own: number // of them, flown on this route nonstop
+  unserved: number // standard-fare demand that did not fly: priced out, or no seat left
+  full: boolean // the route sold out (≥ 95%): unserved travellers are spill
+}
+export interface RouteCostResult { fuel: number; fees: number; flightPay: number; service: number }
+
 export interface Route {
+  lastMarket?: RouteMarketResult
+  lastCostParts?: RouteCostResult
   lastSegments?: { business: number; leisure: number; budget: number }
   lastTransferRevenue?: number
   id: number
@@ -243,6 +258,11 @@ export type OfferKind =
   | 'early_delivery'
   | 'fleet_sale'
   | 'route_rights'
+  // Rules 6 (engine/offers.ts eventOffers): the news asks a question. Buy
+  // the official-carrier deal ahead of a surge, or fly a government airlift
+  // through a regional crisis at the cost of your own schedule there.
+  | 'official_carrier'
+  | 'airlift_contract'
 
 export interface WorldOffer {
   airline?: number
@@ -253,6 +273,10 @@ export interface WorldOffer {
   count?: number // fleet_sale: how many airframes
   ageQuarters?: number // fleet_sale: their age
   pair?: string // route_rights: the exclusive pair
+  region?: Region | null // rules 6 event offers aimed at a region
+  eventId?: string // rules 6 event offers: the announced event behind it
+  incomeK?: number // airlift_contract: paid each quarter the deal runs
+  capacityBp?: number // airlift_contract: share of trips in the region still flying your schedule
   expiresTurn: number // decide before this turn resolves
   costK: number // paid on acceptance
   upkeepK: number // charged each quarter until untilTurn
@@ -273,8 +297,11 @@ export interface ActiveDeal {
   untilTurn: number
   upkeepK: number
   demandBonusBp: number
-  capacityBp?: number // hub_strike: share of trips at `city` that still fly
+  capacityBp?: number // hub_strike / airlift_contract: share of trips at `city` (or in `region`) that still fly
   pair?: string // route_rights: rivals may not open this pair while it runs
+  region?: Region // rules 6: a deal aimed at a whole region
+  incomeK?: number // airlift_contract: paid each quarter the deal runs
+  demandBp?: number // official_carrier: extra demand on pairs touching the host
 }
 
 export interface WorldState {
@@ -287,6 +314,19 @@ export interface WorldState {
   indexHistory: { turn: number; economyBp: number; fuelBp: number }[]
   offers: WorldOffer[] // open questions awaiting the player's answer
   nextOfferId: number
+  // Rules 6: events drawn this quarter land next quarter; until then they
+  // are public news (absent under earlier rules).
+  announced?: ActiveEvent[]
+  // Rules 6: building programmes an airline paid to bring forward.
+  terminals?: FundedTerminal[]
+}
+
+export interface FundedTerminal {
+  city: string
+  funder: number
+  opensTurn: number // counts toward the pool from this turn
+  slots: number
+  cost: number
 }
 
 export interface GameState {
@@ -335,7 +375,7 @@ export type Command =
   | { type: 'withdraw_order'; orderId: number }
   | { type: 'lease_aircraft'; aircraftType: string }
   | { type: 'buy_used'; offerId: number }
-  | { type: 'hedge_fuel'; quarters: number }
+  | { type: 'hedge_fuel'; quarters: number; coverBp?: number }
   | { type: 'refit_cabin'; aircraftId: number; cabin: number }
   | { type: 'sell_aircraft'; aircraftId: number }
   | { type: 'set_marketing'; level: number }
@@ -343,6 +383,7 @@ export type Command =
   | { type: 'accept_offer'; offerId: number }
   | { type: 'decline_offer'; offerId: number }
   | { type: 'request_slots'; city: string }
+  | { type: 'fund_terminal'; city: string }
   | { type: 'cancel_slot_request'; city: string }
   | { type: 'release_slots'; city: string; count: number }
   | { type: 'take_loan'; amount: number }
@@ -365,13 +406,14 @@ export type GameEvent =
   | { type: 'order_cancelled'; airline: number; orderId: number; refund: number }
   | { type: 'aircraft_leased'; airline: number; orderId: number; aircraftType: string; paymentPerQuarter: number }
   | { type: 'used_bought'; airline: number; aircraftId: number; aircraftType: string; price: number; ageQuarters: number }
-  | { type: 'fuel_hedged'; airline: number; bp: number; quarters: number; premium: number }
+  | { type: 'fuel_hedged'; airline: number; bp: number; quarters: number; premium: number; coverBp?: number }
   | { type: 'cabin_refit'; airline: number; aircraftId: number; cabin: number; cost: number }
   | { type: 'aircraft_delivered'; airline: number; aircraftId: number; aircraftType: string }
   | { type: 'aircraft_sold'; airline: number; aircraftId: number; proceeds: number }
   | { type: 'marketing_set'; airline: number; level: number }
   | { type: 'slot_requested'; airline: number; city: string; fee: number; queuePosition: number }
   | { type: 'airport_expanded'; city: string; slots: number }
+  | { type: 'terminal_funded'; airline: number; city: string; cost: number; slots: number; opensTurn: number }
   | { type: 'rival_acquired'; airline: number; target: number; price: number; aircraft: number; routes: number }
   | { type: 'slot_request_cancelled'; airline: number; city: string; refund: number }
   | { type: 'slots_released'; airline: number; city: string; slots: number }
@@ -379,9 +421,11 @@ export type GameEvent =
   | { type: 'loan_taken'; airline: number; loanId: number; amount: number; annualRateBp: number }
   | { type: 'loan_repaid'; airline: number; loanId: number; amount: number; remaining: number }
   | { type: 'world_event_started'; eventId: string; city: string | null; region: Region | null }
+  | { type: 'world_event_announced'; eventId: string; city: string | null; region: Region | null; startsTurn: number }
   | { type: 'world_event_ended'; eventId: string }
   | { type: 'aircraft_introduced'; aircraftType: string; name: string }
   | { type: 'strike_hit'; airline: number; city: string; trips: number }
+  | { type: 'airlift_flown'; airline: number; city: string; trips: number }
   | { type: 'economy_updated'; economyBp: number; fuelBp: number }
   | {
       type: 'route_result'
@@ -393,6 +437,8 @@ export type GameEvent =
       transferPax: number
       revenue: number // $k
       cost: number // $k
+      market?: RouteMarketResult // rules 6
+      costParts?: RouteCostResult // rules 6
     }
   | {
       type: 'quarter_report'

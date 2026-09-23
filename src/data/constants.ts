@@ -329,3 +329,54 @@ export const CABIN_YIELD_BP_V5: readonly number[] = [9200, 10000, 12000]
 // own contribution per passenger last quarter. Sprawl has a price, and the
 // reference bot, the rivals and the fuzz genome all read it.
 export const SPRAWL_HURDLE_BP = 15000
+
+// --- Rules 6: price is a lever again, the world warns, cash has a use ---
+// How strongly each segment walks away from a fare above the standard ladder
+// (bp of the excess). Steeper than rules 2-5 at the top: a top fare now sheds
+// travellers even on a monopoly, so it is a yield choice, not a default. On
+// the probe (jet_age, greedy and budget, three seeds) the profit-maximizing
+// fare at year 15 moved from +2 on 94% of routes to 0/+1/+2 at 27/41/32%.
+// Indexing fares to inflation was tried and rejected: at half the cost drift
+// it doubled late-career net worth and broke the runaway bound.
+export const FARE_ELASTICITY_V6 = { business: 5000, leisure: 11000, budget: 15000 } as const
+// Cheap fares grow the market: travellers who would not have flown at the
+// standard fare fly at a discount (bp of the discount), capped.
+export const FARE_STIMULATION_V6 = { business: 0, leisure: 8000, budget: 15000 } as const
+export const FARE_STIMULATION_CAP_BP = 14000
+// Business travellers notice price too, gently: their weight scales by
+// (priceAppeal + this) / (standard priceAppeal + this).
+export const BUSINESS_PRICE_DAMPING = 22000
+// Service yields: a better product earns a better fare mix per passenger
+// (upgrades, fewer discounted seats), so service pays even on a full plane.
+// Standard service is the reference fare. Probed against the doctrine race
+// and the runaway bound: +14% at full service overheated Oil Crisis past
+// 10x its target, and a 5% basic-service discount trapped the pax-mandate
+// bot on a deregulation seed; this curve cleared both.
+export const SERVICE_YIELD_BP_V6: readonly number[] = [9800, 10000, 10900]
+// Hedges price as a share of the fuel bill they cover, per quarter, and
+// may cover part of the burn. A 100% hedge on a large fleet was 0.6% of the
+// bill — free insurance. Now it is a real premium, scaled to what it saves.
+export const HEDGE_PREMIUM_BP_OF_FUEL_V6 = 400
+export const HEDGE_COVER_OPTIONS_BP: readonly number[] = [5000, 10000]
+// Every world event is announced this many quarters before it lands, so an
+// oil shock is a decision (hedge, trim, bank cash) instead of an ambush.
+export const EVENT_WARNING_QUARTERS_V6 = 1
+// Terminal programmes: pay the authority to bring a city's next expansion
+// forward to next quarter. Price per slot delivered, per (pop + biz) point.
+export const TERMINAL_COST_PER_SLOT_POINT_V6 = 90 // $k
+// The funder takes this many of the new slots straight away; the rest go to
+// the waiting list as usual.
+export const TERMINAL_FUNDER_SLOTS_V6 = 2
+// New-build delivery lines: at most this many new-build orders (purchase or
+// lease) per airline per quarter, rivals and players alike.
+export const ORDERS_PER_QUARTER_V6 = 4
+// A raid picks among the leader's top markets by a stateless hash, not
+// always the single best one.
+export const RAID_CHOICES_V6 = 3
+// Load-factor mandates weigh scale: to qualify, an airline's seats flown last
+// quarter must reach this share of the median live competitor's. Filling a
+// token schedule was the winning efficiency play; now it disqualifies.
+export const LF_FIELD_SCALE_BP_V6 = 5000
+// Event-linked offers: the world asks what you will do about the news.
+export const OFFICIAL_CARRIER_DEMAND_BP_V6 = 2500 // +25% demand on the host's pairs you fly
+export const AIRLIFT_CAPACITY_BP_V6 = 5000 // share of trips into the region still flying

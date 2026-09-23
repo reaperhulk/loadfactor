@@ -1,6 +1,7 @@
 import { distanceKm, pairKey } from '../data/cities'
 import { getAircraftType, typesOnSale } from '../data/aircraft'
-import { AI_MIN_ROUTE_KM, RAID_CASH_BUFFER_MULT_BP } from '../data/constants'
+import { AI_MIN_ROUTE_KM, RAID_CASH_BUFFER_MULT_BP, RAID_CHOICES_V6 } from '../data/constants'
+import { fnv1a } from './rng'
 import { cashBufferFor } from './policy'
 import { netWorth, networkCities, slotsFree, yearOf } from './queries'
 import { slotsRemaining } from './slots'
@@ -40,7 +41,11 @@ export function raidTarget(state: GameState, seat: number): { pair: string; from
     candidates.push({ route, missing, profit: route.lastRevenue - route.lastCost })
   }
   candidates.sort((a, b) => Number(a.missing !== null) - Number(b.missing !== null) || b.profit - a.profit || a.route.id - b.route.id)
-  const pick = candidates[0]
+  // Rules 6: the leader's single best market was a target the player could
+  // read off their own P&L every time. The raider now picks among the top
+  // few of the reachable tier by a stateless hash of (seed, turn, seat).
+  const tier = candidates.filter((c) => (c.missing !== null) === (candidates[0]?.missing !== null)).slice(0, RAID_CHOICES_V6)
+  const pick = (state.rulesVersion ?? 1) >= 6 && tier.length > 1 ? tier[fnv1a(`${state.seed}|raid|${state.turn}|${seat}`) % tier.length] : candidates[0]
   if (!pick) return null
   const { route, missing } = pick
   return { pair: pairKey(route.from, route.to), from: route.from, to: route.to, target: leader.id, city: missing ?? route.from,
@@ -66,7 +71,10 @@ export function chooseCampaign(state: GameState, seat: number): RivalCampaign {
   if (fight && fight.gap>0) {
     const retreat=fight.route.lastRevenue-fight.route.lastCost<0
     const kind=retreat ? 'defend' : airline.personality==='premium' ? 'premium' : 'price'
-    return { ...clock, kind, city:fight.route.from,
+    // Rules 6: a price war is fought on the contested pair, not across every
+    // route the rival flies at the city.
+    const pair = (state.rulesVersion ?? 1) >= 6 && kind === 'price' ? { pair: pairKey(fight.route.from, fight.route.to) } : {}
+    return { ...clock, kind, city:fight.route.from, ...pair,
       evidence:`${fight.route.from}–${fight.route.to}: ${fight.route.lastPax} boardings versus competitors' ${fight.rivalPax}${retreat ? '; route lost money' : ''}.`,
       response:retreat ? 'Protect the core with marketing; avoid a deeper price war.' : kind==='premium' ? 'Compete through full service at this city.' : 'Offer discount fares at this city.' }
   }

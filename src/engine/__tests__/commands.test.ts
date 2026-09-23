@@ -262,6 +262,7 @@ describe('command validation', () => {
     const before = state.airlines[0]!
     const myFleet = before.fleet.length
     const myRoutes = before.routes.length
+    const theirCash = rival.cash
     const { state: after, events } = applyCommand(state, { type: 'acquire_rival', target: 1 })
     const me = after.airlines[0]!
     const shell = after.airlines[1]!
@@ -273,7 +274,8 @@ describe('command validation', () => {
     expect(me.slots['FRA']).toBeGreaterThanOrEqual(2)
     expect(me.loans.some((l) => l.principal === 4000)).toBe(true) // the debt came too
     if (events[0]?.type === 'rival_acquired') {
-      expect(me.cash).toBe(60000 - events[0].price)
+      // Rules 6: the buyer takes the treasury with the company.
+      expect(me.cash).toBe(60000 - events[0].price + theirCash)
     }
     // Transferred metal points at the TRANSFERRED route id, not the old one.
     const movedRoute = me.routes[me.routes.length - 1]!

@@ -39,9 +39,9 @@ import { fnv1a, nextInt } from './rng'
 import { getScenario } from '../data/scenarios'
 import { inflationBp, resolveMarket } from './market'
 import { resaleValue, totalDebt } from './queries'
-import { expansionEvents, resolveSlotRequests, slotsRemaining } from './slots'
+import { expansionEvents, openFundedTerminals, resolveSlotRequests, slotsRemaining } from './slots'
 import { isGrounded, netWorth, objectiveQualified, objectiveBeats, objectiveMet, objectiveScore, objectiveScoreAt, yearOf } from './queries'
-import { expireOffersAndDeals, maybeOfferDeal } from './offers'
+import { eventOffers, expireOffersAndDeals, maybeOfferDeal } from './offers'
 import { deriveFootholds } from './newGame'
 import { runRivalTurn } from './rivals'
 import type { Airline, EngineResult, GameEvent, GameState, OwnedAircraft } from './types'
@@ -314,7 +314,11 @@ function resolveQuarter(prev: GameState, outlook: boolean): EngineResult {
   // 4. World economy and events, plus this quarter's used-aircraft market
   // (stateless hash picks — deterministic, order-independent).
   if (!outlook) events.push(...updateWorld(state))
-  else state.world.events = state.world.events.map(e=>({...e, quartersLeft:e.quartersLeft-1})).filter(e=>e.quartersLeft>0)
+  else {
+    state.world.events = state.world.events.map(e=>({...e, quartersLeft:e.quartersLeft-1})).filter(e=>e.quartersLeft>0)
+    // Announced events are known commitments of the world, not draws.
+    if (state.world.announced?.length) { state.world.events.push(...state.world.announced); state.world.announced = [] }
+  }
   state.world.usedMarket = rollUsedMarket(state)
 
   // 5. Route economics.
@@ -480,6 +484,7 @@ function resolveQuarter(prev: GameState, outlook: boolean): EngineResult {
   // anything unanswered lapses.
   expireOffersAndDeals(state, events)
   if (!outlook) maybeOfferDeal(state, events)
+  if (!outlook) eventOffers(state, events)
 
   // 11. New entrants: an empty seat draws fresh capital on a fixed cadence, so
   // the map never becomes a one-airline world. Capped at the scenario's
@@ -550,6 +555,7 @@ function resolveQuarter(prev: GameState, outlook: boolean): EngineResult {
   // public and computable arbitrarily far ahead (slots.ts) — this only files
   // the report line for airports the player actually has a stake in.
   events.push(...expansionEvents(state, state.turn + 1))
+  if ((state.rulesVersion ?? 1) >= 6) openFundedTerminals(state, state.turn + 1, events)
   state.turn++
 
   return { state, events }

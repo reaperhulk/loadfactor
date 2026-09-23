@@ -28,10 +28,13 @@ import {
   SLOTS_PER_GRANT,
   SLOT_FEE_PER_POINT,
   SLOT_RENT_PER_POINT,
+  TERMINAL_COST_PER_SLOT_POINT_V6,
+  TERMINAL_FUNDER_SLOTS_V6,
 } from '../data/constants'
 import { fnv1a } from './rng'
 import { slotsAllocated, slotsFree } from './queries'
 import type { Airline, GameEvent, GameState } from './types'
+import { inflationBp } from './market'
 
 // A city's weight for every slot price: the same (pop + biz) scale the whole
 // game reads a city's importance by.
@@ -114,7 +117,64 @@ export function expansionsBy(seed: string, cityId: string, turn: number): number
 // The city's pool as it stands this quarter: authored capacity plus every
 // programme delivered so far. Nothing reads `city.slotPool` directly.
 export function cityPool(state: GameState, cityId: string): number {
-  return getCity(cityId).slotPool + expansionsBy(state.seed, cityId, state.turn) * expansionSize(cityId)
+  return getCity(cityId).slotPool + expansionsBy(state.seed, cityId, state.turn) * expansionSize(cityId) + fundedSlots(state, cityId, state.turn)
+}
+
+// --- Funded terminals (rules 6) --------------------------------------------
+//
+// Cash had nowhere to go once airports filled: slots gate growth, the queue
+// is a timetable, and a late career sat on a treasury it could not spend.
+// An airline can now pay to open a city's next programme early. The funder
+// takes the first slots of it and the rest serve the waiting list.
+
+// Slots delivered at a city by funded programmes open by `turn`.
+export function fundedSlots(state: GameState, cityId: string, turn: number): number {
+  let slots = 0
+  for (const t of state.world.terminals ?? []) if (t.city === cityId && t.opensTurn <= turn) slots += t.slots
+  return slots
+}
+
+// What a funded programme costs today ($k): per slot, per city point,
+// inflated with the era's construction costs.
+export function terminalCost(state: GameState, cityId: string): number {
+  return Math.floor((TERMINAL_COST_PER_SLOT_POINT_V6 * cityPoints(cityId) * expansionSize(cityId) * inflationBp(state.turn)) / 10000)
+}
+
+// Why a city cannot take a funded programme right now, or null. One funded
+// programme per city per half-cadence: concrete takes time even when paid.
+export function terminalBlocker(state: GameState, airlineIdx: number, cityId: string): string | null {
+  const airline = state.airlines[airlineIdx]!
+  const last = (state.world.terminals ?? []).filter((t) => t.city === cityId).reduce((m, t) => Math.max(m, t.opensTurn), -Infinity)
+  if (state.turn + 1 - last < Math.floor(EXPANSION_EVERY_QUARTERS / 2)) return `${getCity(cityId).name} is still building its last funded programme`
+  if (nextExpansion(state, cityId).quartersAway <= 1) return `${getCity(cityId).name} opens its scheduled programme next quarter anyway`
+  if (airline.cash < terminalCost(state, cityId)) return 'insufficient cash'
+  return null
+}
+
+// Mutates state. Returns the event, or a rejection reason.
+export function fundTerminal(state: GameState, airlineIdx: number, cityId: string): GameEvent | string {
+  const blocker = terminalBlocker(state, airlineIdx, cityId)
+  if (blocker !== null) return blocker
+  const cost = terminalCost(state, cityId)
+  const slots = expansionSize(cityId)
+  state.airlines[airlineIdx]!.cash -= cost
+  const opensTurn = state.turn + 1
+  state.world.terminals = [...(state.world.terminals ?? []), { city: cityId, funder: airlineIdx, opensTurn, slots, cost }]
+  return { type: 'terminal_funded', airline: airlineIdx, city: cityId, cost, slots, opensTurn }
+}
+
+// Programmes opening as the quarter rolls over hand the funder its slots
+// first, before the waiting list sees the new capacity.
+export function openFundedTerminals(state: GameState, nextTurn: number, events: GameEvent[]): void {
+  for (const t of state.world.terminals ?? []) {
+    if (t.opensTurn !== nextTurn) continue
+    events.push({ type: 'airport_expanded', city: t.city, slots: t.slots })
+    const funder = state.airlines[t.funder]
+    if (!funder || funder.bankrupt) continue
+    const granted = Math.min(TERMINAL_FUNDER_SLOTS_V6, t.slots)
+    funder.slots[t.city] = (funder.slots[t.city] ?? 0) + granted
+    events.push({ type: 'slots_granted', airline: funder.id, city: t.city, slots: granted, waited: 1 })
+  }
 }
 
 export interface Expansion {

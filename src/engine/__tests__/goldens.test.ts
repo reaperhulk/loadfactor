@@ -86,3 +86,12 @@ describe('rules 4 compatibility', () => {
     expect({ checkpointHashes: result.checkpointHashes, summary: result.summary }).toEqual(legacy[career.name])
   })
 })
+
+// Rules 5 (the race, the louder world, the cabin as a product) stays frozen.
+describe('rules 5 compatibility', () => {
+  const legacy = JSON.parse(readFileSync(join(__dirname, '../../../fixtures/legacy-v5-goldens.json'), 'utf8')) as Record<string, Golden>
+  for (const career of CAREERS) it(`preserves ${career.name}`, () => {
+    const result = runCareer(career.scenario, career.seed, career.bot, career.quarters, 5)
+    expect({ checkpointHashes: result.checkpointHashes, summary: result.summary }).toEqual(legacy[career.name])
+  })
+})

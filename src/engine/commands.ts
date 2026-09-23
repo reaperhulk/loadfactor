@@ -19,10 +19,15 @@ import {
   TAKEOVER_BASE_K,
   TAKEOVER_PREMIUM_BP,
   OFFER_FUEL_PREMIUM_BP,
+  ENTRANT_GRACE_QUARTERS,
+  HEDGE_COVER_OPTIONS_BP,
+  HEDGE_PREMIUM_BP_OF_FUEL_V6,
+  ORDERS_PER_QUARTER_V6,
+  OFFICIAL_CARRIER_DEMAND_BP_V6,
 } from '../data/constants'
-import { slotFee, slotQueue } from './slots'
-import { canWithdrawOrder, orderRefund } from './orders'
-import { effFuelBp } from './worldEvents'
+import { fundTerminal, slotFee, slotQueue } from './slots'
+import { canWithdrawOrder, ordersPlacedThisQuarter, orderRefund } from './orders'
+import { effFuelBp, hedgeLockBp } from './worldEvents'
 import {
   isGrounded,
   currentLoanRateBp,
@@ -45,6 +50,21 @@ interface Applied {
 
 function reject(airlineIdx: number, command: Command, reason: string): Applied {
   return { events: [{ type: 'command_rejected', airline: airlineIdx, command, reason }] }
+}
+
+// Rules 6: new-build delivery lines cap how much metal one quarter can buy.
+function orderLineFull(state: GameState, airline: Airline): boolean {
+  return (state.rulesVersion ?? 1) >= 6 && ordersPlacedThisQuarter(airline) >= ORDERS_PER_QUARTER_V6
+}
+
+// Rules 6 hedge premium ($k): a share of last quarter's fuel bill per quarter
+// covered, scaled by the cover. A fleet that has not flown yet prices off the
+// per-airframe legacy rate so the first quarter is not free.
+export function hedgePremium(state: GameState, airline: Airline, quarters: number, coverBp: number): number {
+  const lastFuel = airline.history[airline.history.length - 1]?.breakdown.fuel ?? 0
+  const perQuarter = lastFuel > 0 ? Math.floor((lastFuel * HEDGE_PREMIUM_BP_OF_FUEL_V6) / 10000) : HEDGE_PREMIUM_PER_AIRCRAFT * airline.fleet.length
+  const scenarioBp = getScenario(state.scenario).rules.hedgePremiumBp ?? 10000
+  return Math.floor((Math.floor((perQuarter * quarters * coverBp) / 10000) * scenarioBp) / 10000)
 }
 
 // Mutates `state` in place (callers clone at the entry point).
@@ -297,6 +317,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       if (year < type.availableFrom || year > type.availableTo)
         return reject(airlineIdx, command, `${type.name} is not on sale in ${year}`)
       if (airline.cash < type.price) return reject(airlineIdx, command, 'insufficient cash')
+      if (orderLineFull(state, airline)) return reject(airlineIdx, command, `the manufacturers take at most ${ORDERS_PER_QUARTER_V6} new-build orders a quarter`)
       airline.cash -= type.price
       const order = { id: airline.nextId++, type: type.id, quartersLeft: type.deliveryQuarters, leased: false }
       airline.orders.push(order)
@@ -331,6 +352,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         return reject(airlineIdx, command, `${type.name} is not on sale in ${year}`)
       const payment = Math.floor((type.price * LEASE_BP_PER_QUARTER) / 10000)
       if (airline.cash < payment) return reject(airlineIdx, command, 'insufficient cash for the first payment')
+      if (orderLineFull(state, airline)) return reject(airlineIdx, command, `the lessors deliver at most ${ORDERS_PER_QUARTER_V6} new airframes a quarter`)
       // Leases deliver fast — the lessor has airframes on the ramp.
       const order = { id: airline.nextId++, type: type.id, quartersLeft: 1, leased: true }
       airline.orders.push(order)
@@ -385,6 +407,20 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         return reject(airlineIdx, command, `hedge must run ${HEDGE_MIN_QUARTERS}..${HEDGE_MAX_QUARTERS} quarters`)
       if (airline.fuelHedge !== null) return reject(airlineIdx, command, 'a hedge is already running')
       if (airline.fleet.length === 0) return reject(airlineIdx, command, 'no fleet to hedge')
+      if ((state.rulesVersion ?? 1) >= 6) {
+        // Rules 6: the premium is a share of the fuel bill it covers, and the
+        // desk can cover half the burn or all of it. The lock price has half
+        // of any announced shock priced in — the market reads the news too.
+        const coverBp = command.coverBp ?? 10000
+        if (!HEDGE_COVER_OPTIONS_BP.includes(coverBp)) return reject(airlineIdx, command, `hedge cover must be one of ${HEDGE_COVER_OPTIONS_BP.map((c) => `${c / 100}%`).join(', ')}`)
+        const premium = hedgePremium(state, airline, command.quarters, coverBp)
+        if (airline.cash < premium) return reject(airlineIdx, command, 'insufficient cash')
+        airline.cash -= premium
+        const bp = hedgeLockBp(state.world)
+        airline.fuelHedge = { bp, quartersLeft: command.quarters, coverBp }
+        return { events: [{ type: 'fuel_hedged', airline: airlineIdx, bp, quarters: command.quarters, premium, coverBp }] }
+      }
+      if (command.coverBp !== undefined) return reject(airlineIdx, command, 'partial hedges require rules 6')
       const premium = Math.floor(
         (HEDGE_PREMIUM_PER_AIRCRAFT *
           airline.fleet.length *
@@ -463,6 +499,11 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
             upkeepK: offer.upkeepK,
             demandBonusBp: offer.demandBonusBp,
             ...(offer.pair ? { pair: offer.pair } : {}),
+            // Rules 6 event deals: a region, a fee, a charter, a promotion.
+            ...(offer.region ? { region: offer.region } : {}),
+            ...(offer.incomeK ? { incomeK: offer.incomeK } : {}),
+            ...(offer.capacityBp !== undefined ? { capacityBp: offer.capacityBp } : {}),
+            ...(offer.kind === 'official_carrier' ? { demandBp: OFFICIAL_CARRIER_DEMAND_BP_V6 } : {}),
           },
         ]
       }
@@ -508,6 +549,10 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       const targetWorth = netWorth(target)
       const distressed = target.insolventQuarters >= 1 || targetWorth * 4 <= netWorth(airline)
       if (!distressed) return reject(airlineIdx, command, 'they are not for sale — too healthy to fold')
+      // Rules 6: a newly capitalized entrant is not a distressed asset, for
+      // anyone — the grace period used to live only in the bots' policy.
+      if ((state.rulesVersion ?? 1) >= 6 && target.enteredTurn !== undefined && state.turn - target.enteredTurn < ENTRANT_GRACE_QUARTERS)
+        return reject(airlineIdx, command, `they launched ${state.turn - target.enteredTurn} quarter${state.turn - target.enteredTurn === 1 ? '' : 's'} ago — new carriers cannot be bought for ${ENTRANT_GRACE_QUARTERS} quarters`)
       const price = Math.max(
         TAKEOVER_BASE_K,
         Math.floor((Math.max(0, targetWorth) * TAKEOVER_PREMIUM_BP) / 10000),
@@ -566,6 +611,9 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       target.slotRequests = []
       delete target.slotInterest
       target.fuelHedge = null
+      // Rules 6: the buyer takes the company, treasury included. Before, the
+      // target's cash vanished — a takeover destroyed its whole balance.
+      if ((state.rulesVersion ?? 1) >= 6) airline.cash += Math.max(0, target.cash)
       target.cash = 0
       return {
         events: [
@@ -585,6 +633,16 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
     // served no earlier than next quarter, and only when capacity exists —
     // so joining a list that is longer than the pool is a legal, and
     // sometimes correct, bet on the airport's building programme.
+    // Rules 6: pay the authority to open the city's next building programme
+    // now. The funder takes the first slots; the rest serve the waiting list.
+    case 'fund_terminal': {
+      if ((state.rulesVersion ?? 1) < 6) return reject(airlineIdx, command, 'terminal funding requires rules 6')
+      if (!isCity(command.city)) return reject(airlineIdx, command, 'unknown city')
+      const funded = fundTerminal(state, airlineIdx, command.city)
+      if (typeof funded === 'string') return reject(airlineIdx, command, funded)
+      return { events: [funded] }
+    }
+
     case 'request_slots': {
       if (!isCity(command.city)) return reject(airlineIdx, command, 'unknown city')
       const city = getCity(command.city)

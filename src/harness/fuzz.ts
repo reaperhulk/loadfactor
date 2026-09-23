@@ -102,7 +102,7 @@ export function genomeCommands(state: GameState, g: Genome): Command[] {
   )
   commands.push(...slotReleaseCommands(state, 0))
   commands.push(...slotRequestCommands(state, 0, dials))
-  commands.push(...yieldCommands(state, 0, g.fareFloor))
+  commands.push(...yieldCommands(state, 0, g.fareFloor, g.fareBias))
   const skip = launch.usedAircraft !== null ? new Set([launch.usedAircraft]) : undefined
   return [...commands, ...assignmentCommands(state, 0, skip)]
 }

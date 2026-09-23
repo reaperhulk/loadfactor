@@ -11,6 +11,7 @@ import {
   DEBUT_APPEAL_QUARTERS,
   EVENT_DRAW_CHANCE_BP,
   EVENT_DRAW_CHANCE_BP_V5,
+  EVENT_WARNING_QUARTERS_V6,
   FUEL_MAX_BP,
   FUEL_MIN_BP,
   FUEL_REVERSION_DIV,
@@ -39,6 +40,16 @@ export function effFuelBp(world: WorldState): number {
     if (def.fuelModBp !== undefined) bp = Math.floor((bp * def.fuelModBp) / 10000)
   }
   return bp
+}
+
+// Rules 6: the price a new hedge locks. Announced events are public news, so
+// the fuel desk prices half of an announced shock into the contract: hedging
+// early is worth more than hedging on the headline.
+export function hedgeLockBp(world: WorldState): number {
+  const now = effFuelBp(world)
+  if (!world.announced?.length) return now
+  const landed = effFuelBp({ ...world, events: [...world.events, ...world.announced] })
+  return Math.floor((now + landed) / 2)
 }
 
 // Demand multiplier at one city from active city/region events.
@@ -91,11 +102,21 @@ export function updateWorld(state: GameState): GameEvent[] {
   world.fuelBp = walk(world.fuelBp, FUEL_STEP_BP, FUEL_MIN_BP, FUEL_MAX_BP, FUEL_REVERSION_DIV, d2.value)
   state.rng.economy = econRng
 
+  const rules = state.rulesVersion ?? 1
+  // Rules 6: last quarter's news lands now. The warning was the decision
+  // window; the event itself runs its full course from here.
+  if (rules >= 6) {
+    for (const e of world.announced ?? []) {
+      world.events.push(e)
+      events.push({ type: 'world_event_started', eventId: e.id, city: e.city, region: e.region })
+    }
+    world.announced = []
+  }
+
   // Maybe draw a new world event (events stream).
   let evRng = state.rng.events
   const year = yearOf(state)
-  const active = new Set(world.events.map((e) => e.id))
-  const rules = state.rulesVersion ?? 1
+  const active = new Set([...world.events, ...(world.announced ?? [])].map((e) => e.id))
   const eligible = (rules >= 5 ? WORLD_EVENTS_V5 : WORLD_EVENTS).filter(
     (def) => year >= def.fromYear && year <= def.toYear && !active.has(def.id) && (def.fromRules ?? 1) <= rules,
   )
@@ -136,8 +157,14 @@ export function updateWorld(state: GameState): GameEvent[] {
         region = REGIONS[r.value]!
       }
     }
-    world.events.push({ id: chosen.id, quartersLeft: chosen.durationQuarters, city, region })
-    events.push({ type: 'world_event_started', eventId: chosen.id, city, region })
+    const drawn = { id: chosen.id, quartersLeft: chosen.durationQuarters, city, region }
+    if (rules >= 6) {
+      world.announced = [...(world.announced ?? []), drawn]
+      events.push({ type: 'world_event_announced', eventId: chosen.id, city, region, startsTurn: state.turn + EVENT_WARNING_QUARTERS_V6 })
+    } else {
+      world.events.push(drawn)
+      events.push({ type: 'world_event_started', eventId: chosen.id, city, region })
+    }
   }
   state.rng.events = evRng
 

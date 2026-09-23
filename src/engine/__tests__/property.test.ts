@@ -62,6 +62,7 @@ const commandArb: fc.Arbitrary<Command> = fc.oneof(
   fc.record({ type: fc.constant('withdraw_order' as const), orderId: idArb }),
   fc.record({ type: fc.constant('buy_used' as const), offerId: fc.integer({ min: -5, max: 500 }) }),
   fc.record({ type: fc.constant('hedge_fuel' as const), quarters: fc.integer({ min: -2, max: 12 }) }),
+  fc.record({ type: fc.constant('hedge_fuel' as const), quarters: fc.integer({ min: -2, max: 12 }), coverBp: fc.constantFrom(0, 5000, 7300, 10000, 20000) }),
   fc.record({
     type: fc.constant('refit_cabin' as const),
     aircraftId: idArb,
@@ -70,6 +71,7 @@ const commandArb: fc.Arbitrary<Command> = fc.oneof(
   fc.record({ type: fc.constant('sell_aircraft' as const), aircraftId: idArb }),
   fc.record({ type: fc.constant('request_slots' as const), city: cityArb }),
   fc.record({ type: fc.constant('cancel_slot_request' as const), city: cityArb }),
+  fc.record({ type: fc.constant('fund_terminal' as const), city: cityArb }),
   fc.record({
     type: fc.constant('release_slots' as const),
     city: cityArb,

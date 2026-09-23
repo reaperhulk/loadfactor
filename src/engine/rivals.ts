@@ -23,6 +23,7 @@ import {
   scheduleCommands,
   surplusCommands,
   takeoverCommands,
+  terminalCommands,
   treasuryCommands,
   yieldCommands,
   type PolicyDials,
@@ -130,7 +131,8 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
         raidBonus: campaign.kind === 'expand' ? personality.raidBonus + 5 : personality.raidBonus,
       }
       const warFare = (state.rulesVersion ?? 1) >= 5 ? PRICE_WAR_FARE_LEVEL : -1
-      for (const r of airline.routes.filter((r) => r.from === campaign.city || r.to === campaign.city)) {
+      const inCampaign = (r: (typeof airline.routes)[number]) => campaign.kind === 'price' && campaign.pair !== undefined ? pairKey(r.from, r.to) === campaign.pair : r.from === campaign.city || r.to === campaign.city
+      for (const r of airline.routes.filter(inCampaign)) {
         if (campaign.kind === 'price') apply(state, idx, { type: 'set_fare', routeId: r.id, fareLevel: warFare }, events)
         if (campaign.kind === 'premium') apply(state, idx, { type: 'set_service', routeId: r.id, serviceLevel: 3 }, events)
       }
@@ -157,7 +159,7 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   applyAll(state, idx, takeoverCommands(state, idx, true), events)
   applyAll(state, idx, pruneCommands(state, idx), events)
   applyAll(state, idx, hedgeCommands(state, idx), events)
-  applyAll(state, idx, yieldCommands(state, idx, personality.fareFloor), events)
+  applyAll(state, idx, yieldCommands(state, idx, personality.fareFloor, personality.fareLevel), events)
   applyAll(state, idx, renewalCommands(state, idx), events)
   applyAll(state, idx, scheduleCommands(state, idx), events)
   applyAll(state, idx, refitCommands(state, idx, personality.cabin), events)
@@ -208,6 +210,7 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   }
   const announced = airline.slotInterest ?? null
   if (!recovering) applyAll(state, idx, slotRequestCommands(state, idx, personality, announced), events)
+  if (!recovering) applyAll(state, idx, terminalCommands(state, idx, personality), events)
   // A campaign runs until it lands. Re-picking the richest target every
   // quarter looks smarter and is much worse: the authority you queued at last
   // quarter is abandoned the moment a marginally better one appears, and the
@@ -224,6 +227,8 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   // the policy immediately overwrites its own public commitment.
   if (active) for (const route of airline.routes) {
     if (route.from !== active.city && route.to !== active.city) continue
+    // Rules 6: a price war stays on the pair it names.
+    if (active.kind === 'price' && active.pair !== undefined && pairKey(route.from, route.to) !== active.pair) continue
     if (active.kind === 'price') apply(state, idx, {type:'set_fare',routeId:route.id,fareLevel:modernRace ? PRICE_WAR_FARE_LEVEL : -1}, events)
     if (active.kind === 'premium') apply(state, idx, {type:'set_service',routeId:route.id,serviceLevel:3}, events)
   }

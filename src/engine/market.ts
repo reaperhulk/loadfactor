@@ -1,5 +1,5 @@
 import { modernOperations, resolveOperations, type OperationsResult } from './operations'
-import { resolveItineraries, type createItineraryPlanner, type MarketTrace, type PassengerSegment } from './itineraries'
+import { resolveItineraries, type createItineraryPlanner, type MarketAudit, type MarketTrace, type PassengerSegment } from './itineraries'
 // Route economics: the heart of the game (PLAN.md §2.2). Pure arithmetic plus
 // stateless hash noise — no stream draws, so resolution order can never
 // reshuffle another subsystem's randomness. Resolution has two phases:
@@ -48,13 +48,14 @@ import {
   CABIN_SEGMENT_APPEAL_BP,
   DEBUT_APPEAL_BP,
   WEEKS_PER_QUARTER,
+  SERVICE_YIELD_BP_V6,
 } from '../data/constants'
-import { dealAppealBp, strikeCapacityBp } from './offers'
+import { capacityDealKind, dealAppealBp, strikeCapacityBp } from './offers'
 import { SEGMENTS } from './itineraries'
 import { hashNoiseBp } from './rng'
 import { allocateTrips, reputationAppealBp, roundTripsPerWeek } from './queries'
 import { cityDemandModBp, debutAppealBp, effEconomyBp, effFuelBp } from './worldEvents'
-import type { Airline, GameEvent, GameState, Route, OperationsSummary } from './types'
+import type { Airline, GameEvent, GameState, Route, OperationsSummary, RouteCostResult, RouteMarketResult } from './types'
 
 function cityMass(cityId: string): number {
   const c = getCity(cityId)
@@ -120,6 +121,11 @@ export function baseFare(km: number): number {
 
 export function fareFor(km: number, fareLevel: number): number {
   return Math.floor((baseFare(km) * FARE_LEVEL_PRICE_BP[fareLevel + 2]!) / 10000)
+}
+
+// Rules 6: the product premium a service level earns per passenger (bp).
+export function serviceYieldBp(state: Pick<GameState, 'rulesVersion'>, serviceLevel: number): number {
+  return (state.rulesVersion ?? 1) >= 6 ? SERVICE_YIELD_BP_V6[serviceLevel - 1]! : 10000
 }
 
 // Seasonal demand multiplier for a city at a turn: tourism peaks in the
@@ -274,7 +280,10 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
   const fuelBpFor = (idx: number): number => {
     const airline = state.airlines[idx]!
     const hedge = airline.fuelHedge
-    const base = hedge !== null && hedge.quartersLeft > 0 ? hedge.bp : marketFuelBp
+    const hedged = hedge !== null && hedge.quartersLeft > 0
+    // A partial hedge (rules 6) blends the locked price with the market's.
+    const base = !hedged ? marketFuelBp : hedge.coverBp === undefined ? hedge.bp
+      : Math.floor((hedge.bp * hedge.coverBp + marketFuelBp * (10000 - hedge.coverBp)) / 10000)
     const playerFuelBp = airline.controller === 'player' ? (rules.playerFuelBp ?? 10000) : 10000
     return Math.floor((base * fuelInflationBp(state.turn) * playerFuelBp) / 100_000_000)
   }
@@ -316,7 +325,8 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
       )
       if (struck > 0) {
         const city = strikeCapacityBp(state, airline.id, route.from, route.from) < 10000 ? route.from : route.to
-        events.push({ type: 'strike_hit', airline: airline.id, city, trips: struck * periodWeeks })
+        const airlift = capacityDealKind(state, airline.id, route.from, route.to) === 'airlift_contract'
+        events.push({ type: airlift ? 'airlift_flown' : 'strike_hit', airline: airline.id, city, trips: struck * periodWeeks })
       }
       const yieldBp = weeklyCapacity === 0 ? 10000 : Math.floor(yieldNum / weeklyCapacity)
       const debutBp = weeklyCapacity === 0 ? 0 : Math.floor(debutNum / weeklyCapacity)
@@ -416,8 +426,10 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
     }
   }
 
+  let audits: Map<string, MarketAudit> | undefined
   if ((state.rulesVersion ?? 1) >= 2) {
-    resolveItineraries(state, [...accs.values()], periodWeeks, trace, itineraryPlanner)
+    const audit = resolveItineraries(state, [...accs.values()], periodWeeks, trace, itineraryPlanner)
+    if ((state.rulesVersion ?? 1) >= 6) audits = new Map(audit.map((a) => [a.pair, a]))
   } else {
   // ---- Phase 2: connecting itineraries over each airline's own network ----
   // A share of unserved O/D demand will take a one-stop over a hub if both
@@ -519,6 +531,17 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
         cost,
       })
       if (route.history.length > ROUTE_HISTORY_QUARTERS) route.history.shift()
+      // Rules 6: keep the explanation beside the result.
+      let market: RouteMarketResult | undefined
+      let costParts: RouteCostResult | undefined
+      if (audits) {
+        const a = audits.get(pairKey(route.from, route.to))
+        const demand = (a?.demand ?? 0) * multiplier, carried = (a?.carried ?? 0) * multiplier
+        market = { demand, carried, own: quarterPax - transferPax, unserved: Math.max(0, demand - carried), full: route.lastLoadFactorBp >= 9500 }
+        costParts = { fuel, fees, flightPay, service }
+        route.lastMarket = market
+        route.lastCostParts = costParts
+      }
       totals[airline.id]!.revenue += revenue
       totals[airline.id]!.cost += cost
       totals[airline.id]!.pax += quarterPax
@@ -538,6 +561,8 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
         transferPax,
         revenue,
         cost,
+        ...(market ? { market } : {}),
+        ...(costParts ? { costParts } : {}),
       })
     }
   }

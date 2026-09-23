@@ -2,11 +2,11 @@
 // segments. Direct flights and every viable one-stop compete in that pool.
 // Allocation conserves passengers and consumes a seat on every flown leg.
 import { distanceKm, getCity, pairKey } from '../data/cities'
-import { CONNECT_DETOUR_MAX_BP, CONNECT_FARE_DISCOUNT_BP, SERVICE_COST_PER_PAX, TRANSFER_HANDLING_PER_PAX } from '../data/constants'
+import { BUSINESS_PRICE_DAMPING, CONNECT_DETOUR_MAX_BP, CONNECT_FARE_DISCOUNT_BP, FARE_ELASTICITY_V6, FARE_STIMULATION_CAP_BP, FARE_STIMULATION_V6, SERVICE_COST_PER_PAX, TRANSFER_HANDLING_PER_PAX } from '../data/constants'
 import { getScenario } from '../data/scenarios'
-import { fareFor, inflationBp, pairWeeklyDemand, routeSpoolBp, type RouteAcc } from './market'
+import { fareFor, inflationBp, pairWeeklyDemand, routeSpoolBp, serviceYieldBp, type RouteAcc } from './market'
 import { reputationAppealBp } from './queries'
-import { dealAppealBp } from './offers'
+import { dealAppealBp, promotionDemandBp } from './offers'
 import type { GameState } from './types'
 
 export const SEGMENTS = ['business', 'leisure', 'budget'] as const
@@ -73,7 +73,14 @@ export function createItineraryPlanner() {
 // Optional traces prove conservation without storing an unbounded O/D matrix.
 export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWeeks = 1, trace?: MarketTrace[], planner?:ReturnType<typeof createItineraryPlanner>): MarketAudit[] {
   const markets=planner ? planner(legs) : indexMarkets(legs)
-  const fares=legs.map(leg=>Math.floor(fareFor(leg.km,leg.route.fareLevel)*leg.yieldBp/10000))
+  // Rules 6: a better product yields more per passenger (exactly 10000 under
+  // earlier rules). Shoppers compare the ticket; the service premium is what
+  // the product earns on board (upgrades, fewer discounted seats), so it
+  // bills revenue only.
+  const ticket=(leg:RouteAcc)=>fareFor(leg.km,leg.route.fareLevel)
+  const legFare=(leg:RouteAcc)=>Math.floor(ticket(leg)*serviceYieldBp(state,leg.route.serviceLevel)/10000)
+  const fares=legs.map(leg=>Math.floor(ticket(leg)*leg.yieldBp/10000))
+  const v6 = (state.rulesVersion ?? 1) >= 6
   const spool=legs.map(leg=>routeSpoolBp(state.airlines[leg.airlineIdx]!,leg.route,state.turn))
   for(const leg of legs) {leg.segments={business:0,leisure:0,budget:0};leg.transferRevenue=0}
   const audit: MarketAudit[] = []
@@ -92,7 +99,7 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
     }
     if(!choices.length) continue
     const journeys = trace ? Array<number>(choices.length).fill(0) : undefined
-    const demand = pairWeeklyDemand(state, from, to) * periodWeeks
+    const demand = Math.floor(pairWeeklyDemand(state, from, to) * promotionDemandBp(state, from, to) / 10000) * periodWeeks
     const directFare = fareFor(directKm, 0)
     // Segment-independent attributes are evaluated once per itinerary.
     const attributes = choices.map((it,index) => {
@@ -128,6 +135,8 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
           ? Math.max(1, frequency) * (6500 + service * 1700) * (fit ? fit.business : cabin) / 10000
           : (6 + Math.min(24, frequency)) * (segment === 'budget' ? priceAppeal * priceAppeal / 10000 : priceAppeal)
         if (fit && segment !== 'business') weight *= fit[segment] / 10000
+        // Rules 6: business travellers notice price too, gently.
+        if (v6 && segment === 'business') weight = Math.floor(weight * (priceAppeal + BUSINESS_PRICE_DAMPING) / (11000 + BUSINESS_PRICE_DAMPING))
         if (it.legs.length === 2) {
           const banked = airline.hubMode === 'banked'
           const base = segment === 'business' ? 2000 : segment === 'leisure' ? 4500 : 6500
@@ -148,8 +157,11 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
       })
       // Expensive offers lose shoppers to the outside option. Connections
       // alone attract a limited market; adding more airlines cannot duplicate it.
-      const elasticity = segment === 'business' ? 3000 : segment === 'leisure' ? 6500 : 9500
-      const purchaseBp = Math.max(1200, Math.min(10000, 10000 - Math.floor(Math.max(0, purchaseRatio - 10000) * elasticity / 10000)))
+      const elasticity = v6 ? FARE_ELASTICITY_V6[segment] : segment === 'business' ? 3000 : segment === 'leisure' ? 6500 : 9500
+      // Rules 6: a discount below the standard ladder brings new travellers
+      // into the market (leisure and budget only), up to a cap.
+      const stimulus = v6 ? Math.min(FARE_STIMULATION_CAP_BP - 10000, Math.floor(Math.max(0, 10000 - purchaseRatio) * FARE_STIMULATION_V6[segment] / 10000)) : 0
+      const purchaseBp = Math.max(1200, Math.min(10000, 10000 - Math.floor(Math.max(0, purchaseRatio - 10000) * elasticity / 10000))) + stimulus
       let remaining = Math.floor(population * purchaseBp * attachBp / 100_000_000)
       const connectLimit = Math.floor(population * ((segment === 'business' ? 2500 : segment === 'leisure' ? 5000 : 7000) + bankBonus) / 10000)
       let segmentConnections = 0
@@ -176,7 +188,7 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
           if (journeys) journeys[i]! += take
           if (it.legs.length === 2) { segmentConnections += take; connecting += take }
           for (const leg of it.legs) {
-            const revenue = Math.floor(take * fareFor(leg.km, leg.route.fareLevel) * leg.yieldBp / 10000 * (it.legs.length === 2 ? CONNECT_FARE_DISCOUNT_BP / 10000 : 1))
+            const revenue = Math.floor(take * legFare(leg) * leg.yieldBp / 10000 * (it.legs.length === 2 ? CONNECT_FARE_DISCOUNT_BP / 10000 : 1))
             leg.weeklyPax += take
             leg.segments![segment] += take
             leg.weeklyRevenue += revenue

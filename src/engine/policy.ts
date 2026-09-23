@@ -27,7 +27,7 @@ import {
 } from '../data/constants'
 import { estimateAircraftQuarterCost, inflationBp, pairWeeklyDemand, routeSpoolBp } from './market'
 import { getScenario } from '../data/scenarios'
-import { nextExpansion, slotFee, slotsRemaining } from './slots'
+import { nextExpansion, slotFee, slotsRemaining, terminalBlocker, terminalCost } from './slots'
 import {
   airlinesOnPair,
   debtCeiling,
@@ -43,7 +43,12 @@ import {
   yearOf,
 } from './queries'
 import { effFuelBp } from './worldEvents'
+import { getEventDef } from '../data/events'
 import type { Airline, Command, GameState } from './types'
+
+// Rules 6 planning horizons for capital that pays back slowly.
+const TERMINAL_MIN_HORIZON = 16
+const TAKEOVER_MIN_HORIZON = 8
 
 // The dials that make one competent operator different from another. The
 // rivals' personalities, the greedy bot, and every fuzz genome all map onto
@@ -97,19 +102,35 @@ export function hedgeCommands(state: GameState, idx: number): Command[] {
   if (airline.fuelHedge === null && airline.fleet.length > 0 && effFuelBp(state.world) <= 10500) {
     return [{ type: 'hedge_fuel', quarters: 4 }]
   }
+  // Rules 6: an announced fuel shock is worth hedging even at today's price —
+  // the lock carries only half of the shock the market is about to charge.
+  if ((state.rulesVersion ?? 1) >= 6 && airline.fuelHedge === null && airline.fleet.length > 0 &&
+      (state.world.announced ?? []).some((e) => (getEventDef(e.id).fuelModBp ?? 10000) > 10000)) {
+    return [{ type: 'hedge_fuel', quarters: 4 }]
+  }
   return []
+}
+
+// Rules 6: the highest fare a doctrine will charge on a full route: two
+// steps above its launch posture, never past the top of the ladder.
+export function fareCeilingFor(farePosture: number): number {
+  return Math.min(2, farePosture + 2)
 }
 
 // Yield management plus retaliation, one decision per route. Packed routes
 // raise fares; slack MONOPOLY routes cut toward the floor; on a CONTESTED
 // pair a deep share loss (pax down a third with seats going empty) answers
 // with a fare cut even before the slack threshold trips.
-export function yieldCommands(state: GameState, idx: number, fareFloor: number): Command[] {
+export function yieldCommands(state: GameState, idx: number, fareFloor: number, farePosture = 0): Command[] {
   const airline = state.airlines[idx]!
   const commands: Command[] = []
+  // Rules 6: a full plane is a reason to raise fares only as far as the
+  // doctrine's posture allows — a discount carrier that gouges when full is
+  // not a discount carrier, and the top fare now sheds real demand.
+  const ceiling = (state.rulesVersion ?? 1) >= 6 ? fareCeilingFor(farePosture) : 2
   for (const route of airline.routes) {
     if (route.lastCapacity === 0) continue
-    if (route.lastLoadFactorBp >= 9700 && route.fareLevel < 2) {
+    if (route.lastLoadFactorBp >= 9700 && route.fareLevel < ceiling) {
       commands.push({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel + 1 })
       continue
     }
@@ -302,11 +323,30 @@ export function takeoverCommands(
       : other.insolventQuarters >= 1 || (worth * 4 <= netWorth(airline) && lastProfit <= 0)
     if (!distressed || other.routes.length < 2) continue
     const price = Math.max(TAKEOVER_BASE_K, Math.floor((Math.max(0, worth) * TAKEOVER_PREMIUM_BP) / 10000))
+    // Rules 6: a deal must buy something. The premium over book value has to
+    // be cheaper than queueing for the target's slots, and there must be
+    // time left to fly them. Earlier rules bought anything distressed.
+    if ((state.rulesVersion ?? 1) >= 6 && !takeoverPaysFor(state, other, price)) continue
     if (airline.cash >= price + buffer * 2) {
       return [{ type: 'acquire_rival', target: other.id }]
     }
   }
   return []
+}
+
+// Rules 6 takeover hurdle: the premium over what the company is worth on the
+// books must be less than the slot fees it would take to rebuild its airport
+// positions, with at least TAKEOVER_MIN_HORIZON quarters left to use them.
+export function takeoverPaysFor(state: GameState, target: Airline, price: number): boolean {
+  if (getScenario(state.scenario).quarters - state.turn < TAKEOVER_MIN_HORIZON) return false
+  let slotValue = 0
+  for (const city of Object.keys(target.slots).sort()) {
+    if (city === target.hq) continue
+    slotValue += Math.floor((target.slots[city] ?? 0) / 2) * slotFee(city)
+  }
+  // The buyer receives fleet net of debt plus the target's cash (rules 6).
+  const received = netWorth(target)
+  return price - received <= slotValue
 }
 
 // Feeder potential values the other leg's passengers when choosing a new
@@ -495,6 +535,9 @@ export function slotTarget(
   state: GameState,
   idx: number,
   dials: Pick<PolicyDials, 'slotBudgetBp' | 'raidBonus' | 'homeRegionUntil' | 'connectionFocus'>,
+  // 'fund' (rules 6) asks the opposite question: which FULL airport, too far
+  // from its builders to queue at, is worth paying to expand?
+  mode: 'queue' | 'fund' = 'queue',
 ): string | null {
   const airline = state.airlines[idx]!
   if (airline.cash < 4000) return null
@@ -512,11 +555,14 @@ export function slotTarget(
   let target: string | null = null
   let bestScore = 0
   for (const c of CITIES) {
-    if ((airline.slots[c.id] ?? 0) > 0) continue
+    // A held airport can still be worth expanding: it is where the next
+    // route out of a full hub has to start.
+    if (mode === 'queue' && (airline.slots[c.id] ?? 0) > 0) continue
     if (stayHome && c.region !== homeRegion) continue
     if (airline.slotRequests.some((r) => r.city === c.id)) continue
+    const stuck = slotsRemaining(state, c.id) <= 0 && nextExpansion(state, c.id).quartersAway > SLOT_WAIT_PATIENCE
     // A full pool is only worth queueing for if the builders are close.
-    if (slotsRemaining(state, c.id) <= 0 && nextExpansion(state, c.id).quartersAway > SLOT_WAIT_PATIENCE) continue
+    if (mode === 'queue' ? stuck : !stuck || terminalBlocker(state, idx, c.id) !== null) continue
     let cityScore = 0
     for (const h of anchors) {
       // A takeover can put a route endpoint in the network with no slots
@@ -563,6 +609,23 @@ export function slotRequestCommands(
   const buffer = Math.floor((cashBufferFor(airline) * dials.slotBudgetBp) / 10000)
   if (airline.cash - fee < buffer) return []
   return [{ type: 'request_slots', city: target }]
+}
+
+// Rules 6: a rich operator locked out of the market it wants pays to build
+// the capacity. Only with a deep treasury (the programme plus a quadruple
+// buffer), with years of career left to earn it back, one city a quarter.
+export function terminalCommands(
+  state: GameState,
+  idx: number,
+  dials: Pick<PolicyDials, 'slotBudgetBp' | 'raidBonus' | 'homeRegionUntil' | 'connectionFocus'>,
+): Command[] {
+  if ((state.rulesVersion ?? 1) < 6) return []
+  const airline = state.airlines[idx]!
+  if (getScenario(state.scenario).quarters - state.turn < TERMINAL_MIN_HORIZON) return []
+  if (airline.cash < cashBufferFor(airline) * 4) return []
+  const city = slotTarget(state, idx, dials, 'fund')
+  if (city === null || airline.cash < terminalCost(state, city) + cashBufferFor(airline) * 4) return []
+  return [{ type: 'fund_terminal', city }]
 }
 
 // Rent discipline: hand back capacity that is not carrying anything. Slots

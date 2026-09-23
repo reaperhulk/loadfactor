@@ -15,6 +15,7 @@ import {
   RESALE_INITIAL_BP,
   WEEKLY_BLOCK_MINUTES,
   REPUTATION_APPEAL_WEIGHT_BP,
+  LF_FIELD_SCALE_BP_V6,
 } from '../data/constants'
 import { distanceKm, pairKey } from '../data/cities'
 import { getScenario } from '../data/scenarios'
@@ -287,6 +288,16 @@ export function reputationAppealBp(airline: Airline): number {
   return 10000 - Math.floor(((10000 - rep) * REPUTATION_APPEAL_WEIGHT_BP) / 10000)
 }
 
+// Rules 6: an efficiency mandate is won by a real airline. Last quarter's
+// seats must reach LF_FIELD_SCALE_BP_V6 of the median live competitor's.
+export function fliesAtFieldScale(state: GameState, airline: Airline): boolean {
+  const seats = (a: Airline) => a.history[a.history.length - 1]?.capacity ?? 0
+  const field = state.airlines.filter((a) => a.id !== airline.id && !a.bankrupt).map(seats).sort((a, b) => a - b)
+  if (field.length === 0) return true
+  const median = field[Math.floor((field.length - 1) / 2)]!
+  return seats(airline) * 10000 >= median * LF_FIELD_SCALE_BP_V6
+}
+
 // Scale requirements prevent winning a load-factor race by flying a token
 // schedule. Legacy careers retain their original qualification rules.
 export function objectiveQualified(state: GameState, airline: Airline): boolean {
@@ -295,6 +306,7 @@ export function objectiveQualified(state: GameState, airline: Airline): boolean 
   const obj = scenario.objective
   const minimumPax = obj.minimumPax ?? (obj.kind === 'loadFactor' ? 1500000 : 0)
   const active = airline.routes.filter((r) => r.lastCapacity > 0)
+  if (obj.kind === 'loadFactor' && (state.rulesVersion ?? 1) >= 6 && !fliesAtFieldScale(state, airline)) return false
   return objectiveScore(airline, 'pax') >= minimumPax && active.length >= (obj.minimumRoutes ?? (obj.kind === 'loadFactor' ? 3 : 0)) &&
     active.filter((r) => distanceKm(r.from, r.to) >= 4500).length >= (obj.minimumLongHaul ?? 0)
 }

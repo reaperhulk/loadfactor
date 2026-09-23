@@ -39,6 +39,9 @@ function evaluateQuarter(
   if (routeOnly) for (const command of commands) planned.events.push(...applyPlanningCommand(state, seat, command).events)
   if (assumptions.economyBp !== undefined) state.world.economyBp = assumptions.economyBp
   if (assumptions.fuelBp !== undefined) state.world.fuelBp = assumptions.fuelBp
+  // Rules 6: announced events are certain — they land before next quarter's
+  // market resolves, so the plan is priced with them in force.
+  if (state.world.announced?.length) state.world = { ...state.world, events: [...state.world.events, ...state.world.announced] }
   const airline = state.airlines[seat]
   if (!airline) throw new Error('Unknown forecast airline')
   const events: GameEvent[] = []

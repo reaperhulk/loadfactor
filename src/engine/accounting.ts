@@ -20,7 +20,7 @@ import { getScenario } from '../data/scenarios'
 import { inflationBp } from './market'
 import { routeWeeklyCapacity } from './queries'
 import { slotRentTotal } from './slots'
-import { dealUpkeep } from './offers'
+import { dealIncome, dealUpkeep } from './offers'
 import type { Airline, GameState, OperationsSummary } from './types'
 
 function fieldedSeats(airline: Airline): number {
@@ -136,7 +136,8 @@ export function recurringFinancials(state: GameState, airline: Airline, t: {
     marketing,
     interest,
   }
-  const revenue = t.revenue
+  // Rules 6: airlift contracts pay a fixed charter fee on top of ticket sales.
+  const revenue = t.revenue + ((state.rulesVersion ?? 1) >= 6 ? dealIncome(state, airline) : 0)
   const costs =
     t.cost + recovery + salaries + ownership + maintenance + admin + slotRent + overhead + marketing + interest
   const profit = revenue - costs

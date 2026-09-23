@@ -79,15 +79,15 @@ describe('build fuzzer', () => {
     }
     expect(careers).toBe(step.value.evaluated * options.seeds.length)
     expect(step.value).toEqual(fuzzBuilds(options))
-    // Recorded from the synchronous search before introducing checkpoints.
+    // Recorded from the synchronous search (re-recorded for rules 6).
     expect(step.value).toEqual({
-      bestFitness: 424194,
+      bestFitness: 449282,
       evaluated: 6,
       bestGenome: {
-        buyLfBp: 6701, cabin: 1, cashBuffer: 10184, contestDiscountBp: 12608,
-        debtAppetite: 18120, expandThreshold: 338, fareBias: 2, fareFloor: -1,
-        hedges: 0, marketing: 3, renewAge: 27, serviceLevel: 2,
-        slotBudgetBp: 8616, takeovers: 0,
+        buyLfBp: 6787, cabin: 2, cashBuffer: 1470, contestDiscountBp: 6985,
+        debtAppetite: 7801, expandThreshold: 246, fareBias: 2, fareFloor: 0,
+        hedges: 0, marketing: 3, renewAge: 48, serviceLevel: 3,
+        slotBudgetBp: 11204, takeovers: 1,
       },
     })
   }, 60_000)

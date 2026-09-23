@@ -19,6 +19,7 @@ import {
   renewalCommands,
   scheduleCommands,
   takeoverCommands,
+  terminalCommands,
   treasuryCommands,
   yieldCommands,
   type PolicyDials,
@@ -136,7 +137,8 @@ function greedyCommands(state: GameState, doctrine?: ReturnType<typeof dialsFor>
   commands.push(...orderCommands(state, 0, { renewedThisQuarter: renewal.length > 0 }))
   commands.push(...slotReleaseCommands(state, 0))
   commands.push(...slotRequestCommands(state, 0, dials))
-  commands.push(...yieldCommands(state, 0, dials.fareFloor))
+  commands.push(...terminalCommands(state, 0, dials))
+  commands.push(...yieldCommands(state, 0, dials.fareFloor, dials.fareLevel))
   const skip = launch.usedAircraft !== null ? new Set([launch.usedAircraft]) : undefined
   commands.push(...assignmentCommands(state, skip))
   return commands
@@ -152,6 +154,6 @@ export function botCommands(state: GameState, bot: BotName): Command[] {
   const airline = state.airlines[0]!
   const buffer = Math.max(12000, (airline.history.at(-1)?.costs ?? 0) * 2)
   return commands.filter((command) => command.type !== 'acquire_rival' &&
-    !(airline.cash < buffer && (command.type === 'order_aircraft' || command.type === 'request_slots')))
+    !(airline.cash < buffer && (command.type === 'order_aircraft' || command.type === 'request_slots' || command.type === 'fund_terminal')))
 
 }

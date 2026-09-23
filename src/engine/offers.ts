@@ -10,7 +10,7 @@
 
 import { CITIES, distanceKm, getCity, pairKey } from '../data/cities'
 import { AIRCRAFT, getAircraftType, typesOnSale } from '../data/aircraft'
-import { AI_MIN_ROUTE_KM, EARLY_DELIVERY_PREMIUM_BP, FLEET_SALE_PRICE_BP, OFFER_EVERY_QUARTERS_V5, ROUTE_RIGHTS_QUARTERS, STRIKE_CAPACITY_BP } from '../data/constants'
+import { AIRLIFT_CAPACITY_BP_V6, OFFICIAL_CARRIER_DEMAND_BP_V6, AI_MIN_ROUTE_KM, EARLY_DELIVERY_PREMIUM_BP, FLEET_SALE_PRICE_BP, OFFER_EVERY_QUARTERS_V5, ROUTE_RIGHTS_QUARTERS, STRIKE_CAPACITY_BP } from '../data/constants'
 import { pairWeeklyDemand } from './market'
 import { aircraftOperations, modernOperations } from './operations'
 import { slotsRemaining } from './slots'
@@ -25,6 +25,7 @@ import {
 import { chanceBp, fnv1a, nextInt } from './rng'
 import { netWorth, resaleValue, slotCities, yearOf } from './queries'
 import { effFuelBp } from './worldEvents'
+import { getEventDef } from '../data/events'
 import type { Airline, GameEvent, GameState, OfferKind, WorldOffer } from './types'
 
 // Cost scales with the era so an offer stays meaningful as the money grows.
@@ -104,6 +105,57 @@ function offerV5(state: GameState, player: Airline, kind: OfferKind, id: number,
     }
     default: return null
   }
+}
+
+// Rules 6: an announced event puts a question to every human airline whose
+// network it touches. No RNG — the news itself is the draw. Surges (a city's
+// Games or fair, a region's tourism wave) offer the official-carrier deal;
+// slumps (conflict, currency crisis, runway works) offer a government airlift
+// that pays a fixed fee for half your schedule there while it lasts.
+export function eventOffers(state: GameState, events: GameEvent[]): void {
+  if ((state.rulesVersion ?? 1) < 6) return
+  for (const news of state.world.announced ?? []) {
+    const def = getEventDef(news.id)
+    if (def.demandModBp === undefined || def.demandModBp === 10000) continue
+    const surge = def.demandModBp > 10000
+    for (const airline of state.airlines) {
+      if (airline.controller !== 'player' || airline.bankrupt) continue
+      const touched = airline.routes.filter((r) => touches(news, r.from) || touches(news, r.to))
+      if (touched.length === 0) continue
+      if (state.world.offers.some((o) => o.airline === airline.id && o.eventId === news.id)) continue
+      const where = news.city !== null ? getCity(news.city).name : news.region !== null ? regionName(news.region) : 'the region'
+      const from = state.turn + 1
+      const until = from + def.durationQuarters
+      const base = { id: state.world.nextOfferId++, airline: airline.id, city: news.city, region: news.region, eventId: news.id,
+        expiresTurn: state.turn + 1, benefitFromTurn: from, untilTurn: until, slots: 0, upkeepK: 0 }
+      let offer: WorldOffer
+      if (surge) {
+        const costK = Math.max(300, Math.floor(eraScale(state, airline.id) / 4))
+        offer = { ...base, kind: 'official_carrier', costK, demandBonusBp: OFFER_GAMES_BONUS_BP,
+          headline: `${def.name}: official carrier at ${where}?`,
+          detail: `The organisers of the ${def.name.toLowerCase()} at ${where} want an official airline. Pay ${costK.toLocaleString('en-US')}k now and for ${def.durationQuarters} quarter${def.durationQuarters === 1 ? '' : 's'} your flights there carry +${OFFER_GAMES_BONUS_BP / 100}% appeal and the promotion lifts travel on those pairs by ${OFFICIAL_CARRIER_DEMAND_BP_V6 / 100}%. Worth it only with seats to sell.` }
+      } else {
+        // The contract pays for the seats it takes, at a fraction of what
+        // they earned before the news — generous if the slump empties them,
+        // expensive if your planes were going to fill anyway.
+        const touchedRevenue = touched.reduce((sum, r) => sum + r.lastRevenue, 0)
+        const incomeK = Math.max(100, Math.floor((touchedRevenue * (10000 - AIRLIFT_CAPACITY_BP_V6) * 8000) / 100_000_000))
+        offer = { ...base, kind: 'airlift_contract', costK: 0, demandBonusBp: 0, incomeK, capacityBp: AIRLIFT_CAPACITY_BP_V6,
+          headline: `${def.name}: government airlift from ${where}?`,
+          detail: `The ${def.name.toLowerCase()} at ${where} lands next quarter (demand there falls to ${def.demandModBp / 100}%). The government will charter ${100 - AIRLIFT_CAPACITY_BP_V6 / 100}% of your trips touching ${where} for ${def.durationQuarters} quarter${def.durationQuarters === 1 ? '' : 's'} and pay ${incomeK.toLocaleString('en-US')}k a quarter for them. Take it if your seats there would fly empty; refuse if you can fill them.` }
+      }
+      state.world.offers.push(offer)
+      events.push({ type: 'offer_made', offerId: offer.id, kind: offer.kind, headline: offer.headline, expiresTurn: offer.expiresTurn })
+    }
+  }
+}
+
+function touches(e: { city: string | null; region: string | null }, cityId: string): boolean {
+  return (e.city !== null && e.city === cityId) || (e.region !== null && getCity(cityId).region === e.region)
+}
+
+function regionName(region: string): string {
+  return region.toUpperCase()
 }
 
 // Draw at most one offer per quarter. Deterministic in (seed, turn).
@@ -272,9 +324,9 @@ export function dealAppealBp(state: GameState, airlineIdx: number, from: string,
   if (!deals || deals.length === 0) return 10000
   let bp = 10000
   for (const deal of deals) {
-    if (deal.demandBonusBp === 0 || deal.city === null) continue
+    if (deal.demandBonusBp === 0 || (deal.city === null && deal.region === undefined)) continue
     // The payoff window has to have arrived AND the route has to touch it.
-    if (deal.city !== from && deal.city !== to) continue
+    if (!dealTouches(deal, from, to)) continue
     if (state.turn < deal.fromTurn) continue // committed, but the Games are not here yet
     bp += deal.demandBonusBp
   }
@@ -295,12 +347,51 @@ export function strikeCapacityBp(state: GameState, airlineIdx: number, from: str
   if (!deals || deals.length === 0) return 10000
   let bp = 10000
   for (const deal of deals) {
-    if (deal.capacityBp === undefined || deal.city === null) continue
-    if (deal.city !== from && deal.city !== to) continue
+    if (deal.capacityBp === undefined || (deal.city === null && deal.region === undefined)) continue
+    if (!dealTouches(deal, from, to)) continue
     if (state.turn < deal.fromTurn || state.turn >= deal.untilTurn) continue
     bp = Math.min(bp, deal.capacityBp)
   }
   return bp
+}
+
+// The kind of deal thinning an airline's trips on a route this quarter, if
+// any — the market reports a strike and an airlift differently.
+export function capacityDealKind(state: GameState, airlineIdx: number, from: string, to: string): 'hub_strike' | 'airlift_contract' | null {
+  for (const deal of state.airlines[airlineIdx]?.deals ?? []) {
+    if (deal.capacityBp === undefined || !dealTouches(deal, from, to)) continue
+    if (state.turn < deal.fromTurn || state.turn >= deal.untilTurn) continue
+    return deal.kind === 'airlift_contract' ? 'airlift_contract' : 'hub_strike'
+  }
+  return null
+}
+
+// Rules 6: extra demand on a pair from an official-carrier promotion at
+// either end, by any airline (the promotion fills everyone's planes).
+export function promotionDemandBp(state: GameState, from: string, to: string): number {
+  if ((state.rulesVersion ?? 1) < 6) return 10000
+  let bp = 10000
+  for (const airline of state.airlines) {
+    if (airline.bankrupt) continue
+    for (const deal of airline.deals ?? []) {
+      if (!deal.demandBp || !dealTouches(deal, from, to)) continue
+      if (state.turn < deal.fromTurn || state.turn >= deal.untilTurn) continue
+      bp = Math.max(bp, 10000 + deal.demandBp)
+    }
+  }
+  return bp
+}
+
+// Rules 6 airlift contracts pay a fixed fee each quarter they run ($k).
+export function dealIncome(state: GameState, airline: Airline): number {
+  let total = 0
+  for (const deal of airline.deals ?? []) if (deal.incomeK && state.turn >= deal.fromTurn && state.turn < deal.untilTurn) total += deal.incomeK
+  return total
+}
+
+function dealTouches(deal: { city: string | null; region?: string }, from: string, to: string): boolean {
+  if (deal.city !== null) return deal.city === from || deal.city === to
+  return deal.region !== undefined && (getCity(from).region === deal.region || getCity(to).region === deal.region)
 }
 
 // Whether a pair is under someone else's bilateral exclusivity this turn.
