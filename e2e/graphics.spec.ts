@@ -256,3 +256,36 @@ test('the map shows the quarter result once the report closes', async ({ page })
   await expect(page.getByTestId('map-quarter-result')).toHaveCount(0, { timeout: 8000 })
   await expect(page.locator('.route-result-up, .route-result-down')).toHaveCount(0)
 })
+
+test('keyboard: one tab stop, arrows walk the airports, Enter opens one', async ({ page }) => {
+  await page.addInitScript(quiet)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await expect(page.getByTestId('map')).toHaveAttribute('role', 'application')
+  // A roving tabindex: one airport is in the tab order, the rest are not.
+  await expect(page.locator('svg.map [data-city][tabindex="0"]')).toHaveCount(1)
+  expect(await page.locator('svg.map [data-city][tabindex="-1"]').count()).toBeGreaterThan(20)
+  // Shift+Tab back from the first map control lands on it: the HQ.
+  await page.getByTestId('zoom-in').focus()
+  await page.keyboard.press('Shift+Tab')
+  const focused = page.locator('svg.map [data-city]:focus')
+  await expect(focused).toHaveAttribute('data-city', 'JFK')
+  await expect(focused).toHaveAttribute('role', 'button')
+  await expect(focused).toHaveAttribute('aria-label', /New York.*\(JFK\).*your headquarters/)
+  // Arrow west: the next airport along, and it takes the tab stop with it.
+  await page.keyboard.press('ArrowLeft')
+  await expect(focused).not.toHaveAttribute('data-city', 'JFK')
+  const next = (await focused.getAttribute('data-city'))!
+  await expect(page.locator(`svg.map [data-city="${next}"]`)).toHaveAttribute('tabindex', '0')
+  await expect(page.locator('svg.map [data-city="JFK"]')).toHaveAttribute('tabindex', '-1')
+  // + zooms with the map focused; the airport keeps focus.
+  const before = await page.getByTestId('map-wrap').getAttribute('data-view')
+  await page.keyboard.press('+')
+  await expect.poll(() => page.getByTestId('map-wrap').getAttribute('data-view')).not.toBe(before)
+  await expect(focused).toHaveAttribute('data-city', next)
+  // Enter opens the airport's panel.
+  await page.keyboard.press('Enter')
+  await expect(page.getByTestId('city-panel')).toBeVisible()
+  const name = (await page.locator(`svg.map [data-city="${next}"]`).getAttribute('aria-label'))!.split(' (')[0]!
+  await expect(page.getByTestId('city-panel').locator('h2')).toContainText(name)
+})

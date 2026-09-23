@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import type { MouseEvent as ReactMouseEvent, PointerEvent } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { CITIES, distanceKm, getCity, pairKey, type City } from '../data/cities'
 import { pairWeeklyDemand, seasonalBp } from '../engine/market'
@@ -19,6 +19,7 @@ import { cityMass, cityTier, rivalColor, rivalColorClass, type MapLens } from '.
 import { MapLegend } from './legends'
 import { REGION_COLLAPSE_BELOW_SCALE, eventHalos, regionHaloShape } from './map/eventHalos'
 import { QUARTER_RESULT_MS, quarterTrends } from './map/quarterResult'
+import { ARROW_DIRECTIONS, nearestInDirection } from './map/keyboard'
 import { TrafficCanvas } from './TrafficCanvas'
 import { polylineLeg, quadraticLeg, type TrafficCamera, type TrafficEffect, type TrafficLeg, type TrafficPlane } from './traffic'
 import {
@@ -1040,6 +1041,10 @@ export function MapView({
   // Data lens: recolor your arcs by an operational metric so the network's
   // health reads at a glance.
   const [lens, setLens] = useState<MapLens>('none')
+  // The airport holding the map's single tab stop (roving tabindex); null
+  // until the keyboard first moves, when the selection or the HQ holds it.
+  const [focusCity, setFocusCity] = useState<string | null>(null)
+  const moveFocus = useRef<string | null>(null)
   const lensClass = (r: Route): string => {
     if (lens === 'season') {
       // The calendar's lean on this pair right now (tourism seasonality).
@@ -1398,6 +1403,8 @@ export function MapView({
     for (const c of CITIES) if (slotsHeld(player, c.id) > 0) stakes.add(c.id)
     for (const e of state.world.events) if (e.city !== null) stakes.add(e.city)
     if (selected !== null) stakes.add(selected)
+    // The keyboard's current airport must never be culled out from under it.
+    if (focusCity !== null) stakes.add(focusCity)
     const byTier = CITIES.filter((c) => (lodKey >= 2 ? true : cityTier(c) < 3) || stakes.has(c.id))
     // ...and then only the ones that can actually be seen. At world view that
     // is all of them; at 6x it is a couple of dozen out of 165, and the
@@ -1421,7 +1428,7 @@ export function MapView({
       labeled: new Set(vis.filter((c) => cityTier(c) === 1 || lodKey >= 1 || stakes.has(c.id)).map((c) => c.id)),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, seat, selected, lodKey, isGlobe, cull.x, cull.y, cull.w, cull.h, frameAspect])
+  }, [state, seat, selected, focusCity, lodKey, isGlobe, cull.x, cull.y, cull.w, cull.h, frameAspect])
 
   // Cursor-anchored zoom, computed in TARGET space so consecutive wheel
   // events compound on where the view is heading, not where it is.
@@ -1739,6 +1746,84 @@ export function MapView({
     if (best !== null) onCityClick(best)
   }
 
+  // Airports actually drawn, and where — projected once per render and shared
+  // by the markers, the roving tab stop and the arrow keys.
+  const sites: { id: string; x: number; y: number }[] = []
+  for (const c of visible) {
+    const p = pt(c.lon, c.lat)
+    if (p.vis) sites.push({ id: c.id, x: p.X, y: p.Y })
+  }
+  const sitePos = new Map(sites.map((st) => [st.id, st]))
+  const preferredStop = focusCity ?? selected ?? player.hq
+  const tabStop = sitePos.has(preferredStop) ? preferredStop : (sites[0]?.id ?? null)
+
+  // Keyboard: arrows hop between airports (Shift+arrows, or an arrow with no
+  // airport that way, pans), + and − zoom, Enter or Space opens the airport.
+  const panStep = (dir: 'left' | 'right' | 'up' | 'down'): void => {
+    const sx = dir === 'right' ? 1 : dir === 'left' ? -1 : 0
+    const sy = dir === 'down' ? 1 : dir === 'up' ? -1 : 0
+    if (isGlobe) {
+      const g = globeTarget.current
+      const d = 12 / g.s
+      applyGlobe({ ...g, cLon: g.cLon + sx * d, cLat: g.cLat - sy * d }, false)
+      return
+    }
+    const t = targetRef.current
+    const vis = visibleRect(t, aspectNow())
+    applyView({ ...t, x: t.x + sx * vis.w * 0.2, y: t.y + sy * vis.h * 0.2 }, false)
+  }
+  const zoomStep = (factor: number): void => {
+    if (isGlobe) applyGlobe({ ...globeTarget.current, s: globeTarget.current.s * factor }, false)
+    else zoomAt(null, null, factor)
+  }
+  const onMapKeyDown = (e: ReactKeyboardEvent<SVGSVGElement>): void => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return
+    const cityId = (e.target as Element).getAttribute('data-city')
+    const dir = ARROW_DIRECTIONS[e.key]
+    if (dir !== undefined) {
+      e.preventDefault()
+      const from = cityId !== null ? sitePos.get(cityId) : undefined
+      const next = !e.shiftKey && from !== undefined ? nearestInDirection(from, sites.filter((st) => st.id !== cityId), dir) : null
+      if (next !== null) {
+        moveFocus.current = next
+        setFocusCity(next)
+      } else panStep(dir)
+    } else if (e.key === '+' || e.key === '=') {
+      e.preventDefault()
+      zoomStep(1.5)
+    } else if (e.key === '-' || e.key === '_') {
+      e.preventDefault()
+      zoomStep(1 / 1.5)
+    } else if ((e.key === 'Enter' || e.key === ' ') && cityId !== null) {
+      e.preventDefault()
+      onCityClick(cityId)
+    }
+  }
+
+  // After an arrow key moves the tab stop: focus the new airport, and bring
+  // it into view if it sits near or past the frame's edge.
+  useLayoutEffect(() => {
+    const id = moveFocus.current
+    if (id === null) return
+    moveFocus.current = null
+    svgRef.current?.querySelector<SVGGElement>(`[data-city="${id}"]`)?.focus({ preventScroll: true })
+    const c = getCity(id)
+    if (isGlobe) {
+      const p = globeProjectFull(globe, c.lon, c.lat)
+      if (p.cosc < 0.35) applyGlobe({ ...globeTarget.current, cLon: c.lon, cLat: c.lat }, false)
+      return
+    }
+    const t = targetRef.current
+    const vis = visibleRect(t, aspectNow())
+    const px = x(c.lon)
+    const py = y(c.lat)
+    const mx = vis.w * 0.08
+    const my = vis.h * 0.1
+    if (px < vis.x + mx || px > vis.x + vis.w - mx || py < vis.y + my || py > vis.y + vis.h - my) {
+      applyView({ ...t, x: px - t.w / 2, y: py - t.h / 2 }, false)
+    }
+  })
+
   return (
     // The view React has committed. During a gesture the viewBox on the SVG
     // runs ahead of it — written straight to the DOM — and this attribute is
@@ -1750,7 +1835,20 @@ export function MapView({
       data-testid="map-wrap"
       data-view={`${view.x} ${view.y} ${view.w} ${view.h}`}
       style={{ aspectRatio: `${W} / ${H}` }}
+      // Focusing an airport that sits in the layer's overhang would scroll
+      // this clipped box to reveal it, knocking the layer off its transform.
+      // The keyboard path pans the map itself; the box never scrolls.
+      onScroll={(e) => {
+        const el = e.currentTarget
+        if (el.scrollLeft !== 0 || el.scrollTop !== 0) {
+          el.scrollLeft = 0
+          el.scrollTop = 0
+        }
+      }}
     >
+      <p id="map-keys-hint" className="map-sr-only">
+        Arrow keys move between airports, Shift and an arrow pans the map, plus and minus zoom, Enter opens the airport.
+      </p>
       {/* The element a gesture moves, and the reason it is a div rather than
           the <g> it used to be. Transforming an SVG group re-rasterises every
           path under it on every frame: measured over a 40-frame drag at full
@@ -1782,9 +1880,11 @@ export function MapView({
         viewBox={isGlobe ? `0 0 ${W} ${H}` : `${anchor.x} ${anchor.y} ${anchor.w} ${anchor.h}`}
         preserveAspectRatio="xMidYMid slice"
         className={`map era-${Math.min(2000, Math.max(1960, Math.floor(yearOf(state) / 10) * 10))}`}
-        role="img"
+        role="application"
         aria-label="World route map"
+        aria-describedby="map-keys-hint"
         data-testid="map"
+        onKeyDown={onMapKeyDown}
         onPointerDown={onPointerDown}
         onMouseDown={(e) => {
           // A press on the map is a pan, never the start of a text selection.
@@ -2045,9 +2145,20 @@ export function MapView({
                 (r) =>
                   (r.from === c.id && r.to === routeFrom) || (r.from === routeFrom && r.to === c.id),
               )
-            const p = pt(c.lon, c.lat)
-            if (!p.vis) return null
+            const site = sitePos.get(c.id)
+            if (site === undefined) return null
+            const p = { X: site.x, Y: site.y }
             const r = dotRadius(c)
+            const load = pressure(c.id)
+            const served = player.routes.some((rt) => rt.from === c.id || rt.to === c.id)
+            const status =
+              c.id === player.hq
+                ? 'your headquarters'
+                : served
+                  ? 'served by you'
+                  : held > 0
+                    ? 'your slots, not yet served'
+                    : 'not served by you'
             return (
               <g
                 key={c.id}
@@ -2055,11 +2166,22 @@ export function MapView({
                   e.stopPropagation() // precise hit — don't also run the nearest-city resolver
                   handleCityClick(c.id, e.detail)
                 }}
+                onFocus={() => {
+                  if (focusCity !== c.id) setFocusCity(c.id)
+                }}
                 className="city"
+                role="button"
+                tabIndex={c.id === tabStop ? 0 : -1}
+                data-city={c.id}
+                aria-label={`${c.name} (${c.id}), ${status}${isTarget ? ', a route can open here' : ''}${load >= 1 ? ', airport full' : ''}`}
+                aria-pressed={selected === c.id}
               >
                 {selected === c.id && (
                   <circle cx={p.X} cy={p.Y} r={r + 5 / uiScale} className="selection-ring" />
                 )}
+                {/* The keyboard's focus ring, drawn only on the one tab stop
+                    and shown only while it holds keyboard focus. */}
+                {c.id === tabStop && <circle cx={p.X} cy={p.Y} r={r + 7 / uiScale} className="city-focus-ring" />}
                 {player.slotRequests.some((r) => r.city === c.id) && (
                   <circle
                     cx={p.X}
@@ -2111,7 +2233,7 @@ export function MapView({
                     // Capacity pressure, straight from the slot model: an airport
                     // filling up is a place you have to move on, and the map is
                     // where that decision starts.
-                    (pressure(c.id) >= 1 ? ' full' : pressure(c.id) >= 0.75 ? ' tight' : '')
+                    (load >= 1 ? ' full' : load >= 0.75 ? ' tight' : '')
                   }
                 />
               </g>

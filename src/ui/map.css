@@ -130,6 +130,41 @@
   }
 }
 
+/* Keyboard: the map is one tab stop; the focused airport wears a bright rim
+   (the focus ring an SVG group cannot draw for itself). */
+.map-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.map .city {
+  outline: none;
+}
+.map .city:focus-visible .city-dot {
+  stroke: #ffffff;
+  stroke-width: 2.5px;
+}
+.map .city:focus-visible .city-network-ring {
+  opacity: 1;
+}
+.city-focus-ring {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+  visibility: hidden;
+}
+.map .city:focus-visible .city-focus-ring {
+  visibility: visible;
+}
+
 /* Landscape phones lay the zoom controls along the top edge (workspace.css),
    so the map-colors box and its key must stop short of that row. */
 @media (max-height: 500px) and (max-width: 1000px) and (min-width: 560px) {
