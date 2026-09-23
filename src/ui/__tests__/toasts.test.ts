@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyCommand, newGame } from '../../engine'
 import type { GameEvent } from '../../engine'
-import { toastsFor } from '../toasts'
+import { decideWithin, eventImpact, toastsFor } from '../toasts'
 
 function stateWithRoute() {
   let state = newGame('jet_age', 'toast-test')
@@ -63,5 +63,29 @@ describe('incursion toasts', () => {
     expect(cheer).toHaveLength(1)
     expect(cheer[0]!.kind).toBe('victory')
     expect(cheer[0]!.text).toContain(state.airlines[1]!.name)
+  })
+})
+
+describe('rules 6 news', () => {
+  it('an announced event says when it lands and what it will do', () => {
+    const toasts = toastsFor([{ type: 'world_event_announced', eventId: 'oil_shock', city: null, region: null, startsTurn: 5 }], stateWithRoute())
+    expect(toasts).toHaveLength(1)
+    expect(toasts[0]!.text).toBe('Next quarter: Oil shock (fuel +75%, demand −6%, 6q)')
+    expect(eventImpact('conflict')).toBe('demand there −50%, 4q')
+  })
+
+  it('offers count the planning quarters left, including this one', () => {
+    const state = stateWithRoute()
+    expect(decideWithin(state.turn, state)).toBe('decide this quarter')
+    expect(decideWithin(state.turn + 3, state)).toBe('decide within 4 quarters')
+    const toast = toastsFor([{ type: 'offer_made', offerId: 1, kind: 'airlift_contract', headline: 'Airlift?', expiresTurn: state.turn }], state)[0]!
+    expect(toast.text).toBe('Airlift? — decide this quarter')
+  })
+
+  it('funded terminals and airlifts are the player\'s own news only', () => {
+    const state = stateWithRoute()
+    const mine = toastsFor([{ type: 'terminal_funded', airline: 0, city: 'LHR', cost: 100, slots: 2, opensTurn: 1 }, { type: 'airlift_flown', airline: 0, city: 'JFK', trips: 40 }], state)
+    expect(mine.map((t) => t.icon)).toEqual(['🏗️', '🛩️'])
+    expect(toastsFor([{ type: 'terminal_funded', airline: 1, city: 'LHR', cost: 100, slots: 2, opensTurn: 1 }], state)).toHaveLength(0)
   })
 })

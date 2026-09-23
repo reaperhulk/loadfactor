@@ -88,9 +88,11 @@ export function forecastRange(state: GameState, seat: number, forecast: ReturnTy
     const c = other.campaign
     if (!c || other.id === seat || other.bankrupt) continue
     if (state.turn < c.fromTurn || state.turn >= c.untilTurn) continue
-    const hit = forecast.routes.filter((r) => (c.kind === 'raid' && c.pair === pairKey(r.from, r.to)) || (c.kind === 'price' && (r.from === c.city || r.to === c.city) && rivalPairs.get(pairKey(r.from, r.to))?.includes(other.name)))
+    // Rules 6 price wars name their pair too; older ones cover the city.
+    const hit = forecast.routes.filter((r) => (c.kind === 'raid' && c.pair === pairKey(r.from, r.to)) ||
+      (c.kind === 'price' && (c.pair !== undefined ? c.pair === pairKey(r.from, r.to) : (r.from === c.city || r.to === c.city)) && rivalPairs.get(pairKey(r.from, r.to))?.includes(other.name)))
     const swing = Math.floor((revenueOf(hit) * CAMPAIGN_SWING_BP) / 10000)
-    if (swing > 0) drivers.push({ label: `${other.name}'s ${c.kind} campaign${c.kind === 'raid' && c.pair ? ` on ${c.pair.replace('-', '–')}` : ` at ${c.city}`}`, low: -swing, high: 0 })
+    if (swing > 0) drivers.push({ label: `${other.name}'s ${c.kind} campaign${c.pair ? ` on ${c.pair.replace('-', '–')}` : ` at ${c.city}`}`, low: -swing, high: 0 })
   }
 
   let low = forecast.profit

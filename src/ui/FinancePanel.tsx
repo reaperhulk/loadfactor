@@ -13,10 +13,14 @@ import {
   MARKETING_BASE_PER_LEVEL,
   MARKETING_PER_ROUTE_PER_LEVEL,
   MARKETING_WEIGHT_BP_PER_LEVEL,
+  HEDGE_COVER_OPTIONS_BP,
 } from '../data/constants'
 import { getScenario } from '../data/scenarios'
 import type { CostBreakdown, GameState } from '../engine'
 import { inflationBp } from '../engine/market'
+import { hedgePremium as engineHedgePremium } from '../engine/commands'
+import { hedgeLockBp } from '../engine/worldEvents'
+import { getEventDef } from '../data/events'
 import { currentLoanRateBp, debtCeiling, routeWeeklyCapacity, totalDebt } from '../engine/queries'
 import { HedgeLegend, MarketingLegend, RivalryLegend } from './legends'
 import { planningForecast } from './forecast'
@@ -135,7 +139,10 @@ function CostStructure({ state }: { state: GameState }) {
 export function FinancePanel({ state }: { state: GameState }) {
   const player = state.airlines[viewSeat()]!
   const plan = planningForecast(state,viewSeat())
-  const hedgePremium = (quarters: number): number =>
+  // Rules 6 prices a hedge off the fuel bill it covers and offers half
+  // cover; earlier rules keep the per-airframe premium and full cover only.
+  const modernHedge = (state.rulesVersion ?? 1) >= 6
+  const hedgePremium = (quarters: number, coverBp = 10000): number => modernHedge ? engineHedgePremium(state, player, quarters, coverBp) :
     Math.floor(
       (HEDGE_PREMIUM_PER_AIRCRAFT *
         player.fleet.length *
@@ -143,6 +150,8 @@ export function FinancePanel({ state }: { state: GameState }) {
         (getScenario(state.scenario).rules.hedgePremiumBp ?? 10000)) /
         10000,
     )
+  const hedgeOptions = modernHedge ? [4, 8].flatMap((q) => HEDGE_COVER_OPTIONS_BP.map((coverBp) => ({ q, coverBp }))) : [4, 8].map((q) => ({ q, coverBp: 10000 }))
+  const warnedFuel = (state.world.announced ?? []).filter((e) => (getEventDef(e.id).fuelModBp ?? 10000) !== 10000)
   const [amount, setAmount] = useState(5000)
   const ceiling = debtCeiling(player)
   const debt = totalDebt(player)
@@ -337,7 +346,7 @@ export function FinancePanel({ state }: { state: GameState }) {
       <div className="city-negotiate" data-testid="hedge-panel">
         {player.fuelHedge !== null ? (
           <span>
-            ⛽ Fuel hedged at index {(player.fuelHedge.bp / 100).toFixed(0)}% for{' '}
+            ⛽ Fuel {player.fuelHedge.coverBp !== undefined && player.fuelHedge.coverBp < 10000 ? `${player.fuelHedge.coverBp / 100}% ` : ''}hedged at index {(player.fuelHedge.bp / 100).toFixed(0)}% for{' '}
             {player.fuelHedge.quartersLeft} more quarter(s)
             {player.fuelHedge.quartersLeft === 1 && (
               <span className="neg"> — expires next quarter, you'll be back on the market index</span>
@@ -345,23 +354,28 @@ export function FinancePanel({ state }: { state: GameState }) {
           </span>
         ) : (
           <>
-            <span>Fuel hedge:</span>
-            {[4, 8].map((q) => (
+            <span>Fuel hedge{modernHedge ? ` at index ${(hedgeLockBp(state.world) / 100).toFixed(0)}%` : ''}:</span>
+            {hedgeOptions.map(({ q, coverBp }) => (
               <button
-                key={q}
-                data-testid={`hedge-${q}`}
+                key={`${q}-${coverBp}`}
+                data-testid={coverBp === 10000 ? `hedge-${q}` : `hedge-${q}-${coverBp / 100}`}
                 disabled={
                   player.fleet.length === 0 ||
                   q < HEDGE_MIN_QUARTERS ||
                   q > HEDGE_MAX_QUARTERS ||
-                  player.cash < hedgePremium(q)
+                  player.cash < hedgePremium(q, coverBp)
                 }
-                title="lock today's fuel index for your whole fleet"
-                onClick={() => dispatch({ type: 'hedge_fuel', quarters: q })}
+                title={coverBp === 10000 ? 'lock the fuel index for your whole burn' : 'lock the fuel index for half your burn; the rest rides the market'}
+                onClick={() => dispatch(modernHedge ? { type: 'hedge_fuel', quarters: q, coverBp } : { type: 'hedge_fuel', quarters: q })}
               >
-                {q}q — {money(hedgePremium(q))}
+                {q}q{modernHedge ? ` · ${coverBp / 100}%` : ''} — {money(hedgePremium(q, coverBp))}
               </button>
             ))}
+            {warnedFuel.length > 0 && (
+              <span className="neg" data-testid="hedge-warning">
+                {warnedFuel.map((e) => getEventDef(e.id).name).join(', ')} announced for next quarter — the desk has priced in half of it
+              </span>
+            )}
           </>
         )}
       </div>

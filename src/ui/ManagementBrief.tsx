@@ -11,6 +11,8 @@ import { estimateAircraftQuarterCost, estimateWeeklySeats, pairWeeklyDemand } fr
 import { cabinSeats, isGrounded, roundTripsPerWeek, slotsFree } from '../engine/queries'
 import { viewSeat } from './session'
 import { money, tone } from './format'
+import { getEventDef } from '../data/events'
+import { eventImpact } from './toasts'
 
 type BriefTab = 'routes' | 'fleet' | 'finance' | 'rivals' | 'airports'
 export function ManagementBrief({ state, onTab, onInspect, onPlan, onAircraft }: { state: GameState; onTab: (tab: BriefTab) => void; onAircraft: (id: number) => void; onInspect: (routeId: number) => void; onPlan: (from: string, to: string, preset?: Pick<ExpansionOption, 'aircraftId' | 'frequency'>) => void }) {
@@ -51,7 +53,15 @@ export function ManagementBrief({ state, onTab, onInspect, onPlan, onAircraft }:
   if (airline.fuelHedge?.quartersLeft === 1) items.push({ priority:70,title:'Fuel hedge expires this quarter',detail:'Next quarter’s fuel bill will return to market prices.',action:'Review fuel protection',run:() => onTab('finance') })
   const raid = state.airlines.find((a) => a.id !== seat && !a.bankrupt && a.campaign?.kind === 'raid' && a.campaign.target === seat && state.turn < a.campaign.untilTurn)
   if (raid) items.push({ priority: 75, title: `${raid.name} is coming for ${raid.campaign!.pair!.replace('-', '–')}`, detail: `A raid on your market, announced ${raid.campaign!.fromTurn > state.turn ? 'for next quarter' : `${Math.max(0, raid.campaign!.untilTurn - state.turn)} quarters to run`}. Compare fare, service and frequency on the pair before their first flight.`, action: 'Read rival plans', run: () => onTab('rivals') })
-  if (campaign && campaign !== raid) items.push({ priority: 40, title: `${campaign.name} has a plan`, detail: `${campaign.campaign!.kind} campaign${campaign.campaign!.kind === 'raid' && campaign.campaign!.pair ? ` on ${campaign.campaign!.pair.replace('-', '–')}` : ` at ${campaign.campaign!.city}`} · ${Math.max(0, campaign.campaign!.untilTurn-state.turn)} quarters remaining.`, action: 'Read rival plans', run: () => onTab('rivals') })
+  if (campaign && campaign !== raid) items.push({ priority: 40, title: `${campaign.name} has a plan`, detail: `${campaign.campaign!.kind} campaign${campaign.campaign!.pair ? ` on ${campaign.campaign!.pair.replace('-', '–')}` : ` at ${campaign.campaign!.city}`} · ${Math.max(0, campaign.campaign!.untilTurn-state.turn)} quarters remaining.`, action: 'Read rival plans', run: () => onTab('rivals') })
+  // Rules 6: announced events are the quarter's decision window.
+  for (const news of state.world.announced ?? []) {
+    const def = getEventDef(news.id)
+    const where = news.city ? ` at ${getCity(news.city).name}` : news.region ? ` in ${news.region.toUpperCase()}` : ''
+    const fuel = (def.fuelModBp ?? 10000) > 10000
+    items.push({ priority: fuel ? 85 : 65, title: `${def.name}${where} lands next quarter`, detail: `${eventImpact(news.id)}. ${fuel ? 'Hedge now (the desk has priced in half of it), trim thin routes, or keep extra cash.' : 'The plan above already includes it. Move capacity, reprice, or answer the question it put on your desk.'}`,
+      action: fuel ? 'Review fuel protection' : 'Plan route changes', run: () => onTab(fuel ? 'finance' : 'routes') })
+  }
   if (!items.length) items.push({ priority: 0, title: 'Choose your next move', detail: 'Compare an expansion with improving the network you already have. Retain enough cash for a difficult quarter.', action: 'Plan route changes', run: () => onTab('routes') })
   return <section className="management-brief" data-testid="management-brief">
     <div className="brief-heading"><h2>Needs attention</h2><span>{draft.length ? 'With shared plan:' : 'Planned quarter:'} <strong className={tone(forecast.profit)}>{money(forecast.profit)} net profit</strong></span></div>

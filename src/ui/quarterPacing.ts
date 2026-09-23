@@ -12,8 +12,8 @@ export function needsFullReport(state: GameState, events: GameEvent[], seat: num
   const cities=new Set(airline.routes.flatMap(r=>[r.from,r.to]))
   if (state.world.offers.some(o=>(o.airline??0)===seat && o.expiresTurn<=state.turn+1)) return true
   return events.some(event=>{
-    if (['game_over','offer_made','offer_expired','deal_ended','world_event_started','world_event_ended','airline_bankrupt','airline_restructured','airline_entered','aircraft_introduced'].includes(event.type)) return true
-    if (event.type==='strike_hit') return event.airline===seat
+    if (['game_over','offer_made','offer_expired','deal_ended','world_event_started','world_event_announced','world_event_ended','airline_bankrupt','airline_restructured','airline_entered','aircraft_introduced'].includes(event.type)) return true
+    if (event.type==='strike_hit' || event.type==='airlift_flown') return event.airline===seat
     if (event.type==='route_opened') return event.airline===seat || pairs.has(pairKey(event.from,event.to))
     if (event.type==='operations_changed' && event.airline!==seat) {
       const campaign=state.airlines[event.airline]?.campaign

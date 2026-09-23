@@ -10,6 +10,7 @@ import { getScenario } from '../data/scenarios'
 import type { GameEvent, GameState } from '../engine'
 import { viewSeat, type QuarterRecord } from './session'
 import { money, tone } from './format'
+import { EVENT_NAMES, eventImpact, eventWhere } from './toasts'
 
 function describeEvent(state: GameState, e: GameEvent): string | null {
   const name = (idx: number): string => state.airlines[idx]?.name ?? `airline ${idx}`
@@ -38,6 +39,14 @@ function describeEvent(state: GameState, e: GameEvent): string | null {
       return `World: ${e.eventId.replace('_', ' ')}${e.city ? ` in ${e.city}` : ''}${e.region ? ` in region ${e.region}` : ''}`
     case 'world_event_ended':
       return `World: ${e.eventId.replace('_', ' ')} ended`
+    case 'world_event_announced':
+      return `Forecast: ${EVENT_NAMES[e.eventId] ?? e.eventId}${eventWhere(e)} lands next quarter (${eventImpact(e.eventId)})`
+    case 'terminal_funded':
+      return `${name(e.airline)} paid ${money(e.cost)} to open ${e.slots} slots at ${e.city} next quarter`
+    case 'airlift_flown':
+      return e.airline === viewSeat() ? `Airlift from ${e.city}: ${e.trips} round trips flown for the government` : null
+    case 'fuel_hedged':
+      return e.airline === viewSeat() ? `Hedged ${e.coverBp !== undefined ? `${e.coverBp / 100}% of ` : ''}fuel for ${e.quarters}q at ${e.bp / 100}% of baseline — ${money(e.premium)}` : null
     case 'airline_bankrupt':
       return `${name(e.airline)} went bankrupt`
     case 'airline_restructured':
@@ -98,6 +107,7 @@ function eventSection(e: GameEvent): LogFilter {
     case 'slot_request_cancelled':
     case 'slots_released':
     case 'airport_expanded':
+    case 'terminal_funded':
       return 'airports'
     case 'aircraft_delivered':
     case 'order_cancelled':
@@ -107,6 +117,8 @@ function eventSection(e: GameEvent): LogFilter {
       return 'fleet'
     case 'world_event_started':
     case 'world_event_ended':
+    case 'world_event_announced':
+    case 'airlift_flown':
     case 'airline_bankrupt':
     case 'airline_restructured':
     case 'airline_entered':

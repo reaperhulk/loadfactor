@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AIRCRAFT, getAircraftType } from '../data/aircraft'
 import { pairKey } from '../data/cities'
 import { ROUTE_SPOOL_BP } from '../data/constants'
+import { WORLD_EVENTS_V5 } from '../data/events'
 import type { GameEvent, GameState } from '../engine'
 import { quarterOf, yearOf } from '../engine/queries'
 import { viewSeat } from './session'
@@ -35,6 +36,14 @@ export const EVENT_ICONS: Record<string, string> = {
   currency_crisis: '💱',
 }
 
+// An offer is answered during planning turns up to and including the turn
+// it expires on (it lapses as that quarter resolves).
+export function decideWithin(expiresTurn: number, state?: GameState): string {
+  if (!state) return 'decide soon'
+  const quarters = expiresTurn - state.turn + 1
+  return quarters <= 1 ? 'decide this quarter' : `decide within ${quarters} quarters`
+}
+
 export const EVENT_NAMES: Record<string, string> = {
   recession: 'Global recession',
   boom: 'Economic boom',
@@ -47,6 +56,24 @@ export const EVENT_NAMES: Record<string, string> = {
   alliance_boom: 'Alliance boom',
   airport_works: 'Runway reconstruction',
   currency_crisis: 'Currency crisis',
+}
+
+// What an event does, in a phrase the player can act on: "fuel +75%,
+// demand −6%" for an oil shock, "demand ×0.50 there" for a conflict.
+export function eventImpact(eventId: string): string {
+  const def = WORLD_EVENTS_V5.find((d) => d.id === eventId)
+  if (!def) return ''
+  const parts: string[] = []
+  const pct = (bp: number) => `${bp >= 10000 ? '+' : '−'}${Math.abs(Math.round((bp - 10000) / 100))}%`
+  if (def.fuelModBp !== undefined) parts.push(`fuel ${pct(def.fuelModBp)}`)
+  if (def.economyModBp !== undefined) parts.push(`demand ${pct(def.economyModBp)}`)
+  if (def.demandModBp !== undefined) parts.push(`demand there ${pct(def.demandModBp)}`)
+  parts.push(`${def.durationQuarters}q`)
+  return parts.join(', ')
+}
+
+export function eventWhere(e: { city: string | null; region: string | null }): string {
+  return e.city ? ` — ${e.city}` : e.region ? ` — ${e.region.toUpperCase()}` : ''
 }
 
 // Which events earn a toast, and how they read. Player-only for the personal
@@ -123,8 +150,18 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
       case 'airport_expanded':
         out.push({ kind: 'slots', icon: '⚙', text: `${e.city} opened +${e.slots} slots` })
         break
+      case 'world_event_announced':
+        // Rules 6: the warning is the decision window — say what it will do.
+        out.push({ kind: 'event', icon: '📡', text: `Next quarter: ${EVENT_NAMES[e.eventId] ?? e.eventId}${eventWhere(e)} (${eventImpact(e.eventId)})` })
+        break
+      case 'terminal_funded':
+        if (e.airline === viewSeat()) out.push({ kind: 'slots', icon: '🏗️', text: `${e.city} programme funded — ${e.slots} slots open next quarter, the first ones yours` })
+        break
+      case 'airlift_flown':
+        if (e.airline === viewSeat()) out.push({ kind: 'event', icon: '🛩️', text: `Airlift from ${e.city}: ${e.trips} round trips flown for the government` })
+        break
       case 'world_event_started': {
-        const where = e.city ? ` — ${e.city}` : e.region ? ` — ${e.region.toUpperCase()}` : ''
+        const where = eventWhere(e)
         out.push({
           kind: 'event',
           icon: EVENT_ICONS[e.eventId] ?? '🌍',
@@ -177,7 +214,7 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
         })
         break
       case 'offer_made':
-        out.push({ kind: 'event', icon: '📨', text: `${e.headline} — decide within ${e.expiresTurn} quarters` })
+        out.push({ kind: 'event', icon: '📨', text: `${e.headline} — ${decideWithin(e.expiresTurn, state)}` })
         break
       case 'offer_expired':
         out.push({ kind: 'error', icon: '⌛', text: `Offer lapsed: ${e.headline}` })

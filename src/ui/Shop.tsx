@@ -5,7 +5,8 @@ import { AircraftArt } from './AircraftArt'
 import { useState } from 'react'
 import { AIRCRAFT, getAircraftType, typesOnSale } from '../data/aircraft'
 import { distanceKm } from '../data/cities'
-import { LEASE_BP_PER_QUARTER } from '../data/constants'
+import { LEASE_BP_PER_QUARTER, ORDERS_PER_QUARTER_V6 } from '../data/constants'
+import { ordersPlacedThisQuarter } from '../engine/orders'
 import type { GameState } from '../engine'
 import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor } from '../engine/market'
 import { yearOf } from '../engine/queries'
@@ -20,8 +21,18 @@ export function Shop({ state }: { state: GameState }) {
   const [routeId, setRouteId] = useState<number | ''>('')
   const route = player.routes.find((r) => r.id === routeId)
   const km = route ? distanceKm(route.from, route.to) : null
+  // Rules 6: the delivery lines take a few new-build orders a quarter.
+  const capped = (state.rulesVersion ?? 1) >= 6
+  const placed = ordersPlacedThisQuarter(player)
+  const lineFull = capped && placed >= ORDERS_PER_QUARTER_V6
+  const lineNote = `the manufacturers and lessors take ${ORDERS_PER_QUARTER_V6} new airframes a quarter — more next quarter`
   return (
     <div>
+      {capped && (
+        <p className={lineFull ? 'neg' : 'dim'} data-testid="order-line">
+          New-build orders this quarter: {placed} of {ORDERS_PER_QUARTER_V6}{lineFull ? ' — the lines are full until next quarter (used aircraft are still for sale)' : ''}
+        </p>
+      )}
       <label>
         Estimate economics on:{' '}
         <select
@@ -115,8 +126,8 @@ export function Shop({ state }: { state: GameState }) {
                   )}
                   <td>
                     <button
-                      disabled={player.cash < t.price}
-                      title={player.cash < t.price ? `need ${money(t.price)} cash — you have ${money(player.cash)}` : undefined}
+                      disabled={player.cash < t.price || lineFull}
+                      title={lineFull ? lineNote : player.cash < t.price ? `need ${money(t.price)} cash — you have ${money(player.cash)}` : undefined}
                       data-testid={`order-${t.id}`}
                       onClick={() => dispatch({ type: 'order_aircraft', aircraftType: t.id })}
                     >
@@ -124,7 +135,8 @@ export function Shop({ state }: { state: GameState }) {
                     </button>{' '}
                     <button
                       data-testid={`lease-${t.id}`}
-                      title="no capital outlay; quarterly payments, no resale value"
+                      disabled={lineFull}
+                      title={lineFull ? lineNote : 'no capital outlay; quarterly payments, no resale value'}
                       onClick={() => dispatch({ type: 'lease_aircraft', aircraftType: t.id })}
                     >
                       lease {money(Math.floor((t.price * LEASE_BP_PER_QUARTER) / 10000))}/q

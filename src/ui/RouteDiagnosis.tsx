@@ -4,6 +4,7 @@ import { createForecastPlanner } from '../engine/forecast'
 import { routeRecommendations, routeSignals } from '../engine/planning'
 import { viewSeat } from './session'
 import { money } from './format'
+import { explainRoute } from './routeExplain'
 
 export function RouteDiagnosis({ state, route, onPreview }: { state: GameState; route: Route; onPreview: (commands: import('../engine').Command[]) => void }) {
   const [compare, setCompare] = useState(false)
@@ -14,6 +15,10 @@ export function RouteDiagnosis({ state, route, onPreview }: { state: GameState; 
       suggestions: compare ? routeRecommendations(state, seat, route, evaluate, [], false) : [] }
   }, [state, seat, route, compare])
   return <section className="route-diagnosis" data-testid="route-diagnosis">
+    {explainRoute(route).length > 0 && <div className="route-explain" data-testid="route-explain">
+      <h3>Why it earned what it did</h3>
+      {explainRoute(route).map((line) => <p key={line}>{line}</p>)}
+    </div>}
     <h3>What this route needs</h3>
     {analysis.signals.slice(0, 3).map(s => <p key={s.title}><strong>{s.title}</strong><br />{s.detail}</p>)}
     <button onClick={() => setCompare(!compare)} aria-expanded={compare}>{compare ? 'Hide comparisons' : 'Compare improvements'}</button>

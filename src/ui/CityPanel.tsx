@@ -8,11 +8,11 @@ const PassengerFlows = lazy(() => import('./PassengerFlows').then(m=>({default:m
 import { useMemo } from 'react'
 import { SeasonLegend } from './legends'
 import { CITIES, distanceKm, getCity } from '../data/cities'
-import { SEASON_TOUR_BP_PER_POINT, SLOTS_PER_GRANT } from '../data/constants'
+import { SEASON_TOUR_BP_PER_POINT, SLOTS_PER_GRANT, TERMINAL_FUNDER_SLOTS_V6 } from '../data/constants'
 import { getEventDef } from '../data/events'
 import type { GameState } from '../engine'
 import { baseFare, pairWeeklyDemand, seasonalBp } from '../engine/market'
-import { cityPool, nextExpansion, slotFee, slotQueue, slotRent, slotsRemaining } from '../engine/slots'
+import { cityPool, expansionSize, nextExpansion, slotFee, slotQueue, slotRent, slotsRemaining, terminalBlocker, terminalCost } from '../engine/slots'
 import { airlinesOnPair, networkCities, slotsAllocated, slotsFree, slotsHeld, slotsUsed } from '../engine/queries'
 import { cityMass, cityTier } from './mapStyle'
 import { ConfirmButton } from './ConfirmButton'
@@ -269,6 +269,27 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
           </>
         )}
       </div>
+
+      {(state.rulesVersion ?? 1) >= 6 && (() => {
+        // Rules 6: when the list is a timetable, money can move the builders.
+        const cost = terminalCost(state, cityId)
+        const blocker = terminalBlocker(state, viewSeat(), cityId)
+        return (
+          <div className="city-negotiate" data-testid="city-fund-terminal">
+            <ConfirmButton
+              data-testid="panel-fund-terminal"
+              disabled={blocker !== null}
+              title={blocker ?? `pay the authority to open its next programme next quarter: +${expansionSize(cityId)} slots, the first ${Math.min(TERMINAL_FUNDER_SLOTS_V6, expansionSize(cityId))} yours`}
+              label={`🏗 Fund the next programme — ${money(cost)}`}
+              confirmLabel={`Pay ${money(cost)}?`}
+              onConfirm={() => dispatch({ type: 'fund_terminal', city: cityId })}
+            />{' '}
+            <span className="dim">
+              {blocker ?? `opens +${expansionSize(cityId)} slots next quarter instead of in ${expansion.quartersAway}q; you take the first ${Math.min(TERMINAL_FUNDER_SLOTS_V6, expansionSize(cityId))}, the rest serve the list`}
+            </span>
+          </div>
+        )
+      })()}
 
       <h3>Top markets from here</h3>
       <table className="city-pairs">

@@ -7,7 +7,7 @@ import { getAircraftType } from '../data/aircraft'
 import { pairKey } from '../data/cities'
 import type { Airline, GameState } from '../engine'
 import { netWorth, objectiveScore, objectiveScoreAt, routeWeeklyCapacity, slotCities } from '../engine/queries'
-import { TAKEOVER_BASE_K, TAKEOVER_PREMIUM_BP } from '../data/constants'
+import { ENTRANT_GRACE_QUARTERS, TAKEOVER_BASE_K, TAKEOVER_PREMIUM_BP } from '../data/constants'
 import { getScenario } from '../data/scenarios'
 import { ConfirmButton } from './ConfirmButton'
 import { RIVAL_COLORS } from './mapStyle'
@@ -353,7 +353,7 @@ export function RivalsPanel({ state }: { state: GameState }) {
                 {rival.name} {rival.bankrupt && <span className="neg">— bankrupt</span>}
               </h4>
               <p className="dim">{PERSONALITY_BLURBS[rival.personality] ?? rival.personality}</p>
-              {rival.campaign && <p className="campaign" data-testid={`campaign-${rival.id}`}><strong>{rival.campaign.kind} campaign · {rival.campaign.kind === 'raid' && rival.campaign.pair ? `${rival.campaign.pair.replace('-', '–')}${rival.campaign.target === viewSeat() ? ' (your market)' : ''}` : rival.campaign.city}</strong> · {Math.max(0, rival.campaign.untilTurn - state.turn)}q remaining{rival.campaign.fromTurn > state.turn ? ' · starts next quarter' : ''}</p>}
+              {rival.campaign && <p className="campaign" data-testid={`campaign-${rival.id}`}><strong>{rival.campaign.kind} campaign · {rival.campaign.pair ? `${rival.campaign.pair.replace('-', '–')}${rival.campaign.kind === 'raid' && rival.campaign.target === viewSeat() ? ' (your market)' : ''}` : rival.campaign.city}</strong> · {Math.max(0, rival.campaign.untilTurn - state.turn)}q remaining{rival.campaign.fromTurn > state.turn ? ' · starts next quarter' : ''}</p>}
               {rival.campaign?.evidence && <div className="campaign-evidence"><p><strong>Observed:</strong> {rival.campaign.evidence}</p><p><strong>Announced intent:</strong> {rival.campaign.response}</p><p className="hint">Intent can be constrained by cash, aircraft and airport access. Inspect affected routes to compare price, service or capacity responses in your plan.</p></div>}
               {rival.customerPreference && <CustomerIdentity airline={rival} compact />}
               {!rival.bankrupt && (
@@ -406,6 +406,9 @@ export function RivalsPanel({ state }: { state: GameState }) {
                     const worth = netWorth(rival)
                     const distressed = rival.insolventQuarters >= 1 || worth * 4 <= netWorth(me)
                     if (!distressed) return null
+                    // Rules 6: a newly launched carrier is protected for everyone.
+                    const graceLeft = (state.rulesVersion ?? 1) >= 6 && rival.enteredTurn !== undefined ? ENTRANT_GRACE_QUARTERS - (state.turn - rival.enteredTurn) : 0
+                    if (graceLeft > 0) return <p className="dim" data-testid={`acquire-${rival.id}-grace`}>New carrier: cannot be bought for {graceLeft} more quarter{graceLeft === 1 ? '' : 's'}.</p>
                     const price = Math.max(
                       TAKEOVER_BASE_K,
                       Math.floor((Math.max(0, worth) * TAKEOVER_PREMIUM_BP) / 10000),
@@ -415,12 +418,12 @@ export function RivalsPanel({ state }: { state: GameState }) {
                         <ConfirmButton
                           data-testid={`acquire-${rival.id}`}
                           label={`💼 acquire for ${money(price)}`}
-                          confirmLabel={`buy ${rival.name} — fleet, routes, slots, and their debt?`}
+                          confirmLabel={`buy ${rival.name} — fleet, routes, slots${(state.rulesVersion ?? 1) >= 6 ? ', cash' : ''} and their debt?`}
                           disabled={me.cash < price}
                           title={
                             me.cash < price
                               ? `need ${money(price)} cash`
-                              : 'everything transfers: aircraft, routes, slots, orders — and the loans'
+                              : (state.rulesVersion ?? 1) >= 6 ? 'everything transfers: aircraft, routes, slots, orders, their cash — and the loans' : 'everything transfers: aircraft, routes, slots, orders — and the loans'
                           }
                           onConfirm={() => dispatch({ type: 'acquire_rival', target: rival.id })}
                         />
