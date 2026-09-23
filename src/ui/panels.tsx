@@ -46,7 +46,7 @@ import { assignAllIdle, assignAndSchedule, balancedScheduleCommands } from './as
 import { sortHeaderFactory } from './sortHeader'
 import { ConfirmButton } from './ConfirmButton'
 import { viewSeat, dispatch, dispatchBatch } from './session'
-import { copyTsv, money } from './format'
+import { copyTsv, money, pct, tone } from './format'
 import { Icon } from './Icon'
 import {
   CabinLegend,
@@ -333,11 +333,11 @@ export function RoutesPanel({
               <td className="dim">{costPerSeat > 0 ? `$${costPerSeat}` : '—'}</td>
               <td>{money(r.lastRevenue)}</td>
               <td className="dim">{money(cost)}</td>
-              <td className={marginBp >= 0 ? 'pos' : 'neg'}>{(marginBp / 100).toFixed(0)}%</td>
-              <td className={profit >= 0 ? 'pos' : 'neg'}>
+              <td className={tone(marginBp)}>{pct(marginBp)}</td>
+              <td className={tone(profit)}>
                 {r.history.length ? money(profit) : <span className="dim">Not flown yet</span>}
                 {profitTrend !== 0 && (
-                  <span className={profitTrend > 0 ? 'pos' : 'neg'} title="vs previous quarter">
+                  <span className={tone(profitTrend)} title="vs previous quarter">
                     {' '}
                     {profitTrend > 0 ? '▲' : '▼'}
                   </span>
@@ -356,16 +356,14 @@ export function RoutesPanel({
         <td>{totals.pax.toLocaleString('en-US')}</td>
         <td>{totals.pax > 0 ? `$${Math.floor(totals.revenue*1000/totals.pax)}` : '—'}</td>
         <td>{totals.seatsFlown > 0 ? `$${Math.floor(totals.cost*1000/totals.seatsFlown)}` : '—'}</td>
-        <td>{money(totals.revenue)}</td><td>{money(totals.cost)}</td><td>{(totalMarginBp/100).toFixed(0)}%</td>
-        <td className={totals.profit >= 0 ? 'pos' : 'neg'}><strong>{money(totals.profit)}</strong></td>
+        <td>{money(totals.revenue)}</td><td>{money(totals.cost)}</td><td>{pct(totalMarginBp)}</td>
+        <td className={tone(totals.profit)}><strong>{money(totals.profit)}</strong></td>
       </tr></tfoot>
     </table></div>
-    <Suspense fallback={<p role="status">Loading network adviser…</p>}><NetworkAdvisor key={`${state.turn}-${seat}`} state={state} locks={locks} onToggle={toggle} /></Suspense>
-    <PlanningWorkbench key={`${state.turn}-${seat}`} state={state} suggestions={[]} onSuggest={() => balancedScheduleCommands(state, seat, locks)} />
-    <p className="dim" data-testid="network-overhead">
-      <span className="trend-key">▲▼ contribution vs the previous quarter · ⏳ still ramping · ⚔ rivals on the pair</span><br />
-      Network management: {money(networkOverhead)}/quarter for {player.routes.length} routes (grows with the
-      square of the network — quality beats sprawl){' '}
+    <aside className="table-note" data-testid="network-overhead" aria-label="Routes table notes">
+      <p className="trend-key">▲▼ contribution vs the previous quarter · ⏳ still ramping · ⚔ rivals on the pair</p>
+      <p><strong>Network management {money(networkOverhead)}/quarter</strong> for {player.routes.length} route{player.routes.length === 1 ? '' : 's'}. It grows with the square of the network, so quality beats sprawl.</p>
+      <div className="table-note-actions">
       <button
         className="link-btn"
         data-testid="copy-routes"
@@ -399,7 +397,10 @@ export function RoutesPanel({
       >
         <Icon name="balance" /> Balance schedules
       </button>
-    </p>
+      </div>
+    </aside>
+    <Suspense fallback={<p role="status">Loading network adviser…</p>}><NetworkAdvisor key={`${state.turn}-${seat}`} state={state} locks={locks} onToggle={toggle} /></Suspense>
+    <PlanningWorkbench key={`${state.turn}-${seat}`} state={state} suggestions={[]} onSuggest={() => balancedScheduleCommands(state, seat, locks)} />
     <ServiceLegend />
     <Suspense fallback={<p role="status">Loading expansion planner…</p>}><ExpansionPlanner state={state} onPlan={onPlan} onAirport={onAirport} /></Suspense>
     </div>

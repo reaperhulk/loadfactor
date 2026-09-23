@@ -6,7 +6,7 @@ import { effectiveFrequency, maxRouteFrequency } from '../engine/queries'
 import { viewSeat } from './session'
 import { applyPlanningDraft, planEvaluator } from './planActions'
 import { commandKey, removePlanningCommand, stagePlanningCommands, usePlanningCommands } from './planningDrafts'
-import { money } from './format'
+import { money, tone, signedMoney } from './format'
 
 const RouteDiagnosis = lazy(() => import('./RouteDiagnosis').then(m => ({ default: m.RouteDiagnosis })))
 
@@ -38,7 +38,7 @@ export function RoutePlanner({ state, route }: { state: GameState; route: Route 
         <div><dt>Route contribution</dt><dd>{commands.length > 0 && <span className="forecast-before">{money(prior.lastRevenue-prior.lastCost)} → </span>}<strong className={projected.lastRevenue >= projected.lastCost ? 'pos' : 'neg'}>{money(projected.lastRevenue-projected.lastCost)}</strong></dd></div>
         <div><dt>Load factor</dt><dd>{(projected.lastLoadFactorBp/100).toFixed(0)}%</dd></div>
         <div><dt>Company net profit</dt><dd>{money(after.profit)}</dd></div>
-        <div><dt>Change in company profit</dt><dd className={change >= 0 ? 'pos' : 'neg'}>{change > 0 ? '+' : ''}{money(change)}</dd></div>
+        <div><dt>Change in company profit</dt><dd className={tone(change)}>{signedMoney(change)}</dd></div>
         <div><dt>Ending cash</dt><dd>{money(after.cashAfter)}</dd></div>
       </dl>
     </div>

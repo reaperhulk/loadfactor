@@ -18,7 +18,7 @@ import { forecastReplacement } from '../engine/forecast'
 import { debtCeiling, isGrounded, totalDebt, yearOf } from '../engine/queries'
 import type { Command, GameState } from '../engine'
 import { dispatch, dispatchBatch, viewSeat } from './session'
-import { money } from './format'
+import { money, tone } from './format'
 
 export function OperationsPanel({
   state,
@@ -406,7 +406,7 @@ export function OperationsPanel({
               </p>
               <p>
                 Operating profit after replacement: {money(quote.projectedProfit)}/q · change{' '}
-                <strong className={quote.quarterlySaving >= 0 ? 'pos' : 'neg'}>
+                <strong className={tone(quote.quarterlySaving)}>
                   {money(quote.quarterlySaving)}/q
                 </strong>
                 .

@@ -7,7 +7,7 @@ import { getScenario } from '../data/scenarios'
 import { createForecastPlanner } from '../engine/forecast'
 import { expansionOptions, type ExpansionOption } from '../engine/expansion'
 import { viewSeat } from './session'
-import { money } from './format'
+import { money, tone } from './format'
 
 export function ExpansionPlanner({ state, onPlan, onAirport }: { state: GameState; onPlan?: (from: string, to: string, preset?: ExpansionOption) => void; onAirport?: (city: string) => void }) {
   const seat = viewSeat()
@@ -33,7 +33,7 @@ export function ExpansionPlanner({ state, onPlan, onAirport }: { state: GameStat
     <button disabled={invalid} onClick={() => { setSearched(true); setSelected([]) }}>Find expansion options</button>
     {invalid && <p role="status">Resolve the invalid shared-plan changes before searching for additional launches.</p>}
     {result && <><label className="expansion-sort">Rank by <select aria-label="Rank expansion options" value={sort} onChange={e => setSort(e.target.value as 'objective' | 'profit')}><option value="objective">Scenario objective</option><option value="profit">Company profit</option></select></label>
-      <div className="expansion-options">{[...result.options].sort((a,b)=>sort === 'profit' ? b.profitDelta-a.profitDelta : b.objectiveDelta-a.objectiveDelta).map(o => <article data-testid={`expansion-${key(o)}`} key={key(o)}><h4>{o.from}–{o.to}</h4><p>{getAircraftType(o.aircraftType).name} #{o.aircraftId} · {o.frequency} round trips/week</p><dl className="decision-metrics"><div><dt>Company profit change/q</dt><dd className={o.profitDelta >= 0 ? 'pos' : 'neg'}>{money(o.profitDelta)}</dd></div><div><dt>Ending cash</dt><dd>{money(o.cashAfter)}</dd></div><div><dt>Objective change</dt><dd>{gain(o.objectiveDelta)}</dd></div><div><dt>Connecting boardings change</dt><dd>{o.connectionsDelta.toLocaleString('en-US')}</dd></div></dl>
+      <div className="expansion-options">{[...result.options].sort((a,b)=>sort === 'profit' ? b.profitDelta-a.profitDelta : b.objectiveDelta-a.objectiveDelta).map(o => <article data-testid={`expansion-${key(o)}`} key={key(o)}><h4>{o.from}–{o.to}</h4><p>{getAircraftType(o.aircraftType).name} #{o.aircraftId} · {o.frequency} round trips/week</p><dl className="decision-metrics"><div><dt>Company profit change/q</dt><dd className={tone(o.profitDelta)}>{money(o.profitDelta)}</dd></div><div><dt>Ending cash</dt><dd>{money(o.cashAfter)}</dd></div><div><dt>Objective change</dt><dd>{gain(o.objectiveDelta)}</dd></div><div><dt>Connecting boardings change</dt><dd>{o.connectionsDelta.toLocaleString('en-US')}</dd></div></dl>
         <label><input type="checkbox" aria-label={`Compare ${key(o)}`} checked={selected.includes(key(o))} disabled={!selected.includes(key(o)) && selected.length >= 3} onChange={() => setSelected(current => current.includes(key(o)) ? current.filter(k=>k!==key(o)) : [...current, key(o)])} />Compare</label>{' '}
         <button data-testid={`plan-${key(o)}`} onClick={() => onPlan?.(o.from, o.to, o)}>Review launch</button><details data-testid={`risk-${key(o)}`}><summary>Costs and risks</summary><p>Launch payment {money(o.cashRequired)}. Uses an aircraft you already hold; its continuing costs are included. Both airports have free slots.</p><ul>{o.risks.map(r=><li key={r}>{r}</li>)}</ul></details></article>)}</div>
       {!result.options.length && <p>No shortlisted launch currently has both free slots and a suitable idle aircraft. Resolve the requirements below, then compare again.</p>}

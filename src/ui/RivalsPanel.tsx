@@ -14,7 +14,7 @@ import { RIVAL_COLORS } from './mapStyle'
 import { RaceChart, Sparkline } from './Sparkline'
 import { TakeoverLegend } from './legends'
 import { viewSeat, dispatch, getChallengeTarget } from './session'
-import { copyTsv, money, objectiveValue } from './format'
+import { copyTsv, leaderTone, money, objectiveValue, pct, signedMoney, tone } from './format'
 
 const PERSONALITY_BLURBS: Record<string, string> = {
   player: '',
@@ -75,7 +75,7 @@ function StandingsTable({ state }: { state: GameState }) {
   const best = (key: keyof (typeof rows)[number]): number =>
     Math.max(...rows.filter((r) => !r.bankrupt).map((r) => r[key] as number))
   const cell = (r: (typeof rows)[number], key: keyof (typeof rows)[number], text: string) => (
-    <td className={!r.bankrupt && (r[key] as number) === best(key) ? 'pos' : ''}>{text}</td>
+    <td className={r.bankrupt ? '' : leaderTone(r[key] as number, best(key))}>{text}</td>
   )
   return (
     <div className="table-scroll">
@@ -129,12 +129,12 @@ function StandingsTable({ state }: { state: GameState }) {
           {rows.map((r) => (
             <tr key={r.id} className={r.id === viewSeat() ? 'me' : r.bankrupt ? 'dim' : ''}>
               <td>{r.bankrupt ? `${r.name} ✝` : r.name}</td>
-              <td className={!r.bankrupt && r.netWorth === best('netWorth') ? 'pos' : ''}>
+              <td className={r.bankrupt ? '' : leaderTone(r.netWorth, best('netWorth'))}>
                 {money(r.netWorth)}
                 {!r.bankrupt && r.worthTrend !== 0 && (
                   <span
-                    className={r.worthTrend > 0 ? 'pos' : 'neg'}
-                    title={`${r.worthTrend > 0 ? '+' : ''}${money(r.worthTrend)} vs last quarter`}
+                    className={tone(r.worthTrend)}
+                    title={`${signedMoney(r.worthTrend)} vs last quarter`}
                   >
                     {' '}
                     {r.worthTrend > 0 ? '▲' : '▼'}
@@ -144,7 +144,7 @@ function StandingsTable({ state }: { state: GameState }) {
               {cell(r, 'cash', money(r.cash))}
               {cell(r, 'revenue', money(r.revenue))}
               {cell(r, 'profit', money(r.profit))}
-              {cell(r, 'marginBp', `${(r.marginBp / 100).toFixed(1)}%`)}
+              {cell(r, 'marginBp', pct(r.marginBp, 1))}
               {cell(r, 'pax', r.pax.toLocaleString('en-US'))}
               {cell(r, 'shareBp', `${(r.shareBp / 100).toFixed(1)}%`)}
               {cell(r, 'seats', r.seats.toLocaleString('en-US'))}
@@ -390,7 +390,7 @@ export function RivalsPanel({ state }: { state: GameState }) {
                       if (then <= 0) return null
                       const pct = Math.round(((now - then) * 100) / then)
                       return (
-                        <span className={pct >= 0 ? 'pos' : 'neg'} title="passenger volume vs 4 quarters ago">
+                        <span className={tone(pct)} title="passenger volume vs 4 quarters ago">
                           {' '}
                           · pax {pct >= 0 ? '▲' : '▼'}
                           {Math.abs(pct)}%/y
@@ -441,8 +441,8 @@ export function RivalsPanel({ state }: { state: GameState }) {
                   )}
                   <div className="trend-row">
                     <span className="dim">profit</span>
-                    <Sparkline points={rival.history.slice(-16).map((h) => h.profit)} className="sparkline spark-profit" />
-                    <span className={last && last.profit >= 0 ? 'pos' : 'neg'}>
+                    <Sparkline points={rival.history.slice(-16).map((h) => h.profit)} className="sparkline spark-profit" label={`${rival.name} profit per quarter`} />
+                    <span className={tone(last?.profit ?? 0)}>
                       {last ? `${money(last.profit)}/q` : '—'}
                     </span>
                   </div>

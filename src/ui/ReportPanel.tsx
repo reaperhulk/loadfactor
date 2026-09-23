@@ -9,7 +9,7 @@ import { getAircraftType } from '../data/aircraft'
 import { getScenario } from '../data/scenarios'
 import type { GameEvent, GameState } from '../engine'
 import { viewSeat, type QuarterRecord } from './session'
-import { money } from './format'
+import { money, tone } from './format'
 
 function describeEvent(state: GameState, e: GameEvent): string | null {
   const name = (idx: number): string => state.airlines[idx]?.name ?? `airline ${idx}`
@@ -170,7 +170,7 @@ function QuarterPage({ state, events, turn, onInspect }: { state: GameState; eve
                   <td>{(r.loadFactorBp / 100).toFixed(0)}%</td>
                   <td>{money(r.revenue)}</td>
                   <td>{money(r.cost)}</td>
-                  <td className={r.revenue - r.cost >= 0 ? 'pos' : 'neg'}>{money(r.revenue - r.cost)}</td>
+                  <td className={tone(r.revenue - r.cost)}>{money(r.revenue - r.cost)}</td>
                 </tr>
               ))}
             </tbody>

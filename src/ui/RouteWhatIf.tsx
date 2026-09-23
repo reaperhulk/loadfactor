@@ -3,7 +3,7 @@ import type { GameState, Route } from '../engine'
 import { forecastQuarter } from '../engine/forecast'
 import { fareFor } from '../engine/market'
 import { distanceKm } from '../data/cities'
-import { money } from './format'
+import { money, tone } from './format'
 import { viewSeat } from './session'
 
 export function FuelExposure({ state, routeId }: { state: GameState; routeId: number }) {
@@ -38,7 +38,7 @@ export function RouteWhatIf({ state, route, mode }: { state: GameState; route: R
     {expanded && <><div className="table-scroll"><table><thead><tr><th>{mode}</th><th>Pax/week</th><th>Route contribution/q</th><th>Airline profit/q</th></tr></thead><tbody>
       {rows.map(({ level, label, forecast, leg }) => <tr key={level} className={level === (mode === 'fare' ? route.fareLevel : mode === 'service' ? route.serviceLevel : 0) ? 'me' : ''}>
         <td>{label}{level === (mode === 'fare' ? route.fareLevel : mode === 'service' ? route.serviceLevel : 0) && ' (now)'}</td>
-        <td>{Math.floor((leg?.lastPax ?? 0) / 13).toLocaleString('en-US')}</td><td>{money((leg?.lastRevenue ?? 0) - (leg?.lastCost ?? 0))}</td><td className={forecast.profit >= 0 ? 'pos' : 'neg'}>{money(forecast.profit)}</td>
+        <td>{Math.floor((leg?.lastPax ?? 0) / 13).toLocaleString('en-US')}</td><td>{money((leg?.lastRevenue ?? 0) - (leg?.lastCost ?? 0))}</td><td className={tone(forecast.profit)}>{money(forecast.profit)}</td>
       </tr>)}
     </tbody></table></div><p className="hint" data-testid={`${mode}-whatif-verdict`}>
       {best?.label} gives the highest company profit under current conditions. Includes connections on other routes and company costs; holds world conditions and rival schedules fixed. This is a comparison, not a promise of next quarter's result.
