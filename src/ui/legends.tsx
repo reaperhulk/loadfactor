@@ -39,13 +39,14 @@ import {
   EXPANSION_EVERY_QUARTERS,
   TAKEOVER_PREMIUM_BP,
   TRANSFER_HANDLING_PER_PAX,
+  HEDGE_PREMIUM_BP_OF_FUEL_V6,
 } from '../data/constants'
 
 import type { MapLens } from './mapStyle'
 
 const pctFrom = (bp: number): string => {
   const delta = (bp - 10000) / 100
-  return `${delta >= 0 ? '+' : ''}${delta.toFixed(0)}%`
+  return `${delta >= 0 ? '+' : '−'}${Math.abs(delta).toFixed(0)}%`
 }
 
 const CABIN_NAMES = ['Dense', 'Standard', 'Premium']
@@ -196,15 +197,26 @@ export function MarketingLegend() {
   )
 }
 
-export function HedgeLegend() {
+export function HedgeLegend({ modern = false }: { modern?: boolean }) {
   return (
     <details className="game-legend" data-testid="hedge-legend">
       <summary className="dim">How does fuel hedging work?</summary>
-      <p className="dim">
-        A hedge locks today's fuel price for {HEDGE_MIN_QUARTERS}–{HEDGE_MAX_QUARTERS} quarters at a
-        premium of ${HEDGE_PREMIUM_PER_AIRCRAFT}k per airframe. While it runs, oil shocks cannot touch
-        your fuel bill — and cheap fuel cannot reach it either.
-      </p>
+      {modern ? (
+        <p className="dim">
+          A hedge locks the fuel price for {HEDGE_MIN_QUARTERS}–{HEDGE_MAX_QUARTERS} quarters, covering
+          half your burn or all of it. The premium is {HEDGE_PREMIUM_BP_OF_FUEL_V6 / 100}% of last
+          quarter's fuel bill per quarter covered, scaled by the cover. Every world event is announced a
+          quarter ahead, and the fuel desk prices in half of an announced shock, so hedging before the
+          headline beats hedging on it. While the hedge runs, the covered share of your fuel bill
+          ignores shocks, and cheap fuel does not reach it either.
+        </p>
+      ) : (
+        <p className="dim">
+          A hedge locks today's fuel price for {HEDGE_MIN_QUARTERS}–{HEDGE_MAX_QUARTERS} quarters at a
+          premium of ${HEDGE_PREMIUM_PER_AIRCRAFT}k per airframe. While it runs, oil shocks cannot touch
+          your fuel bill — and cheap fuel cannot reach it either.
+        </p>
+      )}
       <p className="hint">
         Hedge when the index is low and the era is shock-prone (the Oil Crisis, the Low-Cost Wars).
         The premium is the insurance you pay either way.

@@ -1140,7 +1140,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
               <SeasonLegend />
               <SlotLegend />
               <MarketingLegend />
-              <HedgeLegend />
+              <HedgeLegend modern={(state.rulesVersion ?? 1) >= 6} />
               <ReliabilityLegend />
               <RivalryLegend />
               <TakeoverLegend />

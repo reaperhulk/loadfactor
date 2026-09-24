@@ -444,7 +444,7 @@ export function FinancePanel({ state }: { state: GameState }) {
       })()}
       <RivalryLegend />
       <MarketingLegend />
-      <HedgeLegend />
+      <HedgeLegend modern={(state.rulesVersion ?? 1) >= 6} />
       <label>
         Amount:{' '}
         <input type="number" value={amount} min={100} step={100} onChange={(e) => setAmount(Number(e.target.value))} />{' '}
