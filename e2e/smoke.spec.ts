@@ -26,6 +26,21 @@ async function startGame(page: Page): Promise<void> {
   await page.getByTestId('map-wrap').scrollIntoViewIfNeeded()
 }
 
+// Home frames the player's own network, so a test about the map's machinery
+// (culling, level of detail) first centres the view where the old
+// whole-world home did: one step in, then a click on the minimap's middle.
+async function centreOnWorld(page: Page): Promise<void> {
+  await page.getByTestId('zoom-in').click()
+  const minimap = page.getByTestId('minimap')
+  await expect(minimap).toBeVisible()
+  const b = (await minimap.boundingBox())!
+  await minimap.click({ position: { x: b.width / 2, y: b.height / 2 } })
+  await expect.poll(async () => {
+    const [x, , w] = (await page.getByTestId('map-wrap').getAttribute('data-view'))!.split(' ').map(Number)
+    return Math.round(x! + w! / 2)
+  }).toBe(480)
+}
+
 // Ending a quarter via the UI presents the report card; dismiss it so the
 // next interaction isn't behind the overlay.
 async function endQuarterUI(page: Page): Promise<void> {
@@ -813,10 +828,10 @@ test('dragging off the map edge selects no text, and selection returns after', a
 // zero times, however far it goes.
 test('a drag at low zoom never rewrites the viewBox, however long', async ({ page }) => {
   await startGame(page)
-  for (let i = 0; i < 2; i++) {
-    await page.getByTestId('zoom-in').click()
-    await page.waitForTimeout(350)
-  }
+  // One step in from home (which is already a touch closer than the whole
+  // world): still low enough zoom for the layer to hold the entire world.
+  await page.getByTestId('zoom-in').click()
+  await page.waitForTimeout(350)
   await page.waitForTimeout(700)
 
   await page.evaluate(() => {
@@ -899,7 +914,8 @@ test('a drag stops everything that animates inside the map', async ({ page }) =>
 
 test('max zoom draws the cities on screen, not all of them', async ({ page }) => {
   await startGame(page)
-  for (let i = 0; i < 7; i++) {
+  await centreOnWorld(page)
+  for (let i = 0; i < 6; i++) {
     await page.getByTestId('zoom-in').click()
     await page.waitForTimeout(260)
   }
@@ -952,7 +968,7 @@ test('zoom reveals small cities that are hidden at world view', async ({ page })
   await startGame(page)
   // Doha is a tier-3 field with no player stake: invisible at world zoom.
   await expect(page.getByTestId('city-DOH')).toHaveCount(0)
-  await page.getByTestId('zoom-in').click()
+  await centreOnWorld(page)
   await page.getByTestId('zoom-in').click()
   await page.getByTestId('zoom-in').click()
   await expect(page.getByTestId('city-DOH')).toHaveCount(1)

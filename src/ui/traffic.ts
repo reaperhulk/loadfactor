@@ -34,7 +34,7 @@ export type TrafficEffect =
   // A bright arc sweeping around a ring: a negotiation in progress.
   | { kind: 'sweep'; x: number; y: number; r: number; width: number; color: string; period: number }
   // A ring breathing in and out: a world event on a city.
-  | { kind: 'breathe'; x: number; y: number; r: number; width: number; color: string; period: number }
+  | { kind: 'breathe'; x: number; y: number; r: number; width: number; color: string; period: number; alpha?: number }
   // Dashes marching along a leg: a raid announced on the pair.
   | { kind: 'march'; leg: TrafficLeg; width: number; color: string }
 
@@ -120,6 +120,31 @@ export interface TrafficCamera {
   tx: number
   ty: number
   s: number
+  // Map zoom (1 = the widest view), for sizing the glyphs. Optional so a
+  // bare camera still draws at the base size.
+  zoom?: number
+}
+
+// Glyph scale by map zoom. Planes are drawn at a fixed CSS size, which at the
+// world view makes them specks against a whole continent; they grow modestly
+// as the map zooms out, and settle at their base size from 3x in.
+export const PLANE_SCALE_WORLD = 1.4
+export function planeScaleForZoom(zoom: number): number {
+  const t = Math.min(1, Math.max(0, (3 - zoom) / 2))
+  return 1 + (PLANE_SCALE_WORLD - 1) * t
+}
+
+// A short contrail: where the plane was this many seconds ago, oldest last.
+// Time-based, so a fast jet draws a longer wake than a turboprop, and a plane
+// dwelling at a gate (not moving) draws none.
+export const CONTRAIL_STEPS = [0.2, 0.4, 0.6, 0.8] as const
+export function contrailPoints(plane: TrafficPlane, elapsed: number): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = []
+  for (const dt of CONTRAIL_STEPS) {
+    const p = posePlane(plane.leg, (elapsed + plane.phase - dt) / plane.dur)
+    out.push({ x: p.x, y: p.y })
+  }
+  return out
 }
 
 // World (viewBox) → CSS pixel mapping as `css = a * world + e`, per axis.
@@ -196,18 +221,39 @@ export function drawTraffic(
     } else {
       const w = (1 - Math.cos(u * TAU)) / 2 // ease in and out, 0 → 1 → 0
       ctx.arc(cx, cy, r * (0.75 + 0.4 * w), 0, TAU)
-      ctx.globalAlpha = 0.9 - 0.55 * w
+      ctx.globalAlpha = (0.9 - 0.55 * w) * (fx.alpha ?? 1)
     }
     ctx.lineWidth = fx.width * dpr
     ctx.stroke()
   }
+  const glyphScale = camera.zoom === undefined ? 1 : planeScaleForZoom(camera.zoom)
   for (const plane of planes) {
     const pose = posePlane(plane.leg, (elapsed + plane.phase) / plane.dur)
     const cx = (a * pose.x + ex) * dpr
     const cy = (a * pose.y + ey) * dpr
-    const g = plane.size * dpr
+    const g = plane.size * glyphScale * dpr
     const margin = 20 * g
     if (cx < -margin || cy < -margin || cx > wpx + margin || cy > hpx + margin) continue
+    // The wake first, fading with age, so the glyph paints over its start.
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.strokeStyle = plane.fill
+    ctx.lineWidth = 1.4 * glyphScale * dpr
+    let px = cx
+    let py = cy
+    const trail = contrailPoints(plane, elapsed)
+    for (let i = 0; i < trail.length; i++) {
+      const tx = (a * trail[i]!.x + ex) * dpr
+      const ty = (a * trail[i]!.y + ey) * dpr
+      if (Math.abs(tx - px) + Math.abs(ty - py) > 0.5) {
+        ctx.globalAlpha = plane.alpha * 0.3 * (1 - i / trail.length)
+        ctx.beginPath()
+        ctx.moveTo(px, py)
+        ctx.lineTo(tx, ty)
+        ctx.stroke()
+      }
+      px = tx
+      py = ty
+    }
     const cos = Math.cos(pose.heading) * g
     const sin = Math.sin(pose.heading) * g
     ctx.setTransform(cos, sin, -sin, cos, cx, cy)

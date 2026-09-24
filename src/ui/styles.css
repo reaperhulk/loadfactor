@@ -1006,13 +1006,13 @@ button.toast {
 
 /* Each rival's network keeps one color everywhere: map arcs, panel chips. */
 .rival-c0 {
-  stroke: #d0636e;
+  stroke: #9a7cf5;
 }
 .rival-c1 {
-  stroke: #9d7bd8;
+  stroke: #b8d85c;
 }
 .rival-c2 {
-  stroke: #d8a052;
+  stroke: #e67ad8;
 }
 
 /* A pair a rival also serves: your arc runs hot. */
@@ -1049,13 +1049,13 @@ button.toast {
   fill: var(--accent);
 }
 .chart-end-label.race-rival-1 {
-  fill: #d0636e;
+  fill: #9a7cf5;
 }
 .chart-end-label.race-rival-2 {
-  fill: #9d7bd8;
+  fill: #b8d85c;
 }
 .chart-end-label.race-rival-3 {
-  fill: #d8a052;
+  fill: #e67ad8;
 }
 
 /* The duel ghost: the challenger's number to beat, haunting the race chart. */
@@ -1620,15 +1620,15 @@ input[type='number'] {
 }
 
 .race-rival-1 {
-  stroke: #d0636e;
+  stroke: #9a7cf5;
 }
 
 .race-rival-2 {
-  stroke: #9d7bd8;
+  stroke: #b8d85c;
 }
 
 .race-rival-3 {
-  stroke: #d8a052;
+  stroke: #e67ad8;
 }
 
 .race-legend {
@@ -1644,15 +1644,15 @@ input[type='number'] {
 }
 
 .race-key.rival-1 {
-  color: #d0636e;
+  color: #9a7cf5;
 }
 
 .race-key.rival-2 {
-  color: #9d7bd8;
+  color: #b8d85c;
 }
 
 .race-key.rival-3 {
-  color: #d8a052;
+  color: #e67ad8;
 }
 
 .rival-cards {
@@ -2309,7 +2309,7 @@ th { font-size:.78rem; letter-spacing:.02em; }
 .map-area .city-panel { position:relative; top:auto; right:auto; width:auto; max-height:72vh; background:var(--panel); border-color:var(--rule); font-size:.88rem; backdrop-filter:none; }
 .map-area .map-wrap { min-width:0; }
 .map-data-control { position:absolute; right:12px; left:auto; top:10px; z-index:3; max-width:calc(100% - 80px); background:#102b3eee; border:1px solid #4b6878; border-radius:6px; padding:5px 8px; font-size:.73rem; color:#e7edf0; }
-.map-data-control select { font-size:.74rem; max-width:140px; }
+.map-data-control select { font-size:.74rem; min-width:9.5em; max-width:none; }
 .map-data-legend { display:flex; flex-wrap:wrap; gap:9px; margin-top:6px; }
 .route-player.lens-mid { stroke-dasharray:7 3; }
 .route-player.lens-bad { stroke-dasharray:2 4; }

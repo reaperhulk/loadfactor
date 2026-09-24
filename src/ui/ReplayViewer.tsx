@@ -123,6 +123,7 @@ export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () =>
         onCityClick={() => {}}
         newRouteIds={EMPTY}
         newSlotCities={EMPTY}
+        announceQuarter={false}
       />
       <div className="replay-controls">
         <button onClick={() => setIndex(0)} title="restart" aria-label="restart replay">

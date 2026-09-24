@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test'
-import { openPanel } from './workspace'
+import { expect, test, type Locator } from '@playwright/test'
+import { flyQuarter, openPanel } from './workspace'
 import { readFileSync } from 'node:fs'
 import type { GameState } from '../src/engine'
 
@@ -148,4 +148,149 @@ for (const width of [1440,390]) test(`route selection ${width}px accepts a click
     await expect(page.getByTestId('route-dossier')).toBeVisible()
     await page.keyboard.press('Escape')
   }
+})
+
+// ---- The map as a board: framing, key, events, result, keyboard ----------
+
+const quiet = () => localStorage.setItem('loadfactor:display:v1', JSON.stringify({ celebrations: false }))
+const centreOf = async (el: Locator) => {
+  const b = (await el.boundingBox())!
+  return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
+}
+const inside = (p: { x: number; y: number }, b: { x: number; y: number; width: number; height: number }) =>
+  p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height
+
+test('desktop home frames the network clear of the map controls', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.addInitScript(quiet)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  const wrap = (await page.getByTestId('map-wrap').boundingBox())!
+  const controls = (await page.locator('.map-controls').boundingBox())!
+  // The west coast used to sit under the zoom column, cropped off the frame.
+  for (const id of ['SFO', 'LAX', 'JFK', 'ORD', 'MIA']) {
+    const c = await centreOf(page.getByTestId(`city-${id}`))
+    expect(inside(c, wrap), `${id} is inside the frame`).toBe(true)
+    expect(inside(c, controls), `${id} is not under the controls`).toBe(false)
+  }
+  await info.attach('jet_age-home', { body: await page.screenshot(), contentType: 'image/png' })
+  // A Singapore airline opens centred on Asia, not pinned to the right edge.
+  await page.evaluate(() => window.__harness.newGame('open_skies', 'framing'))
+  await expect.poll(async () => {
+    const sin = await centreOf(page.getByTestId('city-SIN'))
+    return (sin.x - wrap.x) / wrap.width
+  }).toBeGreaterThan(0.3)
+  const sin = await centreOf(page.getByTestId('city-SIN'))
+  expect((sin.x - wrap.x) / wrap.width).toBeLessThan(0.85)
+  expect(inside(await centreOf(page.getByTestId('city-HND')), wrap), 'Tokyo is on screen').toBe(true)
+  await info.attach('open_skies-home', { body: await page.screenshot(), contentType: 'image/png' })
+  // The map-colors picker shows its longest option in full.
+  const select = page.getByLabel('map colors', { exact: true })
+  await select.selectOption('demand')
+  expect(await select.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+  const text = await select.evaluate((el) => {
+    const s = el as HTMLSelectElement
+    const ctx = document.createElement('canvas').getContext('2d')!
+    ctx.font = getComputedStyle(s).font
+    return { need: ctx.measureText(s.options[s.selectedIndex]!.text).width, have: s.clientWidth }
+  })
+  expect(text.need, 'Unserved demand fits its select').toBeLessThan(text.have - 16)
+})
+
+test('the ownership key names every network in its map color', async ({ page }) => {
+  await page.addInitScript(quiet)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await page.evaluate(() => { window.__harness.endQuarter(); window.__harness.endQuarter() })
+  const key = page.getByTestId('map-ownership-key')
+  await expect(key).toContainText('Meridian Air (you)')
+  await expect(key).toContainText('Albion Airways')
+  // The swatch is the very color of that airline's arcs.
+  const swatch = await key.locator('.owner', { hasText: 'Albion Airways' }).locator('.owner-swatch').evaluate((el) => getComputedStyle(el).backgroundColor)
+  const arc = await page.locator('.route-rival.rival-c0').first().evaluate((el) => getComputedStyle(el).stroke)
+  expect(swatch).toBe(arc)
+  await page.getByLabel('map colors', { exact: true }).selectOption('load')
+  await expect(key).toHaveCount(0)
+})
+
+test('a world event gets a legend line and a bounded number of halos', async ({ page }) => {
+  await page.addInitScript(quiet)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await expect(page.getByTestId('map-event-legend')).toHaveCount(0)
+  await page.evaluate(() => {
+    const s = window.__harness.getState()!
+    s.world.events.push({ id: 'tourism_wave', quartersLeft: 2, city: null, region: 'na' })
+    const idle = s.airlines[0]!.fleet.find((a) => a.routeId === null)!
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: idle.id, frequency: 5 })
+  })
+  await expect(page.getByTestId('map-event-legend')).toContainText('Tourism wave · North America')
+  // World zoom: one labeled region, not a ring on every North American city.
+  await expect(page.getByTestId('event-region-na')).toHaveCount(1)
+  await expect(page.getByTestId('event-region-na')).toContainText('Tourism wave')
+  expect(await page.locator('[data-testid^="event-halo-"]').count()).toBe(0)
+  // Close up, individual rings — only for the region's biggest markets.
+  for (let i = 0; i < 3; i++) await page.getByTestId('zoom-in').click()
+  await expect(page.getByTestId('event-region-na')).toHaveCount(0)
+  await expect.poll(() => page.locator('[data-testid^="event-halo-"]').count()).toBeGreaterThan(0)
+  expect(await page.locator('[data-testid^="event-halo-"]').count()).toBeLessThanOrEqual(6)
+})
+
+test('the map shows the quarter result once the report closes', async ({ page }) => {
+  await page.addInitScript(quiet)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await page.evaluate(() => {
+    const s = window.__harness.getState()!
+    const [a, b] = s.airlines[0]!.fleet.filter((ac) => ac.routeId === null)
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'ORD', aircraftId: a!.id, frequency: 5 })
+    window.__harness.dispatch({ type: 'open_route', from: 'JFK', to: 'MIA', aircraftId: b!.id, frequency: 5 })
+  })
+  await flyQuarter(page)
+  await expect(page.getByTestId('report-card')).toBeVisible()
+  // Nothing flashes behind the report...
+  await page.waitForTimeout(600)
+  await expect(page.getByTestId('map-quarter-result')).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('report-card')).toHaveCount(0)
+  // ...then every flown route shows which way its profit went.
+  await expect(page.getByTestId('map-quarter-result')).toBeVisible()
+  await expect(page.getByTestId('map-quarter-result')).toContainText('Last quarter')
+  await expect.poll(() => page.locator('.route-result-up, .route-result-down').count()).toBeGreaterThan(0)
+  // And it is transient.
+  await expect(page.getByTestId('map-quarter-result')).toHaveCount(0, { timeout: 8000 })
+  await expect(page.locator('.route-result-up, .route-result-down')).toHaveCount(0)
+})
+
+test('keyboard: one tab stop, arrows walk the airports, Enter opens one', async ({ page }) => {
+  await page.addInitScript(quiet)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await expect(page.getByTestId('map')).toHaveAttribute('role', 'application')
+  // A roving tabindex: one airport is in the tab order, the rest are not.
+  await expect(page.locator('svg.map [data-city][tabindex="0"]')).toHaveCount(1)
+  expect(await page.locator('svg.map [data-city][tabindex="-1"]').count()).toBeGreaterThan(20)
+  // Shift+Tab back from the first map control lands on it: the HQ.
+  await page.getByTestId('zoom-in').focus()
+  await page.keyboard.press('Shift+Tab')
+  const focused = page.locator('svg.map [data-city]:focus')
+  await expect(focused).toHaveAttribute('data-city', 'JFK')
+  await expect(focused).toHaveAttribute('role', 'button')
+  await expect(focused).toHaveAttribute('aria-label', /New York.*\(JFK\).*your headquarters/)
+  // Arrow west: the next airport along, and it takes the tab stop with it.
+  await page.keyboard.press('ArrowLeft')
+  await expect(focused).not.toHaveAttribute('data-city', 'JFK')
+  const next = (await focused.getAttribute('data-city'))!
+  await expect(page.locator(`svg.map [data-city="${next}"]`)).toHaveAttribute('tabindex', '0')
+  await expect(page.locator('svg.map [data-city="JFK"]')).toHaveAttribute('tabindex', '-1')
+  // + zooms with the map focused; the airport keeps focus.
+  const before = await page.getByTestId('map-wrap').getAttribute('data-view')
+  await page.keyboard.press('+')
+  await expect.poll(() => page.getByTestId('map-wrap').getAttribute('data-view')).not.toBe(before)
+  await expect(focused).toHaveAttribute('data-city', next)
+  // Enter opens the airport's panel.
+  await page.keyboard.press('Enter')
+  await expect(page.getByTestId('city-panel')).toBeVisible()
+  const name = (await page.locator(`svg.map [data-city="${next}"]`).getAttribute('aria-label'))!.split(' (')[0]!
+  await expect(page.getByTestId('city-panel').locator('h2')).toContainText(name)
 })
