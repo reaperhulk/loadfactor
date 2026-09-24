@@ -55,21 +55,27 @@ test('the delivery lines count new-build orders', async ({ page }) => {
 })
 
 test('announced news reaches the Desk before it lands', async ({ page }) => {
-  // Fly quiet quarters until the world announces something (deterministic
-  // for this seed), then read it on the Desk.
+  // This seed announces an oil shock in its fourth quarter; fly quarters
+  // until the world has news for this airline, then read it on the Desk.
   const announced = await page.evaluate(() => {
     const h = window.__harness
-    for (let q = 0; q < 24; q++) {
+    h.newGame('hub_defense', 'rules-six-8')
+    for (let q = 0; q < 12; q++) {
       h.endQuarter()
-      const news = h.getState()!.world.announced ?? []
-      if (news.length) return news[0]!.id
+      const s = h.getState()!
+      const flown = new Set(s.airlines[0]!.routes.flatMap((r) => [r.from, r.to]))
+      const hit = (s.world.announced ?? []).find((e) => (e.city === null && e.region === null) || (e.city !== null && flown.has(e.city)))
+      if (hit) return hit.id
     }
     return null
   })
-  expect(announced).not.toBeNull()
+  expect(announced).toBe('oil_shock')
   await page.keyboard.press('Escape')
   await openPanel(page, 'desk')
-  await expect(page.getByTestId('management-brief')).toContainText('lands next quarter')
+  await expect(page.getByTestId('management-brief')).toContainText('Oil shock lands next quarter')
+  // The fuel desk says it has priced half of it in.
+  await openPanel(page, 'finance')
+  await expect(page.getByTestId('hedge-warning')).toContainText('Oil shock announced')
 })
 
 test('a city can be paid to build', async ({ page }) => {
