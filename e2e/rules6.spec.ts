@@ -86,9 +86,10 @@ test('a city can be paid to build', async ({ page }) => {
   })
   await openPanel(page, 'map')
   await page.getByTestId('map-wrap').scrollIntoViewIfNeeded()
-  await page.getByTestId('city-ORD').click({ force: true })
+  // The map opens framed on this network (Dubai); Istanbul is on it.
+  await page.getByTestId('city-IST').click()
   const panel = page.getByTestId('city-panel')
-  await expect(panel).toContainText('Chicago')
+  await expect(panel).toContainText('Istanbul')
   const fund = panel.getByTestId('panel-fund-terminal')
   await expect(fund).toContainText('Fund the next programme')
   const before = await page.evaluate(() => window.__harness.getState()!.world.terminals?.length ?? 0)

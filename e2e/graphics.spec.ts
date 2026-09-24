@@ -165,6 +165,8 @@ test('desktop home frames the network clear of the map controls', async ({ page 
   await page.addInitScript(quiet)
   await page.goto('/')
   await page.getByTestId('start-jet_age').click()
+  // New careers land on the Desk; these tests are about the map.
+  await openPanel(page, 'map')
   const wrap = (await page.getByTestId('map-wrap').boundingBox())!
   const controls = (await page.locator('.map-controls').boundingBox())!
   // The west coast used to sit under the zoom column, cropped off the frame.
@@ -176,6 +178,7 @@ test('desktop home frames the network clear of the map controls', async ({ page 
   await info.attach('jet_age-home', { body: await page.screenshot(), contentType: 'image/png' })
   // A Singapore airline opens centred on Asia, not pinned to the right edge.
   await page.evaluate(() => window.__harness.newGame('open_skies', 'framing'))
+  await openPanel(page, 'map')
   await expect.poll(async () => {
     const sin = await centreOf(page.getByTestId('city-SIN'))
     return (sin.x - wrap.x) / wrap.width
@@ -201,6 +204,8 @@ test('the ownership key names every network in its map color', async ({ page }) 
   await page.addInitScript(quiet)
   await page.goto('/')
   await page.getByTestId('start-jet_age').click()
+  // New careers land on the Desk; these tests are about the map.
+  await openPanel(page, 'map')
   await page.evaluate(() => { window.__harness.endQuarter(); window.__harness.endQuarter() })
   const key = page.getByTestId('map-ownership-key')
   await expect(key).toContainText('Meridian Air (you)')
@@ -217,6 +222,8 @@ test('a world event gets a legend line and a bounded number of halos', async ({ 
   await page.addInitScript(quiet)
   await page.goto('/')
   await page.getByTestId('start-jet_age').click()
+  // New careers land on the Desk; these tests are about the map.
+  await openPanel(page, 'map')
   await expect(page.getByTestId('map-event-legend')).toHaveCount(0)
   await page.evaluate(() => {
     const s = window.__harness.getState()!
@@ -240,6 +247,8 @@ test('the map shows the quarter result once the report closes', async ({ page })
   await page.addInitScript(quiet)
   await page.goto('/')
   await page.getByTestId('start-jet_age').click()
+  // New careers land on the Desk; these tests are about the map.
+  await openPanel(page, 'map')
   await page.evaluate(() => {
     const s = window.__harness.getState()!
     const [a, b] = s.airlines[0]!.fleet.filter((ac) => ac.routeId === null)
@@ -266,6 +275,8 @@ test('keyboard: one tab stop, arrows walk the airports, Enter opens one', async 
   await page.addInitScript(quiet)
   await page.goto('/')
   await page.getByTestId('start-jet_age').click()
+  // New careers land on the Desk; these tests are about the map.
+  await openPanel(page, 'map')
   await expect(page.getByTestId('map')).toHaveAttribute('role', 'application')
   // A roving tabindex: one airport is in the tab order, the rest are not.
   await expect(page.locator('svg.map [data-city][tabindex="0"]')).toHaveCount(1)
