@@ -2,7 +2,7 @@
 // hemisphere — cursor-anchored zoom points at the wrong terrain otherwise.
 
 import { describe, expect, it } from 'vitest'
-import { globeProjectFull, globeUnproject } from '../MapView'
+import { globeProjectFull, globeUnproject } from '../map/globe'
 
 describe('globe unprojection', () => {
   it('round-trips visible points through project → unproject', () => {
@@ -55,7 +55,7 @@ function filled(path: string, x: number, y: number): boolean {
   return winding !== 0
 }
 
-import { globeLandPath, ringTrigTables } from '../MapView'
+import { globeLandPath, ringTrigTables } from '../map/globe'
 import geometry from '../../data/globemap.gen.json'
 import type { GlobeGeometry } from '../globeGeometry'
 
