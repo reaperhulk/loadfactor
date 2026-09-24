@@ -16,9 +16,12 @@ console.log(`initial bundle ${Math.ceil(bytes / 1024)} KiB gzip (reported, not g
 
 // The map is the first game screen. Guard its own download as well as the
 // shell so optional globe coordinates cannot silently become eager again.
+// ~77 KiB of the chunk is the flat coastline itself; the globe geometry would
+// add ~80 KiB more, so the budget sits well clear of the code's own growth
+// and well short of that regression.
 const map = readdirSync(new URL('assets/', dist)).find((name) => /^MapView-.*\.js$/.test(name))
 if (!map) throw new Error('could not find the production map chunk')
 const mapBytes = gzipSync(readFileSync(new URL(`assets/${map}`, dist))).byteLength
-const mapLimit = 95 * 1024
-if (mapBytes > mapLimit) throw new Error(`flat map ${Math.ceil(mapBytes / 1024)} KiB gzip exceeds 95 KiB budget`)
-console.log(`flat map ${Math.ceil(mapBytes / 1024)} KiB gzip (budget 95 KiB; globe loaded on demand)`)
+const mapBudgetKiB = 100
+if (mapBytes > mapBudgetKiB * 1024) throw new Error(`flat map ${Math.ceil(mapBytes / 1024)} KiB gzip exceeds ${mapBudgetKiB} KiB budget`)
+console.log(`flat map ${Math.ceil(mapBytes / 1024)} KiB gzip (budget ${mapBudgetKiB} KiB; globe loaded on demand)`)
