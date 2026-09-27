@@ -2,7 +2,7 @@
 // currency symbol, the same tiers everywhere, and zero always neutral.
 
 import { describe, expect, it } from 'vitest'
-import { leaderTone, MINUS, money, objectiveValue, pct, signed, signedCount, signedMoney, signedPct, tone } from '../format'
+import { leaderTone, MINUS, money, moneyOrNone, NONE, plural, inQuarters, joinParts, objectiveValue, pct, signed, signedCount, signedMoney, signedPct, tone } from '../format'
 
 describe('money', () => {
   it('formats positive amounts by tier', () => {
@@ -10,7 +10,9 @@ describe('money', () => {
     expect(money(999)).toBe('$999k')
     expect(money(1000)).toBe('$1.0M')
     expect(money(1940)).toBe('$1.9M')
-    expect(money(999_999)).toBe('$1000.0M')
+    expect(money(999_949)).toBe('$999.9M')
+    expect(money(999_950)).toBe('$1.00B')
+    expect(money(999_999)).toBe('$1.00B')
     expect(money(1_000_000)).toBe('$1.00B')
     expect(money(2_370_000)).toBe('$2.37B')
   })
@@ -29,6 +31,38 @@ describe('money', () => {
 
   it('treats negative zero as zero', () => {
     expect(money(-0)).toBe('$0k')
+    expect(money(-0.4)).toBe('$0k')
+    expect(signedMoney(-0.4)).toBe('$0k')
+  })
+
+  it('never renders a tier past its boundary', () => {
+    expect(money(999.6)).toBe('$1.0M')
+    expect(money(-999_960)).toBe('−$1.00B')
+    for (let k = 0; k < 3_000_000; k += 997) {
+      expect(money(k)).not.toMatch(/\$1000(\.0)?[kM]/)
+    }
+  })
+
+  it('renders missing figures as an em dash, never NaN', () => {
+    expect(money(Number.NaN)).toBe(NONE)
+    expect(money(Number.POSITIVE_INFINITY)).toBe(NONE)
+    expect(signedMoney(Number.NaN)).toBe(NONE)
+    expect(pct(Number.NaN)).toBe(NONE)
+    expect(signed(Number.NaN)).toBe(NONE)
+    expect(NONE).toBe('—')
+  })
+})
+
+describe('moneyOrNone', () => {
+  it('shows a dash where zero means nothing', () => {
+    expect(moneyOrNone(0)).toBe('—')
+    expect(moneyOrNone(-0)).toBe('—')
+    expect(moneyOrNone(0.2)).toBe('—')
+    expect(moneyOrNone(undefined)).toBe('—')
+    expect(moneyOrNone(null)).toBe('—')
+    expect(moneyOrNone(Number.NaN)).toBe('—')
+    expect(moneyOrNone(480)).toBe('$480k')
+    expect(moneyOrNone(-1900)).toBe('−$1.9M')
   })
 })
 
@@ -96,5 +130,31 @@ describe('leaderTone', () => {
     expect(leaderTone(400, 500)).toBe('')
     expect(leaderTone(0, 0)).toBe('')
     expect(leaderTone(-5, -5)).toBe('')
+  })
+})
+
+describe('plain-language counts', () => {
+  it('pluralizes nouns by count', () => {
+    expect(plural(1, 'route')).toBe('1 route')
+    expect(plural(0, 'route')).toBe('0 routes')
+    expect(plural(2, 'route')).toBe('2 routes')
+    expect(plural(1200, 'passenger')).toBe('1,200 passengers')
+    expect(plural(2, 'city', 'cities')).toBe('2 cities')
+  })
+
+  it('says lead times in words, never "0q"', () => {
+    expect(inQuarters(0)).toBe('this quarter')
+    expect(inQuarters(-1)).toBe('this quarter')
+    expect(inQuarters(1)).toBe('next quarter')
+    expect(inQuarters(37)).toBe('in 37 quarters')
+  })
+})
+
+describe('joinParts', () => {
+  it('joins present parts without stray separators', () => {
+    expect(joinParts(['Checks $480k', false, 0, null, undefined, ''])).toBe('Checks $480k')
+    expect(joinParts(['a', 'b'])).toBe('a · b')
+    expect(joinParts([false, 'b'])).toBe('b')
+    expect(joinParts([])).toBe('')
   })
 })
