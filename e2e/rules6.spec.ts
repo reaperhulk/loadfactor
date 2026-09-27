@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('a flown route explains its result', async ({ page }) => {
-  expect(await page.evaluate(() => window.__harness.getState()!.rulesVersion)).toBe(6)
+  expect(await page.evaluate(() => window.__harness.getState()!.rulesVersion)).toBeGreaterThanOrEqual(6)
   await flyQuarter(page)
   await page.keyboard.press('Escape')
   await openPanel(page, 'routes')

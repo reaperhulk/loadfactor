@@ -400,7 +400,8 @@ test('metric lenses use the colour-blind-safe scale, with a steady key', async (
       expect(swatch, `${lens} ${bucket} swatch`).toBe(rgb)
       // ...which is the colour of that bucket's arcs, when the network has any.
       const arcs = page.locator(`.route-player.lens-${bucket}`)
-      if ((await arcs.count()) > 0) expect(await arcs.first().evaluate((el) => getComputedStyle(el).stroke)).toBe(rgb)
+      // Arcs fade to their lens colour (a CSS transition), so wait for it to settle.
+      if ((await arcs.count()) > 0) await expect.poll(() => arcs.first().evaluate((el) => getComputedStyle(el).stroke)).toBe(rgb)
     }
     // No red/green left in the lens.
     const strokes = await page.locator('.route-player').evaluateAll((els) => els.map((el) => getComputedStyle(el).stroke))
