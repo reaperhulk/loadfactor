@@ -62,9 +62,12 @@ export function useRouteLayers({
     if (lens === 'season') {
       // The calendar's lean on this pair right now (tourism seasonality).
       const bp = Math.floor((seasonalBp(r.from, state.turn) * seasonalBp(r.to, state.turn)) / 10000)
-      return bp > 10100 ? ' lens-good' : bp < 9900 ? ' lens-bad' : ''
+      return bp > 10100 ? ' lens-good' : bp < 9900 ? ' lens-bad' : ' lens-mid'
     }
-    if (lens === 'none' || lens === 'demand' || r.lastCapacity === 0) return ''
+    if (lens === 'none' || lens === 'demand') return ''
+    // Not flown yet: no number to colour by, and grey says so rather than
+    // letting the default livery pass for a bucket.
+    if (r.lastCapacity === 0) return ' lens-none'
     if (lens === 'load') {
       return r.lastLoadFactorBp >= 8000 ? ' lens-good' : r.lastLoadFactorBp >= 5500 ? ' lens-mid' : ' lens-bad'
     }
@@ -192,10 +195,11 @@ export function useRouteLayers({
               {
                 '--cap-w': capWidth(player, r, false, state.turn),
                 // Two more facts ride the same line: how full it flies (opacity
-                // — a limp route is literally faint) and whether it earns (a
+                // — a limp route is literally fainter) and whether it earns (a
                 // losing arc goes red). Width was already seats/wk, so an arc
-                // now says size, fullness and health at once.
-                '--load-o': (0.34 + (0.62 * r.lastLoadFactorBp) / 10000).toFixed(3),
+                // now says size, fullness and health at once. The floor keeps
+                // even an empty route above the rival networks underneath.
+                '--load-o': (0.55 + (0.43 * r.lastLoadFactorBp) / 10000).toFixed(3),
               } as React.CSSProperties
             }
             data-losing={r.lastCapacity > 0 && r.lastRevenue < r.lastCost ? '' : undefined}

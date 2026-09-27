@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PLANE_SCALE_WORLD, cameraAffine, contrailPoints, drawTraffic, planeScaleForZoom, polylineLeg, posePlane, quadraticLeg, type TrafficEffect } from '../traffic'
+import { OCCLUDED_ALPHA, PLANE_SCALE_WORLD, cameraAffine, contrailPoints, drawTraffic, occlusionFade, planeScaleForZoom, polylineLeg, posePlane, quadraticLeg, type TrafficEffect } from '../traffic'
 
 describe('traffic shuttles', () => {
   const leg = quadraticLeg(0, 0, 50, -20, 100, 0)
@@ -120,5 +120,51 @@ describe('traffic at world zoom', () => {
     const dwell = contrailPoints(plane, 4.95)
     expect(dwell[0]!.x).toBeCloseTo(100)
     expect(dwell[1]!.x).toBeCloseTo(100)
+  })
+})
+
+describe('planes give way to city names', () => {
+  const box = { x1: 100, y1: 50, x2: 120, y2: 58 }
+
+  it('fades a plane over a label and restores it clear of one', () => {
+    expect(occlusionFade(110, 54, [box], 6)).toBe(OCCLUDED_ALPHA)
+    expect(occlusionFade(200, 54, [box], 6)).toBe(1)
+    expect(occlusionFade(110, 54, [], 6)).toBe(1)
+    // Easing in over the reach: closer is fainter, never below the floor.
+    const near = occlusionFade(122, 54, [box], 6)
+    const nearer = occlusionFade(121, 54, [box], 6)
+    expect(nearer).toBeLessThan(near)
+    expect(near).toBeLessThan(1)
+    expect(nearer).toBeGreaterThan(OCCLUDED_ALPHA)
+    // The nearest of several boxes decides.
+    expect(occlusionFade(130, 54, [box, { x1: 129, y1: 50, x2: 140, y2: 58 }], 6)).toBe(OCCLUDED_ALPHA)
+  })
+
+  it('draws the plane over a label at the faded alpha', () => {
+    vi.stubGlobal('Path2D', class { constructor(public d: string) {} })
+    const alphas: number[] = []
+    const ctx = new Proxy({} as CanvasRenderingContext2D, {
+      get: () => () => {},
+      set: (_t, key, value) => {
+        if (key === 'globalAlpha') alphas.push(value as number)
+        return true
+      },
+    })
+    const leg = polylineLeg(new Float64Array([110, 54, 300, 54]))
+    const plane = { leg, dur: 10, phase: 0, glyph: 'M0 0Z', size: 0.6, fill: '#fff', stroke: '#000', alpha: 1 }
+    const camera = { vb: { x: 0, y: 0, w: 400, h: 150 }, fw: 400, fh: 150, tx: 0, ty: 0, s: 1 }
+    drawTraffic(ctx, [plane], [], camera, 1, 0, [box])
+    // The last alpha set before the glyph is the plane's own.
+    expect(alphas.at(-2)).toBeCloseTo(OCCLUDED_ALPHA)
+    alphas.length = 0
+    drawTraffic(ctx, [plane], [], camera, 1, 0)
+    expect(alphas.at(-2)).toBe(1)
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps the world-zoom glyph small enough to sit beside a label', () => {
+    // The biggest airframe at world zoom: 0.68 glyph units per px, ~28 units
+    // long. It must stay well under the 45px it used to reach.
+    expect(28 * 0.68 * PLANE_SCALE_WORLD).toBeLessThan(24)
   })
 })

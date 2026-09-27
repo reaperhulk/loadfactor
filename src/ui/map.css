@@ -59,9 +59,6 @@
   border-radius: 2px;
   background: var(--livery, var(--accent));
 }
-.map-owner-key .owner.you {
-  font-weight: 600;
-}
 .event-key.boom {
   color: #ffd166;
 }
@@ -78,6 +75,74 @@
 .event-key small {
   color: var(--dim);
   font-size: inherit;
+}
+
+/* Metric lenses: a colour-blind-safe diverging scale (blue good, warm
+   near-white neutral, orange bad) with a second cue on every bucket — solid,
+   dashed, dotted-and-wider — so a loss never depends on seeing orange. The
+   values are LENS_COLORS / LENS_DASH in mapStyle.ts (mapStyle.test.ts checks
+   they agree). Declared after styles.css's rules, so they win over the
+   contested tint, the losing red and the long-haul dash. */
+.route-player.lens-good {
+  stroke: #7cb9ff;
+  stroke-dasharray: none;
+}
+.route-player.lens-mid {
+  stroke: #e3ddcf;
+  stroke-dasharray: 7 3;
+}
+.route-player.lens-bad {
+  stroke: #ff9a3c;
+  stroke-dasharray: 2 3.5;
+  stroke-width: calc((var(--cap-w, 1.6) + 0.8) * 1px);
+}
+.route-player.lens-none {
+  stroke: #6f7f88;
+  stroke-dasharray: 2 5;
+}
+.lens-key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.lens-swatch {
+  flex: none;
+}
+
+/* Rival networks at world zoom: thin threads under the player's arcs, but
+   visible ones — at half opacity and sub-pixel widths they vanished into
+   the land. With a metric lens on they step back again: the lens is about
+   the player's own routes. */
+.map-wrap[data-zoom='world'] .route-rival {
+  opacity: 0.78;
+  stroke-width: calc((var(--cap-w, 0.8) + 0.35) * 1px);
+}
+.map-wrap[data-lens] .route-rival {
+  opacity: 0.3;
+}
+
+/* The player's own entry leads the ownership key and stands apart: bolder,
+   a heavier swatch, and a rule between it and the rivals. */
+.map-owner-key .owner.you {
+  font-weight: 700;
+  color: #ffffff;
+  padding-right: 9px;
+  border-right: 1px solid #4b6878;
+}
+.map-owner-key .owner.you .owner-swatch {
+  width: 16px;
+  height: 4px;
+}
+
+/* A stable key: the box keeps one width whichever lens is picked, so the
+   select does not jump sideways as the legend under it changes length. */
+.map-data-control {
+  width: min(360px, calc(100% - 80px));
+  box-sizing: border-box;
+}
+.map-data-control .map-data-legend {
+  row-gap: 4px;
 }
 
 /* The quarter's result: for a few seconds after the report closes, each route

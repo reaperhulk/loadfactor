@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { flyQuarter, openPanel } from './workspace'
 import { readFileSync } from 'node:fs'
 import type { GameState } from '../src/engine'
@@ -304,4 +304,229 @@ test('keyboard: one tab stop, arrows walk the airports, Enter opens one', async 
   await expect(page.getByTestId('city-panel')).toBeVisible()
   const name = (await page.locator(`svg.map [data-city="${next}"]`).getAttribute('aria-label'))!.split(' (')[0]!
   await expect(page.getByTestId('city-panel').locator('h2')).toContainText(name)
+})
+
+// ---- Readability: names, colours, framing, globe arcs, pan cost ----------
+
+const loadMature = async (page: Page) => {
+  await page.evaluate((snapshot) => {
+    Object.assign(window.__harness.getState()!, snapshot)
+    const route = snapshot.airlines[0]!.routes[0]!
+    window.__harness.dispatch({ type: 'set_fare', routeId: route.id, fareLevel: route.fareLevel })
+  }, mature)
+}
+type Rect = { left: number; top: number; right: number; bottom: number }
+const labelRects = (page: Page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('svg.map text.city-label')].map((t) => {
+      const r = t.getBoundingClientRect()
+      return { id: t.textContent!, left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+    }),
+  )
+const overlapping = (a: Rect, b: Rect, slack = 0.5) =>
+  a.left < b.right - slack && a.right > b.left + slack && a.top < b.bottom - slack && a.bottom > b.top + slack
+
+test('city names never overlap at world zoom', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.addInitScript(quiet)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await loadMature(page)
+  await openPanel(page, 'map')
+  await page.getByTestId('zoom-reset').click()
+  await expect(page.getByTestId('map-wrap')).toHaveAttribute('data-zoom', 'world')
+  await page.waitForTimeout(400)
+  const labels = await labelRects(page)
+  expect(labels.length, 'the world view still names its airports').toBeGreaterThan(15)
+  for (let i = 0; i < labels.length; i++) {
+    for (let j = i + 1; j < labels.length; j++) {
+      expect(overlapping(labels[i]!, labels[j]!), `${labels[i]!.id} overlaps ${labels[j]!.id}`).toBe(false)
+    }
+  }
+  // The HQ is always named.
+  expect(labels.map((l) => l.id)).toContain('JFK')
+  await info.attach('world-labels', { body: await page.screenshot(), contentType: 'image/png' })
+})
+
+test('the ownership key leads with the player; rivals read at world zoom', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.addInitScript(quiet)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await loadMature(page)
+  await openPanel(page, 'map')
+  const owners = page.getByTestId('map-ownership-key').locator('.owner')
+  await expect(owners.first()).toHaveClass(/\byou\b/)
+  await expect(owners.first()).toContainText('(you)')
+  expect(await owners.count()).toBeGreaterThan(1)
+  await expect(page.getByTestId('map-wrap')).toHaveAttribute('data-zoom', 'world')
+  const rival = await page.locator('.route-rival').first().evaluate((el) => {
+    const s = getComputedStyle(el)
+    return { opacity: Number(s.opacity), width: parseFloat(s.strokeWidth) }
+  })
+  expect(rival.opacity, 'rival arcs are visible at world zoom').toBeGreaterThanOrEqual(0.7)
+  const players = await page.locator('.route-player').evaluateAll((els) => els.map((el) => parseFloat(getComputedStyle(el).strokeWidth)))
+  // The player's thinnest route is no lighter than a typical rival's.
+  expect(Math.min(...players)).toBeGreaterThanOrEqual(rival.width - 0.4)
+})
+
+test('metric lenses use the colour-blind-safe scale, with a steady key', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.addInitScript(quiet)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await loadMature(page)
+  await openPanel(page, 'map')
+  const control = page.locator('.map-data-control')
+  const select = page.getByLabel('map colors', { exact: true })
+  const geometry = async () => {
+    const box = (await control.boundingBox())!
+    const s = (await select.boundingBox())!
+    return { x: Math.round(box.x), width: Math.round(box.width), selectX: Math.round(s.x) }
+  }
+  const home = await geometry()
+  for (const lens of ['load', 'profit', 'season', 'demand', 'none']) {
+    await select.selectOption(lens)
+    // The key's box keeps its width and the picker does not move.
+    expect(await geometry(), `${lens} keeps the key in place`).toEqual(home)
+  }
+  const palette = { good: 'rgb(124, 185, 255)', mid: 'rgb(227, 221, 207)', bad: 'rgb(255, 154, 60)' }
+  for (const lens of ['load', 'profit', 'season']) {
+    await select.selectOption(lens)
+    const key = page.getByTestId('map-data-legend')
+    for (const [bucket, rgb] of Object.entries(palette)) {
+      // The swatch is drawn in the bucket's colour...
+      const swatch = await key.locator(`.lens-key-${bucket} line`).evaluate((el) => getComputedStyle(el).stroke)
+      expect(swatch, `${lens} ${bucket} swatch`).toBe(rgb)
+      // ...which is the colour of that bucket's arcs, when the network has any.
+      const arcs = page.locator(`.route-player.lens-${bucket}`)
+      if ((await arcs.count()) > 0) expect(await arcs.first().evaluate((el) => getComputedStyle(el).stroke)).toBe(rgb)
+    }
+    // No red/green left in the lens.
+    const strokes = await page.locator('.route-player').evaluateAll((els) => els.map((el) => getComputedStyle(el).stroke))
+    for (const s of strokes) expect(['rgb(79, 174, 98)', 'rgb(208, 99, 110)']).not.toContain(s)
+    await info.attach(`lens-${lens}`, { body: await page.screenshot(), contentType: 'image/png' })
+  }
+  // A loss is more than a colour: the loss bucket is dotted and wider.
+  const bad = await page.evaluate(() => {
+    const probe = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    probe.setAttribute('class', 'route-player lens-bad')
+    probe.setAttribute('style', '--cap-w: 1.6')
+    document.querySelector('svg.map .map-pan')!.appendChild(probe)
+    const s = getComputedStyle(probe)
+    const out = { dash: s.strokeDasharray, width: parseFloat(s.strokeWidth) }
+    probe.remove()
+    return out
+  })
+  expect(bad.dash).not.toBe('none')
+  expect(bad.width).toBeGreaterThan(1.6)
+})
+
+for (const [width, height] of [[390, 844], [320, 568]] as const) {
+  test(`a ${width}px portrait phone opens with the HQ fully on the map`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height })
+    await page.addInitScript(quiet)
+    await page.goto('/')
+    await page.getByTestId('start-jet_age').click()
+    await loadMature(page)
+    await openPanel(page, 'map')
+    await page.getByTestId('zoom-reset').click()
+    await page.waitForTimeout(500)
+    const wrap = (await page.getByTestId('map-wrap').boundingBox())!
+    const dot = (await page.getByTestId('city-JFK').boundingBox())!
+    const label = (await page.locator('svg.map text.city-label', { hasText: 'JFK' }).boundingBox())!
+    for (const [name, b] of [['marker', dot], ['name', label]] as const) {
+      expect(b.x, `JFK ${name} inside the left edge`).toBeGreaterThanOrEqual(wrap.x)
+      expect(b.x + b.width, `JFK ${name} inside the right edge`).toBeLessThanOrEqual(wrap.x + wrap.width)
+      expect(b.y, `JFK ${name} inside the top`).toBeGreaterThanOrEqual(wrap.y)
+      expect(b.y + b.height, `JFK ${name} inside the bottom`).toBeLessThanOrEqual(wrap.y + wrap.height)
+    }
+    // Clear of the map's own chrome: the zoom column and the colours box.
+    const centre = { x: dot.x + dot.width / 2, y: dot.y + dot.height / 2 }
+    for (const sel of ['.map-controls', '.map-data-control']) {
+      const c = (await page.locator(sel).boundingBox())!
+      expect(inside(centre, c), `JFK is not under ${sel}`).toBe(false)
+    }
+    await info.attach(`phone-${width}`, { body: await page.screenshot(), contentType: 'image/png' })
+  })
+}
+
+test('globe routes are great-circle arcs, not chords', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.addInitScript(quiet)
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await loadMature(page)
+  await openPanel(page, 'map')
+  await page.getByTestId('map-projection').click()
+  await expect(page.getByTestId('globe-land')).toBeVisible()
+  const arcs = await page.locator('.route-player').evaluateAll((els) =>
+    els.map((el) => {
+      const path = el as SVGPathElement
+      const d = path.getAttribute('d') ?? ''
+      const segments = (d.match(/L/g) ?? []).length
+      const len = path.getTotalLength()
+      if (len < 40) return { segments, bow: null }
+      const a = path.getPointAtLength(0)
+      const b = path.getPointAtLength(len)
+      let bow = 0
+      for (let i = 1; i < 20; i++) {
+        const p = path.getPointAtLength((len * i) / 20)
+        bow = Math.max(bow, Math.abs((p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x)) / Math.hypot(b.x - a.x, b.y - a.y))
+      }
+      return { segments, bow }
+    }),
+  )
+  const drawn = arcs.filter((a) => a.segments > 0)
+  expect(drawn.length).toBeGreaterThan(5)
+  for (const arc of drawn) expect(arc.segments, 'an arc is many points, not a chord').toBeGreaterThan(2)
+  // Long routes visibly bow off their chords. (Not every one: a route that
+  // runs straight out from the disc's centre is lifted toward the viewer and
+  // is seen end-on, as it would be on a real globe.)
+  const bows = drawn.filter((a) => a.bow !== null).map((a) => a.bow!).sort((a, b) => a - b)
+  expect(bows.length).toBeGreaterThan(2)
+  expect(bows[Math.floor(bows.length / 2)]!, 'the typical long route is a curve').toBeGreaterThan(2)
+  await info.attach('globe-arcs', { body: await page.screenshot(), contentType: 'image/png' })
+})
+
+test('a drag moves the traffic canvas without redrawing it', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.addInitScript(() => localStorage.setItem('loadfactor:display:v1', JSON.stringify({ celebrations: false, motion: 'full' })))
+  await page.goto('/')
+  await page.getByTestId('start-jet_age').click()
+  await loadMature(page)
+  await openPanel(page, 'map')
+  const traffic = page.getByTestId('map-traffic')
+  await expect.poll(() => traffic.getAttribute('data-planes').then(Number)).toBeGreaterThan(0)
+  await page.evaluate(() => {
+    const w = window as unknown as { __clears: number }
+    w.__clears = 0
+    const clear = CanvasRenderingContext2D.prototype.clearRect
+    CanvasRenderingContext2D.prototype.clearRect = function (...args: Parameters<typeof clear>) {
+      w.__clears++
+      return clear.apply(this, args)
+    }
+  })
+  await page.getByTestId('zoom-in').click()
+  await page.waitForTimeout(800)
+  const box = (await page.getByTestId('map').boundingBox())!
+  const x = box.x + box.width / 2
+  const y = box.y + box.height / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + 20, y, { steps: 2 })
+  const frame = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))))
+  await frame()
+  await page.evaluate(() => { (window as unknown as { __clears: number }).__clears = 0 })
+  for (let i = 1; i <= 12; i++) {
+    await page.mouse.move(x + 20 + i * 8, y + i * 2)
+    await frame()
+  }
+  // The planes ride along on a transform; the bitmap is not redrawn.
+  expect(await traffic.evaluate((el) => (el as HTMLElement).style.transform)).toContain('translate3d')
+  expect(await page.evaluate(() => (window as unknown as { __clears: number }).__clears)).toBe(0)
+  await page.mouse.up()
+  // Released: the clock runs again and the canvas draws in place.
+  await expect.poll(() => traffic.evaluate((el) => (el as HTMLElement).style.transform)).toBe('')
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __clears: number }).__clears)).toBeGreaterThan(0)
 })

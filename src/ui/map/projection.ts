@@ -18,7 +18,9 @@ import { globeRoutePath, globeTripLeg, type GlobeView } from './globe'
 export function capWidth(airline: Airline, route: Route, thin: boolean, turn: number): number {
   const cap = routeWeeklyCapacity(airline, route, turn)
   const w = (thin ? 0.6 : 0.7) + Math.sqrt(cap) / (thin ? 90 : 40)
-  return Math.min(thin ? 1.6 : 4, Math.max(thin ? 0.7 : 0.9, w))
+  // The player's thinnest arc still outweighs a rival's: a fresh route of
+  // yours must not read as someone else's network.
+  return Math.min(thin ? 1.6 : 4, Math.max(thin ? 0.7 : 1.4, w))
 }
 
 export function slotsUsedAt(routes: readonly Route[], city: string): number {
@@ -106,7 +108,14 @@ export function networkHome(state: GameState, frame: { width: number; height: nu
     return { x: x(c.lon), y: y(c.lat) }
   })
   const compact = typeof window !== 'undefined' && window.innerWidth <= 1100
-  return homeViewFor({ points, frame, insets, maxScale: compact ? HOME_SCALE_COMPACT : HOME_SCALE_DESKTOP })
+  const hq = getCity(me.hq)
+  return homeViewFor({
+    points,
+    frame,
+    insets,
+    maxScale: compact ? HOME_SCALE_COMPACT : HOME_SCALE_DESKTOP,
+    focus: { x: x(hq.lon), y: y(hq.lat) },
+  })
 }
 
 // Short hops, medium stages, and long-haul trunks each get their own line

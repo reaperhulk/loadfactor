@@ -2,7 +2,9 @@
 // hemisphere — cursor-anchored zoom points at the wrong terrain otherwise.
 
 import { describe, expect, it } from 'vitest'
-import { globeProjectFull, globeUnproject } from '../map/globe'
+import { getCity } from '../../data/cities'
+import { MAP_H, MAP_W } from '../../data/worldmap.gen'
+import { GLOBE_R, globeArc, globeArcPath, globeProjectFull, globeRoutePath, globeTripLeg, globeUnproject, type GlobeArcPoint } from '../map/globe'
 
 describe('globe unprojection', () => {
   it('round-trips visible points through project → unproject', () => {
@@ -134,4 +136,76 @@ it('projects land from cached ring trig, identical to the direct projection', ()
     // Equal up to the last printed digit (a rounding boundary may flip).
     for (let i = 0; i < a.length; i++) expect(Math.abs(a[i]! - b[i]!)).toBeLessThanOrEqual(0.1 + 1e-9)
   }
+})
+
+describe('globe routes', () => {
+  const JFK = { lon: -73.8, lat: 40.6 }
+  const LHR = { lon: -0.5, lat: 51.5 }
+  const MIA = { lon: -80.3, lat: 25.8 }
+  const SEA = { lon: -122.3, lat: 47.4 }
+  const home = { cLon: -40, cLat: 30, s: 1 }
+  // Distance of a point from the chord between the arc's ends, in viewBox units.
+  const offChord = (pts: readonly GlobeArcPoint[], p: GlobeArcPoint): number => {
+    const a = pts[0]!
+    const b = pts.at(-1)!
+    const dx = b.X - a.X
+    const dy = b.Y - a.Y
+    return Math.abs((p.X - a.X) * dy - (p.Y - a.Y) * dx) / Math.hypot(dx, dy)
+  }
+
+  it('starts and ends on the airports', () => {
+    const pts = globeArc(home, JFK, LHR)
+    const a = globeProjectFull(home, JFK.lon, JFK.lat)
+    const b = globeProjectFull(home, LHR.lon, LHR.lat)
+    expect(pts[0]!.X).toBeCloseTo(a.X, 6)
+    expect(pts[0]!.Y).toBeCloseTo(a.Y, 6)
+    expect(pts.at(-1)!.X).toBeCloseTo(b.X, 6)
+    expect(pts.at(-1)!.Y).toBeCloseTo(b.Y, 6)
+  })
+
+  it('bows off the straight chord, more for a longer route', () => {
+    // SEA-MIA crosses near the disc's middle, where a bare great circle is
+    // nearly a ruler line: the review's "chords across the sphere".
+    for (const [from, to] of [[JFK, LHR], [SEA, MIA]] as const) {
+      const pts = globeArc(home, from, to)
+      expect(pts.length).toBeGreaterThan(8)
+      const bow = Math.max(...pts.map((p) => offChord(pts, p)))
+      expect(bow, 'a visible curve, not a chord').toBeGreaterThan(4)
+    }
+    const short = globeArc(home, JFK, MIA)
+    const long = globeArc(home, SEA, MIA)
+    expect(Math.max(...long.map((p) => offChord(long, p)))).toBeGreaterThan(Math.max(...short.map((p) => offChord(short, p))))
+  })
+
+  it('draws a smooth multi-segment path', () => {
+    const d = globeRoutePath(home, 'JFK', 'LHR')
+    expect(d.startsWith('M')).toBe(true)
+    expect((d.match(/L/g) ?? []).length).toBeGreaterThan(8)
+  })
+
+  it('hides the part of a route behind the globe', () => {
+    // Looking at the Pacific, New York and London are on the far side.
+    const pacific = { cLon: 170, cLat: 0, s: 1 }
+    const pts = globeArc(pacific, JFK, LHR)
+    expect(pts.every((p) => !p.vis)).toBe(true)
+    expect(globeArcPath(pts)).toBe('')
+    // Straddling the limb: the far end is hidden, the near end drawn, and
+    // no hidden sample ever sits inside the disc on the near side.
+    const limb = { cLon: -150, cLat: 20, s: 1 }
+    const cross = globeArc(limb, SEA, LHR)
+    expect(cross[0]!.vis).toBe(true)
+    expect(cross.at(-1)!.vis).toBe(false)
+    const R = GLOBE_R * limb.s
+    for (const p of cross) {
+      if (!p.vis) expect(Math.hypot(p.X - MAP_W / 2, p.Y - MAP_H / 2)).toBeLessThanOrEqual(R + 1e-9)
+    }
+    expect(globeTripLeg(limb, 'SEA', 'LHR')).toBeNull()
+  })
+
+  it('gives the shuttle the same curve the arc draws', () => {
+    const leg = globeTripLeg(home, 'JFK', 'ORD')!
+    const pts = globeArc(home, getCity('JFK'), getCity('ORD'))
+    expect(leg.pts.length).toBe(pts.length * 2)
+    expect(leg.pts[2]).toBeCloseTo(pts[1]!.X, 9)
+  })
 })

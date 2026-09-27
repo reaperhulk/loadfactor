@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { drawTraffic, type TrafficCamera, type TrafficEffect, type TrafficPlane } from './traffic'
+import { cameraAffine, drawTraffic, type Occluder, type TrafficCamera, type TrafficEffect, type TrafficPlane } from './traffic'
 
 // The map's motion layer: one canvas over the map, one throttled
 // animation-frame loop, carrying the planes and the few ambient effects
@@ -24,9 +24,12 @@ interface Props {
   active: boolean
   camera: () => TrafficCamera
   frozen: () => boolean
+  // The city names on screen, in world units — read each frame, so a new
+  // label layout never restarts the animation loop.
+  occluders?: { readonly current: readonly Occluder[] }
 }
 
-export function TrafficCanvas({ planes, effects, rivalCount, frame, active, camera, frozen }: Props) {
+export function TrafficCanvas({ planes, effects, rivalCount, frame, active, camera, frozen, occluders }: Props) {
   const ref = useRef<HTMLCanvasElement>(null)
   const planesRef = useRef(planes)
   const effectsRef = useRef(effects)
@@ -34,6 +37,14 @@ export function TrafficCanvas({ planes, effects, rivalCount, frame, active, came
   const lastTs = useRef(0)
   const lastDraw = useRef(0)
   const raf = useRef(0)
+  // The world→CSS mapping the bitmap was last drawn through. While the clock
+  // is frozen (a drag, a pinch, a zoom ease) the planes hold still in the
+  // world, so the drawn bitmap is still right — only the camera moved. The
+  // canvas then follows the map with a CSS transform instead of redrawing:
+  // every redraw re-uploads a frame-sized bitmap to the compositor, and in a
+  // traced drag under CPU throttle those uploads were what held frames past
+  // 100ms (the main thread sat in WaitForCommitCompletion, not in script).
+  const drawnAt = useRef<{ a: number; ex: number; ey: number } | null>(null)
   const dpr = Math.min(2, typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1)
   const widthPx = Math.max(1, Math.round(frame.width * dpr))
   const heightPx = Math.max(1, Math.round(frame.height * dpr))
@@ -53,11 +64,24 @@ export function TrafficCanvas({ planes, effects, rivalCount, frame, active, came
     }
     const tick = (ts: number): void => {
       raf.current = 0
-      if (ts - lastDraw.current >= FRAME_MS - 1) {
-        if (lastTs.current && !frozen()) elapsed.current += Math.min(MAX_STEP_MS, ts - lastTs.current) / 1000
+      const still = frozen()
+      const at = drawnAt.current
+      if (still && at !== null) {
+        // Frozen: follow the camera every frame (a style write, no raster),
+        // and keep the clock parked so the pause is not counted on release.
+        lastTs.current = ts
+        const now = cameraAffine(camera())
+        const k = now.a / at.a
+        const style = `translate3d(${(now.ex - k * at.ex).toFixed(2)}px, ${(now.ey - k * at.ey).toFixed(2)}px, 0) scale(${k.toFixed(6)})`
+        if (canvas.style.transform !== style) canvas.style.transform = style
+      } else if (ts - lastDraw.current >= FRAME_MS - 1) {
+        if (lastTs.current && !still) elapsed.current += Math.min(MAX_STEP_MS, ts - lastTs.current) / 1000
         lastTs.current = ts
         lastDraw.current = ts
-        drawTraffic(ctx, planesRef.current, effectsRef.current, camera(), dpr, elapsed.current)
+        const cam = camera()
+        if (canvas.style.transform !== '') canvas.style.transform = ''
+        drawTraffic(ctx, planesRef.current, effectsRef.current, cam, dpr, elapsed.current, occluders?.current)
+        drawnAt.current = cameraAffine(cam)
       }
       raf.current = requestAnimationFrame(tick)
     }
@@ -65,10 +89,14 @@ export function TrafficCanvas({ planes, effects, rivalCount, frame, active, came
       const run = active && !document.hidden && (planes.length > 0 || effects.length > 0)
       if (!run) {
         stop()
+        drawnAt.current = null
+        canvas.style.transform = ''
         ctx.setTransform(1, 0, 0, 1, 0, 0)
         ctx.clearRect(0, 0, canvas.width, canvas.height)
       } else if (raf.current === 0) {
         lastDraw.current = 0
+        // New planes or effects: the next frame draws them for real.
+        drawnAt.current = null
         raf.current = requestAnimationFrame(tick)
       }
     }
@@ -86,7 +114,10 @@ export function TrafficCanvas({ planes, effects, rivalCount, frame, active, came
     const canvas = ref.current
     const ctx = canvas?.getContext('2d') ?? null
     if (canvas === null || ctx === null || raf.current === 0) return
-    drawTraffic(ctx, planes, effects, camera(), dpr, elapsed.current)
+    const cam = camera()
+    canvas.style.transform = ''
+    drawTraffic(ctx, planes, effects, cam, dpr, elapsed.current, occluders?.current)
+    drawnAt.current = cameraAffine(cam)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widthPx, heightPx])
 
@@ -100,6 +131,7 @@ export function TrafficCanvas({ planes, effects, rivalCount, frame, active, came
       width={widthPx}
       height={heightPx}
       aria-hidden="true"
+      style={{ transformOrigin: '0 0', willChange: 'transform' }}
     />
   )
 }

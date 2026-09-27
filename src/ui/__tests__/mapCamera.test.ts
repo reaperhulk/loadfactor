@@ -8,6 +8,7 @@ import { MAP_H, MAP_W, projectLat, projectLon } from '../../data/worldmap.gen'
 import {
   FULL_VIEW,
   HOME_SCALE_COMPACT,
+  HOME_MARGIN,
   HOME_SCALE_DESKTOP,
   MAX_SCALE,
   SPAN_MIN,
@@ -134,6 +135,62 @@ describe('home framing', () => {
     const v = homeViewFor({ points: ids.map(at), frame: PHONE, maxScale: HOME_SCALE_COMPACT })
     expect(MAP_W / v.w).toBeLessThan(HOME_SCALE_COMPACT)
     expectInside(v, PHONE, { left: 0, top: 0, right: 0, bottom: 0 }, ids)
+  })
+})
+
+describe('home framing on narrow phones', () => {
+  // The review's mature jet-age career: HQ at JFK, routes from Seattle to
+  // Moscow and down to Buenos Aires — far wider than a portrait phone holds.
+  const WORLD_NETWORK = ['JFK', 'SEA', 'SFO', 'LAX', 'DEN', 'ORD', 'YYZ', 'YUL', 'DCA', 'ATL', 'IAH', 'MIA', 'MEX', 'BOG', 'SCL', 'EZE', 'GRU', 'GIG', 'LHR', 'CDG', 'FRA', 'FCO', 'MAD', 'IST', 'SVO', 'CAI']
+  // Map frames as measured on the phones (the header, tabs and bottom bar
+  // take the rest), with the map-colour box across the top and the zoom
+  // column standing on the right edge.
+  const PHONES: [string, { width: number; height: number }, Insets][] = [
+    ['390x844', { width: 390, height: 620 }, { left: 0, top: 104, right: 52, bottom: 0 }],
+    ['320x568', { width: 320, height: 335 }, { left: 0, top: 60, right: 52, bottom: 0 }],
+  ]
+  const margined = (i: Insets): Insets => ({
+    left: i.left + HOME_MARGIN.left - 1,
+    top: i.top + HOME_MARGIN.top - 1,
+    right: i.right + HOME_MARGIN.right - 1,
+    bottom: i.bottom + HOME_MARGIN.bottom - 1,
+  })
+
+  for (const [name, frame, insets] of PHONES) {
+    it(`keeps the HQ fully inside, clear of the controls, at ${name}`, () => {
+      const v = homeViewFor({ points: WORLD_NETWORK.map(at), frame, insets, maxScale: HOME_SCALE_COMPACT, focus: at('JFK') })
+      // With room for the dot, the star above it and the name to its right.
+      expectInside(v, frame, margined(insets), ['JFK'])
+    })
+
+    it(`fills the rest of the window with as much network as fits, at ${name}`, () => {
+      const v = homeViewFor({ points: WORLD_NETWORK.map(at), frame, insets, maxScale: HOME_SCALE_COMPACT, focus: at('JFK') })
+      const shown = (view: ViewBox): number =>
+        WORLD_NETWORK.filter((id) => {
+          const p = toCss(view, frame, at(id))
+          return p.x > insets.left && p.x < frame.width - insets.right && p.y > insets.top && p.y < frame.height - insets.bottom
+        }).length
+      // More than JFK alone: the eastern US comes with it.
+      expect(shown(v)).toBeGreaterThan(3)
+      // And no fewer than the old framing (centred on the whole network),
+      // which put the mid-Atlantic in the middle and JFK on the edge.
+      const old = homeViewFor({ points: WORLD_NETWORK.map(at), frame, insets, maxScale: HOME_SCALE_COMPACT })
+      expect(shown(v)).toBeGreaterThanOrEqual(shown(old) - 1)
+    })
+  }
+
+  it('leaves room for names on a network that fits', () => {
+    const ids = ['JFK', 'ORD', 'MIA', 'YYZ', 'ATL']
+    const [, frame, insets] = PHONES[0]!
+    const v = homeViewFor({ points: ids.map(at), frame, insets, maxScale: HOME_SCALE_COMPACT, focus: at('JFK') })
+    expectInside(v, frame, margined(insets), ids)
+  })
+
+  it('changes nothing for a network that fits, focus or not', () => {
+    const ids = ['JFK', 'ORD', 'MIA', 'YYZ']
+    const a = homeViewFor({ points: ids.map(at), frame: PHONE, maxScale: HOME_SCALE_COMPACT })
+    const b = homeViewFor({ points: ids.map(at), frame: PHONE, maxScale: HOME_SCALE_COMPACT, focus: at('JFK') })
+    expect(b).toEqual(a)
   })
 })
 

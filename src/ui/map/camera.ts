@@ -162,13 +162,65 @@ export interface HomeFraming {
   insets?: Insets
   // The closest home may zoom in — a one-city network still opens on a region.
   maxScale: number
+  // The one place home must show whatever else it gives up: the HQ. When the
+  // network is wider than the frame can hold (a world-spanning career on a
+  // portrait phone), home keeps this inside the uncovered area, with room for
+  // its marker and name, and fills the rest of the window with as much of the
+  // network as fits.
+  focus?: { x: number; y: number }
+}
+
+// Screen room a city needs inside the frame's usable area, in CSS px: its
+// name hangs to the right of the dot and the HQ star sits above it.
+export const HOME_MARGIN = { left: 14, right: 44, top: 22, bottom: 14 } as const
+
+// Candidate windows of `size` along one axis: each must hold `focus` with the
+// margins; focusWindow picks the pair holding the most points, preferring
+// the one centred nearest `centre`. Candidates are the windows that start or end
+// at a value (plus the one centred on the network), which is where the count
+// can change — so this is exact, not a scan.
+function windowStarts(values: readonly number[], size: number, focus: number, lo: number, hi: number, centre: number): number[] {
+  // Starts [s, s + size] that keep the focus at least lo from the start and
+  // hi from the end.
+  const minS = focus + hi - size
+  const maxS = focus - lo
+  const starts = new Set<number>([centre - size / 2])
+  for (const v of values) {
+    starts.add(v - lo)
+    starts.add(v + hi - size)
+  }
+  return [...starts].map((s) => Math.min(maxS, Math.max(minS, s)))
+}
+
+function focusWindow(
+  points: readonly { x: number; y: number }[],
+  focus: { x: number; y: number },
+  winW: number,
+  winH: number,
+  m: { left: number; right: number; top: number; bottom: number },
+  centre: { x: number; y: number },
+): { x: number; y: number } {
+  const xs = windowStarts(points.map((p) => p.x), winW, focus.x, m.left, m.right, centre.x)
+  const ys = windowStarts(points.map((p) => p.y), winH, focus.y, m.top, m.bottom, centre.y)
+  let best = { x: xs[0]!, y: ys[0]!, n: -1, d: Infinity }
+  for (const sx of xs) {
+    for (const sy of ys) {
+      let n = 0
+      for (const p of points) {
+        if (p.x >= sx + m.left && p.x <= sx + winW - m.right && p.y >= sy + m.top && p.y <= sy + winH - m.bottom) n++
+      }
+      const d = Math.hypot(sx + winW / 2 - centre.x, sy + winH / 2 - centre.y)
+      if (n > best.n || (n === best.n && d < best.d - 1e-9)) best = { x: sx, y: sy, n, d }
+    }
+  }
+  return { x: best.x + winW / 2, y: best.y + winH / 2 }
 }
 
 // Home: the smallest view (down to `maxScale`) whose visible, uncovered area
 // holds the whole network with a margin, centred on it as far as the world's
 // edge allows. A network wider than the frame falls back to the widest view,
 // still centred on the network rather than on the Atlantic.
-export function homeViewFor({ points, frame, insets = NO_INSETS, maxScale }: HomeFraming): ViewBox {
+export function homeViewFor({ points, frame, insets = NO_INSETS, maxScale, focus }: HomeFraming): ViewBox {
   const fw = Math.max(1, frame.width)
   const fh = Math.max(1, frame.height)
   const aspect = fw / fh
@@ -189,8 +241,11 @@ export function homeViewFor({ points, frame, insets = NO_INSETS, maxScale }: Hom
   const padY = Math.max(18, (maxY - minY) * 0.12)
   const bw = maxX - minX + 2 * padX
   const bh = maxY - minY + 2 * padY
-  const availW = Math.max(1, fw - insets.left - insets.right)
-  const availH = Math.max(1, fh - insets.top - insets.bottom)
+  // The uncovered area, less the screen room a city's name and marker need:
+  // on a phone the world-unit pad alone is a few pixels, and a city on the
+  // box's edge lost its name (or its dot) to the frame.
+  const availW = Math.max(1, fw - insets.left - insets.right - HOME_MARGIN.left - HOME_MARGIN.right)
+  const availH = Math.max(1, fh - insets.top - insets.bottom - HOME_MARGIN.top - HOME_MARGIN.bottom)
   // CSS px per world unit that fits the box into the uncovered area...
   const fit = Math.min(availW / bw, availH / bh)
   // ...expressed as a viewBox width under `slice`, then held to the zoom range.
@@ -199,8 +254,28 @@ export function homeViewFor({ points, frame, insets = NO_INSETS, maxScale }: Hom
   const h = (w / W) * H
   const k = cover / w
   // Centre the network in the UNCOVERED area: shift by half the difference
-  // between the insets on opposite sides.
-  const cx = (minX + maxX) / 2 - (insets.left - insets.right) / (2 * k)
-  const cy = (minY + maxY) / 2 - (insets.top - insets.bottom) / (2 * k)
+  // between the insets (and margins) on opposite sides.
+  let mx = (minX + maxX) / 2
+  let my = (minY + maxY) / 2
+  const holds = bw * k <= availW + 1e-6 && bh * k <= availH + 1e-6
+  if (!holds && focus !== undefined) {
+    // Too wide to hold whole: keep the HQ, and as much network as fits.
+    const winW = (fw - insets.left - insets.right) / k
+    const winH = (fh - insets.top - insets.bottom) / k
+    const m = {
+      left: HOME_MARGIN.left / k,
+      right: HOME_MARGIN.right / k,
+      top: HOME_MARGIN.top / k,
+      bottom: HOME_MARGIN.bottom / k,
+    }
+    const c = focusWindow(points, focus, winW, winH, m, { x: mx, y: my })
+    mx = c.x
+    my = c.y
+  } else {
+    mx -= (HOME_MARGIN.left - HOME_MARGIN.right) / (2 * k)
+    my -= (HOME_MARGIN.top - HOME_MARGIN.bottom) / (2 * k)
+  }
+  const cx = mx - (insets.left - insets.right) / (2 * k)
+  const cy = my - (insets.top - insets.bottom) / (2 * k)
   return clampView({ x: cx - w / 2, y: cy - h / 2, w, h }, aspect)
 }

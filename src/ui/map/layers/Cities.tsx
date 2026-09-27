@@ -5,7 +5,7 @@
 import { distanceKm, type City } from '../../../data/cities'
 import type { Airline, GameState } from '../../../engine'
 import { slotsHeld } from '../../../engine/queries'
-import { placeLabels } from '../../labels'
+import { labelBox, placeLabels, type Box, type LabelPlacement } from '../../labels'
 import { cityMass, cityTier } from '../../mapStyle'
 import { viewSeat } from '../../session'
 import type { GlobePoint } from '../globe'
@@ -159,7 +159,46 @@ export function CityMarkers({
   )
 }
 
-export function CityLabels({
+
+// Label width in ems, measured once per name in the map's own type — a fixed
+// per-character guess was off by a fifth between platforms, and that is the
+// margin two neighbouring names need to not overlap. Falls back to a generous
+// estimate where there is no canvas (unit tests).
+const labelEmCache = new Map<string, number>()
+let measureCtx: CanvasRenderingContext2D | null | undefined
+function labelEms(text: string): number {
+  let em = labelEmCache.get(text)
+  if (em !== undefined) return em
+  if (measureCtx === undefined) {
+    try {
+      measureCtx = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d')
+      if (measureCtx !== null) {
+        const family = getComputedStyle(document.body).fontFamily || 'sans-serif'
+        measureCtx.font = `600 100px ${family}`
+      }
+    } catch {
+      measureCtx = null
+    }
+  }
+  const measured = measureCtx?.measureText(text).width
+  em = measured !== undefined && measured > 0 ? measured / 100 : text.length * 0.74
+  labelEmCache.set(text, em)
+  return em
+}
+
+export interface CityLabelLayout {
+  fs: number
+  labels: (LabelPlacement & { box: Box })[]
+}
+
+// Where every city name goes. Priority is the order names claim space in: the
+// HQ, the selected airport, then the player's own network, then everything
+// else, heaviest market first. Only the HQ and the selected airport are
+// always named; any other name that finds no free side of its marker is
+// hidden until a zoom gives it room (GIG/GRU, YUL/YYZ at world view). The
+// boxes are shared with the traffic canvas, which fades a plane crossing a
+// name so the glyphs never hide the airports they fly between.
+export function layoutCityLabels({
   visible,
   labeled,
   pt,
@@ -167,6 +206,7 @@ export function CityLabels({
   uiScale,
   hq,
   selected,
+  network,
 }: {
   visible: readonly City[]
   labeled: ReadonlySet<string>
@@ -175,49 +215,51 @@ export function CityLabels({
   uiScale: number
   hq: string
   selected: string | null
-}) {
+  network: ReadonlySet<string>
+}): CityLabelLayout {
+  const fs = 11 / uiScale
+  const gap = 3 / uiScale
+  // The halo's stroke paints a pixel past the glyphs on each side.
+  const halo = 2 / uiScale
+  const rank = (c: City): number => (c.id === hq ? 0 : c.id === selected ? 1 : network.has(c.id) ? 2 : 3)
+  const sites = visible
+    .filter((c) => labeled.has(c.id))
+    .sort((a, b) => rank(a) - rank(b) || cityMass(b) - cityMass(a) || (a.id < b.id ? -1 : 1))
+    .map((c) => ({ c, p: pt(c.lon, c.lat) }))
+    .filter(({ p }) => p.vis)
+    .map(({ c, p }) => ({
+      id: c.id,
+      x: p.X,
+      y: p.Y,
+      r: dotRadius(c),
+      w: labelEms(c.id) * fs + halo,
+      optional: c.id !== hq && c.id !== selected,
+    }))
+  const width = new Map(sites.map((s) => [s.id, s.w]))
+  return {
+    fs,
+    labels: placeLabels(sites, fs, gap).map((l) => ({ ...l, box: labelBox(l, width.get(l.id)!, fs) })),
+  }
+}
+
+// Labels draw in their own layer ABOVE every dot, with a halo — a
+// neighboring city's dot can never sit on top of a name.
+export function CityLabels({ layout }: { layout: CityLabelLayout }) {
   return (
     <>
-      {/* Labels draw in their own layer ABOVE every dot, with a halo — a
-          neighboring city's dot can never sit on top of a name. Mass order
-          is the priority order: majors get first pick of the slots. The
-          collision pass itself is in labels.ts, which does it against a
-          uniform grid rather than by scanning every label already placed;
-          the naive version is quadratic and peaks at ~150 labels around
-          1.8x zoom, where tier-3 cities unlock but the frame still holds
-          most of the world. */}
-      {(() => {
-        const fs = 11 / uiScale
-        const gap = 3 / uiScale
-        const sites = visible
-          .filter((c) => labeled.has(c.id))
-          .sort((a, b) => cityMass(b) - cityMass(a) || (a.id < b.id ? -1 : 1))
-          .map((c) => ({ c, p: pt(c.lon, c.lat) }))
-          .filter(({ p }) => p.vis)
-          .map(({ c, p }) => ({
-            id: c.id,
-            x: p.X,
-            y: p.Y,
-            r: dotRadius(c),
-            w: c.id.length * fs * 0.66,
-            // A major, the HQ or the selected city is always named, even
-            // shingled; anything else yields when a cluster of network
-            // cities (JFK/PHL/DCA at world view) leaves it no room.
-            optional: cityTier(c) !== 1 && c.id !== hq && c.id !== selected,
-          }))
-        return placeLabels(sites, fs, gap).map((l) => (
-          <text
-            key={`label-${l.id}`}
-            x={l.x}
-            y={l.y}
-            fontSize={fs}
-            textAnchor={l.anchor}
-            className="city-label"
-          >
-            {l.id}
-          </text>
-        ))
-      })()}
+      {layout.labels.map((l) => (
+        <text
+          key={`label-${l.id}`}
+          x={l.x}
+          y={l.y}
+          fontSize={layout.fs}
+          textAnchor={l.anchor}
+          className="city-label"
+          data-label={l.id}
+        >
+          {l.id}
+        </text>
+      ))}
     </>
   )
 }

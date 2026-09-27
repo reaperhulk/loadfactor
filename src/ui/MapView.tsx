@@ -9,7 +9,7 @@
 //   useMapGestures.ts, useMapKeyboard.ts pointer/wheel/touch and keyboard input
 //   layers/                              the drawn layers and the map's chrome
 
-import { useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getAircraftType } from '../data/aircraft'
 import { CITIES, getCity, type City } from '../data/cities'
 import type { GameState } from '../engine'
@@ -19,7 +19,7 @@ import { useDisplayPreferences, useReducedMotion } from './display'
 import { cityMass, cityTier, rivalColor, type MapLens } from './mapStyle'
 import { viewSeat } from './session'
 import { TrafficCanvas } from './TrafficCanvas'
-import type { TrafficLeg } from './traffic'
+import type { Occluder, TrafficLeg } from './traffic'
 import './map.css'
 import { SPAN_MIN, layerSpan } from './map/camera'
 import { REGION_COLLAPSE_BELOW_SCALE, eventHalos } from './map/eventHalos'
@@ -30,7 +30,7 @@ import { useMapGestures } from './map/useMapGestures'
 import { useMapKeyboard } from './map/useMapKeyboard'
 import { useQuarterResult } from './map/useQuarterResult'
 import { MapBackdrop, MapDefs, useGlobeGeography } from './map/layers/Backdrop'
-import { CityLabels, CityMarkers } from './map/layers/Cities'
+import { CityLabels, CityMarkers, layoutCityLabels } from './map/layers/Cities'
 import { GlobeStatus, MapColors, MapControls, Minimap, QuarterResultCaption } from './map/layers/MapChrome'
 import { EventHaloLayer, HubGlows, OceanLabels, RangeRing, SlotPings } from './map/layers/Marks'
 import { useMapTraffic } from './map/layers/useMapTraffic'
@@ -256,6 +256,14 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, seat, selected, focusCity, lodKey, isGlobe, cull.x, cull.y, cull.w, cull.h, frameAspect])
 
+  // City names: placed once per render, drawn by CityLabels, and handed to
+  // the traffic canvas so a plane crossing a name fades instead of hiding it.
+  const labelLayout = layoutCityLabels({ visible, labeled, pt, dotRadius, uiScale, hq: player.hq, selected, network })
+  const occluders = useRef<readonly Occluder[]>([])
+  useLayoutEffect(() => {
+    occluders.current = labelLayout.labels.map((l) => l.box)
+  })
+
   const { onPointerDown, onPointerMove, onPointerUp, zoomInAt, handleCityClick, handleMapTap } = useMapGestures({
     camera,
     visible,
@@ -285,6 +293,10 @@ export function MapView({
       className="map-wrap"
       data-testid="map-wrap"
       data-view={`${view.x} ${view.y} ${view.w} ${view.h}`}
+      // World zoom and an active metric lens restyle the rival networks
+      // (map.css) — attributes that change on a threshold, not per frame.
+      data-zoom={scale < 1.5 ? 'world' : 'near'}
+      data-lens={lens === 'load' || lens === 'profit' || lens === 'season' ? lens : undefined}
       style={{ aspectRatio: `${W} / ${H}` }}
       // Focusing an airport that sits in the layer's overhang would scroll
       // this clipped box to reveal it, knocking the layer off its transform.
@@ -386,7 +398,7 @@ export function MapView({
             uiScale={uiScale}
             handleCityClick={handleCityClick}
           />
-          <CityLabels visible={visible} labeled={labeled} pt={pt} dotRadius={dotRadius} uiScale={uiScale} hq={player.hq} selected={selected} />
+          <CityLabels layout={labelLayout} />
         </g>
       </svg>
       </div>
@@ -402,6 +414,7 @@ export function MapView({
         active={active}
         camera={trafficCamera}
         frozen={trafficFrozen}
+        occluders={occluders}
       />
       {/* The frame falls off into the dark so the middle of the world holds
           the eye. It belongs to the frame, not the world, so it sits outside

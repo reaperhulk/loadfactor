@@ -126,9 +126,10 @@ export interface TrafficCamera {
 }
 
 // Glyph scale by map zoom. Planes are drawn at a fixed CSS size, which at the
-// world view makes them specks against a whole continent; they grow modestly
-// as the map zooms out, and settle at their base size from 3x in.
-export const PLANE_SCALE_WORLD = 1.4
+// world view makes them specks against a whole continent; they grow a touch
+// as the map zooms out, and settle at their base size from 3x in. A touch:
+// at 1.4x a widebody was 45px long and sat on DEN, ORD and LAX's names.
+export const PLANE_SCALE_WORLD = 1.15
 export function planeScaleForZoom(zoom: number): number {
   const t = Math.min(1, Math.max(0, (3 - zoom) / 2))
   return 1 + (PLANE_SCALE_WORLD - 1) * t
@@ -160,6 +161,41 @@ export function cameraAffine(c: TrafficCamera): { a: number; ex: number; ey: num
   }
 }
 
+// A rectangle a plane must not paint over — a city's name, in world
+// (viewBox) units, the same space the planes fly in.
+export interface Occluder {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+}
+
+// How far a plane over a name fades: enough that the name reads through it,
+// not so far that the plane vanishes and pops back.
+export const OCCLUDED_ALPHA = 0.15
+
+// A plane's opacity factor near the city names: OCCLUDED_ALPHA with its
+// centre inside a name's box, easing back to 1 over `reach` world units
+// (about the glyph's own half-length, so the fade starts as the nose
+// arrives, not when the centre does).
+export function occlusionFade(x: number, y: number, boxes: readonly Occluder[], reach: number): number {
+  let nearest = Infinity
+  for (const b of boxes) {
+    const dx = x < b.x1 ? b.x1 - x : x > b.x2 ? x - b.x2 : 0
+    const dy = y < b.y1 ? b.y1 - y : y > b.y2 ? y - b.y2 : 0
+    const d = Math.max(dx, dy)
+    if (d < nearest) {
+      nearest = d
+      if (d === 0) break
+    }
+  }
+  if (nearest >= reach) return 1
+  return OCCLUDED_ALPHA + (1 - OCCLUDED_ALPHA) * (reach > 0 ? nearest / reach : 1)
+}
+
+// Half the length of a plane glyph, in glyph units (the art spans about ±15).
+const GLYPH_HALF = 14
+
 const glyphCache = new Map<string, Path2D>()
 function glyphPath(d: string): Path2D {
   let p = glyphCache.get(d)
@@ -180,6 +216,7 @@ export function drawTraffic(
   camera: TrafficCamera,
   dpr: number,
   elapsed: number,
+  occluders: readonly Occluder[] = [],
 ): void {
   const { a, ex, ey } = cameraAffine(camera)
   const wpx = camera.fw * dpr
@@ -234,10 +271,13 @@ export function drawTraffic(
     const g = plane.size * glyphScale * dpr
     const margin = 20 * g
     if (cx < -margin || cy < -margin || cx > wpx + margin || cy > hpx + margin) continue
+    // Names win: a plane crossing an airport's label fades so the label
+    // reads through it (the labels live in the map layer, under this canvas).
+    const alpha = plane.alpha * (occluders.length === 0 ? 1 : occlusionFade(pose.x, pose.y, occluders, (GLYPH_HALF * plane.size * glyphScale) / a))
     // The wake first, fading with age, so the glyph paints over its start.
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.strokeStyle = plane.fill
-    ctx.lineWidth = 1.4 * glyphScale * dpr
+    ctx.lineWidth = 1.2 * glyphScale * dpr
     let px = cx
     let py = cy
     const trail = contrailPoints(plane, elapsed)
@@ -245,7 +285,7 @@ export function drawTraffic(
       const tx = (a * trail[i]!.x + ex) * dpr
       const ty = (a * trail[i]!.y + ey) * dpr
       if (Math.abs(tx - px) + Math.abs(ty - py) > 0.5) {
-        ctx.globalAlpha = plane.alpha * 0.3 * (1 - i / trail.length)
+        ctx.globalAlpha = alpha * 0.3 * (1 - i / trail.length)
         ctx.beginPath()
         ctx.moveTo(px, py)
         ctx.lineTo(tx, ty)
@@ -257,7 +297,7 @@ export function drawTraffic(
     const cos = Math.cos(pose.heading) * g
     const sin = Math.sin(pose.heading) * g
     ctx.setTransform(cos, sin, -sin, cos, cx, cy)
-    ctx.globalAlpha = plane.alpha
+    ctx.globalAlpha = alpha
     const path = glyphPath(plane.glyph)
     ctx.strokeStyle = plane.stroke
     ctx.lineWidth = 1.2
