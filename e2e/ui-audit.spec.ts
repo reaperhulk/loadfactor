@@ -34,7 +34,7 @@ for (const [width, height] of [[390,844], [1366,768]]) {
     // New careers land on the Desk, where the first-market quotes are.
     await expect(page.getByTestId('tab-desk')).toHaveClass(/active/)
     await expect(page.getByTestId('coach')).toBeVisible()
-    await page.getByRole('button', {name:'Compare this launch'}).first().click()
+    await page.getByRole('button', {name:'Plan this launch'}).first().click()
     await page.getByTestId('route-setup-confirm').click()
     await expect(page.getByTestId('coach')).toHaveCount(0)
     await openPanel(page, 'map')
@@ -190,7 +190,7 @@ for(const [width,height] of [[320,568],[667,375],[1366,768]] as const) {
     await page.goto('/')
     await page.getByTestId('start-jet_age').click()
     await openPanel(page,'desk')
-    await page.getByRole('button',{name:'Compare this launch'}).first().click()
+    await page.getByRole('button',{name:'Plan this launch'}).first().click()
     const launch=page.getByTestId('route-setup')
     for(const id of ['route-setup-confirm','route-setup-cancel']) await inside(page.getByTestId(id),page)
     await launch.locator('.dialog-scroll').evaluate(el=>{el.scrollTop=el.scrollHeight})

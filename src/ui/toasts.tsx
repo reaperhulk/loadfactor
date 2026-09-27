@@ -76,10 +76,19 @@ export function eventWhere(e: { city: string | null; region: string | null }): s
   return e.city ? ` — ${e.city}` : e.region ? ` — ${e.region.toUpperCase()}` : ''
 }
 
+// Offers are addressed to one airline. Older rules versions sent them without
+// an addressee (everyone saw them); newer events name the airline, and in a
+// hot-seat game only that seat should hear about its offer.
+export function forViewer(e: { airline?: number }, seat = viewSeat()): boolean {
+  return e.airline === undefined || e.airline === seat
+}
+
 // Which events earn a toast, and how they read. Player-only for the personal
 // ones; world events always show. `state` (post-resolution) lets rival moves
-// onto the player's own pairs surface as incursion alerts.
-export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, 'id'>[] {
+// onto the player's own pairs surface as incursion alerts. Events in
+// `celebrated` are already playing as a full-screen scene; a toast repeating
+// the same news underneath it is noise.
+export function toastsFor(events: GameEvent[], state?: GameState, celebrated?: ReadonlySet<GameEvent>): Omit<Toast, 'id'>[] {
   const out: Omit<Toast, 'id'>[] = []
   const myPairs = new Set(state?.airlines[viewSeat()]?.routes.map((r) => pairKey(r.from, r.to)) ?? [])
   // A new year begins as a quarter resolves into Q1 — announce airframes
@@ -105,6 +114,7 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
     }
   }
   for (const e of events) {
+    if (celebrated?.has(e)) continue
     switch (e.type) {
       case 'operations_changed':
         out.push({ kind: 'event', icon: '✈', text: e.detail })
@@ -199,7 +209,7 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
           out.push({
             kind: 'error',
             icon: '🔧',
-            text: `${getAircraftType(e.aircraftType).name} grounded for maintenance — ${e.repairK}k repair, out for ${e.quarters}q`,
+            text: `${getAircraftType(e.aircraftType).name} grounded for maintenance — ${money(e.repairK)} repair, out for ${e.quarters === 1 ? '1 quarter' : `${e.quarters} quarters`}`,
           })
         }
         break
@@ -214,9 +224,11 @@ export function toastsFor(events: GameEvent[], state?: GameState): Omit<Toast, '
         })
         break
       case 'offer_made':
+        if (!forViewer(e as { airline?: number })) break
         out.push({ kind: 'event', icon: '📨', text: `${e.headline} — ${decideWithin(e.expiresTurn, state)}` })
         break
       case 'offer_expired':
+        if (!forViewer(e as { airline?: number })) break
         out.push({ kind: 'error', icon: '⌛', text: `Offer lapsed: ${e.headline}` })
         break
       case 'airline_entered':
@@ -258,9 +270,12 @@ export function ToastStack({
   state,
   unlocks,
   onOpenRoute,
+  celebrated,
 }: {
   events: GameEvent[]
   state?: GameState
+  // Milestones currently shown as a celebration scene (not toasted twice).
+  celebrated?: readonly GameEvent[]
   // Achievements unlocked by the same engine call that produced `events` —
   // they ride the same batch so the dedupe key (the events array) covers both.
   unlocks?: { icon: string; name: string }[]
@@ -295,7 +310,7 @@ export function ToastStack({
   useEffect(() => {
     if (seen.current === events) return // only react to a new engine result
     seen.current = events
-    const fresh = toastsFor(events, state)
+    const fresh = toastsFor(events, state, new Set(celebrated ?? []))
     if (unlocks?.length === 1) {
       fresh.push({ kind:'achievement',icon:unlocks[0]!.icon,text:`Achievement unlocked — ${unlocks[0]!.name}` })
     } else if (unlocks && unlocks.length > 1) {
@@ -312,7 +327,7 @@ export function ToastStack({
         setToasts((prev) => prev.filter((t) => !ids.has(t.id)))
       }, TOAST_MS),
     )
-  }, [events, state, unlocks])
+  }, [events, state, unlocks, celebrated])
 
   // Timers are cleared only on unmount, never between batches.
   useEffect(() => {

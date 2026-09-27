@@ -10,7 +10,7 @@ async function start(page: Page) {
 }
 async function launch(page: Page) {
   await openPanel(page, 'desk')
-  await page.getByTestId('management-brief').getByRole('button', { name: 'Compare this launch' }).first().click()
+  await page.getByTestId('management-brief').getByRole('button', { name: 'Plan this launch' }).first().click()
   await expect(page.getByRole('dialog', { name: /^Plan / })).toBeVisible()
   await page.getByTestId('route-setup-confirm').click()
   await expect(page.getByTestId('route-setup')).toHaveCount(0)

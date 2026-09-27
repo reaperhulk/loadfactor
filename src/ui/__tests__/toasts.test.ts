@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyCommand, newGame } from '../../engine'
 import type { GameEvent } from '../../engine'
-import { decideWithin, eventImpact, toastsFor } from '../toasts'
+import { decideWithin, eventImpact, forViewer, toastsFor } from '../toasts'
 
 function stateWithRoute() {
   let state = newGame('jet_age', 'toast-test')
@@ -87,5 +87,37 @@ describe('rules 6 news', () => {
     const mine = toastsFor([{ type: 'terminal_funded', airline: 0, city: 'LHR', cost: 100, slots: 2, opensTurn: 1 }, { type: 'airlift_flown', airline: 0, city: 'JFK', trips: 40 }], state)
     expect(mine.map((t) => t.icon)).toEqual(['🏗️', '🛩️'])
     expect(toastsFor([{ type: 'terminal_funded', airline: 1, city: 'LHR', cost: 100, slots: 2, opensTurn: 1 }], state)).toHaveLength(0)
+  })
+})
+
+describe('toast deduplication and addressing', () => {
+  it('does not repeat a milestone already playing as a celebration', () => {
+    const state = stateWithRoute()
+    const opened: GameEvent = { type: 'route_opened', airline: 0, routeId: 1, from: 'JFK', to: 'ORD' }
+    const delivered = { type: 'aircraft_delivered', airline: 0, aircraftId: 9, aircraftType: 'caravelle' } as GameEvent
+    expect(toastsFor([opened, delivered], state)).toHaveLength(2)
+    const shown = toastsFor([opened, delivered], state, new Set([opened]))
+    expect(shown).toHaveLength(1)
+    expect(shown[0]!.text).not.toContain('Route opened')
+  })
+
+  it('offers reach only the airline they are addressed to', () => {
+    const state = stateWithRoute()
+    expect(forViewer({}, 0)).toBe(true)
+    expect(forViewer({ airline: 0 }, 0)).toBe(true)
+    expect(forViewer({ airline: 1 }, 0)).toBe(false)
+    const unaddressed = { type: 'offer_made', offerId: 1, kind: 'airlift_contract', headline: 'Airlift?', expiresTurn: state.turn } as GameEvent
+    const toRival = { ...unaddressed, airline: 1 } as GameEvent
+    const toMe = { ...unaddressed, airline: 0 } as GameEvent
+    expect(toastsFor([unaddressed], state)).toHaveLength(1)
+    expect(toastsFor([toMe], state)).toHaveLength(1)
+    expect(toastsFor([toRival], state)).toHaveLength(0)
+    expect(toastsFor([{ type: 'offer_expired', offerId: 1, headline: 'Airlift?', airline: 1 } as GameEvent], state)).toHaveLength(0)
+  })
+
+  it('grounding toasts use the money formatter', () => {
+    const state = stateWithRoute()
+    const [toast] = toastsFor([{ type: 'aircraft_grounded', airline: 0, aircraftId: 1, aircraftType: 'caravelle', quarters: 1, repairK: 1500 }], state)
+    expect(toast!.text).toContain('$1.5M repair, out for 1 quarter')
   })
 })

@@ -38,8 +38,10 @@ export function useCelebration(events: GameEvent[], seat: number, planning: bool
   return { milestones: enabled ? pending : [], dismiss }
 }
 
-export function Celebration({ milestones, state, onClose }: {
+export function Celebration({ milestones, state, onClose, onNext }: {
   milestones: Milestone[]; state: GameState; onClose: () => void
+  // Where the next step lives: the hint under the scene is a real link.
+  onNext?: (page: 'routes' | 'fleet') => void
 }) {
   const event = milestones[0]!
   const airline = state.airlines[event.airline]!
@@ -68,7 +70,9 @@ export function Celebration({ milestones, state, onClose }: {
         <span className="celebration-scene-label">{delivery ? 'WELCOME TO THE FLEET' : `${event.from} → ${event.to}`}</span>
       </div>
       <div className="celebration-copy"><span className="eyebrow">{delivery ? 'Ready for your next chapter' : `${distanceKm(event.from, event.to).toLocaleString('en-US')} km · A new connection`}</span><h2>{title}</h2><p>{detail}</p>
-        <div className="celebration-footer"><span>{delivery ? 'Your aircraft are ready in Fleet.' : 'Plan aircraft and schedules in Routes.'}</span><button onClick={() => { setDisplayPreferences({ celebrations: false }); onClose() }}>Don’t show these again</button></div>
+        <div className="celebration-footer">{onNext
+          ? <button className="link-btn celebration-next" data-testid="celebration-next" onClick={() => onNext(delivery ? 'fleet' : 'routes')}>{delivery ? 'See your aircraft in Fleet' : 'Plan aircraft and schedules in Routes'} <span aria-hidden="true">→</span></button>
+          : <span>{delivery ? 'Your aircraft are ready in Fleet.' : 'Plan aircraft and schedules in Routes.'}</span>}<button onClick={() => { setDisplayPreferences({ celebrations: false }); onClose() }}>Don’t show these again</button></div>
       </div><div className="celebration-progress" aria-hidden="true" />
     </section>
   </Dialog>
