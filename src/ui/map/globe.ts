@@ -231,22 +231,45 @@ export function globeGraticule(g: GlobeView): string {
   return d
 }
 
-// Sample the great circle between two cities as lon/lat waypoints (slerp on
-// the unit sphere).
-function greatCircle(fromId: string, toId: string, n = 24): [number, number][] {
-  const a = getCity(fromId)
-  const b = getCity(toId)
+// A route on the globe: the great circle between two places, lifted off the
+// surface toward its middle like a flight climbing to cruise. Drawn flat on
+// the sphere, a great circle whose plane is seen edge-on projects to a dead
+// straight line under the orthographic projection, and near the middle of the
+// disc they all nearly are — so the network read as rulers laid across the
+// globe. The lift bows every route off its chord in proportion to its length.
+export interface GlobeArcPoint {
+  X: number
+  Y: number
+  vis: boolean
+}
+
+// Peak height of the lift, as a fraction of the globe's radius per radian of
+// arc — capped so an antipodal route does not tower over the disc.
+export const GLOBE_ARC_LIFT = 0.12
+export const GLOBE_ARC_LIFT_MAX = 0.16
+
+export function globeArc(
+  g: GlobeView,
+  from: { lon: number; lat: number },
+  to: { lon: number; lat: number },
+): GlobeArcPoint[] {
   const toXYZ = (lonDeg: number, latDeg: number): [number, number, number] => {
     const lon = (lonDeg * Math.PI) / 180
     const lat = (latDeg * Math.PI) / 180
     return [Math.cos(lat) * Math.cos(lon), Math.cos(lat) * Math.sin(lon), Math.sin(lat)]
   }
-  const va = toXYZ(a.lon, a.lat)
-  const vb = toXYZ(b.lon, b.lat)
+  const va = toXYZ(from.lon, from.lat)
+  const vb = toXYZ(to.lon, to.lat)
   const dot = Math.min(1, Math.max(-1, va[0] * vb[0] + va[1] * vb[1] + va[2] * vb[2]))
   const om = Math.acos(dot)
   const so = Math.sin(om) || 1e-9
-  const out: [number, number][] = []
+  const lift = Math.min(GLOBE_ARC_LIFT_MAX, GLOBE_ARC_LIFT * om)
+  // Enough samples that the curve stays smooth at the closest zoom.
+  const n = Math.min(48, Math.max(8, Math.ceil(om * 40)))
+  const cx = W / 2
+  const cy = H / 2
+  const R = GLOBE_R * g.s
+  const out: GlobeArcPoint[] = []
   for (let i = 0; i <= n; i++) {
     const t = i / n
     const k1 = Math.sin((1 - t) * om) / so
@@ -254,20 +277,31 @@ function greatCircle(fromId: string, toId: string, n = 24): [number, number][] {
     const vx = k1 * va[0] + k2 * vb[0]
     const vy = k1 * va[1] + k2 * vb[1]
     const vz = k1 * va[2] + k2 * vb[2]
-    out.push([
-      (Math.atan2(vy, vx) * 180) / Math.PI,
-      (Math.asin(Math.max(-1, Math.min(1, vz))) * 180) / Math.PI,
-    ])
+    const lon = (Math.atan2(vy, vx) * 180) / Math.PI
+    const lat = (Math.asin(Math.max(-1, Math.min(1, vz))) * 180) / Math.PI
+    const p = globeProjectFull(g, lon, lat)
+    // Altitude above the surface: zero at both airports, peaking mid-route.
+    const r = 1 + lift * Math.sin(Math.PI * t)
+    const X = cx + (p.X - cx) * r
+    const Y = cy + (p.Y - cy) * r
+    // Hidden only where the sphere is in the way: behind the globe's centre
+    // plane AND inside its silhouette. A lifted point just over the limb
+    // stays in sight, as it would on a real globe.
+    out.push({ X, Y, vis: p.cosc > 0.001 || Math.hypot(X - cx, Y - cy) > R })
   }
   return out
 }
 
-// Visible runs of the great circle as subpaths ('' when fully hidden).
-export function globeRoutePath(g: GlobeView, fromId: string, toId: string): string {
+function cityArc(g: GlobeView, fromId: string, toId: string): GlobeArcPoint[] {
+  return globeArc(g, getCity(fromId), getCity(toId))
+}
+
+// Visible runs of an arc as subpaths ('' when fully hidden): the pen lifts
+// wherever the route passes behind the globe.
+export function globeArcPath(points: readonly GlobeArcPoint[]): string {
   let d = ''
   let penDown = false
-  for (const [lon, lat] of greatCircle(fromId, toId)) {
-    const p = globeProject(g, lon, lat)
+  for (const p of points) {
     if (!p.vis) {
       penDown = false
       continue
@@ -278,10 +312,14 @@ export function globeRoutePath(g: GlobeView, fromId: string, toId: string): stri
   return d
 }
 
-// The great circle for the traffic shuttle — only when the whole leg faces
-// the viewer (a plane vanishing mid-flight reads as a glitch).
+export function globeRoutePath(g: GlobeView, fromId: string, toId: string): string {
+  return globeArcPath(cityArc(g, fromId, toId))
+}
+
+// The same arc for the traffic shuttle — only when the whole leg is in sight
+// (a plane vanishing mid-flight reads as a glitch).
 export function globeTripLeg(g: GlobeView, fromId: string, toId: string): TrafficLeg | null {
-  const pts = greatCircle(fromId, toId).map(([lon, lat]) => globeProject(g, lon, lat))
+  const pts = cityArc(g, fromId, toId)
   if (pts.some((p) => !p.vis)) return null
   const flat = new Float64Array(pts.length * 2)
   pts.forEach((p, i) => {
