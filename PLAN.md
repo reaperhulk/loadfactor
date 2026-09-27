@@ -1004,3 +1004,86 @@ The full matrix is `fixtures/balance-v6-report.json`
 
 Tests: `rulesV6.test.ts` checks every mechanic against rules 5;
 `e2e/rules6.spec.ts` covers the UI.
+
+### Rules 7: the second review's fixes (September 2026)
+
+Rules 6 went live on the published site. It is frozen like every earlier
+version (`fixtures/legacy-v6-goldens.json`), and new careers use rules 7.
+A second review probed rules 6 and found the problems below. Each one is
+fixed here and gated on `rulesVersion >= 7`.
+
+**Products are priced by who buys them.**
+- Rules 6 paid a flat service premium, which made full service the most
+  profitable choice on 193 of 224 late routes; standard service was never
+  best. Rules 7 bills the service yield per passenger segment
+  (`SERVICE_YIELD_BY_SEGMENT_V7`): business travellers pay for full
+  service, leisure travellers a little, budget travellers nothing.
+- The cabin fit works the same way (`CABIN_YIELD_BY_SEGMENT_V7`). Under
+  rules 6 the dense fit was the most profitable on 87% of late routes.
+- On the review's Jet Age probe at quarter 60:
+
+  | Choice  | Basic / dense | Standard | Full / premium |
+  |---------|---------------|----------|----------------|
+  | Service | 76            | 32       | 82             |
+  | Cabin   | 61            | 66       | 53             |
+
+- The shared brain chooses service (`serviceCommands`) and cabin
+  (`cabinForRoute` via `refitCommands`) per route, within one step of its
+  doctrine's posture.
+
+**Hedges.**
+- A hedge taken on an announcement locks `HEDGE_ANNOUNCED_LOCK_BP_V7`
+  (70%) of the shock (`hedgeLockBpFor`). Rules 6 locked at the midpoint.
+- The premium is priced at the lock, and half cover costs
+  `HEDGE_HALF_COVER_PRICE_BP_V7` of full cover.
+- Result: the headline hedge went from paying 5–9× its premium to a small
+  edge that sometimes loses.
+- A running hedge can be replaced. The bots never replace a pre-news lock,
+  which was the cheaper one.
+
+**Funded terminals.**
+- A funded programme is the next scheduled one delivered early
+  (`programmesOpen`, `nextUnbuilt`). Rules 6 added it on top of the
+  schedule, so the funder got the capacity twice.
+- The funder takes half of it, at least one slot (`terminalFunderSlots`).
+- The funder pays `TERMINAL_FUNDER_PREMIUM_BP_V7` over the list fee for
+  those slots.
+- Each airline can fund one programme per quarter.
+
+**Event offers.**
+- An airlift charters `AIRLIFT_CAPACITY_BP_V7` of the slumped schedule for
+  `AIRLIFT_FEE_BP_V7` of the slumped revenue. It is offered only when the
+  slump leaves the touched routes under `AIRLIFT_OFFER_MAX_LF_BP_V7` load.
+- The official-carrier deal is offered only where seats are unsold.
+- In rules 6 every airlift accepted in the probe beat declining it.
+
+**Takeovers.**
+- The target's overdraft transfers to the buyer.
+- The engine's size clause also needs a losing quarter, so the leader can
+  no longer farm each new entrant.
+
+**Short mandates.**
+- `objectiveOf(scenario, rules)` raises the short bars to Turnaround $70M,
+  Oil $90M, Atlantic 3.5M and Fortress Hub 2.8M.
+- A bot that only parks aircraft won the Turnaround under rules 6; it now
+  fails every short mandate.
+
+**Smaller fixes.**
+- Deal appeal ends with the deal.
+- Offer events name their airline.
+- Early-delivery slots count against the order line.
+- Offer prose writes money as "$2.5M" and names regions in full.
+
+**Balance.** On the contract seeds, wins out of 8:
+
+| Doctrine  | Wins |
+|-----------|------|
+| greedy    | 5    |
+| premium   | 5    |
+| cautious  | 4    |
+| budget    | 2    |
+| connector | 2    |
+
+The full matrix is `fixtures/balance-v7-report.json`.
+
+Tests: `rulesV7.test.ts` checks each item against rules 6.
