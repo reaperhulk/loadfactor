@@ -146,15 +146,17 @@
 }
 
 /* The quarter's result: for a few seconds after the report closes, each route
-   shows how its profit moved — green earned more, red earned less. A static
-   recolor (reduced motion keeps just that); full motion adds one soft swell. */
+   shows how its profit moved, in the colour-blind-safe lens colours: blue
+   earned more, orange (dotted) earned less. A static recolor (reduced motion
+   keeps just that); full motion adds one soft swell. */
 .route-player.route-result-up {
-  stroke: #5fcf78;
+  stroke: #7cb9ff;
   stroke-width: calc(var(--cap-w, 1.6) + 1.2);
   opacity: 1;
 }
 .route-player.route-result-down {
-  stroke: #e0707a;
+  stroke: #ff9a3c;
+  stroke-dasharray: 1.2 2.4;
   stroke-width: calc(var(--cap-w, 1.6) + 1.2);
   opacity: 1;
 }
@@ -182,10 +184,10 @@
   pointer-events: none;
 }
 .map-quarter-result .pos {
-  color: var(--pos);
+  color: #7cb9ff;
 }
 .map-quarter-result .neg {
-  color: var(--neg);
+  color: #ff9a3c;
 }
 @media (max-width: 700px) {
   .map-quarter-result {

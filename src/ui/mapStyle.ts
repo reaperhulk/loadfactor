@@ -61,15 +61,7 @@ export const LENS_LABELS: Readonly<Record<'load' | 'profit' | 'season', Readonly
   season: { good: 'High season', mid: 'Neutral', bad: 'Low season' },
 }
 
-export const REGION_NAMES: Readonly<Record<string, string>> = {
-  na: 'North America',
-  sa: 'South America',
-  eu: 'Europe',
-  me: 'Middle East',
-  af: 'Africa',
-  as: 'Asia',
-  oc: 'Oceania',
-}
+export { REGION_NAMES } from '../data/cities'
 
 // Level of detail: majors always visible, regionals from mid zoom, small
 // fields only up close — plus anything the player has a stake in.
