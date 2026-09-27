@@ -62,6 +62,10 @@ export interface Scenario {
   // The era's own victory measure. Scored when the final quarter resolves:
   // finish #1 among the live airlines on this metric AND clear its bar.
   objective: ScenarioObjective
+  // Rules 7: a retuned bar for the short mandates (probes showed the
+  // reference bot finishing 3-12x over the rules-6 targets, and a bot that
+  // only parks aircraft winning The Turnaround). Read through objectiveOf.
+  objectiveV7?: Pick<ScenarioObjective, 'target' | 'blurb'>
   // Economic scale reference for the era: the runaway cap and the UI's
   // "how big is big here" both read this. Equals the objective target for
   // net-worth eras.
@@ -384,6 +388,7 @@ export const SHORT_SCENARIOS: readonly Scenario[] = [
     player: { ...SCENARIOS[0]!.player, cash: 12000 },
     objective: { kind: 'profit', target: 20000, higherIsBetter: true, label: 'turnaround profit', unit: 'money', minimumPax: 300000,
       blurb: 'Earn $20M cumulative profit and carry 300,000 passengers in four years.' },
+    objectiveV7: { target: 70000, blurb: 'Earn $70M cumulative profit and carry 300,000 passengers in four years.' },
     targetNetWorth: 150000,
   },
   {
@@ -394,6 +399,7 @@ export const SHORT_SCENARIOS: readonly Scenario[] = [
     player: { name: 'Northstar Atlantic', hq: 'LHR', hqSlots: 8, cash: 30000, extraSlots: { JFK: 3, BOS: 2, MAD: 2 }, starterFleet: ['dc8_62', 'caravelle'] },
     objective: { kind: 'pax', target: 1500000, higherIsBetter: true, label: 'passengers carried', unit: 'count', minimumLongHaul: 1,
       blurb: 'Carry 1.5M passengers and finish with an active route of at least 4,500km.' },
+    objectiveV7: { target: 3500000, blurb: 'Carry 3.5M passengers and finish with an active route of at least 4,500km.' },
     targetNetWorth: 250000,
   },
   {
@@ -402,6 +408,7 @@ export const SHORT_SCENARIOS: readonly Scenario[] = [
     quarters: 16, startingFuelBp: 16000,
     objective: { kind: 'profit', target: 25000, higherIsBetter: true, label: 'crisis profit', unit: 'money', minimumPax: 500000,
       blurb: 'Earn $25M cumulative profit and carry half a million passengers despite costly fuel.' },
+    objectiveV7: { target: 90000, blurb: 'Earn $90M cumulative profit and carry half a million passengers despite costly fuel.' },
     targetNetWorth: 200000,
   },
   {
@@ -413,12 +420,20 @@ export const SHORT_SCENARIOS: readonly Scenario[] = [
     quarters: 24,
     objective: { kind: 'transfer', target: 1200000, higherIsBetter: true, label: 'connecting boardings', unit: 'count', minimumRoutes: 3,
       blurb: 'Carry 1.2M connecting boardings and retain at least three active routes.' },
+    objectiveV7: { target: 2800000, blurb: 'Carry 2.8M connecting boardings and retain at least three active routes.' },
     targetNetWorth: 350000,
   },
 ]
 export const ALL_SCENARIOS = [...SCENARIOS, ...SHORT_SCENARIOS]
 
 const byId = new Map(ALL_SCENARIOS.map((s) => [s.id, s]))
+
+// The objective a career is scored on: its scenario's bar under the
+// career's rules version. Every screen and the engine read it here.
+export function objectiveOf(scenarioId: string, rulesVersion: number | undefined): ScenarioObjective {
+  const s = getScenario(scenarioId)
+  return (rulesVersion ?? 1) >= 7 && s.objectiveV7 ? { ...s.objective, ...s.objectiveV7 } : s.objective
+}
 
 export function getScenario(id: string): Scenario {
   const s = byId.get(id)

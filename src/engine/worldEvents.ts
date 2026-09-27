@@ -12,6 +12,7 @@ import {
   EVENT_DRAW_CHANCE_BP,
   EVENT_DRAW_CHANCE_BP_V5,
   EVENT_WARNING_QUARTERS_V6,
+  HEDGE_ANNOUNCED_LOCK_BP_V7,
   FUEL_MAX_BP,
   FUEL_MIN_BP,
   FUEL_REVERSION_DIV,
@@ -50,6 +51,16 @@ export function hedgeLockBp(world: WorldState): number {
   if (!world.announced?.length) return now
   const landed = effFuelBp({ ...world, events: [...world.events, ...world.announced] })
   return Math.floor((now + landed) / 2)
+}
+
+// Rules 7: the desk prices most of an announced shock into a new contract.
+export function hedgeLockBpFor(state: { rulesVersion?: number; world: WorldState }): number {
+  const world = state.world
+  if ((state.rulesVersion ?? 1) < 7) return hedgeLockBp(world)
+  const now = effFuelBp(world)
+  if (!world.announced?.length) return now
+  const landed = effFuelBp({ ...world, events: [...world.events, ...world.announced] })
+  return now + Math.floor(((landed - now) * HEDGE_ANNOUNCED_LOCK_BP_V7) / 10000)
 }
 
 // Demand multiplier at one city from active city/region events.

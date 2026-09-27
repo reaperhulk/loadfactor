@@ -380,3 +380,48 @@ export const LF_FIELD_SCALE_BP_V6 = 5000
 // Event-linked offers: the world asks what you will do about the news.
 export const OFFICIAL_CARRIER_DEMAND_BP_V6 = 2500 // +25% demand on the host's pairs you fly
 export const AIRLIFT_CAPACITY_BP_V6 = 5000 // share of trips into the region still flying
+
+// --- Rules 7: the retune a second review asked for ---
+// Full service at +9% was the most profitable service on 193 of 224 late
+// routes (standard: none). A smaller premium keeps it a product choice.
+export const SERVICE_YIELD_BP_V7: readonly number[] = [9700, 10000, 10250]
+// ...and it is the business traveller who pays for it. Rules 7 bills the
+// service yield by segment: full service is worth it on business-heavy
+// routes and not on beach routes, which makes it a per-route decision and
+// gives a premium carrier somewhere to win. (A flat premium was either
+// dominant everywhere or worthless everywhere.)
+// The cabin fit by segment, rules 7: a premium cabin's fare premium comes
+// from the business traveller, a dense cabin's discount mostly from the
+// people who notice legroom. At full loads a premium fit (82% of the seats)
+// roughly breaks even on a business route and loses on a beach route; a
+// dense fit (115%) wins on budget routes and loses on business ones. Under
+// rules 6 the dense fit was the most profitable on 87% of late routes.
+export const CABIN_YIELD_BY_SEGMENT_V7 = {
+  business: [8000, 10000, 14000],
+  leisure: [8600, 10000, 11500],
+  budget: [9500, 10000, 10000],
+} as const
+export const SERVICE_YIELD_BY_SEGMENT_V7 = {
+  business: [9200, 10000, 10700],
+  leisure: [9800, 10000, 10150],
+  budget: [10000, 10000, 10000],
+} as const
+// A hedge taken on the headline locks most of an announced shock (70% of the
+// way from today's index), priced at the lock; half cover costs a bit more
+// than half of full cover (the desk's fixed costs), so it is a real choice.
+export const HEDGE_ANNOUNCED_LOCK_BP_V7 = 7000
+export const HEDGE_HALF_COVER_PRICE_BP_V7 = 5500
+// Funded terminals bring the scheduled programme forward (rules 6 added one
+// on top). The funder takes half of it (at least one slot), and pays a
+// premium over the waiting-list fee for those slots; one programme per
+// airline per quarter.
+export const TERMINAL_FUNDER_PREMIUM_BP_V7 = 25000
+// Airlifts charter most of the schedule into a slump and pay for it at a
+// share of the slumped revenue: good business when the seats would fly
+// empty, a loss when they would fill. Offered only when the slump leaves
+// the touched routes under this load factor.
+export const AIRLIFT_CAPACITY_BP_V7 = 3000
+export const AIRLIFT_FEE_BP_V7 = 3500
+export const AIRLIFT_OFFER_MAX_LF_BP_V7 = 9000
+// The official-carrier deal is offered only where there are seats to sell.
+export const OFFICIAL_CARRIER_MAX_LF_BP_V7 = 9000

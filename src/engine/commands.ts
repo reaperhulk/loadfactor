@@ -24,10 +24,11 @@ import {
   HEDGE_PREMIUM_BP_OF_FUEL_V6,
   ORDERS_PER_QUARTER_V6,
   OFFICIAL_CARRIER_DEMAND_BP_V6,
+  HEDGE_HALF_COVER_PRICE_BP_V7,
 } from '../data/constants'
 import { fundTerminal, slotFee, slotQueue } from './slots'
 import { canWithdrawOrder, ordersPlacedThisQuarter, orderRefund } from './orders'
-import { effFuelBp, hedgeLockBp } from './worldEvents'
+import { effFuelBp, hedgeLockBpFor } from './worldEvents'
 import {
   isGrounded,
   currentLoanRateBp,
@@ -62,8 +63,16 @@ function orderLineFull(state: GameState, airline: Airline): boolean {
 // per-airframe legacy rate so the first quarter is not free.
 export function hedgePremium(state: GameState, airline: Airline, quarters: number, coverBp: number): number {
   const lastFuel = airline.history[airline.history.length - 1]?.breakdown.fuel ?? 0
-  const perQuarter = lastFuel > 0 ? Math.floor((lastFuel * HEDGE_PREMIUM_BP_OF_FUEL_V6) / 10000) : HEDGE_PREMIUM_PER_AIRCRAFT * airline.fleet.length
+  let perQuarter = lastFuel > 0 ? Math.floor((lastFuel * HEDGE_PREMIUM_BP_OF_FUEL_V6) / 10000) : HEDGE_PREMIUM_PER_AIRCRAFT * airline.fleet.length
   const scenarioBp = getScenario(state.scenario).rules.hedgePremiumBp ?? 10000
+  if ((state.rulesVersion ?? 1) >= 7) {
+    // Rules 7: priced at the lock (an announced shock raises the premium
+    // with it), and half cover costs more than half of full cover.
+    const now = Math.max(1, effFuelBp(state.world))
+    perQuarter = Math.floor((perQuarter * hedgeLockBpFor(state)) / now)
+    const coverPrice = coverBp >= 10000 ? 10000 : HEDGE_HALF_COVER_PRICE_BP_V7
+    return Math.floor((Math.floor((perQuarter * quarters * coverPrice) / 10000) * scenarioBp) / 10000)
+  }
   return Math.floor((Math.floor((perQuarter * quarters * coverBp) / 10000) * scenarioBp) / 10000)
 }
 
@@ -405,7 +414,9 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         command.quarters > HEDGE_MAX_QUARTERS
       )
         return reject(airlineIdx, command, `hedge must run ${HEDGE_MIN_QUARTERS}..${HEDGE_MAX_QUARTERS} quarters`)
-      if (airline.fuelHedge !== null) return reject(airlineIdx, command, 'a hedge is already running')
+      // Rules 7: a running hedge can be replaced (its remaining quarters are
+      // forfeited) — an expiring contract must not lock you out of the news.
+      if (airline.fuelHedge !== null && (state.rulesVersion ?? 1) < 7) return reject(airlineIdx, command, 'a hedge is already running')
       if (airline.fleet.length === 0) return reject(airlineIdx, command, 'no fleet to hedge')
       if ((state.rulesVersion ?? 1) >= 6) {
         // Rules 6: the premium is a share of the fuel bill it covers, and the
@@ -416,7 +427,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
         const premium = hedgePremium(state, airline, command.quarters, coverBp)
         if (airline.cash < premium) return reject(airlineIdx, command, 'insufficient cash')
         airline.cash -= premium
-        const bp = hedgeLockBp(state.world)
+        const bp = hedgeLockBpFor(state)
         airline.fuelHedge = { bp, quartersLeft: command.quarters, coverBp }
         return { events: [{ type: 'fuel_hedged', airline: airlineIdx, bp, quarters: command.quarters, premium, coverBp }] }
       }
@@ -470,6 +481,9 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       if (airlineIdx !== (offer.airline ?? 0)) return reject(airlineIdx, command, 'this offer belongs to another airline')
       if (airline.cash < offer.costK)
         return reject(airlineIdx, command, `not enough cash — this costs $${offer.costK}k up front`)
+      // Rules 7: a production slot is a new-build order like any other.
+      if (offer.kind === 'early_delivery' && (state.rulesVersion ?? 1) >= 7 && orderLineFull(state, airline))
+        return reject(airlineIdx, command, `the manufacturers take at most ${ORDERS_PER_QUARTER_V6} new-build orders a quarter`)
       airline.cash -= offer.costK
       const events: GameEvent[] = [
         { type: 'offer_accepted', offerId: offer.id, kind: offer.kind, costK: offer.costK },
@@ -477,7 +491,7 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       // Immediate transactions leave no running deal behind.
       if (offer.kind === 'early_delivery' && offer.aircraftType) {
         const orderId = airline.nextId++
-        airline.orders.push({ id: orderId, type: offer.aircraftType, quartersLeft: 1, leased: false })
+        airline.orders.push({ id: orderId, type: offer.aircraftType, quartersLeft: 1, leased: false, ...((state.rulesVersion ?? 1) >= 7 ? { early: true as const } : {}) })
         events.push({ type: 'aircraft_ordered', airline: airlineIdx, orderId, aircraftType: offer.aircraftType, price: offer.costK })
       } else if (offer.kind === 'fleet_sale' && offer.aircraftType && offer.count) {
         for (let i = 0; i < offer.count; i++) {
@@ -547,7 +561,11 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       // Only DISTRESSED rivals sell: insolvent last quarter, or worth a
       // quarter of the acquirer or less. Healthy equals fight on.
       const targetWorth = netWorth(target)
-      const distressed = target.insolventQuarters >= 1 || targetWorth * 4 <= netWorth(airline)
+      // Rules 7: small is not failing — the size clause also needs a losing
+      // quarter, or every entrant becomes a farm for the leader.
+      const lastProfit = target.history[target.history.length - 1]?.profit ?? 0
+      const sizeClause = targetWorth * 4 <= netWorth(airline) && ((state.rulesVersion ?? 1) < 7 || lastProfit <= 0)
+      const distressed = target.insolventQuarters >= 1 || sizeClause
       if (!distressed) return reject(airlineIdx, command, 'they are not for sale — too healthy to fold')
       // Rules 6: a newly capitalized entrant is not a distressed asset, for
       // anyone — the grace period used to live only in the bots' policy.
@@ -613,7 +631,10 @@ export function applyPlanningCommand(state: GameState, airlineIdx: number, comma
       target.fuelHedge = null
       // Rules 6: the buyer takes the company, treasury included. Before, the
       // target's cash vanished — a takeover destroyed its whole balance.
-      if ((state.rulesVersion ?? 1) >= 6) airline.cash += Math.max(0, target.cash)
+      // Rules 7: an overdraft comes with the company too (rules 6 dropped it).
+      const rules = state.rulesVersion ?? 1
+      if (rules >= 7) airline.cash += target.cash
+      else if (rules >= 6) airline.cash += Math.max(0, target.cash)
       target.cash = 0
       return {
         events: [

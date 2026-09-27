@@ -95,3 +95,13 @@ describe('rules 5 compatibility', () => {
     expect({ checkpointHashes: result.checkpointHashes, summary: result.summary }).toEqual(legacy[career.name])
   })
 })
+
+// Rules 6 (the fare decision, warned events, funded terminals) stays frozen:
+// it shipped, and careers begun under it must replay exactly.
+describe('rules 6 compatibility', () => {
+  const legacy = JSON.parse(readFileSync(join(__dirname, '../../../fixtures/legacy-v6-goldens.json'), 'utf8')) as Record<string, Golden>
+  for (const career of CAREERS) it(`preserves ${career.name}`, () => {
+    const result = runCareer(career.scenario, career.seed, career.bot, career.quarters, 6)
+    expect({ checkpointHashes: result.checkpointHashes, summary: result.summary }).toEqual(legacy[career.name])
+  })
+})

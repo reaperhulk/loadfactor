@@ -36,7 +36,7 @@ import {
   RESTRUCTURE_KEEP_ROUTES,
   RESTRUCTURE_MAX} from '../data/constants'
 import { fnv1a, nextInt } from './rng'
-import { getScenario } from '../data/scenarios'
+import { getScenario, objectiveOf } from '../data/scenarios'
 import { inflationBp, resolveMarket } from './market'
 import { resaleValue, totalDebt } from './queries'
 import { expansionEvents, openFundedTerminals, resolveSlotRequests, slotsRemaining } from './slots'
@@ -466,7 +466,7 @@ function resolveQuarter(prev: GameState, outlook: boolean): EngineResult {
   // 9. Milestones on the era's objective: the back half needs a ladder to
   // climb, not just a deadline to wait for.
   for (const p0 of ((state.rulesVersion ?? 1) >= 2 ? state.airlines.filter((a) => a.controller === 'player') : [state.airlines[0]!])) {
-    const obj = getScenario(state.scenario).objective
+    const obj = objectiveOf(state.scenario, state.rulesVersion)
     if (!p0.bankrupt && obj.higherIsBetter) {
       const score = objectiveScore(p0, obj.kind)
       const prevScore = p0.history.length >= 2 ? objectiveScoreAt(p0, obj.kind, p0.history.length - 1) : 0
@@ -510,7 +510,8 @@ function resolveQuarter(prev: GameState, outlook: boolean): EngineResult {
       const ranked = state.airlines.filter((a) => !a.bankrupt && objectiveQualified(state, a))
         .sort((a, b) => objectiveScore(b, scenario.objective.kind) - objectiveScore(a, scenario.objective.kind))
       const winner = ranked[0]
-      if (winner && objectiveMet(objectiveScore(winner, scenario.objective.kind), scenario.objective.target, scenario.objective.higherIsBetter)) state.winnerSeat = winner.id
+      const objective = objectiveOf(state.scenario, state.rulesVersion)
+      if (winner && objectiveMet(objectiveScore(winner, objective.kind), objective.target, objective.higherIsBetter)) state.winnerSeat = winner.id
       state.phase = winner?.controller === 'player' && state.winnerSeat !== undefined ? 'won' : 'lost'
       events.push({ type: 'game_over', result: state.phase, reason: state.winnerSeat === undefined ? 'No airline qualified' : `${winner!.name} wins on ${scenario.objective.label}` })
     }
@@ -520,7 +521,7 @@ function resolveQuarter(prev: GameState, outlook: boolean): EngineResult {
   } else if (state.turn + 1 >= scenario.quarters) {
     // Scored on the ERA's own measure, not always net worth (PLAN §2.4):
     // finish #1 among the live airlines AND clear the qualifying bar.
-    const obj = scenario.objective
+    const obj = objectiveOf(state.scenario, state.rulesVersion)
     const myScore = objectiveScore(player, obj.kind)
     let bestRival: Airline | null = null
     let bestRivalScore = 0

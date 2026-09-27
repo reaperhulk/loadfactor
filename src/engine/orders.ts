@@ -19,5 +19,5 @@ export function orderRefund(order: AircraftOrder, withdraw = canWithdrawOrder(or
 // deliver the quarter after they are signed), and a purchase is while its
 // counter still reads the full lead time.
 export function ordersPlacedThisQuarter(airline: Pick<Airline, 'orders'>): number {
-  return airline.orders.filter((o) => o.leased || o.quartersLeft === getAircraftType(o.type).deliveryQuarters).length
+  return airline.orders.filter((o) => o.leased || o.early || o.quartersLeft === getAircraftType(o.type).deliveryQuarters).length
 }

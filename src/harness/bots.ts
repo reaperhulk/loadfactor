@@ -20,6 +20,7 @@ import {
   scheduleCommands,
   takeoverCommands,
   terminalCommands,
+  serviceCommands,
   treasuryCommands,
   yieldCommands,
   type PolicyDials,
@@ -139,6 +140,7 @@ function greedyCommands(state: GameState, doctrine?: ReturnType<typeof dialsFor>
   commands.push(...slotRequestCommands(state, 0, dials))
   commands.push(...terminalCommands(state, 0, dials))
   commands.push(...yieldCommands(state, 0, dials.fareFloor, dials.fareLevel))
+  commands.push(...serviceCommands(state, 0, dials.serviceLevel))
   const skip = launch.usedAircraft !== null ? new Set([launch.usedAircraft]) : undefined
   commands.push(...assignmentCommands(state, skip))
   return commands

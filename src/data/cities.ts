@@ -5,6 +5,16 @@ export type Region = 'na' | 'sa' | 'eu' | 'me' | 'af' | 'as' | 'oc'
 
 export const REGIONS: readonly Region[] = ['na', 'sa', 'eu', 'me', 'af', 'as', 'oc']
 
+export const REGION_NAMES: Readonly<Record<Region, string>> = {
+  na: 'North America',
+  sa: 'South America',
+  eu: 'Europe',
+  me: 'Middle East',
+  af: 'Africa',
+  as: 'Asia',
+  oc: 'Oceania',
+}
+
 export interface City {
   id: string
   name: string

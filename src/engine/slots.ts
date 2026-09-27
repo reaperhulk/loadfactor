@@ -30,6 +30,7 @@ import {
   SLOT_RENT_PER_POINT,
   TERMINAL_COST_PER_SLOT_POINT_V6,
   TERMINAL_FUNDER_SLOTS_V6,
+  TERMINAL_FUNDER_PREMIUM_BP_V7,
 } from '../data/constants'
 import { fnv1a } from './rng'
 import { slotsAllocated, slotsFree } from './queries'
@@ -117,7 +118,40 @@ export function expansionsBy(seed: string, cityId: string, turn: number): number
 // The city's pool as it stands this quarter: authored capacity plus every
 // programme delivered so far. Nothing reads `city.slotPool` directly.
 export function cityPool(state: GameState, cityId: string): number {
+  if ((state.rulesVersion ?? 1) >= 7) return getCity(cityId).slotPool + programmesOpen(state, cityId, state.turn) * expansionSize(cityId)
   return getCity(cityId).slotPool + expansionsBy(state.seed, cityId, state.turn) * expansionSize(cityId) + fundedSlots(state, cityId, state.turn)
+}
+
+// Rules 7: a funded terminal IS the next scheduled programme, delivered
+// early. Programme k counts once, from whichever comes first: its funded
+// opening or its scheduled one.
+function fundedProgrammes(state: GameState, cityId: string, turn: number): Set<number> {
+  const early = new Set<number>()
+  for (const t of state.world.terminals ?? []) if (t.city === cityId && t.programme !== undefined && t.opensTurn <= turn) early.add(t.programme)
+  return early
+}
+
+export function programmesOpen(state: GameState, cityId: string, turn: number): number {
+  const scheduled = expansionsBy(state.seed, cityId, turn)
+  let early = 0
+  for (const k of fundedProgrammes(state, cityId, turn)) if (k > scheduled) early++
+  return scheduled + early
+}
+
+// The first programme neither delivered on schedule nor funded, as of `turn`.
+function nextUnbuilt(state: GameState, cityId: string, turn: number): number {
+  const taken = new Set<number>()
+  for (const t of state.world.terminals ?? []) if (t.city === cityId && t.programme !== undefined) taken.add(t.programme)
+  let k = expansionsBy(state.seed, cityId, turn) + 1
+  while (taken.has(k)) k++
+  return k
+}
+
+// Rules 7: the funder takes half the programme (at least one slot); the
+// rest serve the waiting list. Rules 6 handed over up to two.
+export function terminalFunderSlots(state: Pick<GameState, 'rulesVersion'>, cityId: string): number {
+  const size = expansionSize(cityId)
+  return (state.rulesVersion ?? 1) >= 7 ? Math.max(1, Math.floor(size / 2)) : Math.min(TERMINAL_FUNDER_SLOTS_V6, size)
 }
 
 // --- Funded terminals (rules 6) --------------------------------------------
@@ -137,6 +171,14 @@ export function fundedSlots(state: GameState, cityId: string, turn: number): num
 // What a funded programme costs today ($k): per slot, per city point,
 // inflated with the era's construction costs.
 export function terminalCost(state: GameState, cityId: string): number {
+  if ((state.rulesVersion ?? 1) >= 7) {
+    // Rules 7: the funder's own slots at a premium over the waiting-list fee
+    // (per slot), and the public share at the list price; inflated.
+    const perSlot = Math.floor(slotFee(cityId) / SLOTS_PER_GRANT)
+    const mine = terminalFunderSlots(state, cityId)
+    const base = Math.floor((perSlot * mine * TERMINAL_FUNDER_PREMIUM_BP_V7) / 10000) + perSlot * (expansionSize(cityId) - mine)
+    return Math.floor((base * inflationBp(state.turn)) / 10000)
+  }
   return Math.floor((TERMINAL_COST_PER_SLOT_POINT_V6 * cityPoints(cityId) * expansionSize(cityId) * inflationBp(state.turn)) / 10000)
 }
 
@@ -144,6 +186,8 @@ export function terminalCost(state: GameState, cityId: string): number {
 // programme per city per half-cadence: concrete takes time even when paid.
 export function terminalBlocker(state: GameState, airlineIdx: number, cityId: string): string | null {
   const airline = state.airlines[airlineIdx]!
+  if ((state.rulesVersion ?? 1) >= 7 && (state.world.terminals ?? []).some((t) => t.funder === airlineIdx && t.opensTurn === state.turn + 1))
+    return 'one funded programme a quarter: the authorities are already building for you'
   const last = (state.world.terminals ?? []).filter((t) => t.city === cityId).reduce((m, t) => Math.max(m, t.opensTurn), -Infinity)
   if (state.turn + 1 - last < Math.floor(EXPANSION_EVERY_QUARTERS / 2)) return `${getCity(cityId).name} is still building its last funded programme`
   if (nextExpansion(state, cityId).quartersAway <= 1) return `${getCity(cityId).name} opens its scheduled programme next quarter anyway`
@@ -159,7 +203,8 @@ export function fundTerminal(state: GameState, airlineIdx: number, cityId: strin
   const slots = expansionSize(cityId)
   state.airlines[airlineIdx]!.cash -= cost
   const opensTurn = state.turn + 1
-  state.world.terminals = [...(state.world.terminals ?? []), { city: cityId, funder: airlineIdx, opensTurn, slots, cost }]
+  const programme = (state.rulesVersion ?? 1) >= 7 ? { programme: nextUnbuilt(state, cityId, state.turn) } : {}
+  state.world.terminals = [...(state.world.terminals ?? []), { city: cityId, funder: airlineIdx, opensTurn, slots, cost, ...programme }]
   return { type: 'terminal_funded', airline: airlineIdx, city: cityId, cost, slots, opensTurn }
 }
 
@@ -168,10 +213,14 @@ export function fundTerminal(state: GameState, airlineIdx: number, cityId: strin
 export function openFundedTerminals(state: GameState, nextTurn: number, events: GameEvent[]): void {
   for (const t of state.world.terminals ?? []) {
     if (t.opensTurn !== nextTurn) continue
-    events.push({ type: 'airport_expanded', city: t.city, slots: t.slots })
+    // The report line goes to the funder and to anyone with a stake here,
+    // like every other opening (expansionEvents).
+    const player = state.airlines[0]
+    if (t.funder === 0 || (player && ((player.slots[t.city] ?? 0) > 0 || player.slotRequests.some((r) => r.city === t.city))))
+      events.push({ type: 'airport_expanded', city: t.city, slots: t.slots })
     const funder = state.airlines[t.funder]
     if (!funder || funder.bankrupt) continue
-    const granted = Math.min(TERMINAL_FUNDER_SLOTS_V6, t.slots)
+    const granted = t.programme !== undefined ? Math.min(t.slots, terminalFunderSlots(state, t.city)) : Math.min(TERMINAL_FUNDER_SLOTS_V6, t.slots)
     funder.slots[t.city] = (funder.slots[t.city] ?? 0) + granted
     events.push({ type: 'slots_granted', airline: funder.id, city: t.city, slots: granted, waited: 1 })
   }
@@ -187,8 +236,8 @@ export interface Expansion {
 // The next programme due at this city — the schedule the airports board
 // publishes. Always defined: authorities never stop building.
 export function nextExpansion(state: GameState, cityId: string): Expansion {
-  const done = expansionsBy(state.seed, cityId, state.turn)
-  const n = done + 1
+  // Rules 7: a programme already funded and delivered early is not "next".
+  const n = (state.rulesVersion ?? 1) >= 7 ? nextUnbuilt(state, cityId, state.turn) : expansionsBy(state.seed, cityId, state.turn) + 1
   const turn = phaseFor(state.seed, cityId) + n * EXPANSION_EVERY_QUARTERS
   return {
     turn,
@@ -211,6 +260,9 @@ export function expansionEvents(state: GameState, nextTurn: number): GameEvent[]
   const events: GameEvent[] = []
   for (const cityId of [...watched].sort()) {
     if (expansionsBy(state.seed, cityId, nextTurn) <= expansionsBy(state.seed, cityId, state.turn)) continue
+    // Rules 7: a programme that was funded opened early; its scheduled date
+    // brings nothing new.
+    if ((state.rulesVersion ?? 1) >= 7 && fundedProgrammes(state, cityId, state.turn).has(expansionsBy(state.seed, cityId, nextTurn))) continue
     events.push({ type: 'airport_expanded', city: cityId, slots: expansionSize(cityId) })
   }
   return events

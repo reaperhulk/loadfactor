@@ -49,6 +49,9 @@ import {
   DEBUT_APPEAL_BP,
   WEEKS_PER_QUARTER,
   SERVICE_YIELD_BP_V6,
+  SERVICE_YIELD_BP_V7,
+  SERVICE_YIELD_BY_SEGMENT_V7,
+  CABIN_YIELD_BY_SEGMENT_V7,
 } from '../data/constants'
 import { capacityDealKind, dealAppealBp, strikeCapacityBp } from './offers'
 import { SEGMENTS } from './itineraries'
@@ -123,9 +126,15 @@ export function fareFor(km: number, fareLevel: number): number {
   return Math.floor((baseFare(km) * FARE_LEVEL_PRICE_BP[fareLevel + 2]!) / 10000)
 }
 
+// Rules 7: the service premium by passenger segment (bp).
+export function segmentServiceYieldBp(state: Pick<GameState, 'rulesVersion'>, segment: PassengerSegment, serviceLevel: number): number {
+  return (state.rulesVersion ?? 1) >= 7 ? SERVICE_YIELD_BY_SEGMENT_V7[segment][serviceLevel - 1]! : serviceYieldBp(state, serviceLevel)
+}
+
 // Rules 6: the product premium a service level earns per passenger (bp).
 export function serviceYieldBp(state: Pick<GameState, 'rulesVersion'>, serviceLevel: number): number {
-  return (state.rulesVersion ?? 1) >= 6 ? SERVICE_YIELD_BP_V6[serviceLevel - 1]! : 10000
+  const rules = state.rulesVersion ?? 1
+  return rules >= 7 ? SERVICE_YIELD_BP_V7[serviceLevel - 1]! : rules >= 6 ? SERVICE_YIELD_BP_V6[serviceLevel - 1]! : 10000
 }
 
 // Seasonal demand multiplier for a city at a turn: tourism peaks in the
@@ -173,6 +182,7 @@ interface Entrant {
   yieldBp: number // capacity-weighted cabin yield on revenue per pax
   debutBp: number // capacity-weighted new-type fanfare (rules 5)
   cabinAppeal?: Record<PassengerSegment, number> // capacity-weighted fit appeal per segment (rules 5)
+  cabinYield?: Record<PassengerSegment, number> // capacity-weighted fit yield per segment (rules 7)
   weight: number // attractiveness for market-share split
 }
 
@@ -234,6 +244,7 @@ export interface RouteAcc {
   yieldBp: number // capacity-weighted cabin yield on revenue per pax
   debutBp?: number // capacity-weighted new-type fanfare (rules 5)
   cabinAppeal?: Record<PassengerSegment, number> // per-segment fit appeal, bp (rules 5)
+  cabinYield?: Record<PassengerSegment, number> // per-segment fit yield, bp (rules 7)
   weeklyRevenue: number // $
   weeklyFuel: number // $
   weeklyFees: number // $
@@ -300,6 +311,8 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
       let debutNum = 0 // Σ seats × debut fanfare (rules 5)
       const modernCabin = (state.rulesVersion ?? 1) >= 5
       const cabinNum = { business: 0, leisure: 0, budget: 0 } // Σ seats × fit appeal per segment (rules 5)
+      const cabinYieldNum = { business: 0, leisure: 0, budget: 0 } // Σ seats × fit yield per segment (rules 7)
+      const segmentYield = (state.rulesVersion ?? 1) >= 7
       // Rules 5: an unsettled hub strike cancels a share of the trips at the
       // struck city. The operations pass already resolved the schedule, so
       // the cut lands on trips and seats here, in whole round trips.
@@ -313,6 +326,7 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
         yieldNum += alloc.seats * trips * 2 * (modernCabin ? CABIN_YIELD_BP_V5 : CABIN_YIELD_BP)[alloc.cabin - 1]!
         debutNum += alloc.seats * trips * 2 * debutAppealBp(state, alloc.type, DEBUT_APPEAL_BP)
         if (modernCabin) for (const segment of SEGMENTS) cabinNum[segment] += alloc.seats * trips * 2 * CABIN_SEGMENT_APPEAL_BP[segment][alloc.cabin - 1]!
+        if (segmentYield) for (const segment of SEGMENTS) cabinYieldNum[segment] += alloc.seats * trips * 2 * CABIN_YIELD_BY_SEGMENT_V7[segment][alloc.cabin - 1]!
       }
       // Accepted world offers can lift a route's appeal (a capacity
       // commitment paying off once the Games actually land).
@@ -333,9 +347,12 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
       const cabinAppeal = modernCabin && weeklyCapacity > 0
         ? { business: Math.floor(cabinNum.business / weeklyCapacity), leisure: Math.floor(cabinNum.leisure / weeklyCapacity), budget: Math.floor(cabinNum.budget / weeklyCapacity) }
         : undefined
+      const cabinYield = segmentYield && weeklyCapacity > 0
+        ? { business: Math.floor(cabinYieldNum.business / weeklyCapacity), leisure: Math.floor(cabinYieldNum.leisure / weeklyCapacity), budget: Math.floor(cabinYieldNum.budget / weeklyCapacity) }
+        : undefined
       const key = pairKey(route.from, route.to)
       const list = pairs.get(key) ?? []
-      list.push({ airlineIdx: airline.id, route, weeklyRoundTrips, weeklyCapacity, yieldBp, debutBp, ...(cabinAppeal ? { cabinAppeal } : {}), weight })
+      list.push({ airlineIdx: airline.id, route, weeklyRoundTrips, weeklyCapacity, yieldBp, debutBp, ...(cabinAppeal ? { cabinAppeal } : {}), ...(cabinYield ? { cabinYield } : {}), weight })
       pairs.set(key, list)
     }
   }
@@ -417,6 +434,7 @@ export function resolveMarket(state: GameState, events: GameEvent[], prepared?: 
         yieldBp: e.yieldBp,
         ...(e.debutBp > 0 ? { debutBp: e.debutBp } : {}),
         ...(e.cabinAppeal ? { cabinAppeal: e.cabinAppeal } : {}),
+        ...(e.cabinYield ? { cabinYield: e.cabinYield } : {}),
         weeklyRevenue: Math.floor((weeklyPax * fare * e.yieldBp) / 10000),
         weeklyFuel,
         weeklyFees: Math.floor((weeklyFees * inflBp) / 10000),

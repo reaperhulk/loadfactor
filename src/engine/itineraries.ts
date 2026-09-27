@@ -4,7 +4,7 @@
 import { distanceKm, getCity, pairKey } from '../data/cities'
 import { BUSINESS_PRICE_DAMPING, CONNECT_DETOUR_MAX_BP, CONNECT_FARE_DISCOUNT_BP, FARE_ELASTICITY_V6, FARE_STIMULATION_CAP_BP, FARE_STIMULATION_V6, SERVICE_COST_PER_PAX, TRANSFER_HANDLING_PER_PAX } from '../data/constants'
 import { getScenario } from '../data/scenarios'
-import { fareFor, inflationBp, pairWeeklyDemand, routeSpoolBp, serviceYieldBp, type RouteAcc } from './market'
+import { fareFor, inflationBp, pairWeeklyDemand, routeSpoolBp, segmentServiceYieldBp, serviceYieldBp, type RouteAcc } from './market'
 import { reputationAppealBp } from './queries'
 import { dealAppealBp, promotionDemandBp } from './offers'
 import type { GameState } from './types'
@@ -81,6 +81,7 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
   const legFare=(leg:RouteAcc)=>Math.floor(ticket(leg)*serviceYieldBp(state,leg.route.serviceLevel)/10000)
   const fares=legs.map(leg=>Math.floor(ticket(leg)*leg.yieldBp/10000))
   const v6 = (state.rulesVersion ?? 1) >= 6
+  const v7 = (state.rulesVersion ?? 1) >= 7
   const spool=legs.map(leg=>routeSpoolBp(state.airlines[leg.airlineIdx]!,leg.route,state.turn))
   for(const leg of legs) {leg.segments={business:0,leisure:0,budget:0};leg.transferRevenue=0}
   const audit: MarketAudit[] = []
@@ -188,7 +189,10 @@ export function resolveItineraries(state: GameState, legs: RouteAcc[], periodWee
           if (journeys) journeys[i]! += take
           if (it.legs.length === 2) { segmentConnections += take; connecting += take }
           for (const leg of it.legs) {
-            const revenue = Math.floor(take * legFare(leg) * leg.yieldBp / 10000 * (it.legs.length === 2 ? CONNECT_FARE_DISCOUNT_BP / 10000 : 1))
+            const fare = v7 ? Math.floor(ticket(leg) * segmentServiceYieldBp(state, segment, leg.route.serviceLevel) / 10000) : legFare(leg)
+            // Rules 7: the cabin's yield as this segment values it.
+            const cabinYieldBp = leg.cabinYield ? leg.cabinYield[segment] : leg.yieldBp
+            const revenue = Math.floor(take * fare * cabinYieldBp / 10000 * (it.legs.length === 2 ? CONNECT_FARE_DISCOUNT_BP / 10000 : 1))
             leg.weeklyPax += take
             leg.segments![segment] += take
             leg.weeklyRevenue += revenue

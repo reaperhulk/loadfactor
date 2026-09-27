@@ -24,6 +24,7 @@ import {
   surplusCommands,
   takeoverCommands,
   terminalCommands,
+  serviceCommands,
   treasuryCommands,
   yieldCommands,
   type PolicyDials,
@@ -160,6 +161,7 @@ export function runRivalTurn(state: GameState, idx: number, events: GameEvent[])
   applyAll(state, idx, pruneCommands(state, idx), events)
   applyAll(state, idx, hedgeCommands(state, idx), events)
   applyAll(state, idx, yieldCommands(state, idx, personality.fareFloor, personality.fareLevel), events)
+  applyAll(state, idx, serviceCommands(state, idx, personality.serviceLevel), events)
   applyAll(state, idx, renewalCommands(state, idx), events)
   applyAll(state, idx, scheduleCommands(state, idx), events)
   applyAll(state, idx, refitCommands(state, idx, personality.cabin), events)

@@ -24,8 +24,14 @@ import {
   RELEASE_KEEP_PAIR_SCORE,
   TAKEOVER_BASE_K,
   TAKEOVER_PREMIUM_BP,
+  HEDGE_MIN_QUARTERS,
+  HEDGE_MAX_QUARTERS,
+  SERVICE_COST_PER_PAX,
+  SERVICE_YIELD_BY_SEGMENT_V7,
+  CABIN_SEATS_BP,
+  CABIN_YIELD_BY_SEGMENT_V7,
 } from '../data/constants'
-import { estimateAircraftQuarterCost, inflationBp, pairWeeklyDemand, routeSpoolBp } from './market'
+import { estimateAircraftQuarterCost, fareFor, inflationBp, pairWeeklyDemand, routeSpoolBp } from './market'
 import { getScenario } from '../data/scenarios'
 import { nextExpansion, slotFee, slotsRemaining, terminalBlocker, terminalCost } from './slots'
 import {
@@ -44,6 +50,7 @@ import {
 } from './queries'
 import { effFuelBp } from './worldEvents'
 import { getEventDef } from '../data/events'
+import { segmentMix } from './itineraries'
 import type { Airline, Command, GameState } from './types'
 
 // Rules 6 planning horizons for capital that pays back slowly.
@@ -104,11 +111,46 @@ export function hedgeCommands(state: GameState, idx: number): Command[] {
   }
   // Rules 6: an announced fuel shock is worth hedging even at today's price —
   // the lock carries only half of the shock the market is about to charge.
-  if ((state.rulesVersion ?? 1) >= 6 && airline.fuelHedge === null && airline.fleet.length > 0 &&
-      (state.world.announced ?? []).some((e) => (getEventDef(e.id).fuelModBp ?? 10000) > 10000)) {
+  const shock = (state.world.announced ?? []).find((e) => (getEventDef(e.id).fuelModBp ?? 10000) > 10000)
+  // Rules 7: cover the shock's whole run. Never replace a running contract:
+  // it was locked before the news, and the desk now prices most of the
+  // shock in, so the old lock is the better one for as long as it lasts.
+  if ((state.rulesVersion ?? 1) >= 7 && shock && airline.fleet.length > 0 && airline.fuelHedge === null) {
+    return [{ type: 'hedge_fuel', quarters: Math.max(HEDGE_MIN_QUARTERS, Math.min(HEDGE_MAX_QUARTERS, shock.quartersLeft)) }]
+  }
+  if ((state.rulesVersion ?? 1) === 6 && airline.fuelHedge === null && airline.fleet.length > 0 && shock) {
     return [{ type: 'hedge_fuel', quarters: 4 }]
   }
   return []
+}
+
+// Rules 7: service is a per-route product decision. Each passenger pays the
+// service's yield on the ticket and costs its per-passenger service bill;
+// pick the level that nets the most per passenger, within a step of the
+// doctrine's own posture (a budget carrier never goes full service).
+export function serviceCommands(state: GameState, idx: number, posture: number): Command[] {
+  if ((state.rulesVersion ?? 1) < 7) return []
+  const airline = state.airlines[idx]!
+  const infl = inflationBp(state.turn)
+  const lo = Math.max(1, posture - 1), hi = Math.min(3, posture + 1)
+  const commands: Command[] = []
+  for (const route of airline.routes) {
+    if (route.lastCapacity === 0) continue
+    const fare = fareFor(distanceKm(route.from, route.to), route.fareLevel)
+    // The route's own passengers by segment (what it actually carried, else
+    // the pair's expected mix) weigh the segment premiums.
+    const mix = route.lastSegments && route.lastPax > 0 ? route.lastSegments : segmentMix(route.from, route.to)
+    const total = Math.max(1, mix.business + mix.leisure + mix.budget)
+    let best = route.serviceLevel, bestNet = -Infinity
+    for (let level = lo; level <= hi; level++) {
+      const y = SERVICE_YIELD_BY_SEGMENT_V7
+      const yieldBp = Math.floor((mix.business * y.business[level - 1]! + mix.leisure * y.leisure[level - 1]! + mix.budget * y.budget[level - 1]!) / total)
+      const net = Math.floor((fare * yieldBp) / 10000) - Math.floor((SERVICE_COST_PER_PAX[level - 1]! * infl) / 10000)
+      if (net > bestNet) { bestNet = net; best = level }
+    }
+    if (best !== route.serviceLevel) commands.push({ type: 'set_service', routeId: route.id, serviceLevel: best })
+  }
+  return commands
 }
 
 // Rules 6: the highest fare a doctrine will charge on a full route: two
@@ -293,9 +335,28 @@ export function refitCommands(state: GameState, idx: number, cabin: number): Com
   const commands: Command[] = []
   for (const ac of airline.fleet) {
     if (commands.length >= 2) break
-    if (ac.cabin !== cabin) commands.push({ type: 'refit_cabin', aircraftId: ac.id, cabin })
+    const target = (state.rulesVersion ?? 1) >= 7 ? cabinForRoute(airline, ac.routeId, cabin) : cabin
+    if (ac.cabin !== target) commands.push({ type: 'refit_cabin', aircraftId: ac.id, cabin: target })
   }
   return commands
+}
+
+// Rules 7: the fit is a per-route decision. Within a step of the doctrine's
+// posture, pick the fit that earns the most per flight at full loads for
+// the route's own passenger mix; keep the current fit unless the best one
+// is clearly better (a refit costs real money). Idle airframes take the
+// doctrine's posture.
+function cabinForRoute(airline: Airline, routeId: number | null, posture: number): number {
+  const route = routeId === null ? undefined : airline.routes.find((r) => r.id === routeId)
+  if (!route) return posture
+  const mix = route.lastSegments && route.lastPax > 0 ? route.lastSegments : segmentMix(route.from, route.to)
+  const total = Math.max(1, mix.business + mix.leisure + mix.budget)
+  const value = (c: number) => Math.floor((CABIN_SEATS_BP[c - 1]! * Math.floor((mix.business * CABIN_YIELD_BY_SEGMENT_V7.business[c - 1]! + mix.leisure * CABIN_YIELD_BY_SEGMENT_V7.leisure[c - 1]! + mix.budget * CABIN_YIELD_BY_SEGMENT_V7.budget[c - 1]!) / total)) / 10000)
+  const current = airline.fleet.find((a) => a.routeId === routeId)?.cabin ?? posture
+  let best = Math.min(3, Math.max(1, current))
+  for (let c = Math.max(1, posture - 1); c <= Math.min(3, posture + 1); c++) if (value(c) > value(best) + 300) best = c
+  if (best < posture - 1 || best > posture + 1) best = posture
+  return best
 }
 
 // The endgame lever: a distressed rival's network for cash — only when the
@@ -327,7 +388,10 @@ export function takeoverCommands(
     // be cheaper than queueing for the target's slots, and there must be
     // time left to fly them. Earlier rules bought anything distressed.
     if ((state.rulesVersion ?? 1) >= 6 && !takeoverPaysFor(state, other, price)) continue
-    if (airline.cash >= price + buffer * 2) {
+    // Rules 7: an overdraft comes with the company, so it counts against
+    // the treasury the deal must leave standing.
+    const inherited = (state.rulesVersion ?? 1) >= 7 ? Math.min(0, other.cash) : 0
+    if (airline.cash + inherited >= price + buffer * 2) {
       return [{ type: 'acquire_rival', target: other.id }]
     }
   }

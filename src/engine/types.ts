@@ -72,6 +72,7 @@ export interface OperationsSummary {
 }
 
 export interface AircraftOrder {
+  early?: true // rules 7: a production slot bought from an offer (counts against the order line)
   replacesAircraftId?: number
   id: number
   type: string
@@ -327,6 +328,7 @@ export interface FundedTerminal {
   opensTurn: number // counts toward the pool from this turn
   slots: number
   cost: number
+  programme?: number // rules 7: the scheduled programme this brings forward
 }
 
 export interface GameState {
@@ -456,10 +458,10 @@ export type GameEvent =
   | { type: 'airline_bankrupt'; airline: number }
   | { type: 'airline_restructured'; airline: number; routesClosed: number; fleetSold: number; debtWiped: number }
   | { type: 'airline_entered'; airline: number; name: string; hq: string; capitalK?: number; backed?: boolean }
-  | { type: 'offer_made'; offerId: number; kind: WorldOffer['kind']; headline: string; expiresTurn: number }
+  | { type: 'offer_made'; offerId: number; kind: WorldOffer['kind']; headline: string; expiresTurn: number; airline?: number }
   | { type: 'offer_accepted'; offerId: number; kind: WorldOffer['kind']; costK: number }
   | { type: 'offer_declined'; offerId: number }
-  | { type: 'offer_expired'; offerId: number; headline: string }
+  | { type: 'offer_expired'; offerId: number; headline: string; airline?: number }
   | { type: 'deal_ended'; kind: WorldOffer['kind']; city: string | null }
   | { type: 'aircraft_grounded'; airline: number; aircraftId: number; aircraftType: string; quarters: number; repairK: number }
   | { type: 'milestone_reached'; airline: number; label: string; pctOfTarget: number }

@@ -36,12 +36,17 @@ describe('fleet depth', () => {
     expect(again.events[0]).toMatchObject({ type: 'command_rejected' })
   })
 
-  it('a fuel hedge locks the index, runs off, and cannot be doubled', () => {
-    let r = applyCommand(newGame('jet_age', 'hedge-seed'), { type: 'hedge_fuel', quarters: 4 })
+  it('a fuel hedge locks the index, runs off, and cannot be doubled (rules 6 and earlier)', () => {
+    let r = applyCommand(newGame('jet_age', 'hedge-seed', undefined, undefined, 6), { type: 'hedge_fuel', quarters: 4 })
     expect(r.events[0]).toMatchObject({ type: 'fuel_hedged', quarters: 4 })
     expect(r.state.airlines[0]!.fuelHedge).toMatchObject({ quartersLeft: 4 })
     const doubled = applyCommand(r.state, { type: 'hedge_fuel', quarters: 4 })
     expect(doubled.events[0]).toMatchObject({ type: 'command_rejected' })
+    // Rules 7: a running contract can be replaced; its remaining quarters go.
+    const modern = applyCommand(newGame('jet_age', 'hedge-seed'), { type: 'hedge_fuel', quarters: 4 })
+    const replaced = applyCommand(modern.state, { type: 'hedge_fuel', quarters: 2 })
+    expect(replaced.events[0]).toMatchObject({ type: 'fuel_hedged', quarters: 2 })
+    expect(replaced.state.airlines[0]!.fuelHedge).toMatchObject({ quartersLeft: 2 })
     for (let q = 0; q < 4; q++) r = applyCommand(r.state, { type: 'end_quarter' })
     expect(r.state.airlines[0]!.fuelHedge).toBeNull()
     // Bad durations reject.

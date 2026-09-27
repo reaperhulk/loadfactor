@@ -8,9 +8,9 @@
 // against. They are offered to the PLAYER only: rivals are policy-driven and
 // have no way to weigh a gamble, and a coin-flip AI answer would be noise.
 
-import { CITIES, distanceKm, getCity, pairKey } from '../data/cities'
+import { CITIES, REGION_NAMES, distanceKm, getCity, pairKey } from '../data/cities'
 import { AIRCRAFT, getAircraftType, typesOnSale } from '../data/aircraft'
-import { AIRLIFT_CAPACITY_BP_V6, OFFICIAL_CARRIER_DEMAND_BP_V6, AI_MIN_ROUTE_KM, EARLY_DELIVERY_PREMIUM_BP, FLEET_SALE_PRICE_BP, OFFER_EVERY_QUARTERS_V5, ROUTE_RIGHTS_QUARTERS, STRIKE_CAPACITY_BP } from '../data/constants'
+import { AIRLIFT_CAPACITY_BP_V7, AIRLIFT_FEE_BP_V7, AIRLIFT_OFFER_MAX_LF_BP_V7, OFFICIAL_CARRIER_MAX_LF_BP_V7, AIRLIFT_CAPACITY_BP_V6, OFFICIAL_CARRIER_DEMAND_BP_V6, AI_MIN_ROUTE_KM, EARLY_DELIVERY_PREMIUM_BP, FLEET_SALE_PRICE_BP, OFFER_EVERY_QUARTERS_V5, ROUTE_RIGHTS_QUARTERS, STRIKE_CAPACITY_BP } from '../data/constants'
 import { pairWeeklyDemand } from './market'
 import { aircraftOperations, modernOperations } from './operations'
 import { slotsRemaining } from './slots'
@@ -27,6 +27,19 @@ import { netWorth, resaleValue, slotCities, yearOf } from './queries'
 import { effFuelBp } from './worldEvents'
 import { getEventDef } from '../data/events'
 import type { Airline, GameEvent, GameState, OfferKind, WorldOffer } from './types'
+
+// Money in offer prose. Rules 7 writes it the way the rest of the game does
+// ("$2.5M"); earlier rules keep their original strings, which live in saved
+// state and so in replay hashes.
+export function offerMoney(state: Pick<GameState, 'rulesVersion'>, k: number): string {
+  if ((state.rulesVersion ?? 1) < 7) return `${k.toLocaleString('en-US')}k`
+  const sign = k < 0 ? '−' : ''
+  const a = Math.abs(k)
+  const tenths = (n: number, unit: number) => `${Math.floor(n / unit)}.${Math.floor((n % unit) * 10 / unit)}`
+  if (a >= 1_000_000) return `${sign}$${tenths(a, 1_000_000)}B`
+  if (a >= 1000) return `${sign}$${tenths(a, 1000)}M`
+  return `${sign}$${a}k`
+}
 
 // Cost scales with the era so an offer stays meaningful as the money grows.
 function eraScale(state: GameState, seat = 0): number {
@@ -81,7 +94,7 @@ function offerV5(state: GameState, player: Airline, kind: OfferKind, id: number,
       const cost = Math.floor((t.price * (10000 + EARLY_DELIVERY_PREMIUM_BP)) / 10000)
       return { ...base, kind, city: null, aircraftType: t.id, costK: cost, untilTurn: state.turn + 1,
         headline: `Production slot: a ${t.name} next quarter`,
-        detail: `A cancelled order has freed a ${t.name} on the line. Pay ${EARLY_DELIVERY_PREMIUM_BP / 100}% over list (${cost.toLocaleString('en-US')}k, paid now) and it delivers next quarter instead of in ${t.deliveryQuarters}. Pass, and the slot goes to whoever is next in line.` }
+        detail: `A cancelled order has freed a ${t.name} on the line. Pay ${EARLY_DELIVERY_PREMIUM_BP / 100}% over list (${offerMoney(state, cost)}, paid now) and it delivers next quarter instead of in ${t.deliveryQuarters}. Pass, and the slot goes to whoever is next in line.` }
     }
     case 'fleet_sale': {
       const year = yearOf(state)
@@ -93,7 +106,7 @@ function offerV5(state: GameState, player: Airline, kind: OfferKind, id: number,
       const each = Math.floor((resaleValue(t.id, ageQuarters) * FLEET_SALE_PRICE_BP) / 10000)
       return { ...base, kind, city: null, aircraftType: t.id, count, ageQuarters, costK: each * count, untilTurn: state.turn + 1,
         headline: `Liquidation: ${count} used ${t.name}s at ${FLEET_SALE_PRICE_BP / 100}% of value`,
-        detail: `A failed carrier's receivers are selling ${count} ${t.name}s (${Math.floor(ageQuarters / 4)} years old) as one lot for ${(each * count).toLocaleString('en-US')}k, delivered immediately. Your strongest rival is bidding too: decide this quarter, or the lot is theirs.` }
+        detail: `A failed carrier's receivers are selling ${count} ${t.name}s (${Math.floor(ageQuarters / 4)} years old) as one lot for ${offerMoney(state, each * count)}, delivered immediately. Your strongest rival is bidding too: decide this quarter, or the lot is theirs.` }
     }
     case 'route_rights': {
       const city = routeRightsCity(state, player)
@@ -101,7 +114,7 @@ function offerV5(state: GameState, player: Airline, kind: OfferKind, id: number,
       const hub = getCity(player.hq).name, there = getCity(city).name
       return { ...base, kind, city, pair: pairKey(player.hq, city), slots: 2, costK: scale, upkeepK: Math.max(100, Math.floor(scale / 10)), untilTurn: state.turn + ROUTE_RIGHTS_QUARTERS,
         headline: `Bilateral: exclusive ${hub}–${there} rights`,
-        detail: `Two governments will designate you sole carrier on ${hub}–${there} for ${ROUTE_RIGHTS_QUARTERS} quarters: two slots at ${there} now, and no rival may open the pair while the treaty runs. It costs ${scale.toLocaleString('en-US')}k up front plus a quarterly fee, whether or not you ever fly it.` }
+        detail: `Two governments will designate you sole carrier on ${hub}–${there} for ${ROUTE_RIGHTS_QUARTERS} quarters: two slots at ${there} now, and no rival may open the pair while the treaty runs. It costs ${offerMoney(state, scale)} up front plus a quarterly fee, whether or not you ever fly it.` }
     }
     default: return null
   }
@@ -122,8 +135,15 @@ export function eventOffers(state: GameState, events: GameEvent[]): void {
       if (airline.controller !== 'player' || airline.bankrupt) continue
       const touched = airline.routes.filter((r) => touches(news, r.from) || touches(news, r.to))
       if (touched.length === 0) continue
+      // Rules 7: ask only when the answer is not obvious. Seat-weighted load
+      // on the touched routes, before the news (and after it, for a slump).
+      const v7 = (state.rulesVersion ?? 1) >= 7
+      const seats = touched.reduce((n, r) => n + r.lastCapacity, 0)
+      const loadBp = seats > 0 ? Math.floor((touched.reduce((n, r) => n + r.lastPax, 0) * 10000) / seats) : 0
+      if (v7 && surge && loadBp >= OFFICIAL_CARRIER_MAX_LF_BP_V7) continue
+      if (v7 && !surge && Math.floor((loadBp * def.demandModBp) / 10000) >= AIRLIFT_OFFER_MAX_LF_BP_V7) continue
       if (state.world.offers.some((o) => o.airline === airline.id && o.eventId === news.id)) continue
-      const where = news.city !== null ? getCity(news.city).name : news.region !== null ? regionName(news.region) : 'the region'
+      const where = news.city !== null ? getCity(news.city).name : news.region !== null ? ((state.rulesVersion ?? 1) >= 7 ? REGION_NAMES[news.region] : regionName(news.region)) : 'the region'
       const from = state.turn + 1
       const until = from + def.durationQuarters
       const base = { id: state.world.nextOfferId++, airline: airline.id, city: news.city, region: news.region, eventId: news.id,
@@ -133,19 +153,26 @@ export function eventOffers(state: GameState, events: GameEvent[]): void {
         const costK = Math.max(300, Math.floor(eraScale(state, airline.id) / 4))
         offer = { ...base, kind: 'official_carrier', costK, demandBonusBp: OFFER_GAMES_BONUS_BP,
           headline: `${def.name}: official carrier at ${where}?`,
-          detail: `The organisers of the ${def.name.toLowerCase()} at ${where} want an official airline. Pay ${costK.toLocaleString('en-US')}k now and for ${def.durationQuarters} quarter${def.durationQuarters === 1 ? '' : 's'} your flights there carry +${OFFER_GAMES_BONUS_BP / 100}% appeal and the promotion lifts travel on those pairs by ${OFFICIAL_CARRIER_DEMAND_BP_V6 / 100}%. Worth it only with seats to sell.` }
+          detail: `The organisers of the ${def.name.toLowerCase()} at ${where} want an official airline. Pay ${offerMoney(state, costK)} now and for ${def.durationQuarters} quarter${def.durationQuarters === 1 ? '' : 's'} your flights there carry +${OFFER_GAMES_BONUS_BP / 100}% appeal and the promotion lifts travel on those pairs by ${OFFICIAL_CARRIER_DEMAND_BP_V6 / 100}%. Worth it only with seats to sell.` }
       } else {
         // The contract pays for the seats it takes, at a fraction of what
         // they earned before the news — generous if the slump empties them,
         // expensive if your planes were going to fill anyway.
         const touchedRevenue = touched.reduce((sum, r) => sum + r.lastRevenue, 0)
-        const incomeK = Math.max(100, Math.floor((touchedRevenue * (10000 - AIRLIFT_CAPACITY_BP_V6) * 8000) / 100_000_000))
-        offer = { ...base, kind: 'airlift_contract', costK: 0, demandBonusBp: 0, incomeK, capacityBp: AIRLIFT_CAPACITY_BP_V6,
+        // Rules 7: the charter takes more of the schedule and pays a share of
+        // what the slumped market would have earned — worth it only when the
+        // seats would have flown empty. Rules 6 paid 40% of pre-slump revenue
+        // for half the trips, which won every time.
+        const capacityBp = v7 ? AIRLIFT_CAPACITY_BP_V7 : AIRLIFT_CAPACITY_BP_V6
+        const incomeK = v7
+          ? Math.max(100, Math.floor((Math.floor((touchedRevenue * def.demandModBp) / 10000) * AIRLIFT_FEE_BP_V7) / 10000))
+          : Math.max(100, Math.floor((touchedRevenue * (10000 - AIRLIFT_CAPACITY_BP_V6) * 8000) / 100_000_000))
+        offer = { ...base, kind: 'airlift_contract', costK: 0, demandBonusBp: 0, incomeK, capacityBp,
           headline: `${def.name}: government airlift from ${where}?`,
-          detail: `The ${def.name.toLowerCase()} at ${where} lands next quarter (demand there falls to ${def.demandModBp / 100}%). The government will charter ${100 - AIRLIFT_CAPACITY_BP_V6 / 100}% of your trips touching ${where} for ${def.durationQuarters} quarter${def.durationQuarters === 1 ? '' : 's'} and pay ${incomeK.toLocaleString('en-US')}k a quarter for them. Take it if your seats there would fly empty; refuse if you can fill them.` }
+          detail: `The ${def.name.toLowerCase()} at ${where} lands next quarter (demand there falls to ${def.demandModBp / 100}%). The government will charter ${100 - capacityBp / 100}% of your trips touching ${where} for ${def.durationQuarters} quarter${def.durationQuarters === 1 ? '' : 's'} and pay ${offerMoney(state, incomeK)} a quarter for them. Take it if your seats there would fly empty; refuse if you can fill them.` }
       }
       state.world.offers.push(offer)
-      events.push({ type: 'offer_made', offerId: offer.id, kind: offer.kind, headline: offer.headline, expiresTurn: offer.expiresTurn })
+      events.push({ type: 'offer_made', offerId: offer.id, kind: offer.kind, headline: offer.headline, expiresTurn: offer.expiresTurn, airline: offer.airline ?? 0 })
     }
   }
 }
@@ -195,7 +222,7 @@ export function maybeOfferDeal(state: GameState, events: GameEvent[]): void {
       const made = offerV5(state, player, kind, id, scale, state.turn + 1)
       if (!made) return
       state.world.offers.push(made)
-      events.push({ type: 'offer_made', offerId: made.id, kind: made.kind, headline: made.headline, expiresTurn: made.expiresTurn })
+      events.push({ type: 'offer_made', offerId: made.id, kind: made.kind, headline: made.headline, expiresTurn: made.expiresTurn, airline: made.airline ?? 0 })
       return
     }
   }
@@ -264,7 +291,7 @@ export function maybeOfferDeal(state: GameState, events: GameEvent[]): void {
   }
   if (modern) offer.airline = player.id
   state.world.offers.push(offer)
-  events.push({ type: 'offer_made', offerId: offer.id, kind: offer.kind, headline: offer.headline, expiresTurn })
+  events.push({ type: 'offer_made', offerId: offer.id, kind: offer.kind, headline: offer.headline, expiresTurn, airline: offer.airline ?? 0 })
 }
 
 // A refused (or ignored) strike ballot becomes the strike: one quarter of
@@ -293,7 +320,7 @@ export function expireOffersAndDeals(state: GameState, events: GameEvent[]): voi
   const live: WorldOffer[] = []
   for (const offer of state.world.offers) {
     if (state.turn >= offer.expiresTurn) {
-      events.push({ type: 'offer_expired', offerId: offer.id, headline: offer.headline })
+      events.push({ type: 'offer_expired', offerId: offer.id, headline: offer.headline, airline: offer.airline ?? 0 })
       const owner = state.airlines[offer.airline ?? 0]
       if (offer.kind === 'hub_strike' && owner && !owner.bankrupt) owner.deals = [...(owner.deals ?? []), strikeDeal(offer, state.turn + 1)]
       if (offer.kind === 'fleet_sale') rivalBuysLot(state, offer, events)
@@ -328,6 +355,9 @@ export function dealAppealBp(state: GameState, airlineIdx: number, from: string,
     // The payoff window has to have arrived AND the route has to touch it.
     if (!dealTouches(deal, from, to)) continue
     if (state.turn < deal.fromTurn) continue // committed, but the Games are not here yet
+    // Rules 7: the market resolves before deals expire, so without this the
+    // appeal ran one quarter past the deal.
+    if ((state.rulesVersion ?? 1) >= 7 && state.turn >= deal.untilTurn) continue
     bp += deal.demandBonusBp
   }
   return bp
