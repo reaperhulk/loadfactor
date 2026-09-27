@@ -45,12 +45,12 @@ export function forecastRange(state: GameState, seat: number, forecast: ReturnTy
 
   // Demand noise and the economy walk: symmetric, on all revenue.
   const demandSwing = Math.floor((revenue * (DEMAND_NOISE_SPREAD_BP / 2 + ECONOMY_STEP_BP)) / 10000)
-  if (demandSwing > 0) drivers.push({ label: 'Demand noise and the economy walk', low: -demandSwing, high: demandSwing })
+  if (demandSwing > 0) drivers.push({ label: 'Demand and economy drift', low: -demandSwing, high: demandSwing })
 
   // Fuel: one step of the walk on the unhedged fuel bill.
   if (airline.fuelHedge === null && forecast.breakdown.fuel > 0) {
     const fuelSwing = Math.floor((forecast.breakdown.fuel * FUEL_STEP_BP) / 10000)
-    if (fuelSwing > 0) drivers.push({ label: 'Fuel price walk (unhedged)', low: -fuelSwing, high: fuelSwing })
+    if (fuelSwing > 0) drivers.push({ label: 'Fuel price drift (unhedged)', low: -fuelSwing, high: fuelSwing })
   }
 
   // Events ending this quarter reverse before the market resolves.

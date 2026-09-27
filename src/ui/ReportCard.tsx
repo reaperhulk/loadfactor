@@ -12,7 +12,7 @@ import { pairKey } from '../data/cities'
 import { getEventDef } from '../data/events'
 import type { GameEvent, GameState } from '../engine'
 import { objectiveScoreAt, quarterOf, yearOf } from '../engine/queries'
-import { COST_LABELS, money, tone } from './format'
+import { COST_LABELS, money, pct, tone } from './format'
 import { Sparkline } from './Sparkline'
 import { viewSeat } from './session'
 
@@ -93,7 +93,7 @@ export function ReportCard({ state, events, onClose, onInspect }: ReportCardProp
             {money(Math.abs(now.profit))}
           </div>
           <div className="report-hero-sub">
-            {now.revenue > 0 ? `${((now.profit * 100) / now.revenue).toFixed(1)}% margin` : 'no revenue'}
+            {now.revenue > 0 ? `${pct(Math.round((now.profit * 10000) / now.revenue), 1)} margin` : 'no revenue'}
             {prev && ` · ${delta(now.profit, prev.profit)} on last quarter`}
           </div>
           {player.history.length >= 3 && (
@@ -133,7 +133,7 @@ export function ReportCard({ state, events, onClose, onInspect }: ReportCardProp
               <tr>
                 <td className="dim">margin</td>
                 <td className={tone(now.profit)}>
-                  {((now.profit * 100) / now.revenue).toFixed(1)}%
+                  {pct(Math.round((now.profit * 10000) / now.revenue), 1)}
                 </td>
                 <td />
               </tr>

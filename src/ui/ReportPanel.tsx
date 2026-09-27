@@ -271,24 +271,29 @@ export function ReportPanel({ state, archive, onInspect }: { state: GameState; a
   const dateOf = (turn: number): string => `${startYear + Math.floor(turn / 4)} Q${(turn % 4) + 1}`
   return (
     <div>
-      <p>
-        <button
-          className={`link-btn sort-btn${view === 'quarter' ? ' active' : ''}`}
-          data-testid="report-view-quarter"
-          onClick={() => setView('quarter')}
-        >
-          quarterly
-        </button>
-        <button
-          className={`link-btn sort-btn${view === 'years' ? ' active' : ''}`}
-          data-testid="report-view-years"
-          onClick={() => setView('years')}
-        >
-          annual review
-        </button>
+      <p className="report-toolbar">
+        {/* A segmented control: two bare link buttons ran together into
+            "quarterlyannual review". */}
+        <span className="segmented" role="group" aria-label="report view">
+          <button
+            className={`segment${view === 'quarter' ? ' active' : ''}`}
+            data-testid="report-view-quarter"
+            aria-pressed={view === 'quarter'}
+            onClick={() => setView('quarter')}
+          >
+            Quarterly
+          </button>
+          <button
+            className={`segment${view === 'years' ? ' active' : ''}`}
+            data-testid="report-view-years"
+            aria-pressed={view === 'years'}
+            onClick={() => setView('years')}
+          >
+            Annual review
+          </button>
+        </span>
         {view === 'quarter' && (
           <span className="report-nav">
-            {' · '}
             <button
               aria-label="previous quarter"
               data-testid="report-prev"

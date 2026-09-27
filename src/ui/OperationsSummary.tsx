@@ -1,5 +1,5 @@
 import type { OperationsSummary as Summary, Route } from '../engine/types'
-import { money } from './format'
+import { joinParts, money, plural } from './format'
 
 export function OperationsSummary({ summary, forecast = false, routes = [] }: { summary: Summary; forecast?: boolean; routes?: Pick<Route, 'id' | 'from' | 'to'>[] }) {
   const affected = summary.routes.filter(r => r.covered > 0 || r.cancelled > 0 || r.unservedSeats > 0)
@@ -33,11 +33,12 @@ export function OperationsSummary({ summary, forecast = false, routes = [] }: { 
         </div>
       </dl>
       <p className="dim">
-        Repairs {money(summary.repairCost)} · checks {money(summary.checkCost)} · recovery{' '}
-        {money(summary.recoveryCost)}. Included in company costs.
+        {summary.repairCost || summary.checkCost || summary.recoveryCost
+          ? `${joinParts([summary.repairCost > 0 && `Repairs ${money(summary.repairCost)}`, summary.checkCost > 0 && `Checks ${money(summary.checkCost)}`, summary.recoveryCost > 0 && `Recovery ${money(summary.recoveryCost)}`])}. Included in company costs.`
+          : 'No repair, check or recovery costs this quarter.'}
       </p>
       {affected.length > 0 && <details className="operations-route-detail" data-testid="operations-route-detail">
-        <summary>{affected.length} routes with cover or disruption</summary>
+        <summary>{plural(affected.length, 'route')} with cover or disruption</summary>
         <div className="table-scroll"><table><thead><tr><th>Route</th><th>Completed</th><th>Covered</th><th>Cancelled</th></tr></thead><tbody>{affected.map(r => {
           const route = routes.find(route => route.id === r.routeId)
           return <tr key={r.routeId}><td>{route ? `${route.from}–${route.to}` : `Route #${r.routeId}`}</td><td>{r.completed}/{r.scheduled}</td><td>{r.covered}</td><td className={r.cancelled ? 'neg' : ''}>{r.cancelled}</td></tr>

@@ -45,3 +45,11 @@ export function readApprovedPlans(value: unknown): ApprovedPlan[] {
     return Array.isArray(p.routes) && p.routes.length <= 1000 && p.routes.every((r: ApprovedPlan['routes'][number]) => r && Number.isInteger(r.id) && typeof r.from === 'string' && r.from.length <= 10 && typeof r.to === 'string' && r.to.length <= 10 && finite(r.contribution) && finite(r.pax))
   })
 }
+
+// The result-versus-plan figures. When cash missed the plan by exactly the
+// profit miss (the usual case — nothing but the quarter's result moved the
+// cash) one row says so, instead of two identical numbers side by side.
+export function planDeltaRows(profitDelta: number, cashDelta: number): { label: string; value: number }[] {
+  if (profitDelta === cashDelta) return [{ label: 'Profit and cash vs plan', value: profitDelta }]
+  return [{ label: 'Profit vs plan', value: profitDelta }, { label: 'Cash vs plan', value: cashDelta }]
+}
