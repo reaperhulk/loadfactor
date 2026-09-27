@@ -1,0 +1,6482 @@
+[
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-0",
+    "bot": "naive",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 129005,
+    "netWorth": 133085,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 87,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 1,
+      "quartersMeasured": 73,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.025,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10389,
+      "leisure": 9938,
+      "budget": 9938
+    },
+    "score": 133085,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-1",
+    "bot": "naive",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 101577,
+    "netWorth": 105657,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 582,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 73,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.025,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10395,
+      "leisure": 9944,
+      "budget": 9944
+    },
+    "score": 105657,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-2",
+    "bot": "naive",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 36424,
+    "netWorth": 40504,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": -1703,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 73,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.025,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10341,
+      "leisure": 9923,
+      "budget": 9923
+    },
+    "score": 40504,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-3",
+    "bot": "naive",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 55924,
+    "netWorth": 60004,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": -1319,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 1,
+      "quartersMeasured": 73,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.025,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10383,
+      "leisure": 9903,
+      "budget": 9903
+    },
+    "score": 60004,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-0",
+    "bot": "greedy",
+    "turn": 80,
+    "phase": "won",
+    "cash": 4565714,
+    "netWorth": 4978838,
+    "routes": 32,
+    "fleet": 40,
+    "quarterlyProfit": 62176,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 73,
+      "quartersMeasured": 73,
+      "proposedActions": 544,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 6.8,
+      "largestQuarter": 15,
+      "actionTypes": 15
+    },
+    "preference": {
+      "business": 9928,
+      "leisure": 9549,
+      "budget": 8875
+    },
+    "score": 4978838,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-1",
+    "bot": "greedy",
+    "turn": 80,
+    "phase": "won",
+    "cash": 3109684,
+    "netWorth": 3494791,
+    "routes": 22,
+    "fleet": 28,
+    "quarterlyProfit": 40865,
+    "pacing": {
+      "leadChanges": 3,
+      "competitiveQuarters": 60,
+      "quartersMeasured": 73,
+      "proposedActions": 445,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.5625,
+      "largestQuarter": 14,
+      "actionTypes": 15
+    },
+    "preference": {
+      "business": 10089,
+      "leisure": 9581,
+      "budget": 8908
+    },
+    "score": 3494791,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-2",
+    "bot": "greedy",
+    "turn": 80,
+    "phase": "won",
+    "cash": 1826377,
+    "netWorth": 2195097,
+    "routes": 23,
+    "fleet": 33,
+    "quarterlyProfit": 16299,
+    "pacing": {
+      "leadChanges": 3,
+      "competitiveQuarters": 73,
+      "quartersMeasured": 73,
+      "proposedActions": 447,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.5875,
+      "largestQuarter": 12,
+      "actionTypes": 16
+    },
+    "preference": {
+      "business": 10003,
+      "leisure": 9598,
+      "budget": 9008
+    },
+    "score": 2195097,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-3",
+    "bot": "greedy",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 170803,
+    "netWorth": 564183,
+    "routes": 23,
+    "fleet": 34,
+    "quarterlyProfit": -43606,
+    "pacing": {
+      "leadChanges": 10,
+      "competitiveQuarters": 65,
+      "quartersMeasured": 73,
+      "proposedActions": 665,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 8.3125,
+      "largestQuarter": 23,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 9925,
+      "leisure": 9606,
+      "budget": 9183
+    },
+    "score": 564183,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-0",
+    "bot": "cautious",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 3230959,
+    "netWorth": 3625339,
+    "routes": 28,
+    "fleet": 29,
+    "quarterlyProfit": 22644,
+    "pacing": {
+      "leadChanges": 4,
+      "competitiveQuarters": 73,
+      "quartersMeasured": 73,
+      "proposedActions": 359,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.4875,
+      "largestQuarter": 11,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9901,
+      "leisure": 9524,
+      "budget": 8836
+    },
+    "score": 3625339,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-1",
+    "bot": "cautious",
+    "turn": 80,
+    "phase": "won",
+    "cash": 3912252,
+    "netWorth": 4284257,
+    "routes": 26,
+    "fleet": 26,
+    "quarterlyProfit": 59837,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 59,
+      "quartersMeasured": 73,
+      "proposedActions": 353,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.4125,
+      "largestQuarter": 11,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 10035,
+      "leisure": 9626,
+      "budget": 8912
+    },
+    "score": 4284257,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-2",
+    "bot": "cautious",
+    "turn": 80,
+    "phase": "won",
+    "cash": 1907918,
+    "netWorth": 2300267,
+    "routes": 24,
+    "fleet": 29,
+    "quarterlyProfit": 22392,
+    "pacing": {
+      "leadChanges": 3,
+      "competitiveQuarters": 72,
+      "quartersMeasured": 73,
+      "proposedActions": 410,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.125,
+      "largestQuarter": 19,
+      "actionTypes": 15
+    },
+    "preference": {
+      "business": 9925,
+      "leisure": 9561,
+      "budget": 9004
+    },
+    "score": 2300267,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-3",
+    "bot": "cautious",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 640591,
+    "netWorth": 1032656,
+    "routes": 24,
+    "fleet": 29,
+    "quarterlyProfit": -8220,
+    "pacing": {
+      "leadChanges": 6,
+      "competitiveQuarters": 73,
+      "quartersMeasured": 73,
+      "proposedActions": 511,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 6.3875,
+      "largestQuarter": 16,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 9930,
+      "leisure": 9610,
+      "budget": 9146
+    },
+    "score": 1032656,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-0",
+    "bot": "premium",
+    "turn": 80,
+    "phase": "won",
+    "cash": 2769051,
+    "netWorth": 3153153,
+    "routes": 27,
+    "fleet": 32,
+    "quarterlyProfit": 27432,
+    "pacing": {
+      "leadChanges": 6,
+      "competitiveQuarters": 73,
+      "quartersMeasured": 73,
+      "proposedActions": 398,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.975,
+      "largestQuarter": 16,
+      "actionTypes": 15
+    },
+    "preference": {
+      "business": 10290,
+      "leisure": 9649,
+      "budget": 8846
+    },
+    "score": 3153153,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-1",
+    "bot": "premium",
+    "turn": 80,
+    "phase": "won",
+    "cash": 2966817,
+    "netWorth": 3352494,
+    "routes": 28,
+    "fleet": 28,
+    "quarterlyProfit": 57157,
+    "pacing": {
+      "leadChanges": 3,
+      "competitiveQuarters": 61,
+      "quartersMeasured": 73,
+      "proposedActions": 455,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.6875,
+      "largestQuarter": 14,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 10240,
+      "leisure": 9629,
+      "budget": 8777
+    },
+    "score": 3352494,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-2",
+    "bot": "premium",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 546921,
+    "netWorth": 967683,
+    "routes": 28,
+    "fleet": 34,
+    "quarterlyProfit": -30439,
+    "pacing": {
+      "leadChanges": 4,
+      "competitiveQuarters": 39,
+      "quartersMeasured": 73,
+      "proposedActions": 495,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 6.1875,
+      "largestQuarter": 23,
+      "actionTypes": 16
+    },
+    "preference": {
+      "business": 10336,
+      "leisure": 9683,
+      "budget": 8970
+    },
+    "score": 967683,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-3",
+    "bot": "premium",
+    "turn": 80,
+    "phase": "won",
+    "cash": 945292,
+    "netWorth": 1398521,
+    "routes": 31,
+    "fleet": 51,
+    "quarterlyProfit": 84561,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 73,
+      "quartersMeasured": 73,
+      "proposedActions": 660,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 8.25,
+      "largestQuarter": 28,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 10406,
+      "leisure": 9710,
+      "budget": 8964
+    },
+    "score": 1398521,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-0",
+    "bot": "budget",
+    "turn": 80,
+    "phase": "won",
+    "cash": 3200824,
+    "netWorth": 3587799,
+    "routes": 27,
+    "fleet": 33,
+    "quarterlyProfit": 52088,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 73,
+      "quartersMeasured": 73,
+      "proposedActions": 411,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.1375,
+      "largestQuarter": 11,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 9858,
+      "leisure": 9639,
+      "budget": 9398
+    },
+    "score": 3587799,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-1",
+    "bot": "budget",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 1969683,
+    "netWorth": 2355075,
+    "routes": 26,
+    "fleet": 28,
+    "quarterlyProfit": 56554,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 58,
+      "quartersMeasured": 73,
+      "proposedActions": 406,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.075,
+      "largestQuarter": 12,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 9861,
+      "leisure": 9692,
+      "budget": 9475
+    },
+    "score": 2355075,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-2",
+    "bot": "budget",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 1013055,
+    "netWorth": 1402355,
+    "routes": 23,
+    "fleet": 34,
+    "quarterlyProfit": -4051,
+    "pacing": {
+      "leadChanges": 5,
+      "competitiveQuarters": 48,
+      "quartersMeasured": 73,
+      "proposedActions": 427,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.3375,
+      "largestQuarter": 12,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 9883,
+      "leisure": 9657,
+      "budget": 9469
+    },
+    "score": 1402355,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-3",
+    "bot": "budget",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 171508,
+    "netWorth": 559488,
+    "routes": 22,
+    "fleet": 34,
+    "quarterlyProfit": -10333,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 56,
+      "quartersMeasured": 73,
+      "proposedActions": 492,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 6.15,
+      "largestQuarter": 15,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 9796,
+      "leisure": 9708,
+      "budget": 9665
+    },
+    "score": 559488,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-0",
+    "bot": "connector",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 2495071,
+    "netWorth": 2885936,
+    "routes": 29,
+    "fleet": 34,
+    "quarterlyProfit": 51464,
+    "pacing": {
+      "leadChanges": 10,
+      "competitiveQuarters": 72,
+      "quartersMeasured": 73,
+      "proposedActions": 501,
+      "repeatedProposals": 1,
+      "proposalsPerQuarter": 6.2625,
+      "largestQuarter": 14,
+      "actionTypes": 15
+    },
+    "preference": {
+      "business": 9930,
+      "leisure": 9530,
+      "budget": 8870
+    },
+    "score": 2885936,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-1",
+    "bot": "connector",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 2801588,
+    "netWorth": 3175033,
+    "routes": 24,
+    "fleet": 28,
+    "quarterlyProfit": 58400,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 73,
+      "proposedActions": 513,
+      "repeatedProposals": 1,
+      "proposalsPerQuarter": 6.4125,
+      "largestQuarter": 14,
+      "actionTypes": 16
+    },
+    "preference": {
+      "business": 9979,
+      "leisure": 9595,
+      "budget": 8995
+    },
+    "score": 3175033,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-2",
+    "bot": "connector",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 1023437,
+    "netWorth": 1413022,
+    "routes": 22,
+    "fleet": 34,
+    "quarterlyProfit": 4274,
+    "pacing": {
+      "leadChanges": 7,
+      "competitiveQuarters": 66,
+      "quartersMeasured": 73,
+      "proposedActions": 591,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 7.3875,
+      "largestQuarter": 20,
+      "actionTypes": 16
+    },
+    "preference": {
+      "business": 10155,
+      "leisure": 9574,
+      "budget": 8809
+    },
+    "score": 1413022,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "jet_age",
+    "seed": "balance-v7-report-3",
+    "bot": "connector",
+    "turn": 80,
+    "phase": "lost",
+    "cash": 195676,
+    "netWorth": 433072,
+    "routes": 22,
+    "fleet": 30,
+    "quarterlyProfit": -12266,
+    "pacing": {
+      "leadChanges": 5,
+      "competitiveQuarters": 73,
+      "quartersMeasured": 73,
+      "proposedActions": 633,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 7.9125,
+      "largestQuarter": 19,
+      "actionTypes": 15
+    },
+    "preference": {
+      "business": 9999,
+      "leisure": 9561,
+      "budget": 8972
+    },
+    "score": 433072,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-0",
+    "bot": "naive",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 210540,
+    "netWorth": 217140,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 2657,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.03333333333333333,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10048,
+      "leisure": 9957,
+      "budget": 9957
+    },
+    "score": 185540,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-1",
+    "bot": "naive",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 165971,
+    "netWorth": 172571,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 3508,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.03333333333333333,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10107,
+      "leisure": 9957,
+      "budget": 9957
+    },
+    "score": 140971,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-2",
+    "bot": "naive",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 107352,
+    "netWorth": 113952,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 1522,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.03333333333333333,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10057,
+      "leisure": 9966,
+      "budget": 9966
+    },
+    "score": 82352,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-3",
+    "bot": "naive",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 144677,
+    "netWorth": 151277,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 1461,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 3,
+      "quartersMeasured": 53,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.03333333333333333,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10111,
+      "leisure": 9960,
+      "budget": 9960
+    },
+    "score": 119677,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-0",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "won",
+    "cash": 3050858,
+    "netWorth": 3430958,
+    "routes": 17,
+    "fleet": 17,
+    "quarterlyProfit": 113588,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 249,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.15,
+      "largestQuarter": 9,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9937,
+      "leisure": 9693,
+      "budget": 9157
+    },
+    "score": 4008469,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-1",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1432033,
+    "netWorth": 1822033,
+    "routes": 17,
+    "fleet": 17,
+    "quarterlyProfit": 142101,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 259,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.316666666666666,
+      "largestQuarter": 16,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9907,
+      "leisure": 9730,
+      "budget": 9307
+    },
+    "score": 2371703,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-2",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1249217,
+    "netWorth": 1680317,
+    "routes": 17,
+    "fleet": 18,
+    "quarterlyProfit": 72724,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 224,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.7333333333333334,
+      "largestQuarter": 10,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9851,
+      "leisure": 9691,
+      "budget": 9294
+    },
+    "score": 2211164,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-3",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1223478,
+    "netWorth": 1693553,
+    "routes": 20,
+    "fleet": 30,
+    "quarterlyProfit": 74046,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 390,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 6.5,
+      "largestQuarter": 17,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 10090,
+      "leisure": 9626,
+      "budget": 9073
+    },
+    "score": 2432765,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-0",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "won",
+    "cash": 2196404,
+    "netWorth": 2613704,
+    "routes": 17,
+    "fleet": 17,
+    "quarterlyProfit": 101324,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 246,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.1,
+      "largestQuarter": 14,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9823,
+      "leisure": 9684,
+      "budget": 9343
+    },
+    "score": 3194775,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-1",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1168229,
+    "netWorth": 1508729,
+    "routes": 14,
+    "fleet": 15,
+    "quarterlyProfit": 127927,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 237,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.95,
+      "largestQuarter": 11,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 9768,
+      "leisure": 9450,
+      "budget": 8926
+    },
+    "score": 1993484,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-2",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1272946,
+    "netWorth": 1610746,
+    "routes": 15,
+    "fleet": 15,
+    "quarterlyProfit": 110213,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 272,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.533333333333333,
+      "largestQuarter": 12,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9872,
+      "leisure": 9553,
+      "budget": 8917
+    },
+    "score": 2134528,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-3",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1350699,
+    "netWorth": 1760799,
+    "routes": 17,
+    "fleet": 17,
+    "quarterlyProfit": 57487,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 227,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.783333333333333,
+      "largestQuarter": 8,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9923,
+      "leisure": 9669,
+      "budget": 9150
+    },
+    "score": 2309753,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-0",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "won",
+    "cash": 2430651,
+    "netWorth": 2815791,
+    "routes": 17,
+    "fleet": 17,
+    "quarterlyProfit": 90923,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 209,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.4833333333333334,
+      "largestQuarter": 9,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10198,
+      "leisure": 9709,
+      "budget": 8938
+    },
+    "score": 3396063,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-1",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1221545,
+    "netWorth": 1614245,
+    "routes": 17,
+    "fleet": 17,
+    "quarterlyProfit": 145830,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 345,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.75,
+      "largestQuarter": 16,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 10236,
+      "leisure": 9731,
+      "budget": 8932
+    },
+    "score": 2184503,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-2",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1841433,
+    "netWorth": 2256243,
+    "routes": 20,
+    "fleet": 26,
+    "quarterlyProfit": 151276,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 246,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.1,
+      "largestQuarter": 20,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 10337,
+      "leisure": 9712,
+      "budget": 9011
+    },
+    "score": 2940633,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-3",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "won",
+    "cash": 972736,
+    "netWorth": 1371736,
+    "routes": 16,
+    "fleet": 17,
+    "quarterlyProfit": 50935,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 250,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.166666666666667,
+      "largestQuarter": 12,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 10298,
+      "leisure": 9783,
+      "budget": 9076
+    },
+    "score": 1916676,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-0",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1219414,
+    "netWorth": 1621564,
+    "routes": 18,
+    "fleet": 18,
+    "quarterlyProfit": 63579,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 211,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.5166666666666666,
+      "largestQuarter": 10,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 9646,
+      "leisure": 9827,
+      "budget": 9942
+    },
+    "score": 2213784,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-1",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 218347,
+    "netWorth": 467408,
+    "routes": 17,
+    "fleet": 20,
+    "quarterlyProfit": 102335,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 25,
+      "quartersMeasured": 53,
+      "proposedActions": 294,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.9,
+      "largestQuarter": 14,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 9836,
+      "leisure": 9831,
+      "budget": 9936
+    },
+    "score": 930177,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-2",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1099217,
+    "netWorth": 1459062,
+    "routes": 18,
+    "fleet": 28,
+    "quarterlyProfit": 117488,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 273,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.55,
+      "largestQuarter": 15,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9912,
+      "leisure": 9688,
+      "budget": 9495
+    },
+    "score": 2127995,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-3",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 446912,
+    "netWorth": 889882,
+    "routes": 21,
+    "fleet": 27,
+    "quarterlyProfit": 93129,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 324,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.4,
+      "largestQuarter": 14,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9845,
+      "leisure": 9658,
+      "budget": 9435
+    },
+    "score": 1574910,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-0",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "won",
+    "cash": 2405790,
+    "netWorth": 2822490,
+    "routes": 17,
+    "fleet": 18,
+    "quarterlyProfit": 101762,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 282,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.7,
+      "largestQuarter": 12,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 9880,
+      "leisure": 9615,
+      "budget": 9032
+    },
+    "score": 3409887,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-1",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "won",
+    "cash": 2199368,
+    "netWorth": 2603468,
+    "routes": 15,
+    "fleet": 17,
+    "quarterlyProfit": 149640,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 242,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.033333333333333,
+      "largestQuarter": 11,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 10027,
+      "leisure": 9603,
+      "budget": 8892
+    },
+    "score": 3150078,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-2",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "won",
+    "cash": 2556096,
+    "netWorth": 2980266,
+    "routes": 20,
+    "fleet": 25,
+    "quarterlyProfit": 156718,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 254,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.233333333333333,
+      "largestQuarter": 12,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 10114,
+      "leisure": 9597,
+      "budget": 8836
+    },
+    "score": 3632744,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "oil_crisis",
+    "seed": "balance-v7-report-3",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1822009,
+    "netWorth": 2327438,
+    "routes": 21,
+    "fleet": 31,
+    "quarterlyProfit": 150696,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 345,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.75,
+      "largestQuarter": 15,
+      "actionTypes": 15
+    },
+    "preference": {
+      "business": 10159,
+      "leisure": 9604,
+      "budget": 8892
+    },
+    "score": 2981338,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-0",
+    "bot": "naive",
+    "turn": 18,
+    "phase": "lost",
+    "cash": -4442,
+    "netWorth": 27278,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": -1806,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 11,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.1111111111111111,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 9557,
+      "leisure": 9775,
+      "budget": 9775
+    },
+    "score": 484200,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-1",
+    "bot": "naive",
+    "turn": 23,
+    "phase": "lost",
+    "cash": -2873,
+    "netWorth": 24947,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": -2064,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 16,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.08695652173913043,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 9757,
+      "leisure": 9954,
+      "budget": 9954
+    },
+    "score": 718135,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-2",
+    "bot": "naive",
+    "turn": 20,
+    "phase": "lost",
+    "cash": -1827,
+    "netWorth": 28333,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": -1682,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 13,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.1,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 9478,
+      "leisure": 9702,
+      "budget": 9702
+    },
+    "score": 539280,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-3",
+    "bot": "naive",
+    "turn": 20,
+    "phase": "lost",
+    "cash": -1931,
+    "netWorth": 28229,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": -1666,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 13,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.1,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 9511,
+      "leisure": 9735,
+      "budget": 9735
+    },
+    "score": 540360,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-0",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 2014111,
+    "netWorth": 2348977,
+    "routes": 15,
+    "fleet": 17,
+    "quarterlyProfit": 114643,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 213,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.55,
+      "largestQuarter": 8,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9829,
+      "leisure": 9763,
+      "budget": 9678
+    },
+    "score": 21778649,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-1",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 677629,
+    "netWorth": 1041376,
+    "routes": 16,
+    "fleet": 18,
+    "quarterlyProfit": 100462,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 255,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.25,
+      "largestQuarter": 15,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9728,
+      "leisure": 9812,
+      "budget": 9858
+    },
+    "score": 25131895,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-2",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1334181,
+    "netWorth": 1699581,
+    "routes": 15,
+    "fleet": 17,
+    "quarterlyProfit": 48968,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 231,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.85,
+      "largestQuarter": 13,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 9706,
+      "leisure": 9851,
+      "budget": 9996
+    },
+    "score": 26053936,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-3",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 232211,
+    "netWorth": 622961,
+    "routes": 16,
+    "fleet": 18,
+    "quarterlyProfit": -77403,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 315,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.25,
+      "largestQuarter": 15,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9607,
+      "leisure": 9821,
+      "budget": 9951
+    },
+    "score": 26310695,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-0",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1335014,
+    "netWorth": 1703414,
+    "routes": 15,
+    "fleet": 15,
+    "quarterlyProfit": 84870,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 214,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.566666666666667,
+      "largestQuarter": 12,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9644,
+      "leisure": 9801,
+      "budget": 9827
+    },
+    "score": 21611238,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-1",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 620845,
+    "netWorth": 1012345,
+    "routes": 15,
+    "fleet": 16,
+    "quarterlyProfit": 67069,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 247,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.116666666666666,
+      "largestQuarter": 15,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9633,
+      "leisure": 9803,
+      "budget": 9926
+    },
+    "score": 23249498,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-2",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1078485,
+    "netWorth": 1488885,
+    "routes": 17,
+    "fleet": 17,
+    "quarterlyProfit": 48933,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 52,
+      "quartersMeasured": 53,
+      "proposedActions": 237,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.95,
+      "largestQuarter": 11,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9599,
+      "leisure": 9746,
+      "budget": 9807
+    },
+    "score": 28063883,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-3",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 631724,
+    "netWorth": 1029524,
+    "routes": 16,
+    "fleet": 16,
+    "quarterlyProfit": -59649,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 264,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.4,
+      "largestQuarter": 15,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9651,
+      "leisure": 9776,
+      "budget": 9793
+    },
+    "score": 24506615,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-0",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1631348,
+    "netWorth": 1986698,
+    "routes": 15,
+    "fleet": 16,
+    "quarterlyProfit": 93868,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 251,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.183333333333334,
+      "largestQuarter": 12,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9868,
+      "leisure": 9440,
+      "budget": 8819
+    },
+    "score": 15114828,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-1",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 301078,
+    "netWorth": 441666,
+    "routes": 10,
+    "fleet": 11,
+    "quarterlyProfit": 61557,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 146,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 2.433333333333333,
+      "largestQuarter": 9,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 10246,
+      "leisure": 9548,
+      "budget": 8721
+    },
+    "score": 5892291,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-2",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 2901631,
+    "netWorth": 3294331,
+    "routes": 17,
+    "fleet": 17,
+    "quarterlyProfit": 75106,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 20,
+      "quartersMeasured": 53,
+      "proposedActions": 279,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.65,
+      "largestQuarter": 11,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 10157,
+      "leisure": 9758,
+      "budget": 9190
+    },
+    "score": 20208707,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-3",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1145624,
+    "netWorth": 1493024,
+    "routes": 16,
+    "fleet": 16,
+    "quarterlyProfit": -46909,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 44,
+      "quartersMeasured": 53,
+      "proposedActions": 360,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 6,
+      "largestQuarter": 16,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 10203,
+      "leisure": 9786,
+      "budget": 9183
+    },
+    "score": 16687461,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-0",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1399775,
+    "netWorth": 1734517,
+    "routes": 15,
+    "fleet": 18,
+    "quarterlyProfit": 94523,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 199,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.316666666666667,
+      "largestQuarter": 8,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9835,
+      "leisure": 9770,
+      "budget": 9708
+    },
+    "score": 20613429,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-1",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 822014,
+    "netWorth": 1185766,
+    "routes": 17,
+    "fleet": 18,
+    "quarterlyProfit": 97526,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 237,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.95,
+      "largestQuarter": 13,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 9652,
+      "leisure": 9712,
+      "budget": 9669
+    },
+    "score": 25284491,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-2",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1903881,
+    "netWorth": 2310981,
+    "routes": 17,
+    "fleet": 18,
+    "quarterlyProfit": 65991,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 243,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.05,
+      "largestQuarter": 12,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9711,
+      "leisure": 9821,
+      "budget": 9911
+    },
+    "score": 30652632,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-3",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 679000,
+    "netWorth": 1095850,
+    "routes": 18,
+    "fleet": 19,
+    "quarterlyProfit": -74777,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 300,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5,
+      "largestQuarter": 16,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 9651,
+      "leisure": 9803,
+      "budget": 9856
+    },
+    "score": 25654237,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-0",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "won",
+    "cash": 2873446,
+    "netWorth": 3272446,
+    "routes": 17,
+    "fleet": 19,
+    "quarterlyProfit": 155476,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 257,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.283333333333333,
+      "largestQuarter": 11,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9991,
+      "leisure": 9652,
+      "budget": 9097
+    },
+    "score": 24531854,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-1",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1624534,
+    "netWorth": 2017234,
+    "routes": 14,
+    "fleet": 18,
+    "quarterlyProfit": 132492,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 271,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.516666666666667,
+      "largestQuarter": 12,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 10079,
+      "leisure": 9677,
+      "budget": 9093
+    },
+    "score": 22598891,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-2",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 2644231,
+    "netWorth": 3039331,
+    "routes": 15,
+    "fleet": 17,
+    "quarterlyProfit": 109929,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 262,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.366666666666666,
+      "largestQuarter": 12,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 9939,
+      "leisure": 9664,
+      "budget": 9152
+    },
+    "score": 24001326,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "deregulation",
+    "seed": "balance-v7-report-3",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 117188,
+    "netWorth": 408802,
+    "routes": 14,
+    "fleet": 19,
+    "quarterlyProfit": -24264,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 262,
+      "repeatedProposals": 2,
+      "proposalsPerQuarter": 4.366666666666666,
+      "largestQuarter": 14,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 10023,
+      "leisure": 9746,
+      "budget": 9375
+    },
+    "score": 16358158,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-0",
+    "bot": "naive",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 201935,
+    "netWorth": 211235,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 2328,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.03333333333333333,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 9575,
+      "leisure": 9695,
+      "budget": 9695
+    },
+    "score": 0,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-1",
+    "bot": "naive",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 149261,
+    "netWorth": 158561,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 1642,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.03333333333333333,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 9742,
+      "leisure": 9889,
+      "budget": 9889
+    },
+    "score": 0,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-2",
+    "bot": "naive",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 124009,
+    "netWorth": 133309,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 699,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.03333333333333333,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 9716,
+      "leisure": 9896,
+      "budget": 9896
+    },
+    "score": 0,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-3",
+    "bot": "naive",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 116652,
+    "netWorth": 125952,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": -579,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.03333333333333333,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 9716,
+      "leisure": 9896,
+      "budget": 9896
+    },
+    "score": 0,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-0",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1369633,
+    "netWorth": 1722463,
+    "routes": 14,
+    "fleet": 14,
+    "quarterlyProfit": 91729,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 29,
+      "quartersMeasured": 53,
+      "proposedActions": 224,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.7333333333333334,
+      "largestQuarter": 11,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 9990,
+      "leisure": 9669,
+      "budget": 9156
+    },
+    "score": 8482356,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-1",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1731502,
+    "netWorth": 2097209,
+    "routes": 16,
+    "fleet": 16,
+    "quarterlyProfit": 100874,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 229,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.816666666666667,
+      "largestQuarter": 10,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9923,
+      "leisure": 9657,
+      "budget": 9219
+    },
+    "score": 11592950,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-2",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1147055,
+    "netWorth": 1531932,
+    "routes": 11,
+    "fleet": 17,
+    "quarterlyProfit": 39675,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 37,
+      "quartersMeasured": 53,
+      "proposedActions": 218,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.6333333333333333,
+      "largestQuarter": 10,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 10075,
+      "leisure": 9555,
+      "budget": 8760
+    },
+    "score": 10355506,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-3",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 676891,
+    "netWorth": 1012981,
+    "routes": 15,
+    "fleet": 18,
+    "quarterlyProfit": 37852,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 15,
+      "quartersMeasured": 53,
+      "proposedActions": 308,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.133333333333334,
+      "largestQuarter": 14,
+      "actionTypes": 16
+    },
+    "preference": {
+      "business": 10046,
+      "leisure": 9654,
+      "budget": 9114
+    },
+    "score": 8254352,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-0",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 540746,
+    "netWorth": 830156,
+    "routes": 11,
+    "fleet": 12,
+    "quarterlyProfit": 45124,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 220,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.6666666666666665,
+      "largestQuarter": 12,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9899,
+      "leisure": 9663,
+      "budget": 9312
+    },
+    "score": 2940118,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-1",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "won",
+    "cash": 879425,
+    "netWorth": 1189625,
+    "routes": 13,
+    "fleet": 13,
+    "quarterlyProfit": 54053,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 185,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.0833333333333335,
+      "largestQuarter": 10,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9841,
+      "leisure": 9643,
+      "budget": 9273
+    },
+    "score": 7894808,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-2",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1444009,
+    "netWorth": 1780759,
+    "routes": 12,
+    "fleet": 15,
+    "quarterlyProfit": 92720,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 27,
+      "quartersMeasured": 53,
+      "proposedActions": 246,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.1,
+      "largestQuarter": 14,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 10079,
+      "leisure": 9601,
+      "budget": 8936
+    },
+    "score": 9976710,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-3",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 411130,
+    "netWorth": 710019,
+    "routes": 13,
+    "fleet": 13,
+    "quarterlyProfit": 17096,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 272,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.533333333333333,
+      "largestQuarter": 14,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 10062,
+      "leisure": 9689,
+      "budget": 9102
+    },
+    "score": 5888592,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-0",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1195882,
+    "netWorth": 1573132,
+    "routes": 16,
+    "fleet": 16,
+    "quarterlyProfit": 63983,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 336,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.6,
+      "largestQuarter": 16,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9804,
+      "leisure": 9281,
+      "budget": 8564
+    },
+    "score": 3194012,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-1",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 893359,
+    "netWorth": 1284919,
+    "routes": 17,
+    "fleet": 17,
+    "quarterlyProfit": 51397,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 38,
+      "quartersMeasured": 53,
+      "proposedActions": 370,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 6.166666666666667,
+      "largestQuarter": 17,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 9951,
+      "leisure": 9538,
+      "budget": 8949
+    },
+    "score": 3110896,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-2",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1257327,
+    "netWorth": 1656177,
+    "routes": 17,
+    "fleet": 17,
+    "quarterlyProfit": 74060,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 310,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.166666666666667,
+      "largestQuarter": 16,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 10005,
+      "leisure": 9461,
+      "budget": 8780
+    },
+    "score": 2822566,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-3",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 347219,
+    "netWorth": 643469,
+    "routes": 16,
+    "fleet": 17,
+    "quarterlyProfit": -5557,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 477,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 7.95,
+      "largestQuarter": 20,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 10065,
+      "leisure": 9623,
+      "budget": 9096
+    },
+    "score": 2291518,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-0",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1147423,
+    "netWorth": 1509673,
+    "routes": 16,
+    "fleet": 16,
+    "quarterlyProfit": 51667,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 34,
+      "quartersMeasured": 53,
+      "proposedActions": 313,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.216666666666667,
+      "largestQuarter": 16,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 9677,
+      "leisure": 9837,
+      "budget": 9934
+    },
+    "score": 4405044,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-1",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 540790,
+    "netWorth": 946540,
+    "routes": 17,
+    "fleet": 17,
+    "quarterlyProfit": 44123,
+    "pacing": {
+      "leadChanges": 3,
+      "competitiveQuarters": 47,
+      "quartersMeasured": 53,
+      "proposedActions": 271,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.516666666666667,
+      "largestQuarter": 13,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9552,
+      "leisure": 9823,
+      "budget": 10048
+    },
+    "score": 4073532,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-2",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1982162,
+    "netWorth": 2420312,
+    "routes": 18,
+    "fleet": 19,
+    "quarterlyProfit": 61825,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 32,
+      "quartersMeasured": 53,
+      "proposedActions": 291,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.85,
+      "largestQuarter": 10,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9696,
+      "leisure": 9720,
+      "budget": 9675
+    },
+    "score": 4588428,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-3",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 216492,
+    "netWorth": 615182,
+    "routes": 19,
+    "fleet": 20,
+    "quarterlyProfit": -3456,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 53,
+      "proposedActions": 414,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 6.9,
+      "largestQuarter": 19,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 9645,
+      "leisure": 9789,
+      "budget": 9891
+    },
+    "score": 4861946,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-0",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1369633,
+    "netWorth": 1722463,
+    "routes": 14,
+    "fleet": 14,
+    "quarterlyProfit": 91729,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 29,
+      "quartersMeasured": 53,
+      "proposedActions": 224,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.7333333333333334,
+      "largestQuarter": 11,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 9990,
+      "leisure": 9669,
+      "budget": 9156
+    },
+    "score": 8482356,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-1",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1731502,
+    "netWorth": 2097209,
+    "routes": 16,
+    "fleet": 16,
+    "quarterlyProfit": 100874,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 229,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.816666666666667,
+      "largestQuarter": 10,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9923,
+      "leisure": 9657,
+      "budget": 9219
+    },
+    "score": 11592950,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-2",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1147055,
+    "netWorth": 1531932,
+    "routes": 11,
+    "fleet": 17,
+    "quarterlyProfit": 39675,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 37,
+      "quartersMeasured": 53,
+      "proposedActions": 218,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.6333333333333333,
+      "largestQuarter": 10,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 10075,
+      "leisure": 9555,
+      "budget": 8760
+    },
+    "score": 10355506,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "open_skies",
+    "seed": "balance-v7-report-3",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 676891,
+    "netWorth": 1012981,
+    "routes": 15,
+    "fleet": 18,
+    "quarterlyProfit": 37852,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 15,
+      "quartersMeasured": 53,
+      "proposedActions": 308,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.133333333333334,
+      "largestQuarter": 14,
+      "actionTypes": 16
+    },
+    "preference": {
+      "business": 10046,
+      "leisure": 9654,
+      "budget": 9114
+    },
+    "score": 8254352,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-0",
+    "bot": "naive",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 328196,
+    "netWorth": 337496,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 4569,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.03333333333333333,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 9816,
+      "leisure": 9782,
+      "budget": 9782
+    },
+    "score": 10000,
+    "qualified": false,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-1",
+    "bot": "naive",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 409795,
+    "netWorth": 419095,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 5942,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.03333333333333333,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 9967,
+      "leisure": 9887,
+      "budget": 9887
+    },
+    "score": 10000,
+    "qualified": false,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-2",
+    "bot": "naive",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 280502,
+    "netWorth": 289802,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 1463,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.03333333333333333,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 9886,
+      "leisure": 9896,
+      "budget": 9896
+    },
+    "score": 10000,
+    "qualified": false,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-3",
+    "bot": "naive",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 322414,
+    "netWorth": 331714,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 2246,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.03333333333333333,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 9924,
+      "leisure": 9890,
+      "budget": 9890
+    },
+    "score": 10000,
+    "qualified": false,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-0",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 794172,
+    "netWorth": 1224972,
+    "routes": 19,
+    "fleet": 19,
+    "quarterlyProfit": 26681,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 228,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.8,
+      "largestQuarter": 8,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9479,
+      "leisure": 9844,
+      "budget": 10150
+    },
+    "score": 7827,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-1",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 720911,
+    "netWorth": 1035911,
+    "routes": 15,
+    "fleet": 15,
+    "quarterlyProfit": 29235,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 241,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.016666666666667,
+      "largestQuarter": 10,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9378,
+      "leisure": 9675,
+      "budget": 9864
+    },
+    "score": 7424,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-2",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 846439,
+    "netWorth": 1277239,
+    "routes": 19,
+    "fleet": 19,
+    "quarterlyProfit": -38679,
+    "pacing": {
+      "leadChanges": 4,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 289,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.816666666666666,
+      "largestQuarter": 11,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 9579,
+      "leisure": 9743,
+      "budget": 9836
+    },
+    "score": 7772,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-3",
+    "bot": "greedy",
+    "turn": 60,
+    "phase": "won",
+    "cash": 975799,
+    "netWorth": 1422949,
+    "routes": 18,
+    "fleet": 23,
+    "quarterlyProfit": -104627,
+    "pacing": {
+      "leadChanges": 11,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 336,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.6,
+      "largestQuarter": 21,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 9652,
+      "leisure": 9813,
+      "budget": 9938
+    },
+    "score": 7893,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-0",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 713208,
+    "netWorth": 1136958,
+    "routes": 18,
+    "fleet": 18,
+    "quarterlyProfit": 55678,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 246,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.1,
+      "largestQuarter": 12,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 9504,
+      "leisure": 9807,
+      "budget": 10048
+    },
+    "score": 7750,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-1",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 878022,
+    "netWorth": 1234122,
+    "routes": 16,
+    "fleet": 16,
+    "quarterlyProfit": 28827,
+    "pacing": {
+      "leadChanges": 13,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 274,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.566666666666666,
+      "largestQuarter": 10,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9336,
+      "leisure": 9690,
+      "budget": 9964
+    },
+    "score": 7444,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-2",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 699567,
+    "netWorth": 1125117,
+    "routes": 17,
+    "fleet": 18,
+    "quarterlyProfit": -52319,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 257,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.283333333333333,
+      "largestQuarter": 11,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9569,
+      "leisure": 9774,
+      "budget": 9940
+    },
+    "score": 7800,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-3",
+    "bot": "cautious",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 124294,
+    "netWorth": 281483,
+    "routes": 9,
+    "fleet": 13,
+    "quarterlyProfit": -61405,
+    "pacing": {
+      "leadChanges": 4,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 218,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.6333333333333333,
+      "largestQuarter": 11,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9485,
+      "leisure": 9859,
+      "budget": 10234
+    },
+    "score": 7232,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-0",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1136305,
+    "netWorth": 1411255,
+    "routes": 13,
+    "fleet": 14,
+    "quarterlyProfit": 42719,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 289,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.816666666666666,
+      "largestQuarter": 11,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9511,
+      "leisure": 9071,
+      "budget": 8585
+    },
+    "score": 7184,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-1",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 791873,
+    "netWorth": 1039823,
+    "routes": 11,
+    "fleet": 12,
+    "quarterlyProfit": 24139,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 283,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.716666666666667,
+      "largestQuarter": 15,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9995,
+      "leisure": 9632,
+      "budget": 9153
+    },
+    "score": 6945,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-2",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1020964,
+    "netWorth": 1366414,
+    "routes": 13,
+    "fleet": 14,
+    "quarterlyProfit": -18022,
+    "pacing": {
+      "leadChanges": 4,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 264,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.4,
+      "largestQuarter": 12,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10263,
+      "leisure": 9788,
+      "budget": 9270
+    },
+    "score": 7382,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-3",
+    "bot": "premium",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 1453848,
+    "netWorth": 1772148,
+    "routes": 16,
+    "fleet": 18,
+    "quarterlyProfit": -53877,
+    "pacing": {
+      "leadChanges": 8,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 400,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 6.666666666666667,
+      "largestQuarter": 18,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 10076,
+      "leisure": 9639,
+      "budget": 9155
+    },
+    "score": 7239,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-0",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 781355,
+    "netWorth": 1212155,
+    "routes": 19,
+    "fleet": 19,
+    "quarterlyProfit": 26082,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 230,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.8333333333333335,
+      "largestQuarter": 8,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9479,
+      "leisure": 9841,
+      "budget": 10142
+    },
+    "score": 7789,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-1",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 579844,
+    "netWorth": 940444,
+    "routes": 15,
+    "fleet": 16,
+    "quarterlyProfit": 15511,
+    "pacing": {
+      "leadChanges": 6,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 259,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.316666666666666,
+      "largestQuarter": 12,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9354,
+      "leisure": 9744,
+      "budget": 10101
+    },
+    "score": 7318,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-2",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "lost",
+    "cash": 784559,
+    "netWorth": 1215359,
+    "routes": 19,
+    "fleet": 19,
+    "quarterlyProfit": -46328,
+    "pacing": {
+      "leadChanges": 4,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 298,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.966666666666667,
+      "largestQuarter": 11,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9576,
+      "leisure": 9786,
+      "budget": 9952
+    },
+    "score": 7793,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-3",
+    "bot": "budget",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1165899,
+    "netWorth": 1613049,
+    "routes": 20,
+    "fleet": 23,
+    "quarterlyProfit": -94972,
+    "pacing": {
+      "leadChanges": 7,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 326,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.433333333333334,
+      "largestQuarter": 19,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9645,
+      "leisure": 9776,
+      "budget": 9852
+    },
+    "score": 7903,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-0",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "won",
+    "cash": 2340699,
+    "netWorth": 2869202,
+    "routes": 26,
+    "fleet": 30,
+    "quarterlyProfit": 160413,
+    "pacing": {
+      "leadChanges": 6,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 244,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.066666666666666,
+      "largestQuarter": 13,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 9857,
+      "leisure": 9631,
+      "budget": 9219
+    },
+    "score": 8257,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-1",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "won",
+    "cash": 2545420,
+    "netWorth": 2937070,
+    "routes": 16,
+    "fleet": 16,
+    "quarterlyProfit": 104230,
+    "pacing": {
+      "leadChanges": 5,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 228,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.8,
+      "largestQuarter": 10,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9795,
+      "leisure": 9557,
+      "budget": 9003
+    },
+    "score": 8361,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-2",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1920205,
+    "netWorth": 2317255,
+    "routes": 16,
+    "fleet": 16,
+    "quarterlyProfit": 13437,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 219,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.65,
+      "largestQuarter": 9,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9872,
+      "leisure": 9603,
+      "budget": 9076
+    },
+    "score": 8623,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "lcc_wars",
+    "seed": "balance-v7-report-3",
+    "bot": "connector",
+    "turn": 60,
+    "phase": "won",
+    "cash": 1908083,
+    "netWorth": 2319833,
+    "routes": 17,
+    "fleet": 17,
+    "quarterlyProfit": -79481,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 53,
+      "quartersMeasured": 53,
+      "proposedActions": 237,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.95,
+      "largestQuarter": 10,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9860,
+      "leisure": 9556,
+      "budget": 8942
+    },
+    "score": 8623,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-0",
+    "bot": "naive",
+    "turn": 16,
+    "phase": "lost",
+    "cash": 41354,
+    "netWorth": 41908,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 2250,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 9,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.125,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10321,
+      "leisure": 9923,
+      "budget": 9923
+    },
+    "score": 33828,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-1",
+    "bot": "naive",
+    "turn": 5,
+    "phase": "lost",
+    "cash": -4237,
+    "netWorth": -6349,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": -3790,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 0,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.4,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10197,
+      "leisure": 9976,
+      "budget": 9976
+    },
+    "score": -14429,
+    "qualified": false,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-2",
+    "bot": "naive",
+    "turn": 16,
+    "phase": "lost",
+    "cash": 48132,
+    "netWorth": 48686,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 2382,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 9,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.125,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10295,
+      "leisure": 9926,
+      "budget": 9926
+    },
+    "score": 40606,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-3",
+    "bot": "naive",
+    "turn": 16,
+    "phase": "lost",
+    "cash": 50413,
+    "netWorth": 50967,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 2831,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 9,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.125,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10333,
+      "leisure": 9910,
+      "budget": 9910
+    },
+    "score": 42887,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-0",
+    "bot": "greedy",
+    "turn": 16,
+    "phase": "won",
+    "cash": 172886,
+    "netWorth": 217042,
+    "routes": 9,
+    "fleet": 10,
+    "quarterlyProfit": 29893,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 76,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.75,
+      "largestQuarter": 8,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10337,
+      "leisure": 9702,
+      "budget": 9081
+    },
+    "score": 248799,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-1",
+    "bot": "greedy",
+    "turn": 16,
+    "phase": "lost",
+    "cash": 23575,
+    "netWorth": 31722,
+    "routes": 3,
+    "fleet": 8,
+    "quarterlyProfit": 4968,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 9,
+      "proposedActions": 79,
+      "repeatedProposals": 5,
+      "proposalsPerQuarter": 4.9375,
+      "largestQuarter": 9,
+      "actionTypes": 14
+    },
+    "preference": {
+      "business": 10320,
+      "leisure": 9699,
+      "budget": 9112
+    },
+    "score": 43592,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-2",
+    "bot": "greedy",
+    "turn": 16,
+    "phase": "won",
+    "cash": 144888,
+    "netWorth": 183636,
+    "routes": 9,
+    "fleet": 10,
+    "quarterlyProfit": 29208,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 7,
+      "quartersMeasured": 9,
+      "proposedActions": 68,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.25,
+      "largestQuarter": 7,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10148,
+      "leisure": 9648,
+      "budget": 9177
+    },
+    "score": 211313,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-3",
+    "bot": "greedy",
+    "turn": 16,
+    "phase": "won",
+    "cash": 166244,
+    "netWorth": 210400,
+    "routes": 9,
+    "fleet": 10,
+    "quarterlyProfit": 30144,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 72,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.5,
+      "largestQuarter": 7,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10250,
+      "leisure": 9671,
+      "budget": 9086
+    },
+    "score": 239111,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-0",
+    "bot": "cautious",
+    "turn": 16,
+    "phase": "won",
+    "cash": 146227,
+    "netWorth": 185725,
+    "routes": 8,
+    "fleet": 9,
+    "quarterlyProfit": 27212,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 65,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.0625,
+      "largestQuarter": 6,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 10306,
+      "leisure": 9699,
+      "budget": 9121
+    },
+    "score": 212176,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-1",
+    "bot": "cautious",
+    "turn": 16,
+    "phase": "lost",
+    "cash": 33534,
+    "netWorth": 28101,
+    "routes": 3,
+    "fleet": 3,
+    "quarterlyProfit": 7658,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 9,
+      "proposedActions": 58,
+      "repeatedProposals": 1,
+      "proposalsPerQuarter": 3.625,
+      "largestQuarter": 8,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 10328,
+      "leisure": 9696,
+      "budget": 9107
+    },
+    "score": 42457,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-2",
+    "bot": "cautious",
+    "turn": 16,
+    "phase": "won",
+    "cash": 103572,
+    "netWorth": 128960,
+    "routes": 7,
+    "fleet": 7,
+    "quarterlyProfit": 24003,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 2,
+      "quartersMeasured": 9,
+      "proposedActions": 51,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.1875,
+      "largestQuarter": 6,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 10140,
+      "leisure": 9619,
+      "budget": 9146
+    },
+    "score": 157146,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-3",
+    "bot": "cautious",
+    "turn": 16,
+    "phase": "won",
+    "cash": 152517,
+    "netWorth": 186949,
+    "routes": 7,
+    "fleet": 8,
+    "quarterlyProfit": 29750,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 54,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.375,
+      "largestQuarter": 5,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 10286,
+      "leisure": 9669,
+      "budget": 9038
+    },
+    "score": 207180,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-0",
+    "bot": "premium",
+    "turn": 16,
+    "phase": "won",
+    "cash": 107629,
+    "netWorth": 146923,
+    "routes": 8,
+    "fleet": 9,
+    "quarterlyProfit": 24114,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 6,
+      "quartersMeasured": 9,
+      "proposedActions": 62,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.875,
+      "largestQuarter": 6,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10526,
+      "leisure": 9733,
+      "budget": 8962
+    },
+    "score": 175868,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-1",
+    "bot": "premium",
+    "turn": 16,
+    "phase": "won",
+    "cash": 38797,
+    "netWorth": 47553,
+    "routes": 5,
+    "fleet": 7,
+    "quarterlyProfit": 15823,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 9,
+      "proposedActions": 72,
+      "repeatedProposals": 1,
+      "proposalsPerQuarter": 4.5,
+      "largestQuarter": 9,
+      "actionTypes": 13
+    },
+    "preference": {
+      "business": 10398,
+      "leisure": 9729,
+      "budget": 9117
+    },
+    "score": 72137,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-2",
+    "bot": "premium",
+    "turn": 16,
+    "phase": "lost",
+    "cash": 14132,
+    "netWorth": 22456,
+    "routes": 4,
+    "fleet": 7,
+    "quarterlyProfit": 917,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 9,
+      "proposedActions": 68,
+      "repeatedProposals": 1,
+      "proposalsPerQuarter": 4.25,
+      "largestQuarter": 7,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 10448,
+      "leisure": 9748,
+      "budget": 9306
+    },
+    "score": 38566,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-3",
+    "bot": "premium",
+    "turn": 16,
+    "phase": "won",
+    "cash": 119478,
+    "netWorth": 150049,
+    "routes": 8,
+    "fleet": 9,
+    "quarterlyProfit": 29521,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 8,
+      "quartersMeasured": 9,
+      "proposedActions": 75,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.6875,
+      "largestQuarter": 9,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 10528,
+      "leisure": 9735,
+      "budget": 8972
+    },
+    "score": 187298,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-0",
+    "bot": "budget",
+    "turn": 16,
+    "phase": "won",
+    "cash": 110805,
+    "netWorth": 152656,
+    "routes": 9,
+    "fleet": 10,
+    "quarterlyProfit": 22412,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 8,
+      "quartersMeasured": 9,
+      "proposedActions": 86,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.375,
+      "largestQuarter": 10,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 10090,
+      "leisure": 9750,
+      "budget": 9582
+    },
+    "score": 185716,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-1",
+    "bot": "budget",
+    "turn": 6,
+    "phase": "lost",
+    "cash": -1211,
+    "netWorth": -9464,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": -898,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 0,
+      "proposedActions": 28,
+      "repeatedProposals": 1,
+      "proposalsPerQuarter": 4.666666666666667,
+      "largestQuarter": 7,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9699,
+      "leisure": 10029,
+      "budget": 10444
+    },
+    "score": -14096,
+    "qualified": false,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-2",
+    "bot": "budget",
+    "turn": 16,
+    "phase": "won",
+    "cash": 91200,
+    "netWorth": 120217,
+    "routes": 9,
+    "fleet": 10,
+    "quarterlyProfit": 23287,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 2,
+      "quartersMeasured": 9,
+      "proposedActions": 76,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.75,
+      "largestQuarter": 7,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9921,
+      "leisure": 9704,
+      "budget": 9658
+    },
+    "score": 158934,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-3",
+    "bot": "budget",
+    "turn": 16,
+    "phase": "won",
+    "cash": 121153,
+    "netWorth": 162940,
+    "routes": 9,
+    "fleet": 10,
+    "quarterlyProfit": 22127,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 76,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.75,
+      "largestQuarter": 7,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 10032,
+      "leisure": 9740,
+      "budget": 9611
+    },
+    "score": 193116,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-0",
+    "bot": "connector",
+    "turn": 16,
+    "phase": "won",
+    "cash": 101753,
+    "netWorth": 145909,
+    "routes": 8,
+    "fleet": 10,
+    "quarterlyProfit": 24310,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 6,
+      "quartersMeasured": 9,
+      "proposedActions": 73,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.5625,
+      "largestQuarter": 9,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 10286,
+      "leisure": 9670,
+      "budget": 9078
+    },
+    "score": 175864,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-1",
+    "bot": "connector",
+    "turn": 16,
+    "phase": "lost",
+    "cash": 33580,
+    "netWorth": 38794,
+    "routes": 4,
+    "fleet": 7,
+    "quarterlyProfit": 12858,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 9,
+      "proposedActions": 77,
+      "repeatedProposals": 2,
+      "proposalsPerQuarter": 4.8125,
+      "largestQuarter": 9,
+      "actionTypes": 15
+    },
+    "preference": {
+      "business": 10289,
+      "leisure": 9703,
+      "budget": 9163
+    },
+    "score": 51851,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-2",
+    "bot": "connector",
+    "turn": 16,
+    "phase": "won",
+    "cash": 107099,
+    "netWorth": 140087,
+    "routes": 9,
+    "fleet": 10,
+    "quarterlyProfit": 26370,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 2,
+      "quartersMeasured": 9,
+      "proposedActions": 74,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.625,
+      "largestQuarter": 8,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 10181,
+      "leisure": 9678,
+      "budget": 9215
+    },
+    "score": 167660,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "rescue",
+    "seed": "balance-v7-report-3",
+    "bot": "connector",
+    "turn": 16,
+    "phase": "won",
+    "cash": 92346,
+    "netWorth": 134976,
+    "routes": 8,
+    "fleet": 11,
+    "quarterlyProfit": 23313,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 2,
+      "quartersMeasured": 9,
+      "proposedActions": 83,
+      "repeatedProposals": 1,
+      "proposalsPerQuarter": 5.1875,
+      "largestQuarter": 9,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 10153,
+      "leisure": 9620,
+      "budget": 9032
+    },
+    "score": 161411,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-0",
+    "bot": "naive",
+    "turn": 20,
+    "phase": "lost",
+    "cash": 105996,
+    "netWorth": 119800,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": -2114,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 2,
+      "quartersMeasured": 13,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.1,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10115,
+      "leisure": 9910,
+      "budget": 9910
+    },
+    "score": 1019439,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-1",
+    "bot": "naive",
+    "turn": 20,
+    "phase": "lost",
+    "cash": 138187,
+    "netWorth": 151991,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 4438,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 2,
+      "quartersMeasured": 13,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.1,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10050,
+      "leisure": 9908,
+      "budget": 9908
+    },
+    "score": 998816,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-2",
+    "bot": "naive",
+    "turn": 20,
+    "phase": "lost",
+    "cash": 140033,
+    "netWorth": 153837,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 5545,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 13,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.1,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10016,
+      "leisure": 9906,
+      "budget": 9906
+    },
+    "score": 962010,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-3",
+    "bot": "naive",
+    "turn": 20,
+    "phase": "lost",
+    "cash": 124001,
+    "netWorth": 137805,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 5814,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 13,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.1,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10032,
+      "leisure": 9914,
+      "budget": 9914
+    },
+    "score": 871784,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-0",
+    "bot": "greedy",
+    "turn": 20,
+    "phase": "won",
+    "cash": 152203,
+    "netWorth": 288196,
+    "routes": 10,
+    "fleet": 12,
+    "quarterlyProfit": -12094,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 86,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.3,
+      "largestQuarter": 7,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9905,
+      "leisure": 9836,
+      "budget": 9810
+    },
+    "score": 3887468,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-1",
+    "bot": "greedy",
+    "turn": 20,
+    "phase": "won",
+    "cash": 305473,
+    "netWorth": 438544,
+    "routes": 10,
+    "fleet": 11,
+    "quarterlyProfit": 33414,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 76,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.8,
+      "largestQuarter": 7,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9950,
+      "leisure": 9763,
+      "budget": 9602
+    },
+    "score": 4510738,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-2",
+    "bot": "greedy",
+    "turn": 20,
+    "phase": "won",
+    "cash": 239299,
+    "netWorth": 370830,
+    "routes": 10,
+    "fleet": 11,
+    "quarterlyProfit": 28446,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 79,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.95,
+      "largestQuarter": 9,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9940,
+      "leisure": 9801,
+      "budget": 9751
+    },
+    "score": 4686387,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-3",
+    "bot": "greedy",
+    "turn": 20,
+    "phase": "lost",
+    "cash": 89715,
+    "netWorth": 232224,
+    "routes": 8,
+    "fleet": 9,
+    "quarterlyProfit": 36525,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 92,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.6,
+      "largestQuarter": 8,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9948,
+      "leisure": 9849,
+      "budget": 9793
+    },
+    "score": 3030179,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-0",
+    "bot": "cautious",
+    "turn": 20,
+    "phase": "lost",
+    "cash": 98188,
+    "netWorth": 231657,
+    "routes": 7,
+    "fleet": 7,
+    "quarterlyProfit": -9729,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 56,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 2.8,
+      "largestQuarter": 6,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 9755,
+      "leisure": 9812,
+      "budget": 9805
+    },
+    "score": 2698263,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-1",
+    "bot": "cautious",
+    "turn": 20,
+    "phase": "won",
+    "cash": 313974,
+    "netWorth": 447443,
+    "routes": 7,
+    "fleet": 7,
+    "quarterlyProfit": 32844,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 60,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3,
+      "largestQuarter": 6,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 9929,
+      "leisure": 9732,
+      "budget": 9517
+    },
+    "score": 3637707,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-2",
+    "bot": "cautious",
+    "turn": 20,
+    "phase": "won",
+    "cash": 258848,
+    "netWorth": 392317,
+    "routes": 7,
+    "fleet": 7,
+    "quarterlyProfit": 51550,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 62,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.1,
+      "largestQuarter": 6,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 9928,
+      "leisure": 9765,
+      "budget": 9644
+    },
+    "score": 3902063,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-3",
+    "bot": "cautious",
+    "turn": 20,
+    "phase": "lost",
+    "cash": 124694,
+    "netWorth": 258633,
+    "routes": 6,
+    "fleet": 7,
+    "quarterlyProfit": 27553,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 62,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.1,
+      "largestQuarter": 7,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 9755,
+      "leisure": 9798,
+      "budget": 9795
+    },
+    "score": 2466222,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-0",
+    "bot": "premium",
+    "turn": 20,
+    "phase": "lost",
+    "cash": 336884,
+    "netWorth": 497367,
+    "routes": 11,
+    "fleet": 12,
+    "quarterlyProfit": -2175,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 76,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.8,
+      "largestQuarter": 7,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10404,
+      "leisure": 9853,
+      "budget": 9194
+    },
+    "score": 2918315,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-1",
+    "bot": "premium",
+    "turn": 20,
+    "phase": "lost",
+    "cash": 340416,
+    "netWorth": 497977,
+    "routes": 10,
+    "fleet": 11,
+    "quarterlyProfit": 32190,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 65,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.25,
+      "largestQuarter": 8,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10407,
+      "leisure": 9822,
+      "budget": 9173
+    },
+    "score": 2789863,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-2",
+    "bot": "premium",
+    "turn": 20,
+    "phase": "lost",
+    "cash": 364504,
+    "netWorth": 539817,
+    "routes": 9,
+    "fleet": 11,
+    "quarterlyProfit": 44806,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 78,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.9,
+      "largestQuarter": 8,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10419,
+      "leisure": 9819,
+      "budget": 9168
+    },
+    "score": 2911361,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-3",
+    "bot": "premium",
+    "turn": 20,
+    "phase": "lost",
+    "cash": 178988,
+    "netWorth": 358056,
+    "routes": 9,
+    "fleet": 12,
+    "quarterlyProfit": 37836,
+    "pacing": {
+      "leadChanges": 3,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 104,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.2,
+      "largestQuarter": 11,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 10400,
+      "leisure": 9802,
+      "budget": 9142
+    },
+    "score": 2410053,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-0",
+    "bot": "budget",
+    "turn": 20,
+    "phase": "won",
+    "cash": 162901,
+    "netWorth": 298894,
+    "routes": 10,
+    "fleet": 12,
+    "quarterlyProfit": -11261,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 85,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.25,
+      "largestQuarter": 7,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9904,
+      "leisure": 9836,
+      "budget": 9810
+    },
+    "score": 3886453,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-1",
+    "bot": "budget",
+    "turn": 20,
+    "phase": "won",
+    "cash": 316742,
+    "netWorth": 449813,
+    "routes": 10,
+    "fleet": 11,
+    "quarterlyProfit": 34293,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 75,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.75,
+      "largestQuarter": 6,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 9950,
+      "leisure": 9763,
+      "budget": 9602
+    },
+    "score": 4510738,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-2",
+    "bot": "budget",
+    "turn": 20,
+    "phase": "won",
+    "cash": 256669,
+    "netWorth": 388200,
+    "routes": 10,
+    "fleet": 11,
+    "quarterlyProfit": 29165,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 75,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.75,
+      "largestQuarter": 9,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 9987,
+      "leisure": 9812,
+      "budget": 9735
+    },
+    "score": 4731527,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-3",
+    "bot": "budget",
+    "turn": 20,
+    "phase": "lost",
+    "cash": 98878,
+    "netWorth": 241387,
+    "routes": 8,
+    "fleet": 9,
+    "quarterlyProfit": 36227,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 91,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.55,
+      "largestQuarter": 8,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9947,
+      "leisure": 9849,
+      "budget": 9793
+    },
+    "score": 3029761,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-0",
+    "bot": "connector",
+    "turn": 20,
+    "phase": "won",
+    "cash": 118258,
+    "netWorth": 278741,
+    "routes": 11,
+    "fleet": 12,
+    "quarterlyProfit": -23121,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 98,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.9,
+      "largestQuarter": 11,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 10054,
+      "leisure": 9744,
+      "budget": 9362
+    },
+    "score": 4339493,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-1",
+    "bot": "connector",
+    "turn": 20,
+    "phase": "won",
+    "cash": 351828,
+    "netWorth": 509389,
+    "routes": 10,
+    "fleet": 11,
+    "quarterlyProfit": 37030,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 79,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.95,
+      "largestQuarter": 7,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 10054,
+      "leisure": 9654,
+      "budget": 9117
+    },
+    "score": 3917189,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-2",
+    "bot": "connector",
+    "turn": 20,
+    "phase": "won",
+    "cash": 341291,
+    "netWorth": 499144,
+    "routes": 10,
+    "fleet": 11,
+    "quarterlyProfit": 54578,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 74,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.7,
+      "largestQuarter": 7,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 10116,
+      "leisure": 9704,
+      "budget": 9163
+    },
+    "score": 3832293,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "atlantic",
+    "seed": "balance-v7-report-3",
+    "bot": "connector",
+    "turn": 20,
+    "phase": "lost",
+    "cash": 288649,
+    "netWorth": 467717,
+    "routes": 9,
+    "fleet": 12,
+    "quarterlyProfit": 63122,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 13,
+      "quartersMeasured": 13,
+      "proposedActions": 107,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.35,
+      "largestQuarter": 13,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 10193,
+      "leisure": 9774,
+      "budget": 9314
+    },
+    "score": 3247112,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-0",
+    "bot": "naive",
+    "turn": 16,
+    "phase": "lost",
+    "cash": 57853,
+    "netWorth": 71933,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 2436,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 9,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.125,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10066,
+      "leisure": 9986,
+      "budget": 9986
+    },
+    "score": 32853,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-1",
+    "bot": "naive",
+    "turn": 16,
+    "phase": "lost",
+    "cash": 69779,
+    "netWorth": 83859,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 3158,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.125,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10117,
+      "leisure": 9984,
+      "budget": 9984
+    },
+    "score": 44779,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-2",
+    "bot": "naive",
+    "turn": 16,
+    "phase": "lost",
+    "cash": 62157,
+    "netWorth": 76237,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 1897,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 0,
+      "quartersMeasured": 9,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.125,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10066,
+      "leisure": 9986,
+      "budget": 9986
+    },
+    "score": 37157,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-3",
+    "bot": "naive",
+    "turn": 16,
+    "phase": "lost",
+    "cash": 40396,
+    "netWorth": 54476,
+    "routes": 2,
+    "fleet": 2,
+    "quarterlyProfit": 3168,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 2,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0.125,
+      "largestQuarter": 1,
+      "actionTypes": 1
+    },
+    "preference": {
+      "business": 10117,
+      "leisure": 9984,
+      "budget": 9984
+    },
+    "score": 15396,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-0",
+    "bot": "greedy",
+    "turn": 16,
+    "phase": "won",
+    "cash": 119343,
+    "netWorth": 199954,
+    "routes": 6,
+    "fleet": 7,
+    "quarterlyProfit": 33102,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 50,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.125,
+      "largestQuarter": 6,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10329,
+      "leisure": 9703,
+      "budget": 9007
+    },
+    "score": 262630,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-1",
+    "bot": "greedy",
+    "turn": 16,
+    "phase": "won",
+    "cash": 105187,
+    "netWorth": 189967,
+    "routes": 6,
+    "fleet": 7,
+    "quarterlyProfit": 18119,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 58,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.625,
+      "largestQuarter": 6,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 10301,
+      "leisure": 9738,
+      "budget": 9151
+    },
+    "score": 252644,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-2",
+    "bot": "greedy",
+    "turn": 16,
+    "phase": "won",
+    "cash": 139402,
+    "netWorth": 223841,
+    "routes": 6,
+    "fleet": 8,
+    "quarterlyProfit": 32406,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 52,
+      "repeatedProposals": 1,
+      "proposalsPerQuarter": 3.25,
+      "largestQuarter": 7,
+      "actionTypes": 8
+    },
+    "preference": {
+      "business": 10254,
+      "leisure": 9817,
+      "budget": 9404
+    },
+    "score": 285802,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-3",
+    "bot": "greedy",
+    "turn": 16,
+    "phase": "won",
+    "cash": 80363,
+    "netWorth": 148764,
+    "routes": 7,
+    "fleet": 9,
+    "quarterlyProfit": 39124,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 51,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.1875,
+      "largestQuarter": 6,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10314,
+      "leisure": 9740,
+      "budget": 9166
+    },
+    "score": 168502,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-0",
+    "bot": "cautious",
+    "turn": 16,
+    "phase": "won",
+    "cash": 128642,
+    "netWorth": 238562,
+    "routes": 4,
+    "fleet": 5,
+    "quarterlyProfit": 22692,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 32,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 2,
+      "largestQuarter": 5,
+      "actionTypes": 8
+    },
+    "preference": {
+      "business": 10222,
+      "leisure": 9667,
+      "budget": 8989
+    },
+    "score": 233267,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-1",
+    "bot": "cautious",
+    "turn": 16,
+    "phase": "won",
+    "cash": 103254,
+    "netWorth": 237234,
+    "routes": 5,
+    "fleet": 6,
+    "quarterlyProfit": 13727,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 32,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 2,
+      "largestQuarter": 5,
+      "actionTypes": 8
+    },
+    "preference": {
+      "business": 10169,
+      "leisure": 9707,
+      "budget": 9133
+    },
+    "score": 239979,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-2",
+    "bot": "cautious",
+    "turn": 16,
+    "phase": "won",
+    "cash": 105750,
+    "netWorth": 205020,
+    "routes": 5,
+    "fleet": 5,
+    "quarterlyProfit": 29839,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 37,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 2.3125,
+      "largestQuarter": 5,
+      "actionTypes": 8
+    },
+    "preference": {
+      "business": 10226,
+      "leisure": 9812,
+      "budget": 9397
+    },
+    "score": 260925,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-3",
+    "bot": "cautious",
+    "turn": 16,
+    "phase": "won",
+    "cash": 80586,
+    "netWorth": 138606,
+    "routes": 4,
+    "fleet": 4,
+    "quarterlyProfit": 21766,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 27,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 1.6875,
+      "largestQuarter": 5,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 10230,
+      "leisure": 9748,
+      "budget": 9230
+    },
+    "score": 123869,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-0",
+    "bot": "premium",
+    "turn": 16,
+    "phase": "won",
+    "cash": 119600,
+    "netWorth": 214289,
+    "routes": 7,
+    "fleet": 7,
+    "quarterlyProfit": 32634,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 50,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.125,
+      "largestQuarter": 7,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 10485,
+      "leisure": 9789,
+      "budget": 9101
+    },
+    "score": 283401,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-1",
+    "bot": "premium",
+    "turn": 16,
+    "phase": "won",
+    "cash": 126617,
+    "netWorth": 225954,
+    "routes": 7,
+    "fleet": 7,
+    "quarterlyProfit": 22620,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 43,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 2.6875,
+      "largestQuarter": 6,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 10521,
+      "leisure": 9805,
+      "budget": 9069
+    },
+    "score": 293479,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-2",
+    "bot": "premium",
+    "turn": 16,
+    "phase": "won",
+    "cash": 112179,
+    "netWorth": 192790,
+    "routes": 6,
+    "fleet": 7,
+    "quarterlyProfit": 25396,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 61,
+      "repeatedProposals": 1,
+      "proposalsPerQuarter": 3.8125,
+      "largestQuarter": 8,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10495,
+      "leisure": 9765,
+      "budget": 8994
+    },
+    "score": 257636,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-3",
+    "bot": "premium",
+    "turn": 16,
+    "phase": "won",
+    "cash": 80073,
+    "netWorth": 145310,
+    "routes": 7,
+    "fleet": 8,
+    "quarterlyProfit": 39720,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 53,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.3125,
+      "largestQuarter": 6,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 10537,
+      "leisure": 9788,
+      "budget": 9032
+    },
+    "score": 160765,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-0",
+    "bot": "budget",
+    "turn": 16,
+    "phase": "won",
+    "cash": 70293,
+    "netWorth": 156762,
+    "routes": 8,
+    "fleet": 8,
+    "quarterlyProfit": 29232,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 57,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.5625,
+      "largestQuarter": 6,
+      "actionTypes": 8
+    },
+    "preference": {
+      "business": 9984,
+      "leisure": 9763,
+      "budget": 9624
+    },
+    "score": 224542,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-1",
+    "bot": "budget",
+    "turn": 16,
+    "phase": "won",
+    "cash": 54473,
+    "netWorth": 141796,
+    "routes": 8,
+    "fleet": 8,
+    "quarterlyProfit": 23894,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 55,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.4375,
+      "largestQuarter": 5,
+      "actionTypes": 8
+    },
+    "preference": {
+      "business": 9994,
+      "leisure": 9805,
+      "budget": 9701
+    },
+    "score": 207951,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-2",
+    "bot": "budget",
+    "turn": 16,
+    "phase": "won",
+    "cash": 51001,
+    "netWorth": 138411,
+    "routes": 8,
+    "fleet": 8,
+    "quarterlyProfit": 22666,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 68,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.25,
+      "largestQuarter": 7,
+      "actionTypes": 8
+    },
+    "preference": {
+      "business": 9994,
+      "leisure": 9871,
+      "budget": 9872
+    },
+    "score": 204566,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-3",
+    "bot": "budget",
+    "turn": 16,
+    "phase": "won",
+    "cash": 74246,
+    "netWorth": 95049,
+    "routes": 7,
+    "fleet": 9,
+    "quarterlyProfit": 30352,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 62,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.875,
+      "largestQuarter": 6,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10017,
+      "leisure": 9799,
+      "budget": 9679
+    },
+    "score": 102228,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-0",
+    "bot": "connector",
+    "turn": 16,
+    "phase": "won",
+    "cash": 86418,
+    "netWorth": 167246,
+    "routes": 5,
+    "fleet": 7,
+    "quarterlyProfit": 27440,
+    "pacing": {
+      "leadChanges": 2,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 57,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.5625,
+      "largestQuarter": 9,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10249,
+      "leisure": 9743,
+      "budget": 9291
+    },
+    "score": 197843,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-1",
+    "bot": "connector",
+    "turn": 16,
+    "phase": "won",
+    "cash": 152723,
+    "netWorth": 273669,
+    "routes": 6,
+    "fleet": 8,
+    "quarterlyProfit": 28017,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 48,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3,
+      "largestQuarter": 7,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 10302,
+      "leisure": 9762,
+      "budget": 9170
+    },
+    "score": 280843,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-2",
+    "bot": "connector",
+    "turn": 16,
+    "phase": "won",
+    "cash": 114884,
+    "netWorth": 212087,
+    "routes": 5,
+    "fleet": 9,
+    "quarterlyProfit": 27916,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 49,
+      "repeatedProposals": 1,
+      "proposalsPerQuarter": 3.0625,
+      "largestQuarter": 8,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10298,
+      "leisure": 9746,
+      "budget": 9236
+    },
+    "score": 214684,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "fuel_crunch",
+    "seed": "balance-v7-report-3",
+    "bot": "connector",
+    "turn": 16,
+    "phase": "won",
+    "cash": 80789,
+    "netWorth": 156367,
+    "routes": 8,
+    "fleet": 9,
+    "quarterlyProfit": 32934,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 9,
+      "quartersMeasured": 9,
+      "proposedActions": 51,
+      "repeatedProposals": 1,
+      "proposalsPerQuarter": 3.1875,
+      "largestQuarter": 6,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10299,
+      "leisure": 9740,
+      "budget": 9129
+    },
+    "score": 159514,
+    "qualified": true,
+    "liveRivals": 2
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-0",
+    "bot": "naive",
+    "turn": 24,
+    "phase": "lost",
+    "cash": 138994,
+    "netWorth": 174094,
+    "routes": 3,
+    "fleet": 3,
+    "quarterlyProfit": 5151,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 0,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0,
+      "largestQuarter": 0,
+      "actionTypes": 0
+    },
+    "preference": {
+      "business": 10036,
+      "leisure": 9979,
+      "budget": 9979
+    },
+    "score": 949376,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-1",
+    "bot": "naive",
+    "turn": 24,
+    "phase": "lost",
+    "cash": 95809,
+    "netWorth": 130909,
+    "routes": 3,
+    "fleet": 3,
+    "quarterlyProfit": 5955,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 0,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0,
+      "largestQuarter": 0,
+      "actionTypes": 0
+    },
+    "preference": {
+      "business": 10038,
+      "leisure": 9980,
+      "budget": 9980
+    },
+    "score": 899910,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-2",
+    "bot": "naive",
+    "turn": 24,
+    "phase": "lost",
+    "cash": 162871,
+    "netWorth": 197971,
+    "routes": 3,
+    "fleet": 3,
+    "quarterlyProfit": 7447,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 0,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0,
+      "largestQuarter": 0,
+      "actionTypes": 0
+    },
+    "preference": {
+      "business": 10035,
+      "leisure": 9979,
+      "budget": 9979
+    },
+    "score": 974112,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-3",
+    "bot": "naive",
+    "turn": 24,
+    "phase": "lost",
+    "cash": 114096,
+    "netWorth": 149196,
+    "routes": 3,
+    "fleet": 3,
+    "quarterlyProfit": 4161,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 0,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 0,
+      "largestQuarter": 0,
+      "actionTypes": 0
+    },
+    "preference": {
+      "business": 10040,
+      "leisure": 9982,
+      "budget": 9982
+    },
+    "score": 826496,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-0",
+    "bot": "greedy",
+    "turn": 24,
+    "phase": "won",
+    "cash": 400513,
+    "netWorth": 617561,
+    "routes": 10,
+    "fleet": 11,
+    "quarterlyProfit": 57550,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 106,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.416666666666667,
+      "largestQuarter": 9,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 9869,
+      "leisure": 9730,
+      "budget": 9485
+    },
+    "score": 3272320,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-1",
+    "bot": "greedy",
+    "turn": 24,
+    "phase": "won",
+    "cash": 248256,
+    "netWorth": 446916,
+    "routes": 8,
+    "fleet": 8,
+    "quarterlyProfit": 43385,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 80,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.3333333333333335,
+      "largestQuarter": 9,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9943,
+      "leisure": 9797,
+      "budget": 9604
+    },
+    "score": 3277556,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-2",
+    "bot": "greedy",
+    "turn": 24,
+    "phase": "won",
+    "cash": 357690,
+    "netWorth": 597071,
+    "routes": 10,
+    "fleet": 11,
+    "quarterlyProfit": 65393,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 92,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.8333333333333335,
+      "largestQuarter": 9,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9894,
+      "leisure": 9729,
+      "budget": 9482
+    },
+    "score": 3409818,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-3",
+    "bot": "greedy",
+    "turn": 24,
+    "phase": "won",
+    "cash": 589792,
+    "netWorth": 841048,
+    "routes": 12,
+    "fleet": 13,
+    "quarterlyProfit": 71576,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 115,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.791666666666667,
+      "largestQuarter": 11,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9868,
+      "leisure": 9714,
+      "budget": 9457
+    },
+    "score": 4338854,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-0",
+    "bot": "cautious",
+    "turn": 24,
+    "phase": "won",
+    "cash": 361557,
+    "netWorth": 575707,
+    "routes": 8,
+    "fleet": 8,
+    "quarterlyProfit": 47464,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 98,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.083333333333333,
+      "largestQuarter": 9,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 10063,
+      "leisure": 9728,
+      "budget": 9298
+    },
+    "score": 3170220,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-1",
+    "bot": "cautious",
+    "turn": 24,
+    "phase": "won",
+    "cash": 259814,
+    "netWorth": 459294,
+    "routes": 8,
+    "fleet": 8,
+    "quarterlyProfit": 42219,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 77,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.2083333333333335,
+      "largestQuarter": 9,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9936,
+      "leisure": 9793,
+      "budget": 9606
+    },
+    "score": 3346862,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-2",
+    "bot": "cautious",
+    "turn": 24,
+    "phase": "won",
+    "cash": 360123,
+    "netWorth": 589393,
+    "routes": 8,
+    "fleet": 8,
+    "quarterlyProfit": 65024,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 84,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.5,
+      "largestQuarter": 9,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9958,
+      "leisure": 9726,
+      "budget": 9391
+    },
+    "score": 3400780,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-3",
+    "bot": "cautious",
+    "turn": 24,
+    "phase": "won",
+    "cash": 464597,
+    "netWorth": 705557,
+    "routes": 9,
+    "fleet": 9,
+    "quarterlyProfit": 57956,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 91,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.7916666666666665,
+      "largestQuarter": 9,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9996,
+      "leisure": 9684,
+      "budget": 9201
+    },
+    "score": 3885896,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-0",
+    "bot": "premium",
+    "turn": 24,
+    "phase": "lost",
+    "cash": 444819,
+    "netWorth": 678207,
+    "routes": 11,
+    "fleet": 12,
+    "quarterlyProfit": 52719,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 120,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5,
+      "largestQuarter": 13,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 10382,
+      "leisure": 9816,
+      "budget": 9237
+    },
+    "score": 1631596,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-1",
+    "bot": "premium",
+    "turn": 24,
+    "phase": "lost",
+    "cash": 190255,
+    "netWorth": 396274,
+    "routes": 9,
+    "fleet": 9,
+    "quarterlyProfit": 35271,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 117,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.875,
+      "largestQuarter": 10,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 10378,
+      "leisure": 9862,
+      "budget": 9361
+    },
+    "score": 1265220,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-2",
+    "bot": "premium",
+    "turn": 24,
+    "phase": "lost",
+    "cash": 274482,
+    "netWorth": 465431,
+    "routes": 10,
+    "fleet": 12,
+    "quarterlyProfit": 49628,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 103,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.291666666666667,
+      "largestQuarter": 11,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 10346,
+      "leisure": 9870,
+      "budget": 9435
+    },
+    "score": 1580082,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-3",
+    "bot": "premium",
+    "turn": 24,
+    "phase": "lost",
+    "cash": 177439,
+    "netWorth": 370851,
+    "routes": 10,
+    "fleet": 11,
+    "quarterlyProfit": 34645,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 100,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.166666666666667,
+      "largestQuarter": 11,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 10329,
+      "leisure": 9894,
+      "budget": 9557
+    },
+    "score": 1170558,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-0",
+    "bot": "budget",
+    "turn": 24,
+    "phase": "lost",
+    "cash": 376405,
+    "netWorth": 619463,
+    "routes": 11,
+    "fleet": 12,
+    "quarterlyProfit": 45583,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 129,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 5.375,
+      "largestQuarter": 14,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9815,
+      "leisure": 9814,
+      "budget": 9858
+    },
+    "score": 2025602,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-1",
+    "bot": "budget",
+    "turn": 24,
+    "phase": "lost",
+    "cash": 360084,
+    "netWorth": 573624,
+    "routes": 9,
+    "fleet": 9,
+    "quarterlyProfit": 52693,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 75,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.125,
+      "largestQuarter": 7,
+      "actionTypes": 9
+    },
+    "preference": {
+      "business": 9850,
+      "leisure": 9835,
+      "budget": 9849
+    },
+    "score": 1919954,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-2",
+    "bot": "budget",
+    "turn": 24,
+    "phase": "lost",
+    "cash": 400738,
+    "netWorth": 644122,
+    "routes": 11,
+    "fleet": 12,
+    "quarterlyProfit": 75703,
+    "pacing": {
+      "leadChanges": 1,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 95,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.9583333333333335,
+      "largestQuarter": 10,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9837,
+      "leisure": 9839,
+      "budget": 9888
+    },
+    "score": 1728414,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-3",
+    "bot": "budget",
+    "turn": 24,
+    "phase": "lost",
+    "cash": 438384,
+    "netWorth": 660236,
+    "routes": 11,
+    "fleet": 12,
+    "quarterlyProfit": 64643,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 97,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.041666666666667,
+      "largestQuarter": 10,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9860,
+      "leisure": 9826,
+      "budget": 9848
+    },
+    "score": 2189294,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-0",
+    "bot": "connector",
+    "turn": 24,
+    "phase": "won",
+    "cash": 400513,
+    "netWorth": 617561,
+    "routes": 10,
+    "fleet": 11,
+    "quarterlyProfit": 57550,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 106,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.416666666666667,
+      "largestQuarter": 9,
+      "actionTypes": 12
+    },
+    "preference": {
+      "business": 9869,
+      "leisure": 9730,
+      "budget": 9485
+    },
+    "score": 3272320,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-1",
+    "bot": "connector",
+    "turn": 24,
+    "phase": "won",
+    "cash": 248256,
+    "netWorth": 446916,
+    "routes": 8,
+    "fleet": 8,
+    "quarterlyProfit": 43385,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 80,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.3333333333333335,
+      "largestQuarter": 9,
+      "actionTypes": 10
+    },
+    "preference": {
+      "business": 9943,
+      "leisure": 9797,
+      "budget": 9604
+    },
+    "score": 3277556,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-2",
+    "bot": "connector",
+    "turn": 24,
+    "phase": "won",
+    "cash": 357690,
+    "netWorth": 597071,
+    "routes": 10,
+    "fleet": 11,
+    "quarterlyProfit": 65393,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 92,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 3.8333333333333335,
+      "largestQuarter": 9,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9894,
+      "leisure": 9729,
+      "budget": 9482
+    },
+    "score": 3409818,
+    "qualified": true,
+    "liveRivals": 3
+  },
+  {
+    "scenario": "hub_defense",
+    "seed": "balance-v7-report-3",
+    "bot": "connector",
+    "turn": 24,
+    "phase": "won",
+    "cash": 589792,
+    "netWorth": 841048,
+    "routes": 12,
+    "fleet": 13,
+    "quarterlyProfit": 71576,
+    "pacing": {
+      "leadChanges": 0,
+      "competitiveQuarters": 17,
+      "quartersMeasured": 17,
+      "proposedActions": 115,
+      "repeatedProposals": 0,
+      "proposalsPerQuarter": 4.791666666666667,
+      "largestQuarter": 11,
+      "actionTypes": 11
+    },
+    "preference": {
+      "business": 9868,
+      "leisure": 9714,
+      "budget": 9457
+    },
+    "score": 4338854,
+    "qualified": true,
+    "liveRivals": 3
+  }
+]
