@@ -92,7 +92,9 @@ export function useMapTraffic({
         biggestSeats = Math.max(biggestSeats, t.seats)
         fastestKmh = Math.max(fastestKmh, t.speedKmh)
       }
-      const size = 0.62 + Math.min(0.5, biggestSeats / 800)
+      // 12-19px of airliner at base zoom: the metal still reads (a 747 is
+      // visibly bigger than a Caravelle) without burying the airport names.
+      const size = 0.42 + Math.min(0.26, biggestSeats / 1000)
       const dur = (4 + Math.min(14, km / 900)) * (850 / Math.max(1, fastestKmh))
       const glyph = aircraftGlyph(aircraftType)
       for (let i = 0; i < count; i++) {
@@ -123,7 +125,7 @@ export function useMapTraffic({
           dur: 5 + Math.min(15, km / 900),
           phase: ((r.id * 17 + airline.id * 7) % 70) / 10,
           glyph: PLANE_GLYPH,
-          size: 0.55,
+          size: 0.4,
           fill: rivalColor(airline.id),
           stroke: '#0b2332',
           alpha: 0.7,

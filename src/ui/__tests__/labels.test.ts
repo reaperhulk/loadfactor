@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   GRID_FROM,
+  labelBox,
+  labelSpots,
+  overlaps,
   placeLabels,
-  type LabelAnchor,
   type LabelPlacement,
   type LabelSite,
 } from '../labels'
@@ -11,28 +13,22 @@ import {
 // box already placed. Short, obviously correct, and quadratic — which is why
 // it lives here and not in the map.
 function placeLabelsNaive(sites: readonly LabelSite[], fs: number, gap: number): LabelPlacement[] {
-  const leftEdge = (x: number, w: number, a: LabelAnchor): number =>
-    a === 'start' ? x : a === 'end' ? x - w : x - w / 2
   const placed: { x1: number; y1: number; x2: number; y2: number }[] = []
   const out: LabelPlacement[] = []
   for (const s of sites) {
-    const spots: { x: number; y: number; anchor: LabelAnchor }[] = [
-      { x: s.x + s.r + gap, y: s.y + fs / 3, anchor: 'start' },
-      { x: s.x - s.r - gap, y: s.y + fs / 3, anchor: 'end' },
-      { x: s.x, y: s.y - s.r - gap, anchor: 'middle' },
-      { x: s.x, y: s.y + s.r + fs, anchor: 'middle' },
-    ]
+    const spots = labelSpots(s, fs, gap)
     let pick = spots[0]!
+    let fit = false
     for (const spot of spots) {
-      const x1 = leftEdge(spot.x, s.w, spot.anchor)
-      const box = { x1, y1: spot.y - fs, x2: x1 + s.w, y2: spot.y }
+      const box = labelBox(spot, s.w, fs)
       if (!placed.some((b) => box.x1 < b.x2 && box.x2 > b.x1 && box.y1 < b.y2 && box.y2 > b.y1)) {
         pick = spot
+        fit = true
         break
       }
     }
-    const px1 = leftEdge(pick.x, s.w, pick.anchor)
-    placed.push({ x1: px1, y1: pick.y - fs, x2: px1 + s.w, y2: pick.y })
+    if (!fit && s.optional === true) continue
+    placed.push(labelBox(pick, s.w, fs))
     out.push({ id: s.id, x: pick.x, y: pick.y, anchor: pick.anchor })
   }
   return out
@@ -181,6 +177,59 @@ describe('placeLabels', () => {
     expect(optional.map((p) => p.id)).toEqual(['E', 'W', 'N', 'S'])
     // With room to spare an optional label is placed like any other.
     expect(placeLabels([{ id: 'Y', x: 300, y: 300, r: 2, w: 20, optional: true }], 9, 3)).toHaveLength(1)
+  })
+})
+
+describe('label collision avoidance', () => {
+  it('never lets two optional labels overlap, at any density', () => {
+    for (const spread of [60, 200, 600, 2000]) {
+      for (let seed = 1; seed <= 12; seed++) {
+        const sites = layout(seed, 90, spread).map((s) => ({ ...s, optional: true }))
+        const byId = new Map(sites.map((s) => [s.id, s]))
+        const boxes = placeLabels(sites, 9, 3).map((p) => labelBox(p, byId.get(p.id)!.w, 9))
+        for (let i = 0; i < boxes.length; i++) {
+          for (let j = i + 1; j < boxes.length; j++) {
+            expect(overlaps(boxes[i]!, boxes[j]!), `seed ${seed}, spread ${spread}: labels ${i} and ${j}`).toBe(false)
+          }
+        }
+      }
+    }
+  })
+
+  it('moves a crowded name to another side before giving up on it', () => {
+    // GIG sits just above GRU: GRU's right-hand slot is taken by GIG's name,
+    // so GRU hangs off another side of its own marker instead.
+    const sites: LabelSite[] = [
+      { id: 'GRU', x: 100, y: 104, r: 2, w: 20, optional: true },
+      { id: 'GIG', x: 101, y: 98, r: 2, w: 20, optional: true },
+    ]
+    const out = placeLabels(sites, 9, 3)
+    expect(out.map((p) => p.id)).toEqual(['GRU', 'GIG'])
+    expect(out[0]!.anchor).toBe('start')
+    expect(out[1]!.anchor).not.toBe('start')
+    expect(overlaps(labelBox(out[0]!, 20, 9), labelBox(out[1]!, 20, 9))).toBe(false)
+  })
+
+  it('gives the slot to the earlier (more important) city and hides the later one', () => {
+    // Three names on one marker's worth of space: whoever comes first in the
+    // priority order keeps its best slot; the rest take what is left, and a
+    // name with nowhere to go is hidden rather than drawn over another.
+    const hub = { x: 200, y: 200, r: 2, w: 8, optional: true }
+    const ring: LabelSite[] = ['A', 'B', 'C', 'D', 'E'].map((id) => ({ id, ...hub }))
+    const out = placeLabels(ring, 9, 3)
+    expect(out.map((p) => p.id)).toEqual(['A', 'B', 'C', 'D'])
+    expect(out.map((p) => p.anchor)).toEqual(['start', 'end', 'middle', 'middle'])
+  })
+
+  it('boxes a label by its font box, so above and below clear the marker', () => {
+    const site: LabelSite = { id: 'X', x: 0, y: 0, r: 2, w: 20 }
+    const [right, , above, below] = labelSpots(site, 10, 3).map((p) => labelBox(p, 20, 10))
+    expect(right!.x1).toBeCloseTo(5)
+    // The capitals' middle sits on the marker's centre line.
+    expect((right!.y1 + right!.y2) / 2).toBeLessThan(1)
+    expect((right!.y1 + right!.y2) / 2).toBeGreaterThan(-1)
+    expect(above!.y2).toBeCloseTo(-5)
+    expect(below!.y1).toBeCloseTo(5)
   })
 })
 

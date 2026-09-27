@@ -3,8 +3,13 @@
 // Greedy, in the order the caller supplies (mass first, so majors claim the
 // best slot): each label tries the right-hand slot, then left, then above,
 // then below, taking the first that does not overlap a label already placed.
-// A label that finds no free slot is placed right anyway — a shingled name is
-// better than a missing one.
+// A label that finds no free slot is dropped when it is optional (the map
+// passes every name but the HQ's and the selected city's as optional), and
+// otherwise placed right anyway, shingled.
+//
+// A label's box is the text's own font box — ascent above the baseline and
+// descent below it, the way the browser measures an SVG <text> — so "no two
+// boxes overlap" here means no two rendered names overlap on screen.
 //
 // The collision test comes in two shapes, and which one is faster is not the
 // one the big-O suggests. Scanning every label already placed is quadratic;
@@ -55,19 +60,42 @@ export interface LabelPlacement {
   anchor: LabelAnchor
 }
 
-interface Box {
+export interface Box {
   x1: number
   y1: number
   x2: number
   y2: number
 }
 
-const overlaps = (a: Box, b: Box): boolean =>
+export const overlaps = (a: Box, b: Box): boolean =>
   a.x1 < b.x2 && a.x2 > b.x1 && a.y1 < b.y2 && a.y2 > b.y1
 
 // Where a label's box starts, given the anchor it hangs from.
 const leftEdge = (x: number, w: number, anchor: LabelAnchor): number =>
   anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2
+
+// The font box around a baseline, in ems: what getBBox() reports for a line
+// of capitals in the map's sans-serif.
+export const LABEL_ASCENT = 0.93
+export const LABEL_DESCENT = 0.24
+
+// The four candidate positions, in preference order: right of the marker,
+// left, above, below. Right and left sit the capitals' middle on the marker's
+// centre; above and below clear the marker by `gap`.
+export function labelSpots(site: LabelSite, fs: number, gap: number): { x: number; y: number; anchor: LabelAnchor }[] {
+  return [
+    { x: site.x + site.r + gap, y: site.y + fs / 3, anchor: 'start' },
+    { x: site.x - site.r - gap, y: site.y + fs / 3, anchor: 'end' },
+    { x: site.x, y: site.y - site.r - gap - LABEL_DESCENT * fs, anchor: 'middle' },
+    { x: site.x, y: site.y + site.r + gap + LABEL_ASCENT * fs, anchor: 'middle' },
+  ]
+}
+
+// The rectangle a label occupies once placed.
+export function labelBox(p: { x: number; y: number; anchor: LabelAnchor }, w: number, fs: number): Box {
+  const x1 = leftEdge(p.x, w, p.anchor)
+  return { x1, y1: p.y - LABEL_ASCENT * fs, x2: x1 + w, y2: p.y + LABEL_DESCENT * fs }
+}
 
 // Where the grid starts paying, from the table above. Not a cliff — the two
 // are within a third of each other on either side of it — so it needs no
@@ -143,25 +171,18 @@ export function placeLabels(
 
   const out: LabelPlacement[] = []
   for (const site of sites) {
-    const spots: { x: number; y: number; anchor: LabelAnchor }[] = [
-      { x: site.x + site.r + gap, y: site.y + fs / 3, anchor: 'start' },
-      { x: site.x - site.r - gap, y: site.y + fs / 3, anchor: 'end' },
-      { x: site.x, y: site.y - site.r - gap, anchor: 'middle' },
-      { x: site.x, y: site.y + site.r + fs, anchor: 'middle' },
-    ]
+    const spots = labelSpots(site, fs, gap)
     let pick = spots[0]!
     let fit = false
     for (const spot of spots) {
-      const x1 = leftEdge(spot.x, site.w, spot.anchor)
-      if (!clashes({ x1, y1: spot.y - fs, x2: x1 + site.w, y2: spot.y })) {
+      if (!clashes(labelBox(spot, site.w, fs))) {
         pick = spot
         fit = true
         break
       }
     }
     if (!fit && site.optional === true) continue
-    const px1 = leftEdge(pick.x, site.w, pick.anchor)
-    keep({ x1: px1, y1: pick.y - fs, x2: px1 + site.w, y2: pick.y })
+    keep(labelBox(pick, site.w, fs))
     out.push({ id: site.id, x: pick.x, y: pick.y, anchor: pick.anchor })
   }
   if (stats !== undefined) stats.comparisons = comparisons
