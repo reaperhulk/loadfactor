@@ -7,27 +7,17 @@ const PassengerFlows = lazy(() => import('./PassengerFlows').then(m=>({default:m
 
 import { useMemo } from 'react'
 import { SeasonLegend } from './legends'
-import { CITIES, distanceKm, getCity } from '../data/cities'
-import { SEASON_TOUR_BP_PER_POINT, SLOTS_PER_GRANT, TERMINAL_FUNDER_SLOTS_V6 } from '../data/constants'
+import { CITIES, REGION_NAMES, distanceKm, getCity } from '../data/cities'
+import { SEASON_TOUR_BP_PER_POINT, SLOTS_PER_GRANT } from '../data/constants'
 import { getEventDef } from '../data/events'
 import type { GameState } from '../engine'
 import { baseFare, pairWeeklyDemand, seasonalBp } from '../engine/market'
-import { cityPool, expansionSize, nextExpansion, slotFee, slotQueue, slotRent, slotsRemaining, terminalBlocker, terminalCost } from '../engine/slots'
+import { cityPool, expansionSize, nextExpansion, slotFee, slotQueue, slotRent, slotsRemaining, terminalBlocker, terminalCost, terminalFunderSlots } from '../engine/slots'
 import { airlinesOnPair, networkCities, slotsAllocated, slotsFree, slotsHeld, slotsUsed } from '../engine/queries'
 import { cityMass, cityTier } from './mapStyle'
 import { ConfirmButton } from './ConfirmButton'
 import { viewSeat, dispatch } from './session'
 import { inQuarters, money, signed, tone } from './format'
-
-const REGION_NAMES: Record<string, string> = {
-  na: 'North America',
-  sa: 'South America',
-  eu: 'Europe',
-  me: 'Middle East',
-  af: 'Africa',
-  as: 'Asia',
-  oc: 'Oceania',
-}
 
 function Rating({ label, value }: { label: string; value: number }) {
   return (
@@ -281,7 +271,7 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
             <ConfirmButton
               data-testid="panel-fund-terminal"
               disabled={blocker !== null}
-              title={blocker ?? `pay the authority to open its next programme next quarter: +${expansionSize(cityId)} slots, the first ${Math.min(TERMINAL_FUNDER_SLOTS_V6, expansionSize(cityId))} yours`}
+              title={blocker ?? `pay the authority to open its next programme next quarter: +${expansionSize(cityId)} slots, ${terminalFunderSlots(state, cityId)} of them yours`}
               label={`🏗 Fund the next programme — ${money(cost)}`}
               confirmLabel={`Pay ${money(cost)}?`}
               onConfirm={() => dispatch({ type: 'fund_terminal', city: cityId })}
@@ -289,7 +279,7 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
             <span className="dim">
               {blocker ?? (remaining > 0
                 ? `${remaining} slots are still free here: joining the list is far cheaper than building`
-                : `opens +${expansionSize(cityId)} slots next quarter instead of ${inQuarters(expansion.quartersAway)}; you take the first ${Math.min(TERMINAL_FUNDER_SLOTS_V6, expansionSize(cityId))}, the rest serve the list`)}
+                : `opens +${expansionSize(cityId)} slots next quarter instead of ${inQuarters(expansion.quartersAway)}; you take ${terminalFunderSlots(state, cityId)}${terminalFunderSlots(state, cityId) < expansionSize(cityId) ? ', the rest serve the list' : ''}`)}
             </span>
           </div>
         )

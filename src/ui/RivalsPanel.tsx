@@ -8,7 +8,7 @@ import { pairKey } from '../data/cities'
 import type { Airline, GameState } from '../engine'
 import { netWorth, objectiveScore, objectiveScoreAt, routeWeeklyCapacity, slotCities } from '../engine/queries'
 import { ENTRANT_GRACE_QUARTERS, TAKEOVER_BASE_K, TAKEOVER_PREMIUM_BP } from '../data/constants'
-import { getScenario } from '../data/scenarios'
+import { getScenario, objectiveOf } from '../data/scenarios'
 import { ConfirmButton } from './ConfirmButton'
 import { RIVAL_COLORS } from './mapStyle'
 import { RaceChart, Sparkline } from './Sparkline'
@@ -329,9 +329,9 @@ export function RivalsPanel({ state }: { state: GameState }) {
         return (
           <p className="dim" data-testid="race-pace">
             Pace: at the current trend you finish ~
-            <strong className={projected >= scenario.objective.target ? 'pos' : 'neg'}>{objectiveValue(projected, scenario.objective.unit)}</strong>{' '}
+            <strong className={projected >= objectiveOf(scenario.id, state.rulesVersion).target ? 'pos' : 'neg'}>{objectiveValue(projected, scenario.objective.unit)}</strong>{' '}
             in {Math.floor(remaining / 4)}y {remaining % 4}q — this era is won on{' '}
-            <strong>{scenario.objective.label}</strong> ({objectiveValue(scenario.objective.target, scenario.objective.unit)} plus #1)
+            <strong>{scenario.objective.label}</strong> ({objectiveValue(objectiveOf(scenario.id, state.rulesVersion).target, scenario.objective.unit)} plus #1)
             {now < leader && <span className="neg"> (currently behind the leader)</span>}
           </p>
         )

@@ -3,7 +3,7 @@ import type { GameState } from '../engine'
 import { applyCommandBatchFor } from '../engine'
 import { usePlanningCommands } from './planningDrafts'
 import { getAircraftType } from '../data/aircraft'
-import { getScenario } from '../data/scenarios'
+import { objectiveOf } from '../data/scenarios'
 import { createForecastPlanner } from '../engine/forecast'
 import { expansionOptions, type ExpansionOption } from '../engine/expansion'
 import { viewSeat } from './session'
@@ -25,7 +25,7 @@ export function ExpansionPlanner({ state, onPlan, onAirport }: { state: GameStat
     return result.options.filter(o => selected.includes(key(o))).map(o => ({ ...o,
       stress: evaluate([o.command], { fuelBp: Math.floor(state.world.fuelBp * 1.2), economyBp: Math.floor(state.world.economyBp * 0.9) }) }))
   }, [state, working, seat, result, selected])
-  const objective = getScenario(state.scenario).objective
+  const objective = objectiveOf(state.scenario, state.rulesVersion)
   const gain = (n: number) => objective.unit === 'money' ? money(n) : objective.unit === 'rate' ? `${(n / 100).toFixed(2)} percentage points` : `${n.toLocaleString('en-US')} boardings`
   return <section className="expansion-planner" data-testid="expansion-planner">
     <h3>Where to grow next</h3><p className="hint">Compare routes your current fleet and slots can launch. Rankings include connecting traffic, fleet costs and your scenario objective.</p>

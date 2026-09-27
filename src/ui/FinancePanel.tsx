@@ -19,7 +19,7 @@ import { getScenario } from '../data/scenarios'
 import type { CostBreakdown, GameState } from '../engine'
 import { inflationBp } from '../engine/market'
 import { hedgePremium as engineHedgePremium } from '../engine/commands'
-import { hedgeLockBp } from '../engine/worldEvents'
+import { hedgeLockBpFor } from '../engine/worldEvents'
 import { getEventDef } from '../data/events'
 import { currentLoanRateBp, debtCeiling, routeWeeklyCapacity, totalDebt } from '../engine/queries'
 import { HedgeLegend, MarketingLegend, RivalryLegend } from './legends'
@@ -150,6 +150,7 @@ export function FinancePanel({ state }: { state: GameState }) {
   // Rules 6 prices a hedge off the fuel bill it covers and offers half
   // cover; earlier rules keep the per-airframe premium and full cover only.
   const modernHedge = (state.rulesVersion ?? 1) >= 6
+  const replaceable = (state.rulesVersion ?? 1) >= 7
   const hedgePremium = (quarters: number, coverBp = 10000): number => modernHedge ? engineHedgePremium(state, player, quarters, coverBp) :
     Math.floor(
       (HEDGE_PREMIUM_PER_AIRCRAFT *
@@ -352,7 +353,7 @@ export function FinancePanel({ state }: { state: GameState }) {
         Debt {debt > 0 ? money(debt) : 'none'} · borrowing ceiling {money(ceiling)}
       </p>
       <div className="city-negotiate" data-testid="hedge-panel">
-        {player.fuelHedge !== null ? (
+        {player.fuelHedge !== null && (
           <span>
             ⛽ Fuel {player.fuelHedge.coverBp !== undefined && player.fuelHedge.coverBp < 10000 ? `${player.fuelHedge.coverBp / 100}% ` : ''}hedged at index {(player.fuelHedge.bp / 100).toFixed(0)}% for{' '}
             {plural(player.fuelHedge.quartersLeft, 'more quarter')}
@@ -360,9 +361,12 @@ export function FinancePanel({ state }: { state: GameState }) {
               <span className="neg"> — expires next quarter, you'll be back on the market index</span>
             )}
           </span>
-        ) : (
+        )}
+        {/* Rules 7: a running contract can be replaced (its remaining
+            quarters are forfeited), so the desk stays open. */}
+        {(player.fuelHedge === null || replaceable) && (
           <>
-            <span>Fuel hedge{modernHedge ? ` at index ${(hedgeLockBp(state.world) / 100).toFixed(0)}%` : ''}:</span>
+            <span>{player.fuelHedge === null ? 'Fuel hedge' : 'Replace it'}{modernHedge ? ` at index ${(hedgeLockBpFor(state) / 100).toFixed(0)}%` : ''}:</span>
             {hedgeOptions.map(({ q, coverBp }) => (
               <button
                 key={`${q}-${coverBp}`}
@@ -381,7 +385,7 @@ export function FinancePanel({ state }: { state: GameState }) {
             ))}
             {warnedFuel.length > 0 && (
               <span className="neg" data-testid="hedge-warning">
-                {warnedFuel.map((e) => getEventDef(e.id).name).join(', ')} announced for next quarter — the desk has priced in half of it
+                {warnedFuel.map((e) => getEventDef(e.id).name).join(', ')} announced for next quarter — the desk has priced in {(state.rulesVersion ?? 1) >= 7 ? 'most' : 'half'} of it
               </span>
             )}
           </>

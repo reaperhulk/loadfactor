@@ -17,7 +17,8 @@ import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState, u
 import { CITIES } from '../data/cities'
 import { AIRCRAFT, getAircraftType } from '../data/aircraft'
 import { getEventDef } from '../data/events'
-import { SCENARIOS, SHORT_SCENARIOS, getScenario } from '../data/scenarios'
+import { SCENARIOS, SHORT_SCENARIOS, getScenario, objectiveOf } from '../data/scenarios'
+import { RULES_VERSION } from '../engine/version'
 import { netWorth, networkCities, objectiveQualified, objectiveScore, quarterOf, yearOf } from '../engine/queries'
 import { nextExpansion } from '../engine/slots'
 // Inspectors and the launch dialog are lazy like the report surfaces: they
@@ -439,7 +440,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
       )}
       <section className="short-scenarios"><h2>Short-haul sessions</h2><p className="dim">Focused challenges in 16–24 quarters. Every mandate uses the full simulation.</p>
         {SHORT_SCENARIOS.map((s) => <article className="scenario-card" key={s.id} data-testid={`scenario-${s.id}`}>
-          <h3>{s.name}</h3><p>{s.description}</p><p>{s.objective.blurb}</p>
+          <h3>{s.name}</h3><p>{s.description}</p><p>{objectiveOf(s.id, RULES_VERSION).blurb}</p>
           <ConfirmButton label={`Start · ${s.quarters} quarters`} confirmLabel={overwrites ? 'Replace oldest save and start?' : 'Take the mandate?'} onConfirm={() => startGame(s.id, seed.trim() || crypto.randomUUID().slice(0, 8), custom(), undefined, players)} />
         </article>)}
       </section>
@@ -471,7 +472,7 @@ function ScenarioSelect({ onWatchReplay }: { onWatchReplay: (replay: Replay) => 
           <p>{s.description}</p>
           <p className="dim scenario-facts">
             {s.startYear}–{s.startYear + Math.floor(s.quarters / 4)} · {s.quarters} quarters · target{' '}
-            {objectiveValue(s.objective.target, s.objective.unit)} {s.objective.label} · vs{' '}
+            {objectiveValue(objectiveOf(s.id, RULES_VERSION).target, s.objective.unit)} {s.objective.label} · vs{' '}
             {s.rivals.map((r) => `${r.name} (${r.personality ?? 'balanced'})`).join(', ')}
           </p>
           <p className="scenario-chips">
@@ -553,7 +554,7 @@ function GameOverOverlay({
 }) {
   // The final table ranks on the ERA's objective — the thing that actually
   // decided the career — with net worth alongside for context.
-  const obj = getScenario(state.scenario).objective
+  const obj = objectiveOf(state.scenario, state.rulesVersion)
   const score = (a: (typeof state.airlines)[number]): number => objectiveScore(a, obj.kind)
   const qualifies = (a: (typeof state.airlines)[number]): boolean => !a.bankrupt && objectiveQualified(state, a)
   const ranked = [...state.airlines].sort((a, b) =>
@@ -884,21 +885,21 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         <span className="hud-stat hud-figure hud-objective" data-label="Objective" data-testid="networth">
           {scenario.objective.kind === 'netWorth' ? (
             <>
-              <AnimatedMoney value={netWorth(player)} /> <span className="hud-target">/ {money(scenario.objective.target)}</span>
-              <ObjectiveBar value={netWorth(player)} target={scenario.objective.target} />
+              <AnimatedMoney value={netWorth(player)} /> <span className="hud-target">/ {money(objectiveOf(scenario.id, state.rulesVersion).target)}</span>
+              <ObjectiveBar value={netWorth(player)} target={objectiveOf(scenario.id, state.rulesVersion).target} />
             </>
           ) : (
             <>
               <span data-testid="objective-progress">
                 {objectiveValue(objectiveScore(player, scenario.objective.kind), scenario.objective.unit)}{' '}
                 <span className="hud-target">
-                  / {objectiveValue(scenario.objective.target, scenario.objective.unit)}{' '}
+                  / {objectiveValue(objectiveOf(scenario.id, state.rulesVersion).target, scenario.objective.unit)}{' '}
                   {scenario.objective.label}
                 </span>
               </span>
               <ObjectiveBar
                 value={objectiveScore(player, scenario.objective.kind)}
-                target={scenario.objective.target}
+                target={objectiveOf(scenario.id, state.rulesVersion).target}
               />
             </>
           )}
@@ -995,7 +996,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       {(state.rulesVersion ?? 1) >= 2 && <details className="world-outlook" data-testid="world-outlook">
         <summary>Planning calendar · next board opportunity {inQuarters(state.turn % 8 === 0 ? 0 : 8 - state.turn % 8)}</summary>
         <p>Board opportunities arrive every eight quarters with four quarters to decide. Accepted commitments can run for several years.</p>
-        <p>{scenario.objective.blurb} {scenario.objective.kind === 'loadFactor' ? 'Qualification also requires 1.5M total passengers and three active routes.' : ''}</p>
+        <p>{objectiveOf(scenario.id, state.rulesVersion).blurb} {scenario.objective.kind === 'loadFactor' ? 'Qualification also requires 1.5M total passengers and three active routes.' : ''}</p>
         <p>Scheduled deliveries: {player.orders.length === 0 ? 'none' : player.orders.map((o) => `${getAircraftType(o.type).name} ${inQuarters(o.quartersLeft)}${o.replacesAircraftId ? ' (replacement)' : ''}`).join(' · ')}</p>
         <p>Aircraft entering the market within two years: {AIRCRAFT.filter((t) => t.availableFrom > yearOf(state) && t.availableFrom <= yearOf(state) + 2).map((t) => `${t.name} (${t.availableFrom})`).join(' · ') || 'none announced'}.</p>
         <p>Airport programmes on your network: {[...new Set([...Object.keys(player.slots), ...player.slotRequests.map((r) => r.city)])].map((city) => ({ city, ...nextExpansion(state, city) })).filter((e) => e.quartersAway <= 8).sort((a,b) => a.quartersAway-b.quartersAway).map((e) => `${e.city}: +${e.slots} slots ${inQuarters(e.quartersAway)}`).join(' · ') || 'none opening in the next eight quarters'}.</p>
@@ -1141,7 +1142,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
               you use it too.
             </p>
             <p className="dim" data-testid="handbook-objective">
-              <strong>This era: {scenario.objective.blurb}</strong>
+              <strong>This era: {objectiveOf(scenario.id, state.rulesVersion).blurb}</strong>
             </p>
             <div data-testid="handbook-systems">
               <HubLegend />
