@@ -435,7 +435,16 @@ for (const [width, height] of [[390, 844], [320, 568]] as const) {
     await page.waitForTimeout(500)
     const wrap = (await page.getByTestId('map-wrap').boundingBox())!
     const dot = (await page.getByTestId('city-JFK').boundingBox())!
-    const label = (await page.locator('svg.map text.city-label', { hasText: 'JFK' }).boundingBox())!
+    // The glyph box, mapped to the screen. WebKit's getBoundingClientRect on
+    // SVG text with a non-scaling-stroke halo reports a box hundreds of pixels
+    // wide, so measure the text itself rather than its stroke.
+    const label = await page.locator('svg.map text.city-label', { hasText: 'JFK' }).evaluate((el) => {
+      const t = el as SVGTextElement, b = t.getBBox(), m = t.getScreenCTM()!
+      const corners = [[b.x, b.y], [b.x + b.width, b.y], [b.x, b.y + b.height], [b.x + b.width, b.y + b.height]]
+        .map(([x, y]) => new DOMPoint(x, y).matrixTransform(m))
+      const xs = corners.map((p) => p.x), ys = corners.map((p) => p.y)
+      return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) }
+    })
     for (const [name, b] of [['marker', dot], ['name', label]] as const) {
       expect(b.x, `JFK ${name} inside the left edge`).toBeGreaterThanOrEqual(wrap.x)
       expect(b.x + b.width, `JFK ${name} inside the right edge`).toBeLessThanOrEqual(wrap.x + wrap.width)
