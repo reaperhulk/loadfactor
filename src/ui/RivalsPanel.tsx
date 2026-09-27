@@ -263,11 +263,18 @@ export function RivalsPanel({ state }: { state: GameState }) {
     const own = a.history.map((h, index) => metric === 'objective' ? objectiveScoreAt(a, getScenario(state.scenario).objective.kind, index + 1) : h[metric])
     const pad = Array<number>(Math.max(0, span - own.length)).fill(0)
     return {
-      label: a.name,
+      label: a.id === viewSeat() ? `${a.name} (you)` : a.name,
       points: [...pad, ...own],
       className: i === viewSeat() ? 'race-me' : `race-rival-${i}`,
     }
   })
+  // The longest history carries the calendar the chart's x-axis reads.
+  const longest = state.airlines.reduce((best, a) => (a.history.length > best.history.length ? a : best), state.airlines[0]!)
+  const startYear = getScenario(state.scenario).startYear
+  const raceDate = (i: number): string => {
+    const turn = longest.history[i]?.turn ?? i
+    return `${startYear + Math.floor(turn / 4)} Q${(turn % 4) + 1}`
+  }
   const mySeats = fieldedSeats(state.airlines[viewSeat()]!, state.turn)
 
   return (
@@ -292,6 +299,8 @@ export function RivalsPanel({ state }: { state: GameState }) {
       </h3>
       <RaceChart
         series={series}
+        xLabel={raceDate}
+        label={`Race chart: ${RACE_METRICS.find((m) => m.key === metric)?.label ?? 'objective'} by airline, quarter by quarter`}
         format={metric === 'objective' ? (v) => objectiveValue(v, getScenario(state.scenario).objective.unit) : metric === 'pax' ? (v) => v.toLocaleString('en-US') : undefined}
         target={(() => {
           // A duel career races the challenger's ghost — their final net
@@ -329,13 +338,6 @@ export function RivalsPanel({ state }: { state: GameState }) {
       })()}
       <StandingsTable state={state} />
       <HeadToHead state={state} />
-      <div className="race-legend">
-        {state.airlines.map((a, i) => (
-          <span key={a.id} className={i === 0 ? 'race-key me' : `race-key rival-${i}`}>
-            ■ {a.id === viewSeat() ? 'You' : a.name}
-          </span>
-        ))}
-      </div>
       <TakeoverLegend />
       <div className="rival-cards">
         {state.airlines.filter((a) => a.id !== viewSeat()).map((rival) => {

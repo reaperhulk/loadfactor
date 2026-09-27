@@ -1,0 +1,225 @@
+/* UI polish layered last: text that used to run together, honest disabled
+   and selected states, the race chart at true pixel size, focus rings that
+   are never clipped, and phone-width fixes for the tab strip and dialogs. */
+
+/* --- Words that ran together ------------------------------------------- */
+.slot-release { margin-left: 0.5em; }
+.report-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.report-toolbar .report-nav { display: inline-flex; align-items: center; gap: 6px; }
+
+/* --- Disabled means disabled -------------------------------------------
+   A filled primary button kept its accent fill when disabled and read as
+   ready to press. Disabled buttons of every kind go flat and muted. */
+button:disabled:not(.map-area *),
+button[aria-disabled='true'] {
+  opacity: 1;
+  background: transparent;
+  border-color: color-mix(in srgb, var(--dim) 45%, transparent);
+  border-style: dashed;
+  color: color-mix(in srgb, var(--dim) 80%, transparent);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.primary-action:disabled,
+.end-quarter:disabled {
+  background: transparent;
+  color: var(--dim);
+  border-color: color-mix(in srgb, var(--dim) 55%, transparent);
+}
+
+/* --- Segmented choices: the selected one is unmistakable --------------- */
+.segmented .segment { color: var(--ink); }
+.segmented .segment.active { box-shadow: inset 0 -2px 0 color-mix(in srgb, #06101f 40%, transparent); }
+.segmented .segment.active::before { content: '✓ '; font-weight: 700; }
+.marketing-levels { vertical-align: middle; }
+
+/* --- Finance: the loan form -------------------------------------------- */
+.loan-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; margin: 6px 0 4px; }
+.loan-amount { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.loan-amount > span:first-child { font-weight: 600; }
+.input-unit { display: inline-flex; align-items: center; border: 1px solid #526777; border-radius: 6px; background: #0e1522; padding: 0 8px; }
+.input-unit input { width: 8ch; border: 0; background: transparent; color: var(--ink); padding: 5px 4px; text-align: right; font-variant-numeric: tabular-nums; }
+.input-unit input:focus-visible { outline: none; }
+.input-unit:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.input-unit > span { color: var(--dim); }
+.loan-table th { text-align: left; }
+
+/* --- The race chart ----------------------------------------------------
+   Drawn at its real width, so every label is an 11px app label. */
+.race-figure { margin: 8px 0 14px; }
+.race-chart-frame { width: 100%; min-width: 0; }
+.race-chart { display: block; background: #0e1522; border-radius: 8px; font-family: inherit; }
+.race-chart .race-line { fill: none; stroke-width: 2; stroke-linejoin: round; }
+.race-chart .chart-grid { stroke: #2b3a5a; stroke-width: 1; stroke-dasharray: 3 4; }
+.race-chart .chart-baseline { stroke: #3a4a6a; stroke-width: 1; }
+.race-chart .chart-grid-label,
+.race-chart .chart-axis-label { fill: var(--dim); font-size: 11px; opacity: 1; font-variant-numeric: tabular-nums; }
+.race-chart .chart-end-label { font-size: 11px; font-weight: 600; stroke: none; font-variant-numeric: tabular-nums; }
+.race-chart .race-target-label { font-size: 11px; }
+.race-chart text.race-me { fill: var(--accent); }
+.race-chart text.race-rival-0,
+.race-chart text.race-rival-1 { fill: #9a7cf5; }
+.race-chart text.race-rival-2 { fill: #b8d85c; }
+.race-chart text.race-rival-3 { fill: #e67ad8; }
+.race-rival-0 { stroke: #9a7cf5; }
+.race-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 0; font-size: 0.82rem; color: var(--ink); }
+.race-key { display: inline-flex; align-items: center; gap: 6px; }
+.race-swatch { display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: currentColor; }
+.race-key.race-me .race-swatch { background: var(--accent); }
+.race-key.race-rival-0 .race-swatch,
+.race-key.race-rival-1 .race-swatch { background: #9a7cf5; }
+.race-key.race-rival-2 .race-swatch { background: #b8d85c; }
+.race-key.race-rival-3 .race-swatch { background: #e67ad8; }
+
+/* --- Primary actions stay primary inside dialogs ------------------------
+   The dialog button rule (.gameover-card button) outranked .primary-action,
+   so "Open route" looked like its neighbours. */
+button.primary-action:not(:disabled) {
+  background: var(--accent);
+  color: #06101f;
+  border-color: var(--accent);
+  font-weight: 700;
+}
+button.primary-action:not(:disabled):hover { filter: brightness(1.08); }
+
+/* --- Route launch dialog: full-width controls -------------------------- */
+.route-launch-review .setup-field { display: grid; gap: 4px; margin-bottom: 10px; }
+.route-launch-review .setup-field > span { font-weight: 600; }
+.route-launch-review .setup-field select { width: 100%; }
+.route-launch-review .freq-row { display: grid; gap: 4px; margin-bottom: 10px; }
+.route-launch-review .freq-row input[type='range'] { width: 100%; margin: 0; }
+
+/* --- Keyboard: skip link and unclipped focus rings ---------------------- */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 1000;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #06101f;
+  font-weight: 700;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+.skip-link:focus,
+.skip-link:focus-visible { transform: none; outline: 2px solid var(--ink); outline-offset: 2px; }
+.workspace-pages:focus,
+#desk-heading:focus { outline: none; }
+.workspace-pages:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
+#desk-heading:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* --- Operations calendar -------------------------------------------------
+   All thirteen weeks fit a desktop workspace (fixed layout, stacked cell
+   text); open and folded rows share one height. Narrow screens scroll. */
+.fleet-calendar tr.calendar-open td button { flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; }
+.fleet-calendar tr.calendar-open td button small { white-space: normal; line-height: 1.2; }
+.fleet-calendar td button,
+.fleet-calendar tr:not(.calendar-open) td button { min-height: 52px; }
+.fleet-calendar tr:not(.calendar-open) td button { align-items: center; }
+.fleet-calendar th { vertical-align: middle; }
+@media (min-width: 1100px) {
+  .fleet-calendar { table-layout: fixed; }
+  .fleet-calendar thead th:first-child { width: 170px; }
+  .fleet-calendar td button { min-width: 0; padding: 4px 2px; }
+}
+
+/* --- Routes page: one style for every collapsible section ----------------
+   The adviser, the workbench, the growth finder and the explainer used four
+   different heading treatments. They are one family of panels. */
+[data-testid='page-routes'] .split-list :is(.network-advisor, .planning-workbench, .expansion-planner, .game-legend) {
+  background: var(--panel);
+  border: 1px solid var(--rule, #2b3a5a);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 12px 0;
+}
+[data-testid='page-routes'] .split-list :is(.network-advisor, .planning-workbench, .game-legend) > summary,
+[data-testid='page-routes'] .split-list .expansion-planner > h3 {
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.4;
+  color: var(--ink);
+  margin: 0;
+}
+[data-testid='page-routes'] .split-list .expansion-planner > h3 { margin-bottom: 6px; }
+[data-testid='page-routes'] .split-list :is(.network-advisor, .planning-workbench, .game-legend)[open] > summary { margin-bottom: 8px; }
+
+/* --- Route dossier: the pair table lines up with its header ------------- */
+.city-panel .pair-table, .pair-table { display: table; width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.game-shell .workspace-page .pair-table thead,
+.pair-table thead th { background: transparent; }
+.pair-table th,
+.pair-table td { padding: 4px 6px; text-align: right; white-space: nowrap; }
+.pair-table th:first-child,
+.pair-table td:first-child { text-align: left; white-space: normal; padding-left: 0; }
+.pair-table thead th { font-weight: 500; font-size: 0.78rem; border-bottom: 1px solid var(--rule, #2b3a5a); }
+
+/* --- Used aircraft: columns under their headers ------------------------- */
+.used-market-table { width: 100%; }
+.used-market-table th,
+.used-market-table td { text-align: left; vertical-align: middle; }
+.used-market-table td:nth-child(2),
+.used-market-table td:nth-child(3) { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.used-market-table td:last-child { text-align: right; }
+.used-market-table .aircraft-art { max-width: 180px; }
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The tab strip scrolls (overflow-x), which clipped the outside focus ring
+   of every tab and of Undo. Draw those rings inside the button instead. */
+.workspace-tabs.tabs > button:not(.undo-action) { padding-inline: 6px; margin-inline: -6px; }
+.workspace-tabs.tabs > button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+  border-radius: 4px;
+}
+.workspace-tabs.tabs > button.active:focus-visible { box-shadow: inset 0 -2px var(--accent); }
+
+/* --- Small print that can actually be read ------------------------------ */
+.game-shell .brief-assumptions { font-size: 0.8rem; line-height: 1.45; color: color-mix(in srgb, var(--ink) 62%, var(--dim)); }
+.sparkline .spark-label { font-size: 11px; fill: color-mix(in srgb, var(--ink) 55%, var(--dim)); }
+.sparkline .spark-label-last { fill: var(--ink); }
+.build-stamp { opacity: 0.85; font-size: 0.72rem; }
+.nav-footer small { font-size: 0.75rem; }
+
+/* --- Tabs: full labels on wide screens, short ones on phones ------------- */
+.workspace-tabs .tab-short { display: none; }
+.workspace-tabs.tabs > button { flex: 0 0 auto; }
+@media (max-width: 480px) {
+  .workspace-tabs .tab-long { display: none; }
+  .workspace-tabs .tab-short { display: inline; }
+}
+/* A strip that scrolls says so: the last tab fades at the edge. */
+@media (max-width: 700px) {
+  .workspace-tabs.tabs { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); padding-right: 28px; }
+  .workspace-tabs.tabs > .undo-action { flex: 0 0 auto; }
+}
+
+/* --- Narrowest phones (≤360px) -------------------------------------------
+   Keep the sticky quarter bar to one line and the objective whole. */
+@media (max-width: 360px) {
+  .status-bar { gap: 10px; }
+  .status-bar [data-testid='cash']::before { content: 'Cash'; }
+  .status-bar .hud-objective::before { content: 'Goal'; }
+  .turn-actions .end-quarter { white-space: nowrap; padding-inline: 12px; font-size: 0.78rem; }
+  .turn-actions .mobile-profit .hud-range { display: none; }
+  .workspace-tabs.tabs { gap: 14px; }
+}
+
+.route-launch-review .dialog-actions .primary-action { white-space: nowrap; }
+@media (max-width: 700px) {
+  .route-launch-review .dialog-actions .primary-action { flex: 1.5; }
+}
