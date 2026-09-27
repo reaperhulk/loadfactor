@@ -11,7 +11,7 @@ import type { GameState } from '../engine'
 import { estimateAircraftQuarterCost, estimateWeeklySeats, fareFor } from '../engine/market'
 import { yearOf } from '../engine/queries'
 import { viewSeat, dispatch } from './session'
-import { money } from './format'
+import { money, pct } from './format'
 
 // The showroom: full specs, and — pick one of your routes — an honest
 // estimate of what each type would cost and carry there per quarter.
@@ -166,7 +166,16 @@ export function Shop({ state }: { state: GameState }) {
         <>
           <h3>Used market (this quarter)</h3>
           <div className="table-scroll">
-            <table data-testid="used-market">
+            <table className="used-market-table" data-testid="used-market">
+              <thead>
+                <tr>
+                  <th scope="col">Aircraft</th>
+                  <th scope="col">Age</th>
+                  <th scope="col">Price</th>
+                  <th scope="col">Versus new</th>
+                  <th><span className="visually-hidden">Buy</span></th>
+                </tr>
+              </thead>
               <tbody>
                 {state.world.usedMarket.map((o) => {
                   const t = getAircraftType(o.type)
@@ -174,12 +183,12 @@ export function Shop({ state }: { state: GameState }) {
                   return (
                     <tr key={o.id}>
                       <td><strong>{t.name}</strong><AircraftArt type={t.id} /></td>
-                      <td>{(o.ageQuarters / 4).toFixed(1)}y old</td>
-                      <td>
-                        {money(o.price)}{' '}
-                        <span className="pos" title={`vs ${money(t.price)} new`}>
-                          −{(discountBp / 100).toFixed(0)}%
-                        </span>
+                      <td>{(o.ageQuarters / 4).toFixed(1)} years</td>
+                      <td>{money(o.price)}</td>
+                      {/* A discount is a fact, not a gain: an older airframe
+                          costs more to keep flying. Neutral, and explained. */}
+                      <td className="dim" title="Used airframes cost less up front but more in maintenance as they age">
+                        {pct(discountBp)} below the {money(t.price)} new price
                       </td>
                       <td>
                         <button

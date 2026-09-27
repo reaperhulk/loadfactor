@@ -10,6 +10,11 @@ export const PAGE_LABELS: Record<WorkspacePage, string> = {
   fleet: 'Owned aircraft', operations: 'Operations', orders: 'Orders', catalog: 'Aircraft market',
   finance: 'Finances', outlook: 'Outlook', rivals: 'Rivals', report: 'Reports',
 }
+// Phone tab strips show a shorter word; the full label stays the button's
+// accessible name, and each short label is contained in its long one.
+export const PAGE_SHORT_LABELS: Partial<Record<WorkspacePage, string>> = {
+  desk: 'Desk', fleet: 'Owned', catalog: 'Market',
+}
 export function areaFor(page: WorkspacePage): WorkspaceArea {
   return (Object.keys(AREA_PAGES) as WorkspaceArea[]).find((area) => AREA_PAGES[area].includes(page))!
 }

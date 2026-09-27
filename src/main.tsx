@@ -7,6 +7,7 @@ import { installSounds } from './ui/sounds'
 import './ui/styles.css'
 import './ui/workspace.css'
 import './ui/refinements.css'
+import './ui/polish.css'
 
 installDisplay()
 installHarness()

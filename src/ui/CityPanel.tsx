@@ -17,7 +17,7 @@ import { airlinesOnPair, networkCities, slotsAllocated, slotsFree, slotsHeld, sl
 import { cityMass, cityTier } from './mapStyle'
 import { ConfirmButton } from './ConfirmButton'
 import { viewSeat, dispatch } from './session'
-import { money, signed, tone } from './format'
+import { inQuarters, money, signed, tone } from './format'
 
 const REGION_NAMES: Record<string, string> = {
   na: 'North America',
@@ -117,8 +117,10 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
             {city.name} <span className="dim">{city.id}</span>
           </h2>
           <span className="dim">
-            {REGION_NAMES[city.region]} · {['', 'major hub', 'regional', 'small field'][cityTier(city)]} · mass{' '}
-            {cityMass(city)}
+            {REGION_NAMES[city.region]} · {['', 'major hub', 'regional', 'small field'][cityTier(city)]} ·{' '}
+            <span title="Market size: how much travel this city generates, from its population, wealth and tourism ratings (higher draws more passengers)">
+              market size {cityMass(city)}
+            </span>
             {networkCities(player).has(cityId) && <span className="pos"> · in your network</span>}
           </span>
         </div>
@@ -179,7 +181,7 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
           planning around it is the point: a place in the line at a full
           airport is a bet on a date you can read right here. */}
       <div className="dim" data-testid="city-expansion">
-        <strong>Next build</strong> — {expansion.name} opens in {expansion.quartersAway}q (+
+        <strong>Next build</strong> — {expansion.name} opens {inQuarters(expansion.quartersAway)} (+
         {expansion.slots} slots)
       </div>
 
@@ -235,7 +237,7 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
                   {served ? (
                     <span className="pos">capacity waiting</span>
                   ) : (
-                    <span className="neg">needs the {expansion.quartersAway}q expansion</span>
+                    <span className="neg">needs the expansion {inQuarters(expansion.quartersAway)}</span>
                   )}
                 </li>
               )
@@ -287,7 +289,7 @@ export function CityPanel({ state, cityId, routeFrom, onPlanRoute, onPlanPair, o
             <span className="dim">
               {blocker ?? (remaining > 0
                 ? `${remaining} slots are still free here: joining the list is far cheaper than building`
-                : `opens +${expansionSize(cityId)} slots next quarter instead of in ${expansion.quartersAway}q; you take the first ${Math.min(TERMINAL_FUNDER_SLOTS_V6, expansionSize(cityId))}, the rest serve the list`)}
+                : `opens +${expansionSize(cityId)} slots next quarter instead of ${inQuarters(expansion.quartersAway)}; you take the first ${Math.min(TERMINAL_FUNDER_SLOTS_V6, expansionSize(cityId))}, the rest serve the list`)}
             </span>
           </div>
         )

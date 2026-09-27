@@ -18,8 +18,8 @@ describe('forecast range', () => {
     const range = forecastRange(state, 0, forecast)
     expect(range.low).toBeLessThan(forecast.profit)
     expect(range.high).toBeGreaterThan(forecast.profit)
-    expect(range.drivers.map((d) => d.label)).toContain('Demand noise and the economy walk')
-    expect(range.drivers.some((d) => d.label.startsWith('Fuel price walk'))).toBe(true)
+    expect(range.drivers.map((d) => d.label)).toContain('Demand and economy drift')
+    expect(range.drivers.some((d) => d.label.startsWith('Fuel price drift'))).toBe(true)
     for (const d of range.drivers) { expect(d.low).toBeLessThanOrEqual(0); expect(d.high).toBeGreaterThanOrEqual(0) }
   })
 
@@ -27,7 +27,7 @@ describe('forecast range', () => {
     const state = flying()
     state.airlines[0]!.fuelHedge = { bp: 10000, quartersLeft: 4 }
     const range = forecastRange(state, 0, forecastQuarter(state, 0))
-    expect(range.drivers.some((d) => d.label.startsWith('Fuel price walk'))).toBe(false)
+    expect(range.drivers.some((d) => d.label.startsWith('Fuel price drift'))).toBe(false)
   })
 
   it('an event in its last quarter shifts the range in the direction it reverses', () => {

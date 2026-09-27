@@ -14,7 +14,7 @@ import { forecastQuarter } from '../engine/forecast'
 import { viewSeat } from './session'
 import { stagePlanningCommands, usePlanningCommands, mergePlanningCommands } from './planningDrafts'
 import { applyPlanningDraft } from './planActions'
-import { money } from './format'
+import { money, moneyOrNone, signedMoney, tone } from './format'
 
 interface RouteSetupDialogProps {
   state: GameState
@@ -72,8 +72,8 @@ export function RouteSetupDialog({ state, from, to, onClose, preset }: RouteSetu
           </>
         ) : (
           <>
-            <label>
-              Aircraft:{' '}
+            <label className="setup-field">
+              <span>Aircraft</span>
               <select
                 data-testid="route-setup-aircraft"
                 data-dialog-initial-focus
@@ -89,15 +89,18 @@ export function RouteSetupDialog({ state, from, to, onClose, preset }: RouteSetu
                   const t = getAircraftType(ac.type)
                   return (
                     <option key={ac.id} value={ac.id}>
-                      {t.name} ({t.seats} seats, max {roundTripsPerWeek(ac.type, km, player.operationsPolicy?.reserveBp)} rt/wk)
+                      {t.name} · {t.seats} seats
                     </option>
                   )
                 })}
               </select>
+              {/* The ceiling lives under the select, not inside the option:
+                  a phone-width select cut "max 21 rt/wk" to "max 21 r". */}
+              {chosen && <small className="dim" data-testid="route-setup-max">Up to {maxFreq} round trips a week on this route</small>}
             </label>
             <div className="freq-row">
               <label htmlFor="freq-slider">
-                Frequency: <strong data-testid="route-setup-freq">{clampedFreq} rt/wk</strong>{' '}
+                Frequency <strong data-testid="route-setup-freq">{clampedFreq} rt/wk</strong>{' '}
                 <span className="dim">({seats} seats/wk)</span>
               </label>
               <input
@@ -132,9 +135,9 @@ export function RouteSetupDialog({ state, from, to, onClose, preset }: RouteSetu
             {preview && launch && (
               <div className="forecast-card" data-testid="route-setup-estimate" aria-live="polite">
                 <p>First-quarter revenue <strong>{money(launch.lastRevenue)}/q</strong> · flight costs {money(launch.lastCost)}/q</p>
-                <p>Route contribution <strong className={launch.lastRevenue >= launch.lastCost ? 'pos' : 'neg'}>{money(launch.lastRevenue - launch.lastCost)}/q</strong></p>
-                <p>Airline net profit <strong>{money(preview.profit)}/q</strong> · change {money(preview.profit - baseline.profit)}/q</p>
-                <p>Cash after quarter {money(preview.cashAfter)} · launch cash {money(preview.cashRequired)}</p>
+                <p>Route contribution <strong className={tone(launch.lastRevenue - launch.lastCost)}>{money(launch.lastRevenue - launch.lastCost)}/q</strong></p>
+                <p>Airline net profit <strong>{money(preview.profit)}/q</strong> · change <span className={tone(preview.profit - baseline.profit)}>{signedMoney(preview.profit - baseline.profit)}/q</span></p>
+                <p>Cash after quarter {money(preview.cashAfter)} · launch cash {moneyOrNone(preview.cashRequired)}</p>
                 <p className="dim">Includes the selected schedule, cabin, current maintenance, lease payments, hedges and connecting traffic. Holds today's economy and rival schedules fixed; new routes ramp over 3 quarters.</p>
               </div>
             )}
@@ -164,7 +167,7 @@ export function RouteSetupDialog({ state, from, to, onClose, preset }: RouteSetu
             >
               ✈ Open route
             </button>{' '}
-            <button disabled={!preview || !!preview.errors.length} onClick={() => { if (aircraftId === null) return; stagePlanningCommands([{ type: 'open_route', from, to, aircraftId, frequency: clampedFreq, fareLevel, serviceLevel }]); onClose() }}>Add to plan</button>{' '}
+            <button data-testid="route-setup-stage" disabled={!preview || !!preview.errors.length} onClick={() => { if (aircraftId === null) return; stagePlanningCommands([{ type: 'open_route', from, to, aircraftId, frequency: clampedFreq, fareLevel, serviceLevel }]); onClose() }}>Add to plan</button>{' '}
           </>}
           <button data-testid="route-setup-cancel" onClick={onClose}>{candidates.length ? 'Cancel' : 'Close'}</button>
         </div>

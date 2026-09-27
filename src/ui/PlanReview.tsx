@@ -1,5 +1,5 @@
 import type { GameEvent, QuarterStats } from '../engine'
-import { comparePlan, type ApprovedPlan } from './planReview'
+import { comparePlan, planDeltaRows, type ApprovedPlan } from './planReview'
 import { COST_LABELS, money, tone, signedMoney, signedCount } from './format'
 
 export function PlanReview({ plan, actual, events, onInspect }: { plan?: ApprovedPlan; actual: QuarterStats; events: GameEvent[]; onInspect?: (id: number) => void }) {
@@ -12,8 +12,7 @@ export function PlanReview({ plan, actual, events, onInspect }: { plan?: Approve
     <dl className="decision-metrics">
       <div><dt>Planned profit</dt><dd>{money(plan.profit)}</dd></div>
       <div><dt>Actual profit</dt><dd>{money(actual.profit)}</dd></div>
-      <div><dt>Difference</dt><dd className={tone(comparison.profitDelta)}>{signedMoney(comparison.profitDelta)}</dd></div>
-      <div><dt>Cash vs plan</dt><dd className={tone(comparison.cashDelta)}>{signedMoney(comparison.cashDelta)}</dd></div>
+      {planDeltaRows(comparison.profitDelta, comparison.cashDelta).map((row) => <div key={row.label}><dt>{row.label}</dt><dd className={tone(row.value)}>{signedMoney(row.value)}</dd></div>)}
     </dl>
     {top.length > 0 ? <><p className="eyebrow">What changed profit</p><ul className="decision-movements">{[...top, ...(other ? [{ key: 'other', delta: other }] : [])].map(row => <li key={row.key}><span>{row.key === 'revenue' ? 'Passenger revenue' : row.key === 'other' ? 'Other costs combined' : COST_LABELS[row.key as keyof typeof COST_LABELS]}</span><strong className={tone(row.delta)}>{signedMoney(row.delta)}</strong></li>)}</ul></> : <p>The quarter matched the planned profit.</p>}
     {comparison.routes.some(r => r.delta !== 0) && <details><summary>Routes with the largest differences</summary><ul className="decision-movements">{comparison.routes.filter(r => r.delta !== 0).slice(0, 3).map(r => <li key={r.id}><span>{onInspect ? <button className="link-btn" onClick={() => onInspect(r.id)}>{r.name} →</button> : r.name}<small>{signedCount(r.paxDelta)} boardings vs plan</small></span><strong className={tone(r.delta)}>{signedMoney(r.delta)}</strong></li>)}</ul></details>}

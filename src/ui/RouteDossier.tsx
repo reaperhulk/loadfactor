@@ -216,10 +216,10 @@ export function RouteDossier({ state, routeId, onClose, onSelectRoute, onHighlig
       <details className="entity-actions"><summary>Close this route</summary><p className="hint">Removes the schedule and releases assigned aircraft. The market remembers this pair for {ROUTE_MEMORY_QUARTERS} quarters.</p><ConfirmButton label="close route" confirmLabel="really close it?" onConfirm={() => { dispatch({ type:'close_route', routeId:route.id }); onClose() }} /></details>
 
       <h3>The pair{contenders.length > 1 ? ' — contested' : ''}</h3>
-      <table data-testid="pair-battle">
+      <table className="pair-table" data-testid="pair-battle">
         <thead>
           <tr className="dim">
-            <th />
+            <th scope="col">airline</th>
             <th>share</th>
             <th>seats/wk</th>
             <th>fare</th>

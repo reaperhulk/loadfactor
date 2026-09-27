@@ -5,21 +5,30 @@
 import type { GameState, WorldOffer } from '../engine'
 import { viewSeat, dispatch } from './session'
 import { money } from './format'
+import { decideWithin } from './toasts'
 
 // Rules 6 can put more than one question on the table at once (the regular
-// offer and one per announced event touching the network): show each.
+// offer and one per announced event touching the network): show each. They
+// head the Desk — an offer is the one item with a deadline attached. Test ids
+// carry the offer id so several cards never share one.
 export function OfferCard({ state }: { state: GameState }) {
   const offers = state.world.offers.filter((o) => (o.airline ?? 0) === viewSeat())
   if (offers.length === 0 || state.phase !== 'planning') return null
-  return <>{offers.map((offer) => <OfferItem key={offer.id} state={state} offer={offer} />)}</>
+  return (
+    <section className="desk-offers" data-testid="desk-offers" aria-labelledby="desk-offers-heading">
+      <h2 id="desk-offers-heading">Awaiting your answer <span className="dim">· {offers.length === 1 ? '1 offer' : `${offers.length} offers`}</span></h2>
+      {offers.map((offer) => <OfferItem key={offer.id} state={state} offer={offer} />)}
+    </section>
+  )
 }
 
 function OfferItem({ state, offer }: { state: GameState; offer: WorldOffer }) {
   const player = state.airlines[viewSeat()]!
-  const quartersLeft = offer.expiresTurn - state.turn
+  // Answerable through the expiry turn itself — the same count the toast uses.
+  const quartersLeft = offer.expiresTurn - state.turn + 1
   const affordable = player.cash >= offer.costK
   return (
-    <div className="scenario-card offer-card" data-testid="offer-card">
+    <div className="scenario-card offer-card" data-testid={`offer-card-${offer.id}`}>
       <h2>
         📨 {offer.headline}
       </h2>
@@ -39,19 +48,19 @@ function OfferItem({ state, offer }: { state: GameState; offer: WorldOffer }) {
           </>
         )}
         {' · '}
-        <span className={quartersLeft <= 1 ? 'neg' : 'dim'} data-testid="offer-deadline">
-          {quartersLeft <= 1 ? 'decide this quarter' : `${quartersLeft} quarters to decide`}
+        <span className={quartersLeft <= 1 ? 'neg' : 'dim'} data-testid={`offer-deadline-${offer.id}`}>
+          {decideWithin(offer.expiresTurn, state)}
         </span>
       </p>
       <button
-        data-testid="offer-accept"
+        data-testid={`offer-accept-${offer.id}`}
         disabled={!affordable}
         title={affordable ? undefined : 'not enough cash for the up-front payment'}
         onClick={() => dispatch({ type: 'accept_offer', offerId: offer.id })}
       >
         ✔ Take the deal
       </button>{' '}
-      <button data-testid="offer-decline" onClick={() => dispatch({ type: 'decline_offer', offerId: offer.id })}>
+      <button data-testid={`offer-decline-${offer.id}`} onClick={() => dispatch({ type: 'decline_offer', offerId: offer.id })}>
         ✕ Pass
       </button>
     </div>

@@ -123,7 +123,7 @@ test('every scenario starts from its menu card', async ({ page }) => {
   await expect(page.getByTestId('date')).toHaveText('1995 Q1')
   // The desk proposes useful first markets for the starter fleet.
   await openPanel(page, 'desk')
-  await expect(page.getByTestId('management-brief').getByRole('button',{name:'Compare this launch'}).first()).toBeVisible()
+  await expect(page.getByTestId('management-brief').getByRole('button',{name:'Plan this launch'}).first()).toBeVisible()
   // The fifth era sits at the end of the same chain and starts the same way.
   await page.goto('/')
   await expect(page.getByTestId('locked-lcc_wars')).toBeVisible()
@@ -173,7 +173,7 @@ test('the city panel shows stats and joins the slot queue in context', async ({ 
   await expect(panel).toContainText('Top markets from here')
   // The authority's building programme is published years ahead — a full
   // airport is a date, not a wall.
-  await expect(page.getByTestId('city-expansion')).toContainText(/opens in \d+q \(\+\d+ slots\)/)
+  await expect(page.getByTestId('city-expansion')).toContainText(/opens (this quarter|next quarter|in \d+ quarters) \(\+\d+ slots\)/)
   // Take a place in the line straight from the dossier.
   await page.getByTestId('panel-request-slots').click()
   await expect(page.getByTestId('queued-note')).toContainText('#1 in line')
@@ -1040,7 +1040,7 @@ test('a new career lands on the Desk and the market coach steps aside once a rou
   await expect(page.getByTestId('coach')).toContainText('first-market choices on the Desk')
   // Pick a first market from the Desk: the choose-a-market coach dismisses
   // itself without the player having to wave it off.
-  await page.getByRole('button', { name: 'Compare this launch' }).first().click()
+  await page.getByRole('button', { name: 'Plan this launch' }).first().click()
   await page.getByTestId('route-setup-confirm').click()
   expect(await page.evaluate(() => window.__harness.getState()!.airlines[0]!.routes.length)).toBe(1)
   await expect(page.getByTestId('coach')).toHaveCount(0)
@@ -1151,7 +1151,7 @@ test('M2 tools: daily challenge, leasing, used market, fuel hedge', async ({ pag
   await expect(page.getByTestId('hedge-panel')).toContainText('Fuel hedged')
   // Brand: setting a marketing level sticks in the engine state.
   await page.getByTestId('marketing-2').click()
-  await expect(page.getByTestId('marketing-2')).toBeDisabled()
+  await expect(page.getByTestId('marketing-2')).toHaveAttribute('aria-pressed', 'true')
   const marketing = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.marketing)
   expect(marketing).toBe(2)
 })
@@ -1635,19 +1635,45 @@ test('the world asks questions: an offer can be taken or passed', async ({ page 
       headline: 'Authority deal: 3 slots at London',
       detail: 'Gates now, an upkeep charge later.',
     })
+    // A second question on the table, due this quarter.
+    s.world.offers.push({
+      id: 100,
+      kind: 'regulator_slots',
+      city: 'CDG',
+      expiresTurn: s.turn,
+      costK: 900,
+      upkeepK: 200,
+      benefitFromTurn: s.turn,
+      untilTurn: s.turn + 16,
+      slots: 2,
+      demandBonusBp: 0,
+      headline: 'Authority deal: 2 slots at Paris',
+      detail: 'Gates now, an upkeep charge later.',
+    })
     // Nudge the session to re-render with the mutated world.
     window.__harness.dispatch({ type: 'set_marketing', level: 0 })
   })
   await openPanel(page, 'desk')
-  const card = page.getByTestId('offer-card')
+  // Offers carry deadlines: they head the Desk, above the attention list and
+  // its footnote, one card per offer with ids that never repeat.
+  const offers = page.getByTestId('desk-offers')
+  await expect(offers.locator('[data-testid^="offer-card-"]')).toHaveCount(2)
+  const offersTop = (await offers.boundingBox())!.y
+  expect(offersTop).toBeLessThan((await page.getByTestId('management-brief').boundingBox())!.y)
+  expect(offersTop).toBeLessThan((await page.locator('.brief-assumptions').boundingBox())!.y)
+  const card = page.getByTestId('offer-card-99')
   await expect(card).toContainText('London')
-  await expect(page.getByTestId('offer-deadline')).toContainText('quarters to decide')
-  await page.getByTestId('offer-accept').click()
+  // The card and the toast count the same way: answerable through expiry.
+  await expect(page.getByTestId('offer-deadline-99')).toHaveText('decide within 4 quarters')
+  await expect(page.getByTestId('offer-deadline-100')).toHaveText('decide this quarter')
+  await page.getByTestId('offer-accept-99').click()
   // Taking it grants the gates immediately and starts a running commitment.
   const slots = await page.evaluate(() => window.__harness.getState()!.airlines[0]!.slots['LHR'] ?? 0)
   expect(slots).toBeGreaterThanOrEqual(3)
-  await expect(page.getByTestId('offer-card')).toHaveCount(0)
+  await expect(page.getByTestId('offer-card-99')).toHaveCount(0)
   await expect(page.getByTestId('active-deals')).toContainText('LHR')
+  await page.getByTestId('offer-decline-100').click()
+  await expect(page.getByTestId('desk-offers')).toHaveCount(0)
 })
 
 test('older aircraft remain usable and the fleet explains wear and checks', async ({ page }) => {

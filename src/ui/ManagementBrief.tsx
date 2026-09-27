@@ -15,6 +15,31 @@ import { getEventDef } from '../data/events'
 import { eventImpact } from './toasts'
 
 type BriefTab = 'routes' | 'fleet' | 'finance' | 'rivals' | 'airports'
+
+// A campaign's remaining run in words: never "0 quarters remaining".
+export function campaignLeft(quarters: number): string {
+  if (quarters <= 0) return 'ends this quarter'
+  return quarters === 1 ? '1 quarter to run' : `${quarters} quarters to run`
+}
+
+type Hedge = { quartersLeft: number; coverBp?: number } | null | undefined
+// A hedge protects next quarter's bill only if it is still running then.
+export function hedgeCovers(hedge: Hedge): boolean {
+  return !!hedge && hedge.quartersLeft > 1
+}
+
+// What to do about an announced fuel shock depends on the hedge already in
+// place: "Hedge now" is wrong advice when the fuel bill is already locked.
+export function fuelAdvice(hedge: Hedge): string {
+  if (hedgeCovers(hedge)) {
+    const partial = hedge!.coverBp !== undefined && hedge!.coverBp < 10000
+    return partial
+      ? `Your hedge locks ${hedge!.coverBp! / 100}% of your fuel for ${hedge!.quartersLeft} more quarters; the rest rides the shock. Trim thin routes or keep extra cash.`
+      : `Your fuel hedge covers the shock for ${hedge!.quartersLeft} more quarters. Plan for the bill when it expires.`
+  }
+  if (hedge) return 'Your hedge expires as the shock lands. Hedge again (the desk has priced in half of it), trim thin routes, or keep extra cash.'
+  return 'Hedge now (the desk has priced in half of it), trim thin routes, or keep extra cash.'
+}
 export function ManagementBrief({ state, onTab, onInspect, onPlan, onAircraft }: { state: GameState; onTab: (tab: BriefTab) => void; onAircraft: (id: number) => void; onInspect: (routeId: number) => void; onPlan: (from: string, to: string, preset?: Pick<ExpansionOption, 'aircraftId' | 'frequency'>) => void }) {
   const seat = viewSeat(), draft=usePlanningCommands()
   const { forecast, firstFlights } = useMemo(() => {
@@ -52,8 +77,8 @@ export function ManagementBrief({ state, onTab, onInspect, onPlan, onAircraft }:
   if (idleSlotRent(airline) > 0) items.push({ priority:50, title:'Unused airport capacity', detail:`${money(idleSlotRent(airline))}/quarter in rent on unused slots. Keep strategic capacity or release surplus.`, action:'Review airports', run:() => onTab('airports') })
   if (airline.fuelHedge?.quartersLeft === 1) items.push({ priority:70,title:'Fuel hedge expires this quarter',detail:'Next quarter’s fuel bill will return to market prices.',action:'Review fuel protection',run:() => onTab('finance') })
   const raid = state.airlines.find((a) => a.id !== seat && !a.bankrupt && a.campaign?.kind === 'raid' && a.campaign.target === seat && state.turn < a.campaign.untilTurn)
-  if (raid) items.push({ priority: 75, title: `${raid.name} is coming for ${raid.campaign!.pair!.replace('-', '–')}`, detail: `A raid on your market, announced ${raid.campaign!.fromTurn > state.turn ? 'for next quarter' : `${Math.max(0, raid.campaign!.untilTurn - state.turn)} quarters to run`}. Compare fare, service and frequency on the pair before their first flight.`, action: 'Read rival plans', run: () => onTab('rivals') })
-  if (campaign && campaign !== raid) items.push({ priority: 40, title: `${campaign.name} has a plan`, detail: `${campaign.campaign!.kind} campaign${campaign.campaign!.pair ? ` on ${campaign.campaign!.pair.replace('-', '–')}` : ` at ${campaign.campaign!.city}`} · ${Math.max(0, campaign.campaign!.untilTurn-state.turn)} quarters remaining.`, action: 'Read rival plans', run: () => onTab('rivals') })
+  if (raid) items.push({ priority: 75, title: `${raid.name} is coming for ${raid.campaign!.pair!.replace('-', '–')}`, detail: `A raid on your market, announced ${raid.campaign!.fromTurn > state.turn ? 'for next quarter' : campaignLeft(raid.campaign!.untilTurn - state.turn)}. Compare fare, service and frequency on the pair before their first flight.`, action: 'Read rival plans', run: () => onTab('rivals') })
+  if (campaign && campaign !== raid) items.push({ priority: 40, title: `${campaign.name} has a plan`, detail: `${campaign.campaign!.kind} campaign${campaign.campaign!.pair ? ` on ${campaign.campaign!.pair.replace('-', '–')}` : ` at ${campaign.campaign!.city}`} · ${campaignLeft(campaign.campaign!.untilTurn - state.turn)}.`, action: 'Read rival plans', run: () => onTab('rivals') })
   // Rules 6: announced events are the quarter's decision window.
   // Global news always matters; a city or region only if the network touches it.
   const touches = (city: string) => (news: { city: string | null; region: string | null }) => news.city === city || (news.region !== null && getCity(city).region === news.region)
@@ -64,14 +89,14 @@ export function ManagementBrief({ state, onTab, onInspect, onPlan, onAircraft }:
     const where = news.city ? ` at ${getCity(news.city).name}` : news.region ? ` in ${news.region.toUpperCase()}` : ''
     const fuel = (def.fuelModBp ?? 10000) > 10000
     const asked = state.world.offers.some((o) => (o.airline ?? 0) === seat && o.eventId === news.id)
-    items.push({ priority: fuel ? 85 : 65, title: `${def.name}${where} lands next quarter`, detail: `${eventImpact(news.id)}. ${fuel ? 'Hedge now (the desk has priced in half of it), trim thin routes, or keep extra cash.' : `The plan above already includes it. Move capacity or reprice${asked ? ', and answer the offer it put on your desk' : ''}.`}`,
-      action: fuel ? 'Review fuel protection' : 'Plan route changes', run: () => onTab(fuel ? 'finance' : 'routes') })
+    items.push({ priority: fuel ? 85 : 65, title: `${def.name}${where} lands next quarter`, detail: `${eventImpact(news.id)}. ${fuel ? fuelAdvice(airline.fuelHedge) : `The plan above already includes it. Move capacity or reprice${asked ? ', and answer the offer it put on your desk' : ''}.`}`,
+      action: fuel ? (hedgeCovers(airline.fuelHedge) ? 'Review finances' : 'Review fuel protection') : 'Plan route changes', run: () => onTab(fuel ? 'finance' : 'routes') })
   }
   if (!items.length) items.push({ priority: 0, title: 'Choose your next move', detail: 'Compare an expansion with improving the network you already have. Retain enough cash for a difficult quarter.', action: 'Plan route changes', run: () => onTab('routes') })
   return <section className="management-brief" data-testid="management-brief">
     <div className="brief-heading"><h2>Needs attention</h2><span>{draft.length ? 'With shared plan:' : 'Planned quarter:'} <strong className={tone(forecast.profit)}>{money(forecast.profit)} net profit</strong></span></div>
-    {firstFlights.length > 0 ? <div className="brief-grid">{firstFlights.map((choice) => <article key={choice.to}><span className="eyebrow">Your first market</span><h3>{getCity(choice.to).name}</h3><p>{choice.from}–{choice.to} · {getCity(choice.to).tour >= getCity(choice.to).biz ? 'Leisure appeal' : 'Business demand'}</p><dl className="decision-metrics"><div><dt>Company profit / q</dt><dd>{money(choice.quote.profit)}</dd></div><div><dt>Ending cash</dt><dd>{money(choice.quote.cashAfter)}</dd></div><div><dt>Frequency</dt><dd>{choice.preset.frequency} return trips / week</dd></div><div><dt>Boardings / q</dt><dd>{choice.quote.routes.reduce((n,r)=>n+r.lastPax,0).toLocaleString('en-US')}</dd></div></dl><p className="hint">{getCity(choice.to).tour >= getCity(choice.to).biz ? 'More leisure exposure: watch seasonal demand and price sensitivity.' : 'More business exposure: schedule frequency and service help compete.'}</p><button onClick={() => onPlan(choice.from, choice.to, choice.preset)}>Compare this launch</button></article>)}</div>
+    {firstFlights.length > 0 ? <div className="brief-grid">{firstFlights.map((choice) => <article key={choice.to}><span className="eyebrow">Your first market</span><h3>{getCity(choice.to).name}</h3><p>{choice.from}–{choice.to} · {getCity(choice.to).tour >= getCity(choice.to).biz ? 'Leisure appeal' : 'Business demand'}</p><dl className="decision-metrics"><div><dt>Company profit / q</dt><dd>{money(choice.quote.profit)}</dd></div><div><dt>Ending cash</dt><dd>{money(choice.quote.cashAfter)}</dd></div><div><dt>Frequency</dt><dd>{choice.preset.frequency} return trips / week</dd></div><div><dt>Boardings / q</dt><dd>{choice.quote.routes.reduce((n,r)=>n+r.lastPax,0).toLocaleString('en-US')}</dd></div></dl><p className="hint">{getCity(choice.to).tour >= getCity(choice.to).biz ? 'More leisure exposure: watch seasonal demand and price sensitivity.' : 'More business exposure: schedule frequency and service help compete.'}</p><button data-testid={`plan-first-${choice.to}`} onClick={() => onPlan(choice.from, choice.to, choice.preset)}>Plan this launch</button></article>)}</div>
       : <div className="brief-list">{items.sort((a,b)=>b.priority-a.priority).slice(0,5).map((item) => <article key={item.title}><div><h3>{item.title}</h3><p>{item.detail}</p></div><button onClick={item.run}>{item.action} <span aria-hidden="true">→</span></button></article>)}</div>}
-    <p className="brief-assumptions">Inbox items marked as seen. Operational issues stay here until resolved. Planning forecast uses current fuel, demand and rival schedules.</p>
+    <p className="brief-assumptions">Opening the Desk marks new items as seen; operational issues stay here until resolved. Planning forecast uses current fuel, demand and rival schedules.</p>
   </section>
 }

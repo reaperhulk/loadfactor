@@ -7,7 +7,7 @@ import { useInbox } from './inbox'
 import { Celebration, useCelebration } from './Celebration'
 import { planningForecast } from './forecast'
 import { forecastRange } from './forecastRange'
-import { AREA_PAGES, PAGE_LABELS, areaFor, type WorkspaceArea, type WorkspacePage } from './workspace'
+import { AREA_PAGES, PAGE_LABELS, PAGE_SHORT_LABELS, areaFor, type WorkspaceArea, type WorkspacePage } from './workspace'
 import { DisplaySettings } from './DisplaySettings'
 import { Dialog } from './Dialog'
 import { AudioSettings } from './AudioSettings'
@@ -15,7 +15,7 @@ import { ManagementBrief } from './ManagementBrief'
 import { rulesOf, identityOf } from '../engine/version'
 import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react'
 import { CITIES } from '../data/cities'
-import { AIRCRAFT } from '../data/aircraft'
+import { AIRCRAFT, getAircraftType } from '../data/aircraft'
 import { getEventDef } from '../data/events'
 import { SCENARIOS, SHORT_SCENARIOS, getScenario } from '../data/scenarios'
 import { netWorth, networkCities, objectiveQualified, objectiveScore, quarterOf, yearOf } from '../engine/queries'
@@ -74,7 +74,7 @@ import {
 } from './legends'
 import { EVENT_ICONS, EVENT_NAMES, ToastStack } from './toasts'
 import type { GameState, Replay } from '../engine'
-import { copyText, money, objectiveValue, tone, signed } from './format'
+import { copyText, inQuarters, money, objectiveValue, tone, signed } from './format'
 import { Icon } from './Icon'
 
 type Tab = 'routes' | 'fleet' | 'airports' | 'rivals' | 'finance' | 'report'
@@ -704,6 +704,10 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     setTabState(page)
   }, [])
   const area = areaFor(tab)
+  // On a phone the tab strip scrolls: keep the current tab in view.
+  useEffect(() => {
+    document.querySelector(`[data-testid="tab-${tab}"]`)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  }, [tab])
   const [flowFocus, setFlowFocus] = useState<FlowFocus | null>(null)
   const [selectedCity, setSelectedCity] = useState<string | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<number | null>(null)
@@ -787,11 +791,16 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
   }, [setTab])
   const livery = getPlayerColor()
   return <main className={`game game-shell era-${Math.min(2000, Math.max(1960, Math.floor(yearOf(state) / 10) * 10))}`} style={livery ? ({ '--livery': livery } as React.CSSProperties) : undefined}>
+    {/* First tab stop: past the header, status strip and both nav rows
+        straight into the page being worked on. */}
+    <a className="skip-link" href="#workspace-content" data-testid="skip-link" onClick={(e) => { e.preventDefault(); document.getElementById('workspace-content')?.focus() }}>Skip to content</a>
     <SaveWarning />
     <header className="app-header" data-testid="app-header">
       <div className="airline-brand"><Icon name="aircraft" /><div><h1 title={player.name}>{player.name}</h1><small>Load Factor</small></div></div>
       <span className="app-date"><span data-testid="date">{yearOf(state)} Q{quarterOf(state)}</span><small data-testid="race-clock">{Math.max(0, scenario.quarters - state.turn)}q left</small></span>
-      <button className="inbox-button" data-testid="open-inbox" aria-label={attentionCount ? `Inbox, ${attentionCount} unseen items` : 'Inbox'} title="New items since your last Desk visit. Opening the Desk marks them as seen." onClick={() => setTab('desk')}><Icon name="inbox" /><span>Inbox</span>{attentionCount > 0 && <b aria-label={`${attentionCount} unseen items`}>{attentionCount}</b>}</button>
+      {/* Not a separate inbox: the Desk is where new items live. The button
+          says so, and lands on the Desk's heading. */}
+      <button className="inbox-button" data-testid="open-inbox" aria-label={attentionCount ? `Desk · ${attentionCount} new` : 'Desk'} title="Go to the Desk. The count is what is new since your last visit; opening the Desk marks it as seen." onClick={() => { setTab('desk'); requestAnimationFrame(() => document.getElementById('desk-heading')?.focus()) }}><Icon name="inbox" /><span>Desk</span>{attentionCount > 0 && <b aria-hidden="true">{attentionCount} new</b>}</button>
       <button className="settings-button" data-testid="open-settings" aria-label="Open settings" onClick={() => setShowSettings(true)}><Icon name="settings" /></button>
     </header>
     <div className="turn-actions" data-testid="turn-actions"><span className="mobile-profit"><small>Planned net profit</small><strong className={tone(forecast.profit)}>{money(forecast.profit)}</strong>{range.low !== range.high && <small className="hud-range">{money(range.low)} to {money(range.high)}</small>}</span>
@@ -871,7 +880,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     <section className="status-bar" aria-label="Airline status" data-testid="status-bar">
       <span className="hud-stat hud-figure" data-label="Cash now" data-testid="cash"><AnimatedMoney value={player.cash} /></span>
       <span className={`hud-stat hud-figure planned-profit ${tone(forecast.profit)}`} data-label="Planned net profit / q" data-testid="planned-profit" title={`Likely ${money(range.low)} to ${money(range.high)} — ${range.drivers.map((d) => d.label).join('; ') || 'nothing in play'}`}>{money(forecast.profit)}{range.low !== range.high && <span className="hud-range" data-testid="planned-range">{money(range.low)} to {money(range.high)}</span>}</span>
-      <button className="hud-stat hud-figure planned-cash" data-label="Planned ending cash" onClick={() => setShowReview(true)}>{money(forecast.cashAfter)}</button>
+      <span className="hud-stat hud-figure planned-cash" data-label="Planned ending cash" data-testid="planned-cash">{money(forecast.cashAfter)}</span>
         <span className="hud-stat hud-figure hud-objective" data-label="Objective" data-testid="networth">
           {scenario.objective.kind === 'netWorth' ? (
             <>
@@ -928,12 +937,12 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
     </nav>
     <section className="workspace" data-testid="workspace">
       <nav className="workspace-tabs tabs" aria-label={`${area} views`} data-testid="workspace-tabs">
-        {AREA_PAGES[area].map((page) => <button key={page} data-testid={`tab-${page}`} aria-current={tab === page ? 'page' : undefined} className={tab === page ? 'active' : ''} onClick={() => setTab(page)}>{PAGE_LABELS[page]}</button>)}
+        {AREA_PAGES[area].map((page) => <button key={page} data-testid={`tab-${page}`} aria-current={tab === page ? 'page' : undefined} aria-label={PAGE_SHORT_LABELS[page] ? PAGE_LABELS[page] : undefined} className={tab === page ? 'active' : ''} onClick={() => setTab(page)}>{PAGE_SHORT_LABELS[page] ? <><span className="tab-long">{PAGE_LABELS[page]}</span><span className="tab-short" aria-hidden="true">{PAGE_SHORT_LABELS[page]}</span></> : PAGE_LABELS[page]}</button>)}
         <button className="undo-action" data-testid="undo-action" disabled={!canUndo()} aria-label="Undo last planning action" onClick={() => undoLastAction()}><Icon name="undo" /><span>Undo</span></button>
       </nav>
-      <div className="workspace-pages">
+      <div className="workspace-pages" id="workspace-content" tabIndex={-1}>
         <section className="workspace-page desk-page" hidden={tab !== 'desk'} data-testid="page-desk">
-          <div className="page-heading"><div><span className="eyebrow">{yearOf(state)} Q{quarterOf(state)}</span><h2>Operations desk</h2></div><span className="dim">{scenario.name}</span></div>
+          <div className="page-heading"><div><span className="eyebrow">{yearOf(state)} Q{quarterOf(state)}</span><h2 id="desk-heading" tabIndex={-1}>Operations desk</h2></div><span className="dim">{scenario.name}</span></div>
         {(() => {
           // The duel, always on screen: a challenge career shows the number
           // to beat in the HUD, not just on a chart two tabs away.
@@ -959,8 +968,8 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         )}
       {quietTurn===state.turn && <div className="quiet-result" role="status" data-testid="quiet-result"><strong>Quarter complete</strong><span>{money(player.history.at(-1)?.profit ?? 0)} profit · {money(player.cash)} cash</span><button onClick={()=>setShowReport(true)}>Read full report</button></div>}
       <div className="desk-columns"><div className="desk-priorities">
-      {state.phase === 'planning' && <ManagementBrief state={state} onTab={setTab} onAircraft={(id) => { setSelectedAircraft(id); setTab('fleet') }} onInspect={(id) => { setSelectedRoute(id); setTab('routes') }} onPlan={(from, to, preset) => setPendingRoute({ from, to, preset })} />}
       <OfferCard state={state} />
+      {state.phase === 'planning' && <ManagementBrief state={state} onTab={setTab} onAircraft={(id) => { setSelectedAircraft(id); setTab('fleet') }} onInspect={(id) => { setSelectedRoute(id); setTab('routes') }} onPlan={(from, to, preset) => setPendingRoute({ from, to, preset })} />}
       </div><aside className="desk-agenda"><h2>Coming up</h2><DeskTimeline state={state} onTab={setTab} /><ActiveDeals state={state} />
       {state.world.events.length > 0 && (
         <div className="events-strip" data-testid="events-strip">
@@ -984,12 +993,12 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
         </div>
       )}
       {(state.rulesVersion ?? 1) >= 2 && <details className="world-outlook" data-testid="world-outlook">
-        <summary>Planning calendar · next board opportunity in {state.turn % 8 === 0 ? 0 : 8 - state.turn % 8}q</summary>
+        <summary>Planning calendar · next board opportunity {inQuarters(state.turn % 8 === 0 ? 0 : 8 - state.turn % 8)}</summary>
         <p>Board opportunities arrive every eight quarters with four quarters to decide. Accepted commitments can run for several years.</p>
         <p>{scenario.objective.blurb} {scenario.objective.kind === 'loadFactor' ? 'Qualification also requires 1.5M total passengers and three active routes.' : ''}</p>
-        <p>Scheduled deliveries: {player.orders.length === 0 ? 'none' : player.orders.map((o) => `${o.type} in ${o.quartersLeft}q${o.replacesAircraftId ? ' (replacement)' : ''}`).join(' · ')}</p>
+        <p>Scheduled deliveries: {player.orders.length === 0 ? 'none' : player.orders.map((o) => `${getAircraftType(o.type).name} ${inQuarters(o.quartersLeft)}${o.replacesAircraftId ? ' (replacement)' : ''}`).join(' · ')}</p>
         <p>Aircraft entering the market within two years: {AIRCRAFT.filter((t) => t.availableFrom > yearOf(state) && t.availableFrom <= yearOf(state) + 2).map((t) => `${t.name} (${t.availableFrom})`).join(' · ') || 'none announced'}.</p>
-        <p>Airport programmes on your network: {[...new Set([...Object.keys(player.slots), ...player.slotRequests.map((r) => r.city)])].map((city) => ({ city, ...nextExpansion(state, city) })).filter((e) => e.quartersAway <= 8).sort((a,b) => a.quartersAway-b.quartersAway).map((e) => `${e.city}: +${e.slots} slots in ${e.quartersAway}q`).join(' · ') || 'none opening in the next eight quarters'}.</p>
+        <p>Airport programmes on your network: {[...new Set([...Object.keys(player.slots), ...player.slotRequests.map((r) => r.city)])].map((city) => ({ city, ...nextExpansion(state, city) })).filter((e) => e.quartersAway <= 8).sort((a,b) => a.quartersAway-b.quartersAway).map((e) => `${e.city}: +${e.slots} slots ${inQuarters(e.quartersAway)}`).join(' · ') || 'none opening in the next eight quarters'}.</p>
         {state.airlines.filter((a) => a.campaign).map((a) => <p key={a.id}>{a.name}: {a.campaign!.kind} campaign at {a.campaign!.city}, through quarter {a.campaign!.untilTurn}.</p>)}
       </details>}
       </aside></div>
@@ -1080,7 +1089,7 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
           {tab === 'routes' && inspectedRoute !== undefined && <RouteDossier state={state} routeId={inspectedRoute!.id} onClose={closeRoute} onSelectRoute={setSelectedRoute} onHighlight={highlightFlow} />}
         </section>}
         {visited.has('fleet') && <section className={`workspace-page fleet-page split-view${inspectedAircraft ? ' has-inspector' : ''}`} hidden={tab !== 'fleet'} data-testid="page-fleet"><div className="split-list"><FleetPanel state={state} selectedAircraftId={selectedAircraft} onInspect={setSelectedAircraft} /></div>{tab === 'fleet' && inspectedAircraft && <AircraftDossier state={state} aircraftId={inspectedAircraft.id} onClose={() => { setSelectedAircraft(null); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-testid="inspect-aircraft-${inspectedAircraft.id}"]`)?.focus({ preventScroll:true })) }} />}</section>}
-        {visited.has('orders') && <section className="workspace-page" hidden={tab !== 'orders'} data-testid="page-orders"><FleetPanel state={state} view="orders" /></section>}
+        {visited.has('orders') && <section className="workspace-page" hidden={tab !== 'orders'} data-testid="page-orders"><FleetPanel state={state} view="orders" onMarket={() => setTab('catalog')} /></section>}
         {visited.has('catalog') && <section className="workspace-page" hidden={tab !== 'catalog'} data-testid="page-catalog"><FleetPanel state={state} view="catalog" /></section>}
         {visited.has('airports') && <section className="workspace-page" hidden={tab !== 'airports'} data-testid="page-airports"><div className="page-heading"><h2>Airports</h2></div><AirportsPanel state={state} /></section>}
         {visited.has('rivals') && <section className="workspace-page" hidden={tab !== 'rivals'} data-testid="page-rivals"><Suspense fallback={<p role="status">Loading rival intelligence…</p>}><RivalsPanel state={state} /></Suspense></section>}
@@ -1091,8 +1100,8 @@ function GameScreen({ onWatchReplay }: { onWatchReplay: (r: Replay) => void }) {
       </div>
       <PlanTray state={state} />
     </section>
-    {celebration.milestones.length > 0 && <Celebration milestones={celebration.milestones} state={state} onClose={celebration.dismiss} />}
-    <ToastStack events={session.lastEvents} state={state} unlocks={session.lastUnlocks} onOpenRoute={inspectRoute} />
+    {celebration.milestones.length > 0 && <Celebration milestones={celebration.milestones} state={state} onClose={celebration.dismiss} onNext={(page) => { celebration.dismiss(); setTab(page) }} />}
+    <ToastStack events={session.lastEvents} state={state} unlocks={session.lastUnlocks} onOpenRoute={inspectRoute} celebrated={celebration.milestones} />
     {showReview && <Suspense fallback={<Dialog label="Review quarter" className="gameover-overlay" onClose={() => setShowReview(false)}><p role="status">Loading quarter review…</p></Dialog>}><QuarterReview state={state} forecast={forecast} onClose={() => setShowReview(false)} onConfirm={endQuarter} /></Suspense>}
     {state.phase === 'planning' && showReport && !celebration.milestones.length && session.reportEvents.length > 0 && <Suspense fallback={<Dialog label="Quarterly report" className="gameover-overlay" onClose={() => setShowReport(false)}><p role="status">Loading quarterly report…</p></Dialog>}><ReportCard state={state} events={session.reportEvents} onClose={() => setShowReport(false)} onInspect={(id) => { setShowReport(false); setTab('routes'); inspectRoute(id) }} /></Suspense>}
     {pendingRoute !== null && <RouteSetupDialog state={state} from={pendingRoute.from} to={pendingRoute.to}

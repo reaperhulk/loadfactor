@@ -26,7 +26,7 @@ import { HedgeLegend, MarketingLegend, RivalryLegend } from './legends'
 import { planningForecast } from './forecast'
 import { Sparkline } from './Sparkline'
 import { viewSeat, dispatch } from './session'
-import { COST_LABELS, money, pct, tone } from './format'
+import { COST_LABELS, money, pct, plural, tone } from './format'
 
 // The cost buckets in a stable presentation order, labelled from the shared
 // format module so every surface names them identically.
@@ -42,13 +42,20 @@ const BUCKET_COLORS: Record<keyof CostBreakdown, string> = {
   ownership: '#4fa3ff',
   maintenance: '#9d7bd8',
   fees: '#d8a052',
-  service: '#8fbf6f',
-  flightPay: '#c9b458',
+  service: '#3fc1c9',
+  flightPay: '#e6d86a',
   overhead: '#5b6b8c',
-  admin: '#7a8fb3',
+  admin: '#a3b4d6',
   slots: '#b38f7a',
   marketing: '#e07ab8',
-  interest: '#b3564f',
+  interest: '#efeadb',
+}
+
+// The table and the chart stack in the same order — largest bucket last
+// quarter first (bottom of the chart, top of the table) — so reading one
+// against the other is a matter of colour and position, not a hunt.
+function bucketOrder(breakdown: CostBreakdown): (typeof COST_BUCKETS)[number][] {
+  return [...COST_BUCKETS].sort((a, b) => breakdown[b.key] - breakdown[a.key])
 }
 
 // How the cost mix evolved: each quarter is a 100%-stacked slice of its
@@ -58,6 +65,7 @@ function CostMixHistory({ state }: { state: GameState }) {
   const player = state.airlines[viewSeat()]!
   const hist = player.history.slice(-16).filter((h) => h.costs > 0)
   if (hist.length < 2) return null
+  const order = bucketOrder(hist[hist.length - 1]!.breakdown)
   const w = 360
   const h = 72
   const bw = w / hist.length
@@ -66,7 +74,7 @@ function CostMixHistory({ state }: { state: GameState }) {
       <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-label="cost mix by quarter">
         {hist.map((q, i) => {
           let yTop = h
-          return COST_BUCKETS.map((b) => {
+          return order.map((b) => {
             const v = q.breakdown[b.key]
             if (v <= 0) return null
             const bh = (v / q.costs) * h
@@ -86,7 +94,7 @@ function CostMixHistory({ state }: { state: GameState }) {
           })
         })}
       </svg>
-      <span className="dim">cost mix, last {hist.length}q →</span>
+      <span className="dim">Cost mix, last {hist.length} quarters (oldest left) · colours match the table above</span>
     </div>
   )
 }
@@ -99,7 +107,7 @@ function CostStructure({ state }: { state: GameState }) {
   const now = player.history[player.history.length - 1]
   const prev = player.history[player.history.length - 2]
   if (!now || now.costs <= 0) return null
-  const rows = COST_BUCKETS.map((b) => ({
+  const rows = bucketOrder(now.breakdown).map((b) => ({
     ...b,
     value: now.breakdown[b.key],
     prevValue: prev?.breakdown[b.key],
@@ -120,7 +128,7 @@ function CostStructure({ state }: { state: GameState }) {
                   <span className="bucket-chip" style={{ background: BUCKET_COLORS[r.key] }} /> {r.label}
                 </td>
                 <td className="cost-bar-cell">
-                  <span className="cost-bar" style={{ width: `${Math.round((r.value * 100) / max)}%` }} />
+                  <span className="cost-bar" style={{ width: `${Math.round((r.value * 100) / max)}%`, background: BUCKET_COLORS[r.key] }} />
                 </td>
                 <td>{money(r.value)}</td>
                 <td className="dim">{Math.round((r.value * 100) / now.costs)}%</td>
@@ -182,7 +190,7 @@ export function FinancePanel({ state }: { state: GameState }) {
   return (
     <div className="finance-page">
       <div className="page-heading"><h2>Finance</h2><span className="dim">Company totals</span></div>
-      <dl className="company-summary"><div><dt>Cash now</dt><dd>{money(player.cash)}</dd></div><div><dt>Last quarter · net profit</dt><dd className={last ? tone(last.profit) : ''}>{last ? money(last.profit) : 'Not flown yet'}</dd></div><div><dt>Next quarter · planned profit</dt><dd className={plan.profit >= 0 ? 'pos':'neg'}>{money(plan.profit)}</dd></div><div><dt>Next quarter · ending cash</dt><dd>{money(plan.cashAfter)}</dd></div></dl>
+      <dl className="company-summary"><div><dt>Cash now</dt><dd>{money(player.cash)}</dd></div><div><dt>Last quarter · net profit</dt><dd className={last ? tone(last.profit) : ''}>{last ? money(last.profit) : 'Not flown yet'}</dd></div><div><dt>Next quarter · planned profit</dt><dd className={tone(plan.profit)}>{money(plan.profit)}</dd></div><div><dt>Next quarter · ending cash</dt><dd>{money(plan.cashAfter)}</dd></div></dl>
       <CustomerIdentity airline={player} />
       {u && (
         <div data-testid="unit-economics">
@@ -270,7 +278,7 @@ export function FinancePanel({ state }: { state: GameState }) {
                       <td>{money(h.revenue)}</td>
                       <td className="dim">{money(h.costs)}</td>
                       <td className={tone(h.profit)}>{money(h.profit)}</td>
-                      <td className={tone(m)}>{(m / 100).toFixed(0)}%</td>
+                      <td className={tone(m)}>{pct(m)}</td>
                       <td>{h.pax.toLocaleString('en-US')}</td>
                       <td>{money(h.netWorth)}</td>
                     </tr>
@@ -341,13 +349,13 @@ export function FinancePanel({ state }: { state: GameState }) {
       <CostStructure state={state} />
       <CostMixHistory state={state} />
       <p>
-        Debt {money(debt)} of {money(ceiling)} ceiling
+        Debt {debt > 0 ? money(debt) : 'none'} · borrowing ceiling {money(ceiling)}
       </p>
       <div className="city-negotiate" data-testid="hedge-panel">
         {player.fuelHedge !== null ? (
           <span>
             ⛽ Fuel {player.fuelHedge.coverBp !== undefined && player.fuelHedge.coverBp < 10000 ? `${player.fuelHedge.coverBp / 100}% ` : ''}hedged at index {(player.fuelHedge.bp / 100).toFixed(0)}% for{' '}
-            {player.fuelHedge.quartersLeft} more quarter(s)
+            {plural(player.fuelHedge.quartersLeft, 'more quarter')}
             {player.fuelHedge.quartersLeft === 1 && (
               <span className="neg"> — expires next quarter, you'll be back on the market index</span>
             )}
@@ -383,13 +391,19 @@ export function FinancePanel({ state }: { state: GameState }) {
         <span title="brand spend buys pair appeal in every share battle: schedule × cabin × fare × service × brand">
           Marketing:
         </span>
+        {/* A segmented control: the current level is filled, the others
+            are plain choices. The active level used to be a disabled button,
+            which read as "unavailable" rather than "selected". */}
+        <span className="segmented marketing-levels" role="group" aria-label="marketing level">
         {[0, 1, 2, 3].map((level) => (
           <button
             key={level}
             data-testid={`marketing-${level}`}
-            className={player.marketing === level ? 'active sort-btn' : 'sort-btn'}
-            disabled={player.marketing === level}
-            onClick={() => dispatch({ type: 'set_marketing', level })}
+            className={player.marketing === level ? 'segment active' : 'segment'}
+            aria-pressed={player.marketing === level}
+            onClick={() => {
+              if (player.marketing !== level) dispatch({ type: 'set_marketing', level })
+            }}
           >
             {['off', 'low', 'mid', 'high'][level]}
             {level > 0 &&
@@ -403,6 +417,7 @@ export function FinancePanel({ state }: { state: GameState }) {
               )}/q`}
           </button>
         ))}
+        </span>
         <span className="dim">
           +{(MARKETING_WEIGHT_BP_PER_LEVEL / 100).toFixed(0)}% appeal per level on every pair
         </span>
@@ -445,12 +460,28 @@ export function FinancePanel({ state }: { state: GameState }) {
       <RivalryLegend />
       <MarketingLegend />
       <HedgeLegend modern={(state.rulesVersion ?? 1) >= 6} />
-      <label>
-        Amount:{' '}
-        <input type="number" value={amount} min={100} step={100} onChange={(e) => setAmount(Number(e.target.value))} />{' '}
-        $k
-      </label>
-      <button onClick={() => dispatch({ type: 'take_loan', amount })}>take loan</button>{' '}
+      <h3>Loans</h3>
+      <div className="loan-row">
+        <label className="loan-amount">
+          <span>Amount</span>
+          <span className="input-unit">
+            <span aria-hidden="true">$</span>
+            <input
+              type="number"
+              data-testid="loan-amount"
+              value={amount}
+              min={100}
+              step={100}
+              inputMode="numeric"
+              aria-describedby="loan-amount-unit"
+              onChange={(e) => setAmount(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+            />
+            <span id="loan-amount-unit">k</span>
+          </span>
+          <span className="dim" data-testid="loan-amount-readout">= {money(amount)}</span>
+        </label>
+        <button data-testid="take-loan" disabled={amount <= 0} onClick={() => dispatch({ type: 'take_loan', amount })}>Take loan</button>
+      </div>
       <span className="dim" data-testid="loan-rate">
         today's rate {(currentLoanRateBp(state) / 100).toFixed(1)}%/yr
         <span title="the rate follows the economy — borrow in booms, not busts">
@@ -458,7 +489,10 @@ export function FinancePanel({ state }: { state: GameState }) {
           ({state.world.economyBp >= 10000 ? 'cheap money' : 'tight money'})
         </span>
       </span>
-      <div className="table-scroll"><table>
+      {player.loans.length > 0 && <div className="table-scroll"><table className="loan-table">
+        <thead>
+          <tr><th>Outstanding</th><th>Rate</th><th /></tr>
+        </thead>
         <tbody>
           {player.loans.map((l) => (
             <tr key={l.id}>
@@ -472,7 +506,7 @@ export function FinancePanel({ state }: { state: GameState }) {
             </tr>
           ))}
         </tbody>
-      </table></div>
+      </table></div>}
       <h3>History</h3>
       <div className="table-scroll"><table>
         <thead>

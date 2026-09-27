@@ -46,7 +46,7 @@ import { assignAllIdle, assignAndSchedule, balancedScheduleCommands } from './as
 import { sortHeaderFactory } from './sortHeader'
 import { ConfirmButton } from './ConfirmButton'
 import { viewSeat, dispatch, dispatchBatch } from './session'
-import { copyTsv, money, pct, tone } from './format'
+import { copyTsv, inQuarters, money, pct, tone } from './format'
 import { Icon } from './Icon'
 import {
   CabinLegend,
@@ -409,7 +409,7 @@ export function RoutesPanel({
 
 type FleetSortKey = 'type' | 'age' | 'util' | 'maint' | 'value'
 
-export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftId }: { state: GameState; view?: 'fleet' | 'orders' | 'catalog'; onInspect?: (id: number) => void; selectedAircraftId?: number | null }) {
+export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftId, onMarket }: { state: GameState; view?: 'fleet' | 'orders' | 'catalog'; onInspect?: (id: number) => void; selectedAircraftId?: number | null; onMarket?: () => void }) {
   const player = state.airlines[viewSeat()]!
   const year = yearOf(state)
   const readiness = player.operationsPolicy && view === 'fleet' ? planningForecast(state, player.id).operations : undefined
@@ -650,13 +650,13 @@ export function FleetPanel({ state, view = 'fleet', onInspect, selectedAircraftI
       })()}
       <CabinLegend modern={(state.rulesVersion ?? 1) >= 5} />
       </>}
-      {view === 'orders' && <>{player.orders.length === 0 ? <p className="hint">No aircraft on order. Choose an aircraft in the market to compare purchase and lease options.</p> : <div className="table-scroll"><table><thead><tr><th>Aircraft</th><th colSpan={5}>Delivery</th><th>Actions</th></tr></thead><tbody>          {player.orders.map((o) => {
+      {view === 'orders' && <>{player.orders.length === 0 ? <div className="empty-state" data-testid="orders-empty"><p className="hint">No aircraft on order. Choose an aircraft in the market to compare purchase and lease options.</p>{onMarket && <button className="primary-action" data-testid="orders-open-market" onClick={onMarket}>Browse the aircraft market <span aria-hidden="true">→</span></button>}</div> : <div className="table-scroll"><table><thead><tr><th>Aircraft</th><th colSpan={5}>Delivery</th><th>Actions</th></tr></thead><tbody>          {player.orders.map((o) => {
             const refund = orderRefund(o), withdraw = canWithdrawOrder(o)
             return (
               <tr key={`order-${o.id}`} className="dim">
                 <td>{getAircraftType(o.type).name}</td>
                 <td colSpan={5}>
-                  on order — delivers in {o.quartersLeft} quarter(s)
+                  on order — delivers {inQuarters(o.quartersLeft)}
                   {withdraw && <small className="hint"> · Full refund until you advance the quarter</small>}
                 </td>
                 <td>
@@ -760,11 +760,12 @@ export function AirportsPanel({ state }: { state: GameState }) {
                 </td>
                 <td>
                   {held} / {used}
+                  {idle && ' '}
                   {idle && (
                     <ConfirmButton
                       // Idle slots are a warning only when the rent is real money;
                       // one spare slot at a small field is a quiet link, not an alarm.
-                      className={`link-btn ${(held - used) * slotRent(c.id) >= 200 ? 'neg' : 'dim'}`}
+                      className={`link-btn slot-release ${(held - used) * slotRent(c.id) >= 200 ? 'neg' : 'dim'}`}
                       label={`${(held - used) * slotRent(c.id) >= 200 ? '⚠ ' : ''}hand back ${held - used}`}
                       confirmLabel="give them up?"
                       title={`${held - used} unused — ${money((held - used) * slotRent(c.id))}/q of rent buying nothing. Released slots go back to the pool.`}
@@ -783,7 +784,7 @@ export function AirportsPanel({ state }: { state: GameState }) {
                   {cityPax > 0 ? money(cityProfit) : '—'}
                 </td>
                 <td className="dim" data-testid={`expansion-${c.id}`} title={expansion.name}>
-                  +{expansion.slots} in {expansion.quartersAway}q
+                  +{expansion.slots} slots {inQuarters(expansion.quartersAway)}
                 </td>
                 <td>
                   {myPlace >= 0 ? (

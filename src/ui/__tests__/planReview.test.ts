@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { approvedPlan, dispatch, exportCurrentCareer, getSession, importSave, passSeat, reset, resumeSave, startGame } from '../session'
-import { comparePlan, readApprovedPlans } from '../planReview'
+import { comparePlan, planDeltaRows, readApprovedPlans } from '../planReview'
 import { hashState } from '../../harness/hash'
 beforeEach(() => {
   const data = new Map<string, string>()
@@ -40,4 +40,10 @@ it('ignores malformed optional metadata while preserving old careers', () => {
   reset(); expect(importSave(JSON.stringify(save), 0)).toBe(true)
   expect(resumeSave(0)).toBe(true)
   expect(approvedPlan(0)).toBeUndefined()
+})
+
+it('says profit and cash once when they missed the plan by the same amount', () => {
+  expect(planDeltaRows(-1200, -1200)).toEqual([{ label: 'Profit and cash vs plan', value: -1200 }])
+  expect(planDeltaRows(0, 0)).toHaveLength(1)
+  expect(planDeltaRows(500, -300).map((r) => r.label)).toEqual(['Profit vs plan', 'Cash vs plan'])
 })

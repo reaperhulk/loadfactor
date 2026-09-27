@@ -10,7 +10,7 @@ import { objectiveScore, objectiveScoreAt, quarterOf, yearOf } from '../engine/q
 import { MapView } from './MapView'
 import { RaceChart } from './Sparkline'
 import { EVENT_ICONS, EVENT_NAMES } from './toasts'
-import { objectiveValue } from './format'
+import { objectiveValue, plural } from './format'
 
 const EMPTY = new Set<never>()
 
@@ -193,13 +193,15 @@ export function ReplayViewer({ replay, onExit }: { replay: Replay; onExit: () =>
                 }
               })
             })()}
+            xLabel={(i) => `${getScenario(state.scenario).startYear + Math.floor(i / 4)} Q${(i % 4) + 1}`}
+            height={180}
           />
         </div>
       )}
       <footer className="standings">
         {state.airlines.map((a) => (
           <span key={a.id} className={a.id === 0 ? 'me' : ''}>
-            {a.name}: {a.bankrupt ? 'bankrupt' : `${a.routes.length} routes, ${objectiveValue(objectiveScore(a, getScenario(state.scenario).objective.kind), getScenario(state.scenario).objective.unit)}`}
+            {a.name}: {a.bankrupt ? 'bankrupt' : `${plural(a.routes.length, 'route')}, ${objectiveValue(objectiveScore(a, getScenario(state.scenario).objective.kind), getScenario(state.scenario).objective.unit)}`}
           </span>
         ))}
       </footer>
