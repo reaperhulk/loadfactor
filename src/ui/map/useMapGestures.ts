@@ -112,6 +112,40 @@ export function useMapGestures({
     }
   }
 
+  const pendingMove = useRef<{ x: number; y: number } | null>(null)
+  const moveRaf = useRef(0)
+  const flushMove = (): void => {
+    moveRaf.current = 0
+    const p = pendingMove.current
+    pendingMove.current = null
+    if (p === null || drag.current === null) return
+    const dx = p.x - drag.current.px
+    const dy = p.y - drag.current.py
+    const rect = frameRect()
+    if (rect === null) return
+    if (isGlobe) {
+      // Trackball: the terrain follows the pointer. Degrees per pixel shrink
+      // as the globe grows.
+      const g = globeTargetRef.current
+      const deg = 57.3 / (GLOBE_R * g.s * (rect.width / W))
+      applyGlobe({ ...g, cLon: g.cLon - dx * deg, cLat: g.cLat + dy * deg }, true)
+    } else {
+      const t = targetRef.current
+      const m = viewToCss(rect, t.w, t.h)
+      applyView({ ...t, x: t.x - dx / m.k, y: t.y - dy / m.k }, true)
+    }
+    drag.current.px = p.x
+    drag.current.py = p.y
+  }
+  // The frame callback reads this render's camera; a newer render replaces it.
+  const flushRef = useRef(flushMove)
+  useEffect(() => {
+    flushRef.current = flushMove
+  })
+  useEffect(() => () => {
+    if (moveRaf.current !== 0) cancelAnimationFrame(moveRaf.current)
+  }, [])
+
   const onPointerDown = (e: PointerEvent<SVGSVGElement>): void => {
     // A fresh gesture wipes any stale suppression. When a drag ends over
     // empty map, no click handler consumes the flag — without this, the NEXT
@@ -172,21 +206,12 @@ export function useMapGestures({
       beginGesture()
       tryCapture(e.currentTarget, e.pointerId, e.pointerType)
     }
-    const rect = frameRect()
-    if (rect === null) return
-    if (isGlobe) {
-      // Trackball: the terrain follows the pointer. Degrees per pixel shrink
-      // as the globe grows.
-      const g = globeTargetRef.current
-      const deg = 57.3 / (GLOBE_R * g.s * (rect.width / W))
-      applyGlobe({ ...g, cLon: g.cLon - dx * deg, cLat: g.cLat + dy * deg }, true)
-    } else {
-      const t = targetRef.current
-      const m = viewToCss(rect, t.w, t.h)
-      applyView({ ...t, x: t.x - dx / m.k, y: t.y - dy / m.k }, true)
-    }
-    drag.current.px = e.clientX
-    drag.current.py = e.clientY
+    // One camera move per frame, however many pointer events arrive in it.
+    // A flat pan is only a style write, but a globe drag re-projects the
+    // world and renders — and a fast finger or a high-rate mouse can deliver
+    // several moves a frame, each of which used to pay that in full.
+    pendingMove.current = { x: e.clientX, y: e.clientY }
+    if (moveRaf.current === 0) moveRaf.current = requestAnimationFrame(() => flushRef.current())
   }
 
   // Double click / double tap zooms one level toward the point you aimed at —
@@ -201,6 +226,13 @@ export function useMapGestures({
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null)
 
   const onPointerUp = (e: PointerEvent<SVGSVGElement>): void => {
+    // Land the last move before the gesture ends, so release commits exactly
+    // where the pointer let go.
+    if (moveRaf.current !== 0) {
+      cancelAnimationFrame(moveRaf.current)
+      moveRaf.current = 0
+      flushMove()
+    }
     pointers.current.delete(e.pointerId)
     if (pointers.current.size < 2) pinch.current = null
     // Keep `moved` readable by the click handlers that fire right after.
