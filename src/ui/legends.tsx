@@ -42,7 +42,7 @@ import {
   HEDGE_PREMIUM_BP_OF_FUEL_V6,
 } from '../data/constants'
 
-import type { MapLens } from './mapStyle'
+import { LENS_COLORS, LENS_DASH, LENS_LABELS, type LensBucket, type MapLens } from './mapStyle'
 
 const pctFrom = (bp: number): string => {
   const delta = (bp - 10000) / 100
@@ -338,22 +338,46 @@ export interface MapEventEntry {
   pct: number
 }
 
+// A lens bucket's swatch: the arc itself in miniature — its colour, its dash
+// and its weight — so the key matches the map for every reader, including
+// the ones who cannot tell the colours apart.
+function LensSwatch({ bucket }: { bucket: LensBucket }) {
+  return (
+    <svg className="lens-swatch" width="22" height="8" viewBox="0 0 22 8" aria-hidden="true">
+      <line
+        x1="1"
+        y1="4"
+        x2="21"
+        y2="4"
+        stroke={LENS_COLORS[bucket]}
+        strokeWidth={bucket === 'bad' ? 3 : 2.2}
+        strokeDasharray={LENS_DASH[bucket] === 'none' ? undefined : LENS_DASH[bucket]}
+      />
+    </svg>
+  )
+}
+
 // The map's key, under the map-colors picker: what the active lens means,
 // whose network is whose (ownership lens), and which world events the halos
 // on the map stand for. Kept terse — it floats over the map itself.
 export function MapLegend({ lens, opportunities, owners, events }: { lens: MapLens; opportunities: number; owners: readonly MapOwner[]; events: readonly MapEventEntry[] }) {
+  // The player's own network leads the key, set apart from the rivals: a
+  // rival can share the player's first word ("Meridian Blue" beside
+  // "Meridian Air"), so position and weight have to do the telling.
+  const you = owners.filter((o) => o.you)
+  const rivals = owners.filter((o) => !o.you)
   return (
     <>
       {lens === 'demand' && <span className="map-data-legend" data-testid="map-data-legend">
         <span className="opportunity-key">┅┅ {opportunities > 0 ? `${opportunities} richest unflown markets from your network — thicker is more unmet demand` : 'No unflown market reachable from your network'}</span>
       </span>}
-      {lens !== 'none' && lens !== 'demand' && <span className="map-data-legend" data-testid="map-data-legend">
-        <span className="pos">━━ {lens === 'load' ? '≥80%' : lens === 'profit' ? '≥15%' : 'High season'}</span>
-        <span>┄┄ {lens === 'load' ? '55–79%' : lens === 'profit' ? '0–14%' : 'Neutral'}</span>
-        <span className="neg">···· {lens === 'load' ? '<55%' : lens === 'profit' ? 'Loss' : 'Low season'}</span>
+      {(lens === 'load' || lens === 'profit' || lens === 'season') && <span className="map-data-legend lens-key" data-testid="map-data-legend">
+        {(['good', 'mid', 'bad'] as const).map((b) => <span key={b} className={`lens-key-item lens-key-${b}`}>
+          <LensSwatch bucket={b} />{LENS_LABELS[lens][b]}
+        </span>)}
       </span>}
       {lens === 'none' && owners.length > 1 && <span className="map-data-legend map-owner-key" data-testid="map-ownership-key" aria-label="route owners">
-        {owners.map((o) => <span key={o.id} className={o.you ? 'owner you' : 'owner'}>
+        {[...you, ...rivals].map((o) => <span key={o.id} className={o.you ? 'owner you' : 'owner'}>
           <i className="owner-swatch" style={o.you ? undefined : { background: o.color }} aria-hidden="true" />{o.name}{o.you ? ' (you)' : ''}
         </span>)}
       </span>}

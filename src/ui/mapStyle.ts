@@ -31,6 +31,36 @@ export function rivalColorClass(airlineId: number): string {
 // The map's color lenses: who flies it (the default), or a route metric.
 export type MapLens = 'none' | 'load' | 'profit' | 'season' | 'demand'
 
+// The metric lenses' three buckets, as a colour-blind-safe diverging scale:
+// blue for good, a warm near-white neutral, orange for bad — the pair that
+// survives every common colour-vision deficiency, where the old green/red
+// collapsed into one olive for one reader in twelve. Colour is never the only
+// cue: the buckets are also solid, dashed and dotted (see LENS_DASH), and a
+// loss draws wider. `none` is a route with no quarter flown yet, grey so it
+// cannot pass for any bucket. map.css carries the same values
+// (mapStyle.test.ts checks they agree, and the separations under simulated
+// deuteranopia, protanopia and tritanopia, and the contrast on the map).
+export const LENS_COLORS = {
+  good: '#7cb9ff',
+  mid: '#e3ddcf',
+  bad: '#ff9a3c',
+  none: '#6f7f88',
+} as const
+export type LensBucket = keyof typeof LENS_COLORS
+export const LENS_DASH: Readonly<Record<LensBucket, string>> = {
+  good: 'none',
+  mid: '7 3',
+  bad: '2 3.5',
+  none: '2 5',
+}
+
+// What each bucket means under each metric lens, for the key.
+export const LENS_LABELS: Readonly<Record<'load' | 'profit' | 'season', Readonly<Record<'good' | 'mid' | 'bad', string>>>> = {
+  load: { good: '≥80% full', mid: '55–79%', bad: '<55%' },
+  profit: { good: '≥15% margin', mid: '0–14%', bad: 'Loss' },
+  season: { good: 'High season', mid: 'Neutral', bad: 'Low season' },
+}
+
 export const REGION_NAMES: Readonly<Record<string, string>> = {
   na: 'North America',
   sa: 'South America',
