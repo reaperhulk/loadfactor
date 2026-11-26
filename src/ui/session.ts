@@ -414,6 +414,7 @@ export function clearAllData(): void {
       if (key.startsWith('loadfactor:coach:')) localStorage.removeItem(key)
     }
     localStorage.removeItem('loadfactor:achievements:v1')
+    localStorage.removeItem('loadfactor:inbox:v1')
     localStorage.removeItem('loadfactor:planning-locks:v1')
     localStorage.removeItem('loadfactor:planning-preference:v1')
   } catch {

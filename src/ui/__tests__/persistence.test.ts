@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hashState } from '../../harness/hash'
 import { runReplay } from '../../engine'
 import { rulesOf, RULES_VERSION } from '../../engine/version'
-import { dispatch, exportCurrentCareer, getReplay, getSession, getStorageWarning, importSave, passSeat, reset, resumeSave, startGame, undoLastAction, viewSeat } from '../session'
+import { clearAllData, dispatch, exportCurrentCareer, getReplay, getSession, getStorageWarning, importSave, passSeat, reset, resumeSave, startGame, undoLastAction, viewSeat } from '../session'
 
 beforeEach(() => {
   const data = new Map<string, string>()
@@ -54,6 +54,11 @@ describe('career continuity', () => {
     } finally {
       parse.mockRestore()
     }
+  })
+  it('forgets inbox acknowledgements when clearing career data', () => {
+    localStorage.setItem('loadfactor:inbox:v1', '{"career":["0:cash"]}')
+    clearAllData()
+    expect(localStorage.getItem('loadfactor:inbox:v1')).toBeNull()
   })
   it('keeps unversioned logs on original rules and refuses unknown future versions', () => {
     expect(rulesOf({})).toBe(1)
