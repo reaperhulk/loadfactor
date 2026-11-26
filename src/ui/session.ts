@@ -387,9 +387,10 @@ export function exportSave(slot: number): string | null {
 }
 
 export function importSave(raw: string, slot: number): boolean {
+  if (raw.length > 8_000_000 || !Number.isInteger(slot) || !SLOT_KEYS[slot]) return false
   try {
     const save = JSON.parse(raw) as AnySave
-    if (!save || typeof save.seed !== 'string' || raw.length > 8_000_000 || !SLOT_KEYS[slot]) return false
+    if (!save || typeof save.seed !== 'string') return false
     rulesOf(save)
     getScenario(save.scenario)
     if (save.version === 1 && Array.isArray(save.commands)) runReplay(save)

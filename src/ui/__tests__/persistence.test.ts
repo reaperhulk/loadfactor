@@ -46,6 +46,15 @@ describe('career continuity', () => {
     expect(viewSeat()).toBe(1)
     expect(hashState(getSession()!.state)).toBe(hash)
   })
+  it('rejects an oversized import before parsing it', () => {
+    const parse = vi.spyOn(JSON, 'parse')
+    try {
+      expect(importSave(' '.repeat(8_000_001), 0)).toBe(false)
+      expect(parse).not.toHaveBeenCalled()
+    } finally {
+      parse.mockRestore()
+    }
+  })
   it('keeps unversioned logs on original rules and refuses unknown future versions', () => {
     expect(rulesOf({})).toBe(1)
     expect(() => rulesOf({ rulesVersion: 999 })).toThrow(/unsupported/)
