@@ -99,8 +99,9 @@ const KEY = 'loadfactor:achievements:v1'
 export function loadAchievements(): Record<string, true> {
   try {
     const raw = localStorage.getItem(KEY)
-    const parsed = raw ? (JSON.parse(raw) as Record<string, true>) : {}
-    return parsed && typeof parsed === 'object' ? parsed : {}
+    const parsed: unknown = raw ? JSON.parse(raw) : {}
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return Object.fromEntries(Object.entries(parsed).filter(([, unlocked]) => unlocked === true))
   } catch {
     return {}
   }

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { loadAchievements } from '../achievements'
 import { hashState } from '../../harness/hash'
 import { runReplay } from '../../engine'
 import { rulesOf, RULES_VERSION } from '../../engine/version'
@@ -59,6 +60,13 @@ describe('career continuity', () => {
     localStorage.setItem('loadfactor:inbox:v1', '{"career":["0:cash"]}')
     clearAllData()
     expect(localStorage.getItem('loadfactor:inbox:v1')).toBeNull()
+  })
+  it('reads only boolean unlock flags from stored achievement records', () => {
+    const key = 'loadfactor:achievements:v1'
+    localStorage.setItem(key, '["winner"]')
+    expect(loadAchievements()).toEqual({})
+    localStorage.setItem(key, '{"winner":true,"other":"false"}')
+    expect(loadAchievements()).toEqual({ winner: true })
   })
   it('keeps unversioned logs on original rules and refuses unknown future versions', () => {
     expect(rulesOf({})).toBe(1)
